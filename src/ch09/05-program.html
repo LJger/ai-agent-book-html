@@ -1,0 +1,931 @@
+<!-- ================= PART 05 将经验写成程序 ================= -->
+<section class="slide chapter" id="c09-d5" data-part="5" data-title="PART 05 · 将经验写成程序" data-notes="当经验描述的是稳定、重复且可验证的操作时，每次都让模型重新阅读文档和推理并不经济。此时更合适的做法是把经验编译为工作流、工具或 Harness 代码，使一次探索变成可重复执行的程序。<br>这一部分依次讲：四层可修改对象；浏览器工作流的六步生命周期与 PreAct 的三种验证（实验 9-5）；把自我修改变成软件发布、可证伪的变更契约与 Alita 的工具创造（实验 9-6）；验证层的确认门禁（实验 9-7）；最后是 DeepSeek Harness 以“一切皆插件”实现自我进化的案例。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">将经验写成程序</h1>
+  <div class="ch-s fx fx-up" style="--d:3">稳定、重复且可验证的操作，不必每次重新推理</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">本节关注的不是一般代码生成，而是 Agent 如何根据自己的轨迹修改未来版本的自己。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c09-prog" data-part="5" data-dur="14000" data-title="把一次探索变成可重复执行的程序" data-notes="当经验描述的是稳定、重复且可验证的操作时，每次都让模型重新阅读文档和推理并不经济。此时更合适的做法是把经验编译为工作流、工具或 Harness 代码，使一次探索变成可重复执行的程序。第五章已经说明 Coding Agent 如何读写文件、运行测试和生成系统；本节关注的不是一般代码生成，而是 Agent 如何根据自己的轨迹修改未来版本的自己。<br>可修改的对象远不止新工具：<b>操作层</b>可以把浏览器轨迹编译为参数化工作流，或为变化的 API 生成适配器；<b>控制层</b>可以修改工具路由、重试、熔断和上下文压缩策略；<b>验证层</b>可以根据生产失败新增参数检查、状态验证器和回归测试；<b>架构层</b>则可以增加 Reviewer Agent，改变规划与执行之间的信息流。<br>右侧四层逐一点亮，每层附一个示意改动；本部分的三个实验分别落在操作层（9-5）、控制层（9-6）和验证层（9-7）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">把一次探索变成<em>可重复执行的程序</em></h2></header>
+  <div class="g5b-body">
+    <div class="g5b-l fx fx-left" style="--d:2">
+      <div class="c9-card g5b-why"><b>为什么写成程序</b><p>经验描述的是<em>稳定、重复且可验证</em>的操作时，每次都让模型重新阅读文档和推理并不经济——把它编译为工作流、工具或 Harness 代码</p></div>
+      <div class="g5b-vs"><div><span class="lbl">第五章</span><p>Coding Agent 如何读写文件、运行测试和生成系统</p></div><div class="me"><span class="lbl">本节</span><p>Agent 如何根据<b>自己的轨迹</b>修改<b>未来版本的自己</b></p></div></div>
+    </div>
+    <div class="g5b-stack fx fx-right" style="--d:3"></div>
+  </div>
+  <div class="src">第九章 ·「将经验写成程序」</div>
+</section>
+<style>
+.g5b-body{display:grid;grid-template-columns:520px 1fr;gap:26px;flex:1;min-height:0}
+.g5b-l{display:flex;flex-direction:column;gap:16px}
+.g5b-why b{font-size:22px}
+.g5b-why p{margin-top:8px;font-size:18px;line-height:1.65;color:var(--text2)}
+.g5b-why em{font-style:normal;color:var(--acc);font-weight:700}
+.g5b-vs{display:flex;flex-direction:column;gap:12px}
+.g5b-vs>div{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g5b-vs>div.me{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.g5b-vs p{margin-top:4px;font-size:18px;line-height:1.55;color:var(--text2)}
+.g5b-vs b{color:var(--text)}
+.g5b-stack{display:flex;flex-direction:column;gap:12px}
+.g5b-ly{display:grid;grid-template-columns:140px 1fr 330px;gap:16px;align-items:center;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.45;transition:all .45s var(--ease)}
+.g5b-ly.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 60%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 22%,transparent);translate:-6px 0}
+.g5b-ly>b{font-size:22px;color:var(--acc)}
+.g5b-ly>b small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+.g5b-ly>p{font-size:17px;line-height:1.55;color:var(--text2)}
+.g5b-ly code{padding:8px 12px;border-radius:10px;font:15px/1.5 var(--mono);color:#fde68a;background:rgba(5,9,22,.7);border:1px solid var(--line);white-space:pre}
+.g5b-ly .c9-pill{margin-top:6px;--c:var(--acc)}
+</style>
+<script>
+HOOKS['c09-prog'] = {
+  L: [
+    ['操作层', '把浏览器轨迹编译为参数化工作流，或为变化的 API 生成适配器', 'fill("#recipient", "{recipient}")\nclick("#send")', '实验 9-5'],
+    ['控制层', '修改工具路由、重试、熔断和上下文压缩策略', 'if not retryable:\n    return False   # 不再重试', '实验 9-6'],
+    ['验证层', '根据生产失败新增参数检查、状态验证器和回归测试', 'if tool in HIGH_RISK and not token:\n    return SUSPEND', '实验 9-7'],
+    ['架构层', '增加 Reviewer Agent，改变规划与执行之间的信息流', 'planner → reviewer → executor', ''],
+  ],
+  init(s) {
+    s.querySelector('.g5b-stack').innerHTML = this.L.map(([n, t, c, x]) => `<div class="g5b-ly"><b>${n}<small>可修改的对象</small></b><p>${t}${x ? `<br><span class="c9-pill">${x}</span>` : ''}</p><code>${C9.esc(c)}</code></div>`).join('') + '<p class="c9-data" style="text-align:right">右侧代码均为示意</p>';
+  },
+  enter(s, ctx) {
+    const ls = [...s.querySelectorAll('.g5b-ly')];
+    let i = 0;
+    const tick = () => { ls.forEach((l, j) => l.classList.toggle('on', j === i)); i = (i + 1) % ls.length; };
+    tick(); ctx.every(tick, 2400);
+  },
+  reset(s) { s.querySelectorAll('.g5b-ly').forEach((l) => l.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-macro" data-part="5" data-trans="zoom" data-dur="26000" data-title="浏览器工作流：六步生命周期" data-notes="浏览器工作流说明了程序化经验的价值。它可以类比电子表格的宏录制：第一次发送邮件时，多模态 Agent 通过观察—思考—行动寻找“撰写、收件人、主题、正文、发送”这些控件；以后发送另一封邮件时，流程没有变化，只有收件人和内容不同，没必要再次调用模型从像素和 DOM 中重新发现整条路径。系统要做的，是把第一次探索产生的轨迹编译成一个带参数、状态检查和版本信息的小程序。图9-4 的知识提炼过程在浏览器场景中对应一个更具体的生命周期：<br>1. <b>捕获轨迹</b>：记录导航、点击、输入、下拉选择等动作，保存动作参数、当时的 URL，以及 XPath、CSS 等元素定位证据——定位信息只用于再次寻找元素，不能证明任务已经完成。2. <b>参数化</b>：把首次运行中的字面量识别为模板变量，例如把 test@example.com、主题和正文替换为 {recipient}、{subject} 和 {content}，其余稳定动作保持不变。3. <b>定义状态检查</b>：为动作增加执行前检查和执行后检查，例如“发送按钮当前可见”，为整个工作流增加最终状态检查；动作执行成功与任务成功是两件事，最终状态检查必须读取真实页面或后端状态。4. <b>独立回放验证</b>：把沙盒账号或测试站点重置到独立初始状态，再完整回放；每一步的执行前、执行后和最终状态检查全部通过后才能发布。5. <b>匹配与回放</b>：新任务到来时，先在正式能力库中按意图和关键词寻找工作流，提取本次参数，由 Playwright 直接执行；回放路径不需要逐步调用 LLM，但仍需等待元素可用并完成所有状态检查。6. <b>失效与重学</b>：找不到目标元素、状态检查不通过、API Schema 改变或最终状态错误时，回退到完整的 Agent 模式重新探索。<br>左侧邮件页面与工作流内容为示意，参照实验 9-5 的设置；右侧六步可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">浏览器工作流：<em>像录制宏一样</em>，但要带状态检查</h2></header>
+  <div class="g5c-body">
+    <div class="g5c-app fx fx-left" style="--d:2">
+      <div class="g5c-ab"><span>本地邮件沙盒</span><span class="c9-sy">示意</span></div>
+      <div class="g5c-form">
+        <label>收件人<i class="g5c-f" data-f="recipient"></i></label>
+        <label>主题<i class="g5c-f" data-f="subject"></i></label>
+        <label>正文<i class="g5c-f g5c-ta" data-f="content"></i></label>
+        <div class="g5c-btns"><span class="g5c-send">发送</span><span class="g5c-st">Draft</span></div>
+      </div>
+      <div class="g5c-sent"><span class="lbl">已发送列表（真实后端状态）</span><div class="g5c-sl"></div></div>
+      <div class="g5c-say"></div>
+    </div>
+    <div class="g5c-steps fx fx-up" style="--d:3"></div>
+    <div class="win g5c-wf fx fx-right" style="--d:4"><div class="win-bar"><i></i><i></i><i></i><span>workflow · send_email</span><b class="g5c-ver">—</b></div><pre class="g5c-json"></pre></div>
+  </div>
+  <div class="src">第九章 ·「将经验写成程序」· 浏览器工作流的六步生命周期</div>
+</section>
+<style>
+.g5c-body{display:grid;grid-template-columns:470px 340px 1fr;gap:20px;flex:1;min-height:0}
+.g5c-app{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:18px;background:#f5f7fb;color:#1e293b;min-height:0}
+.g5c-ab{display:flex;align-items:center;justify-content:space-between;font-size:16px;font-weight:700;color:#334155}
+.g5c-form{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:#fff;border:1px solid #e2e8f0}
+.g5c-form label{display:grid;grid-template-columns:62px 1fr;align-items:center;gap:8px;font-size:15px;color:#475569}
+.g5c-f{display:block;min-height:34px;padding:6px 10px;border-radius:8px;border:1.5px solid #cbd5e1;font:15px var(--mono);font-style:normal;color:#0f172a;transition:all .3s}
+.g5c-f.ta{min-height:52px}
+.g5c-f.hot{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.2)}
+.g5c-f.bad{border-color:#dc2626;background:#fef2f2}
+.g5c-btns{display:flex;align-items:center;justify-content:space-between}
+.g5c-send{padding:6px 18px;border-radius:8px;font-size:16px;font-weight:700;color:#fff;background:#2563eb;transition:all .3s}
+.g5c-send.gone{opacity:.2;text-decoration:line-through}
+.g5c-send.hot{box-shadow:0 0 0 4px rgba(37,99,235,.3)}
+.g5c-st{font:15px var(--mono);color:#64748b}
+.g5c-sent{display:flex;flex-direction:column;gap:4px;flex:none}
+.g5c-sent .lbl{color:#64748b}
+.g5c-sl{display:flex;flex-direction:column;gap:4px}
+.g5c-sl div{padding:4px 10px;border-radius:8px;font-size:15px;background:#dcfce7;color:#166534;animation:upIn .4s var(--spring) both}
+.g5c-say{margin-top:auto;min-height:46px;padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.5;background:#eef2ff;color:#3730a3}
+.g5c-say.bad{background:#fef2f2;color:#991b1b}
+.g5c-say.ok{background:#dcfce7;color:#166534}
+.g5c-steps{display:flex;flex-direction:column;gap:7px}
+.g5c-s{display:grid;grid-template-columns:30px 1fr;gap:4px 10px;align-items:start;padding:8px 12px;border-radius:12px;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.g5c-s em{grid-row:span 2;width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:700 15px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.g5c-s b{font-size:17px}
+.g5c-s span{font-size:15px;line-height:1.45;color:var(--text3)}
+.g5c-s.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.8))}
+.g5c-s.on em{color:#06101f;background:var(--acc)}
+.g5c-s.on span{color:var(--text2)}
+.g5c-wf{display:flex;flex-direction:column;min-height:0}
+.g5c-ver{margin-left:auto;padding:1px 10px;border-radius:999px;font:600 15px var(--mono);color:var(--text3);border:1px solid var(--line2)}
+.g5c-ver.cand{color:#fde68a;border-color:rgba(251,191,36,.5)}
+.g5c-ver.val{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.g5c-ver.inv{color:#fda4af;border-color:rgba(251,113,133,.55)}
+.g5c-json{flex:1;margin:0;padding:12px 16px;font:15px/1.55 var(--mono);color:var(--text2);white-space:pre-wrap;overflow:hidden}
+.g5c-json .k{color:#93c5fd}.g5c-json .s{color:#fde68a}.g5c-json .n{color:#6ee7b7}.g5c-json .r{color:#fda4af}
+</style>
+<script>
+HOOKS['c09-macro'] = {
+  S: [['捕获轨迹', '动作、参数、URL 与 XPath / CSS 定位证据'], ['参数化', '字面量 → {recipient} {subject} {content}'], ['定义状态检查', '动作前 / 动作后检查 + 最终状态检查'], ['独立回放验证', '重置到独立初始状态，完整回放后才发布'], ['匹配与回放', '按意图匹配，Playwright 直接执行，不逐步调用 LLM'], ['失效与重学', '元素找不到、检查失败 → 回退完整 Agent']],
+  init(s) {
+    s.querySelector('.g5c-steps').innerHTML = this.S.map(([b, t], i) => `<button class="g5c-s" data-i="${i}"><em>${i + 1}</em><b>${b}</b><span>${t}</span></button>`).join('');
+    s.querySelectorAll('.g5c-s').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.go(s, +b.dataset.i); }));
+  },
+  J(stage) {
+    const v = stage >= 1 ? ['"{recipient}"', '"{subject}"', '"{content}"'] : ['"test@example.com"', '"测试邮件"', '"第一次探索正文"'];
+    const ck = stage >= 2;
+    const st = stage >= 5 ? '<span class="r">"invalid"</span>' : stage >= 3 ? '<span class="n">"validated"</span>' : '<span class="s">"candidate"</span>';
+    let h = `{ <span class="k">"status"</span>: ${st},\n  <span class="k">"steps"</span>: [\n`;
+    const rows = [['input_text', '#recipient', v[0]], ['input_text', '#subject', v[1]], ['input_text', '#content', v[2]], ['click', stage >= 5 ? '<span class="r">#send ✗</span>' : '#send', null]];
+    h += rows.map(([a, sel, val], i) => `   { <span class="k">"action"</span>: <span class="s">"${a}"</span>, <span class="k">"selector"</span>: <span class="s">"${sel}"</span>${val ? `, <span class="k">"value"</span>: <span class="s">${val}</span>` : ''}${ck && i === 3 ? `,\n     <span class="k">"pre"</span>: <span class="s">"发送按钮可见"</span>, <span class="k">"post"</span>: <span class="s">"状态变为已发送"</span>` : ''}${stage === 0 && i === 0 ? `,\n     <span class="k">"locator"</span>: { <span class="k">"xpath"</span>: <span class="s">"/html/body/main/label[1]/input"</span>, … }` : ''} }`).join(',\n');
+    h += '\n  ]';
+    if (ck) h += `,\n  <span class="k">"final_check"</span>: <span class="s">"已发送列表里出现这封邮件"</span>`;
+    return h + ' }';
+  },
+  async go(s, k) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.k = k;
+    s.querySelectorAll('.g5c-s').forEach((b, j) => b.classList.toggle('on', j === k));
+    const f = (n) => s.querySelector(`.g5c-f[data-f="${n}"]`), send = s.querySelector('.g5c-send'), stt = s.querySelector('.g5c-st'), sl = s.querySelector('.g5c-sl'), say = s.querySelector('.g5c-say'), ver = s.querySelector('.g5c-ver');
+    const sayit = (c, t) => { say.className = 'g5c-say ' + c; say.textContent = t; };
+    s.querySelector('.g5c-json').innerHTML = this.J(k);
+    ver.className = 'g5c-ver ' + (k >= 5 ? 'inv' : k >= 3 ? 'val' : 'cand'); ver.textContent = k >= 5 ? 'invalid' : k >= 3 ? 'validated' : 'candidate';
+    ['recipient', 'subject', 'content'].forEach((n) => { f(n).textContent = ''; f(n).className = 'g5c-f' + (n === 'content' ? ' g5c-ta' : ''); });
+    send.className = 'g5c-send'; send.textContent = '发送'; stt.textContent = 'Draft'; sl.innerHTML = ''; sayit('', '');
+    const fill = async (vals) => {
+      for (const [n, v] of vals) {
+        f(n).classList.add('hot');
+        for (let i = 1; i <= v.length; i += 2) { f(n).textContent = v.slice(0, i); await U.wait(ctx, 30); if (!ok()) return false; }
+        f(n).textContent = v; f(n).classList.remove('hot');
+      }
+      return true;
+    };
+    const first = [['recipient', 'test@example.com'], ['subject', '测试邮件'], ['content', '第一次探索正文']];
+    const other = [['recipient', 'alice@example.net'], ['subject', '周会改期'], ['content', '周会改到周四下午']];
+    if (k === 0) sayit('', '观察—思考—行动：模型从页面里找“收件人、主题、正文、发送”');
+    if (k === 1) sayit('', '首次运行的字面量被识别为模板变量，其余动作保持不变');
+    if (k === 2) sayit('', '动作执行成功 ≠ 任务成功：最终检查必须读真实的后端状态');
+    if (k === 3) sayit('', '先把测试站点重置到独立的初始状态，再完整回放');
+    if (k === 4) sayit('', '新任务：匹配到正式工作流，提取参数，由 Playwright 直接回放');
+    if (k === 5) sayit('', '页面改版：发送按钮的 id 变了');
+    if (k === 5) { send.className = 'g5c-send gone'; send.textContent = '发送'; }
+    if (!(await fill(k === 4 || k === 5 ? other : first))) return;
+    await U.wait(ctx, 300); if (!ok()) return;
+    if (k === 5) {
+      sayit('bad', '执行前检查失败：“发送按钮可见”不成立 → 在产生副作用前中止，版本转为 invalid，回退完整 Agent 重新探索');
+      return;
+    }
+    send.classList.add('hot'); await U.wait(ctx, 400); if (!ok()) return; send.classList.remove('hot');
+    stt.textContent = 'Message sent';
+    sl.insertAdjacentHTML('beforeend', `<div>${k === 4 ? 'alice@example.net · 周会改期' : 'test@example.com · 测试邮件'}</div>`);
+    if (k >= 2) sayit('ok', k === 3 ? '执行前、执行后、最终状态检查全部通过 → 发布为 validated' : k === 4 ? '回放没有调用 LLM，仍完成了全部状态检查' : '最终检查读到了已发送列表里的这封邮件');
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.go(s, 0);
+    ctx.every(() => { if (this.auto) this.go(s, ((this.k || 0) + 1) % 6); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-verify3x" data-part="5" data-dur="16000" data-title="动作前、动作后与独立回放验证" data-notes="PreAct 的实验中，这类程序在重复任务上实现了 8.5–13 倍的端到端加速，回放阶段不需要逐步调用语言模型；更重要的结论是，流程记忆必须同时具备<b>动作前验证、动作后验证和独立回放验证</b>。否则系统很容易得到一种危险的假象：每个按钮都点过了，但某个字段其实为空，任务从未真正完成。<br>页面用一个示意回放说明这种假象：正文字段因为页面结构变化没有被填上，“只数动作”的回放器看到四个动作都执行了，就报告成功；带状态验证的回放器在动作后检查和最终状态检查处发现问题，报告失败并要求回退。切换右上角开关对比两种回放器；实验 9-5 在真实浏览器上做了同样的对照。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每个按钮都点过了，<em>任务却从未完成</em></h2></div>
+    <div class="g5d-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="count">只数动作</button><button data-v="state">状态验证</button></div></header>
+  <div class="g5d-body">
+    <div class="g5d-run panel fx fx-left" style="--d:3">
+      <div class="g5d-h"><b>同一次回放</b><span class="c9-sy">示意</span></div>
+      <div class="g5d-rows"></div>
+      <div class="g5d-fin"></div>
+    </div>
+    <div class="g5d-r fx fx-right" style="--d:4">
+      <div class="c9-card g5d-pre"><span class="lbl">PreAct</span><div class="g5d-kv"><b class="c9-big">8.5–13×</b><span>重复任务上的端到端加速<br>回放阶段不需要逐步调用语言模型</span></div></div>
+      <div class="g5d-three"><span class="lbl">更重要的结论：流程记忆必须同时具备</span><div><span>动作前验证</span><span>动作后验证</span><span>独立回放验证</span></div></div>
+      <p class="g5d-nt">否则系统很容易得到一种危险的假象：<b>每个按钮都点过了，但某个字段其实为空</b>，任务从未真正完成</p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写成程序」· 动作前验证、动作后验证和独立回放验证</div>
+</section>
+<style>
+.g5d-body{display:grid;grid-template-columns:1.2fr 1fr;gap:26px;flex:1;min-height:0}
+.g5d-run{padding:16px 22px;display:flex;flex-direction:column;gap:10px}
+.g5d-h{display:flex;align-items:center;justify-content:space-between}
+.g5d-h b{font-size:20px}
+.g5d-rows{display:flex;flex-direction:column;gap:8px}
+.g5d-row{display:grid;grid-template-columns:200px 1fr 150px;gap:12px;align-items:center;padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.35;transition:all .35s}
+.g5d-row.on{opacity:1}
+.g5d-row code{font:15px var(--mono);color:var(--text)}
+.g5d-row span{font-size:15px;color:var(--text2)}
+.g5d-row em{font-style:normal;font-size:15px;font-weight:700;text-align:right}
+.g5d-row em.ok{color:#6ee7b7}.g5d-row em.bad{color:#fda4af}.g5d-row em.dim{color:var(--text3)}
+.g5d-row.bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.07)}
+.g5d-fin{margin-top:auto;min-height:72px;padding:12px 16px;border-radius:14px;font-size:18px;line-height:1.55;color:var(--text3);border:1px dashed var(--line2)}
+.g5d-fin.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+.g5d-fin.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.08)}
+.g5d-fin.warn{color:#fde68a;border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.08)}
+.g5d-r{display:flex;flex-direction:column;gap:16px}
+.g5d-kv{display:flex;align-items:center;gap:18px;margin-top:6px}
+.g5d-kv span{font-size:17px;line-height:1.55;color:var(--text2)}
+.g5d-three div{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.g5d-three div span{padding:12px 10px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.g5d-nt{margin-top:auto;font-size:18px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--bad)}
+.g5d-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c09-verify3x'] = {
+  R: [['input_text', '#recipient', 'alice@example.net', 1], ['input_text', '#subject', '周会改期', 1], ['input_text', '#body ← 页面已改名', '（没有填上）', 0], ['click', '#send', '服务端收到请求', 1]],
+  init(s) {
+    this.set = U.seg(s.querySelector('.g5d-seg'), (v) => { this.auto = false; this.run(s, v); });
+    s.querySelector('.g5d-rows').innerHTML = this.R.map(([a, sel]) => `<div class="g5d-row"><code>${a} ${C9.esc(sel)}</code><span></span><em class="dim">—</em></div>`).join('');
+  },
+  async run(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const rows = [...s.querySelectorAll('.g5d-row')], fin = s.querySelector('.g5d-fin');
+    rows.forEach((r) => { r.className = 'g5d-row'; r.querySelector('span').textContent = ''; const e = r.querySelector('em'); e.className = 'dim'; e.textContent = '—'; });
+    fin.className = 'g5d-fin'; fin.textContent = '回放中……';
+    for (let i = 0; i < rows.length; i++) {
+      await U.wait(ctx, 700); if (!ok()) return;
+      const [, , val, good] = this.R[i], r = rows[i], e = r.querySelector('em');
+      r.classList.add('on'); r.querySelector('span').textContent = val;
+      if (v === 'count') { e.className = 'ok'; e.textContent = '动作已执行 ✓'; }
+      else if (good) { e.className = 'ok'; e.textContent = '动作后检查 ✓'; }
+      else { r.classList.add('bad'); e.className = 'bad'; e.textContent = '正文为空 ✕'; }
+    }
+    await U.wait(ctx, 700); if (!ok()) return;
+    if (v === 'count') { fin.className = 'g5d-fin warn'; fin.textContent = '4/4 个动作都执行了 → 报告“成功”——这是一次假成功：邮件正文是空的'; }
+    else { fin.className = 'g5d-fin bad'; fin.textContent = '动作后检查与最终状态检查失败 → 报告失败、版本失效、回退完整 Agent 重新探索'; }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.run(s, 'count');
+    ctx.every(() => { if (this.auto) this.run(s, this.v === 'count' ? 'state' : 'count'); }, 6500);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-exp5" data-part="5" data-trans="flip" data-dur="18000" data-title="实验 9-5 ★★★：从浏览器轨迹生成可验证工作流" data-notes="<b>实验 9-5 ★★★：从浏览器轨迹生成可验证工作流。实验目的</b>：验证网页 Agent 能否把一次探索转化为可复用工作流，并在页面变化或状态异常时拒绝错误回放。<b>实验说明</b>：把一次成功轨迹编译成带参数和状态检查的待验证工作流，与“每次都重新探索”的基线比较；再改变页面或制造假成功，观察待验证工作流是否失效并回退到完整 Agent。<b>实验说明了什么</b>：流程记忆的价值不在于重复执行动作，而在于确保任务的最终状态仍然正确。可复用工作流必须有独立验证和失效机制，否则加速只是把错误更快地重复。<br>配套仓库 chapter9/browser-use-rpa 的正式运行（2026-07-30，doubao-seed-1-6-flash-250615，本地 HTTP 消息站 + 真实 Playwright Chromium）覆盖了四个阶段：一，Agent 四个观察—决策—动作回合发出首条消息，逐步保存参数、URL、XPath、CSS、id、data-testid 与页面状态，只生成 candidate；二，经独立 HTTP 重置后完整回放，动作前、动作后与最终 sent-list 检查都通过，才发布为 validated；三，收件人、主题、正文都不同的新任务参数化回放，不调用 LLM、不复用首轮字面量；四，页面把 #send 改成 #deliver-v2 后，前置谓词在发送请求产生之前中止，版本转为 invalid、移出检索，并返回 fallback_required。<br>结果：探索 5.313 秒、4 次 LLM 调用；回放 4.447 秒、0 次 LLM 调用，实测加速 1.195 倍——证明有加速，但没有声称复现 PreAct 的 8.5–13 倍。“正文为空”和“服务端接受但不持久化”两种故障下，只数动作的基线报告 2/2 假成功，带状态验证的实验组 0/2。13 项执行门槛全部通过，共 3,999 token。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-5 ★★★：从浏览器轨迹生成<em>可验证工作流</em></h2></header>
+  <div class="c9-xp g5e-xp fx fx-up" style="--d:2">
+    <div class="c9-xp-it"><b>实验目的</b><p>网页 Agent 能否把一次探索转化为可复用工作流，并在页面变化或状态异常时<b>拒绝错误回放</b></p></div>
+    <div class="c9-xp-it"><b>说明了什么</b><p>流程记忆的价值不在于重复执行动作，而在于确保<b>任务的最终状态仍然正确</b>；没有独立验证和失效机制，加速只是把错误更快地重复</p></div>
+  </div>
+  <div class="g5e-ph fx fx-up" style="--d:3"></div>
+  <div class="g5e-low">
+    <div class="g5e-kp fx fx-left" style="--d:4">
+      <div class="g5e-k"><span class="lbl">探索</span><b>5.313 s</b><em>4 次 LLM 调用</em></div>
+      <div class="g5e-k g"><span class="lbl">参数化回放</span><b>4.447 s</b><em>0 次 LLM 调用</em></div>
+      <div class="g5e-k"><span class="lbl">实测加速</span><b>1.195×</b><em>未声称复现 PreAct 的 8.5–13×</em></div>
+    </div>
+    <div class="g5e-fs panel fx fx-right" style="--d:5"><span class="lbl">假成功对照：“正文为空”“服务端接受但不持久化”各一次</span>
+      <div class="g5e-b"><span>只数动作</span><i><b style="--w:100%;--c:var(--bad)"></b></i><em>2/2 假成功</em></div>
+      <div class="g5e-b"><span>状态验证</span><i><b style="--w:3%;--c:var(--ok)"></b></i><em>0/2 假成功</em></div>
+      <p class="g5e-err">页面变化：<code>step 4 precondition failed: send button is visible before the side effect; expected=True, actual=False</code></p>
+    </div>
+  </div>
+  <div class="g5e-loc fx fx-up" style="--d:6"><span class="lbl">真实记录：第一步动作的定位证据（只用于再次寻找元素，不能证明任务完成）</span><div><code>input_text #recipient → {recipient}</code><code>xpath /html[1]/body[1]/main[1]/label[1]/input[1]</code><code>css #recipient</code><code>id recipient · name recipient</code><code>data-testid recipient</code><code>动作前 status_text Draft · persisted_count 0</code></div></div>
+  <div class="c9-data g5e-rec fx fx-up" style="--d:7">数据：chapter9/browser-use-rpa · 2026-07-30 · doubao-seed-1-6-flash-250615 · 本地 HTTP 消息站 + 真实 Playwright Chromium · 13 项执行门槛全部通过 · 3,999 token</div>
+  <div class="src">第九章 ·「将经验写成程序」· 实验 9-5</div>
+</section>
+<style>
+.g5e-xp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g5e-ph{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.g5e-p{position:relative;display:flex;flex-direction:column;gap:8px;padding:16px 16px;min-height:170px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.4;transition:all .4s}
+.g5e-p.on{opacity:1;border-color:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
+.g5e-p em{font-style:normal;font-size:15px;font-weight:700;color:var(--c)}
+.g5e-p b{font-size:18px}
+.g5e-p span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g5e-p code{align-self:flex-start;padding:2px 10px;border-radius:999px;font:600 15px var(--mono);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.g5e-low{display:grid;grid-template-columns:1fr 1.15fr;gap:20px;margin-top:14px}
+.g5e-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g5e-k{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g5e-k b{font:800 32px var(--num);color:var(--text)}
+.g5e-k.g b{color:var(--ok)}
+.g5e-k em{font-style:normal;font-size:15px;line-height:1.45;color:var(--text3)}
+.g5e-fs{padding:12px 18px;display:flex;flex-direction:column;gap:8px}
+.g5e-b{display:grid;grid-template-columns:90px 1fr 110px;gap:10px;align-items:center;font-size:16px;color:var(--text2)}
+.g5e-b i{height:20px;border-radius:7px;background:rgba(255,255,255,.05);overflow:hidden}
+.g5e-b i b{display:block;height:100%;width:0;border-radius:7px;background:var(--c);transition:width 1s var(--ease)}
+.active .g5e-b i b{width:var(--w)}
+.g5e-b em{font:700 16px var(--num);font-style:normal;color:var(--text)}
+.g5e-err{font-size:15px;line-height:1.5;color:var(--text3)}
+.g5e-err code{font:15px var(--mono);color:#fda4af}
+.g5e-loc{display:flex;flex-direction:column;gap:8px;margin-top:16px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g5e-loc div{display:flex;flex-wrap:wrap;gap:8px}
+.g5e-loc code{padding:4px 10px;border-radius:8px;font:15px var(--mono);color:#93c5fd;border:1px solid rgba(96,165,250,.35)}
+.g5e-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c09-exp5'] = {
+  P: [
+    ['#fbbf24', '阶段一 · 探索', '真实模型 4 个回合发出首条消息', '保存参数、URL、XPath、CSS、id、data-testid 与页面状态', 'candidate'],
+    ['#34d399', '阶段二 · 独立重置后回放', '动作前 / 动作后 / 最终 sent-list 检查全部通过', '无重置的负对照始终不可检索', 'validated'],
+    ['#22d3ee', '阶段三 · 参数化回放', '收件人、主题、正文都不同的新任务', '不调用 LLM，也不复用首轮字面量', 'validated'],
+    ['#fb7185', '阶段四 · 页面变化', '#send 改成 #deliver-v2', '前置谓词在发送请求之前中止，移出检索', 'invalid'],
+  ],
+  init(s) { s.querySelector('.g5e-ph').innerHTML = this.P.map(([c, a, b, t, st]) => `<div class="g5e-p" style="--c:${c}"><em>${a}</em><b>${b}</b><span>${t}</span><code>${st}</code></div>`).join(''); },
+  enter(s, ctx) {
+    const ps = [...s.querySelectorAll('.g5e-p')]; let i = 0;
+    const tick = () => { ps.forEach((p, j) => p.classList.toggle('on', j <= i % 5 && i % 5 < 4)); i++; };
+    tick(); ctx.every(tick, 1600);
+  },
+  reset(s) { s.querySelectorAll('.g5e-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-release" data-part="5" data-trans="rise" data-dur="18000" data-title="自我修改即软件发布" data-notes="Agent 修改自己的代码不意味着运行中的进程直接覆盖自身。生产系统应从当前稳定版本创建隔离更新分支，由 Coding Agent 生成最小补丁，依次通过静态检查、单元测试、安全扫描、失败轨迹重放和旧任务回归，再生成可灰度部署的新版本。这把“自我修改”转化为可审计的软件发布流程，也正是第九章与第五章的边界：第五章提供修改系统的能力，本章提供由经验触发、以验证闭环约束的自我修改方法。<br>Git worktree 和 Pull Request 是软件开发流程中一个很好的例子。Skill 应主动指导 Agent：先为任务创建独立 worktree，确认需求和 Spec，完成实现与测试，提交有意义的 commit，并在 Pull Request 中写清背景、方案、测试结果和剩余风险。Harness 不负责替模型做这些判断，但可以在它准备结束任务时检查是否仍在 main 上直接提交、是否遗漏 worktree 或 Pull Request；一旦违反边界就否决这次操作，要求 Agent 返回修复。<br>左侧补丁依次通过五道检查；右侧示意 Agent 试图在 main 上直接提交时被 Harness 否决。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">自我修改不是覆盖自身，<em>而是一次软件发布</em></h2></header>
+  <div class="g5f-pipe panel fx fx-up" style="--d:2">
+    <div class="g5f-n st"><svg class="ic"><use href="#i-lock"/></svg><b>稳定版本</b></div><i></i>
+    <div class="g5f-n"><svg class="ic"><use href="#i-branch"/></svg><b>隔离更新分支</b></div><i></i>
+    <div class="g5f-n"><svg class="ic"><use href="#i-code"/></svg><b>最小补丁</b></div><i></i>
+    <div class="g5f-gs"></div><i></i>
+    <div class="g5f-n out"><svg class="ic"><use href="#i-rocket"/></svg><b>可灰度的新版本</b></div>
+    <span class="g5f-pk"></span>
+  </div>
+  <div class="g5f-low">
+    <div class="g5f-b c9-card fx fx-left" style="--d:3"><b>第五章 vs 本章</b><p>第五章提供<em>修改系统的能力</em>；本章提供<em>由经验触发、以验证闭环约束</em>的自我修改方法</p></div>
+    <div class="g5f-wt panel fx fx-right" style="--d:4">
+      <div class="g5f-wh"><b>Git worktree 与 Pull Request</b><span class="c9-sy">示意</span></div>
+      <div class="g5f-two">
+        <div><span class="lbl">Skill 主动指导</span><ol class="g5f-sk"><li>为任务创建独立 worktree</li><li>确认需求和 Spec</li><li>完成实现与测试</li><li>提交有意义的 commit</li><li>PR 写清背景、方案、测试结果和剩余风险</li></ol></div>
+        <div><span class="lbl">Harness 只否决</span><div class="win g5f-tw"><div class="g5f-term" data-clip-ok></div></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写成程序」· 自我修改与 Git worktree / Pull Request</div>
+</section>
+<style>
+.g5f-pipe{position:relative;display:flex;align-items:center;gap:8px;padding:16px 20px}
+.g5f-pipe>i{flex:1;min-width:12px;height:3px;background:var(--line2)}
+.g5f-n{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 14px;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.03);text-align:center}
+.g5f-n .ic{font-size:26px;color:var(--acc)}
+.g5f-n b{font-size:16px;white-space:nowrap}
+.g5f-n.st .ic{color:var(--text2)}
+.g5f-n.out{border-color:color-mix(in srgb,var(--ok) 50%,transparent)}.g5f-n.out .ic{color:var(--ok)}
+.g5f-gs{display:flex;gap:6px}
+.g5f-g{padding:8px 10px;border-radius:10px;font-size:15px;line-height:1.35;text-align:center;color:var(--text2);border:1px dashed var(--line2);transition:all .3s;width:96px}
+.g5f-g.on{color:#06101f;font-weight:700;background:var(--ok);border:1px solid var(--ok)}
+.g5f-g.cur{border:1px solid var(--acc);color:var(--text);box-shadow:0 0 14px color-mix(in srgb,var(--acc) 35%,transparent)}
+.g5f-pk{position:absolute;top:8px;left:0;width:14px;height:14px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);opacity:0;transition:left .6s var(--ease),opacity .3s}
+.g5f-low{display:grid;grid-template-columns:420px 1fr;gap:22px;margin-top:18px;flex:1;min-height:0}
+.g5f-b b{font-size:20px}
+.g5f-b p{margin-top:10px;font-size:18px;line-height:1.7;color:var(--text2)}
+.g5f-b em{font-style:normal;color:var(--acc);font-weight:700}
+.g5f-wt{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.g5f-wh{display:flex;align-items:center;justify-content:space-between}
+.g5f-wh b{font-size:19px}
+.g5f-two{display:grid;grid-template-columns:1fr 1.1fr;gap:16px;flex:1;min-height:0}
+.g5f-two>div{display:flex;flex-direction:column;gap:6px;min-height:0}
+.g5f-sk{display:flex;flex-direction:column;gap:6px;counter-reset:k}
+.g5f-sk li{counter-increment:k;position:relative;padding:6px 10px 6px 36px;border-radius:10px;font-size:15px;line-height:1.45;color:var(--text2);border:1px solid var(--line)}
+.g5f-sk li::before{content:counter(k);position:absolute;left:10px;top:6px;font:700 15px var(--num);color:var(--c9-inst)}
+.g5f-tw{flex:1;min-height:0;display:flex;flex-direction:column}
+.g5f-term{flex:1;min-height:0;padding:10px 14px;display:flex;flex-direction:column;gap:2px;overflow:hidden;font:15px/1.55 var(--mono);color:#cbd5f5}
+.g5f-term .l{white-space:pre-wrap;word-break:break-word;animation:upIn .3s var(--ease) both}
+.g5f-term .l.cmd::before{content:"$ ";color:var(--ok)}
+.g5f-term .l.sys{color:#93c5fd}
+.g5f-term .l.err{color:#fda4af}
+.g5f-term .l.ag{color:#c4b5fd}
+.g5f-term .l.ag::before{content:"● ";color:var(--llm)}
+.g5f-term .l.ok{color:#6ee7b7}
+</style>
+<script>
+HOOKS['c09-release'] = {
+  G: ['静态检查', '单元测试', '安全扫描', '失败轨迹重放', '旧任务回归'],
+  T: [
+    { c: 'cmd', t: 'git commit -am "fix retry"' },
+    { c: 'sys', t: '当前分支：main' },
+    { c: 'err', t: 'Harness 否决：不允许直接在 main 上提交' },
+    { c: 'ag', t: '返回修复：创建 worktree，走 Pull Request' },
+    { c: 'cmd', t: 'git worktree add ../fix-retry -b fix-retry' },
+    { c: 'cmd', t: 'git commit -m "retry: stop on non-retryable errors"' },
+    { c: 'cmd', t: 'gh pr create --title "..." --body "背景 / 方案 / 测试结果 / 剩余风险"' },
+    { c: 'ok', t: 'Harness 检查通过：在 worktree 中提交，并已提交 PR' },
+  ],
+  init(s) {
+    s.querySelector('.g5f-gs').innerHTML = this.G.map((g) => `<span class="g5f-g">${g}</span>`).join('');
+  },
+  line(s, c, t) { const d = document.createElement('div'); d.className = 'l ' + c; d.textContent = t; const h = s.querySelector('.g5f-term'); h.appendChild(d); while (h.children.length > 10) h.firstElementChild.remove(); },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const gs = [...s.querySelectorAll('.g5f-g')], pk = s.querySelector('.g5f-pk'), pipe = s.querySelector('.g5f-pipe');
+    while (ok()) {
+      gs.forEach((g) => (g.className = 'g5f-g')); s.querySelector('.g5f-term').innerHTML = '';
+      pk.style.opacity = 1; pk.style.transition = 'none'; pk.style.left = '20px'; void pk.offsetWidth; pk.style.transition = '';
+      for (let i = 0; i < this.T.length; i++) {
+        this.line(s, this.T[i].c, this.T[i].t);
+        if (i < gs.length) {
+          const p = pipe.getBoundingClientRect(), r = gs[i].getBoundingClientRect(), sc = U.scale || 1;
+          pk.style.left = ((r.left - p.left + r.width / 2) / sc - 7) + 'px';
+          gs[i].classList.add('cur');
+          await U.wait(ctx, 700); if (!ok()) return;
+          gs[i].className = 'g5f-g on';
+        } else { await U.wait(ctx, 700); if (!ok()) return; }
+      }
+      pk.style.opacity = 0;
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.g5f-term').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c09-contract" data-part="5" data-trans="zoom" data-dur="20000" data-title="可证伪的变更契约" data-notes="仅有“补丁尽量小”还不足以支持可靠归因。每个修改请求还应是一份<b>可证伪的变更契约</b>：列出失败证据、推断根因、归属的 Harness 组件、修改提案、预期修复的行为、可能受损的既有行为，以及分别验证两者的用例。Agentic Harness Engineering 将这种做法概括为组件、经验和决策三层可观测性：可编辑组件都有文件级表示；海量轨迹先整理为可逐层下钻的证据；每次编辑在执行前声明影响预测，再由下一轮结果验证。这样，分数上涨才能与某个具体机制建立联系，而不只是一次不可解释的试错。<br>提案生成器的输入也不应只有失败案例。Self-Harness 的做法还会提供必须保留的成功行为和此前被拒绝的修改记录：前者告诉 Agent 哪些性质不能在修复时被破坏，后者避免它换一种说法重复提交已经失败的方案。失败证据、成功约束与历史尝试共同构成一个有边界的方案空间，比把全部源码和原始日志无差别塞给修改 Agent 更容易产生局部、可验证的改动。<br>左侧契约逐项填写，内容取自实验 9-6 正式运行的真实诊断（英文原文，页面给出中文）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每个修改请求都是一份<em>可证伪的变更契约</em></h2></header>
+  <div class="g5g-body">
+    <div class="g5g-ct panel fx fx-left" style="--d:2">
+      <div class="g5g-h"><b>变更契约</b><span class="c9-data">内容取自实验 9-6 的真实诊断</span></div>
+      <div class="g5g-fs"></div>
+    </div>
+    <div class="g5g-r fx fx-right" style="--d:3">
+      <div class="g5g-ahe c9-card"><span class="lbl">Agentic Harness Engineering · 三层可观测性</span>
+        <div><b>组件</b><span>可编辑组件都有文件级表示</span></div>
+        <div><b>经验</b><span>海量轨迹先整理为可逐层下钻的证据</span></div>
+        <div><b>决策</b><span>编辑前声明影响预测，由下一轮结果验证</span></div>
+      </div>
+      <div class="g5g-sh"><span class="lbl">Self-Harness · 提案生成器的三类输入</span>
+        <div class="g5g-in"><span class="a">失败证据</span><span class="b">必须保留的成功行为</span><span class="c">此前被拒绝的修改记录</span></div>
+        <div class="g5g-fn"><i></i><p>有边界的方案空间 → 局部、可验证的改动</p></div>
+        <p class="g5g-nt">实验 9-6 交给 Coding Agent 的被拒记录：“禁用了临时超时的重试”——没通过临时故障恢复、旧任务回归与灰度就绪三项检查</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写成程序」· 可证伪的变更契约</div>
+</section>
+<style>
+.g5g-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.g5g-ct{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.g5g-h{display:flex;align-items:baseline;justify-content:space-between}
+.g5g-h b{font-size:20px}
+.g5g-fs{display:flex;flex-direction:column;gap:6px}
+.g5g-f{display:grid;grid-template-columns:130px 1fr;gap:12px;align-items:start;padding:7px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.25;transition:all .35s}
+.g5g-f.on{opacity:1}
+.g5g-f.cur{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.g5g-f b{font-size:16px;color:var(--acc)}
+.g5g-f span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g5g-f code{font:15px var(--mono);color:#fde68a}
+.g5g-f.bad span{color:#fda4af}
+.g5g-r{display:flex;flex-direction:column;gap:14px;min-height:0}
+.g5g-ahe{display:flex;flex-direction:column;gap:8px}
+.g5g-ahe div{display:grid;grid-template-columns:60px 1fr;gap:10px;align-items:baseline}
+.g5g-ahe b{font-size:18px;color:var(--acc)}
+.g5g-ahe span{font-size:16px;color:var(--text2)}
+.g5g-sh{display:flex;flex-direction:column;gap:10px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g5g-in{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.g5g-in span{padding:10px;border-radius:12px;font-size:15px;line-height:1.4;text-align:center;font-weight:700}
+.g5g-in .a{color:#fda4af;border:1px solid rgba(251,113,133,.5)}
+.g5g-in .b{color:#6ee7b7;border:1px solid rgba(52,211,153,.5)}
+.g5g-in .c{color:#fde68a;border:1px solid rgba(251,191,36,.5)}
+.g5g-fn{display:flex;flex-direction:column;align-items:center;gap:6px}
+.g5g-fn i{width:0;height:0;border-left:120px solid transparent;border-right:120px solid transparent;border-top:44px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+.g5g-fn p{font-size:17px;font-weight:700;color:var(--acc)}
+.g5g-nt{font-size:15px;line-height:1.55;color:var(--text3)}
+</style>
+<script>
+HOOKS['c09-contract'] = {
+  F: [
+    ['失败证据', 'run-payment-001：同一笔被拒付款提交了四次；run-payment-002：同一个不可重试调用重复了三次'],
+    ['推断根因', '控制策略忽略 <code>retryable=false</code>，永久错误也不熔断——根因在重试 / 熔断代码，不在 Prompt'],
+    ['归属组件', '<code>retry_and_circuit_breaker_control</code> · <code>stable/retry_policy.py</code>'],
+    ['修改提案', '对稳定源码的最小 diff，只写入隔离的候选目录'],
+    ['预期修复', '不可重试的调用降到 1 次；首次永久失败即打开熔断'],
+    ['可能受损', '临时超时不再重试；可重试错误的五次熔断阈值被改动；公开函数签名改变', 'bad'],
+    ['验证用例', '失败轨迹重放 · 临时故障恢复 · 旧阈值回归 · 公开 API 兼容'],
+  ],
+  init(s) { s.querySelector('.g5g-fs').innerHTML = this.F.map(([a, b, c]) => `<div class="g5g-f${c ? ' ' + c : ''}"><b>${a}</b><span>${b}</span></div>`).join(''); },
+  enter(s, ctx) {
+    const fs = [...s.querySelectorAll('.g5g-f')]; let i = 0;
+    const tick = () => { const k = i % (fs.length + 3); fs.forEach((f, j) => { f.classList.toggle('on', j <= k); f.classList.toggle('cur', j === k); }); i++; };
+    tick(); ctx.every(tick, 1100);
+  },
+  reset(s) { s.querySelectorAll('.g5g-f').forEach((f) => f.classList.remove('on', 'cur')); },
+};
+</script>
+
+<section class="slide" id="c09-alita" data-part="5" data-dur="16000" data-title="工具创造也遵循同一协议：Alita" data-notes="工具创造也遵循同一个协议。Alita 给出的案例是：Agent 要从一段由《指环王》中咕噜配音演员解说的 YouTube 360 VR 视频中，找出恐龙首次出现后紧接着提到的数字。它发现自己缺少字幕读取能力后，搜索并测试 youtube-transcript-api，将其封装为新的字幕工具，最终从字幕中得到答案 100000000。只有安全扫描、功能测试和后续任务复用都通过，新工具才进入能力库。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">工具创造也遵循同一协议：<em>Alita</em></h2></header>
+  <div class="g5h-task c9-card fx fx-up" style="--d:2"><span class="lbl">任务</span><p>从一段由《指环王》中咕噜配音演员解说的 YouTube 360 VR 视频里，找出<b>恐龙首次出现后紧接着提到的数字</b></p></div>
+  <div class="g5h-flow fx fx-up" style="--d:3"></div>
+  <div class="g5h-low">
+    <div class="g5h-ans fx fx-left" style="--d:4"><span class="lbl">从字幕中得到答案</span><b class="g5h-n">—</b></div>
+    <div class="g5h-gate fx fx-right" style="--d:5"><span class="lbl">三道检查都通过，才进入能力库</span><div><span>安全扫描</span><span>功能测试</span><span>后续任务复用</span></div><div class="g5h-lib"><svg class="ic"><use href="#i-archive"/></svg><span class="g5h-lt">能力库</span></div></div>
+  </div>
+  <div class="g5h-proto fx fx-up" style="--d:6"><span class="lbl">同一个协议</span><span>发现缺口</span><i>→</i><span>生成候选（工具 / 工作流 / 补丁）</span><i>→</i><span>模型外检查</span><i>→</i><span>进入正式能力库</span><em>与实验 9-5、9-6、9-7 相同</em></div>
+  <div class="src">第九章 ·「将经验写成程序」· Alita</div>
+</section>
+<style>
+.g5h-task p{margin-top:6px;font-size:21px;line-height:1.6}
+.g5h-task b{color:var(--acc)}
+.g5h-flow{display:flex;align-items:stretch;gap:10px;margin-top:18px}
+.g5h-s{flex:1;display:flex;flex-direction:column;gap:8px;padding:18px 18px;min-height:170px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.35;transition:all .4s}
+.g5h-s.on{opacity:1;border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 25%,transparent)}
+.g5h-s .ic{font-size:28px;color:var(--acc)}
+.g5h-s b{font-size:19px}
+.g5h-s span{font-size:16px;line-height:1.5;color:var(--text2)}
+.g5h-s code{font:15px var(--mono);color:#fde68a}
+.g5h-low{display:grid;grid-template-columns:1fr 1.4fr;gap:22px;margin-top:20px}
+.g5h-ans{display:flex;flex-direction:column;gap:8px;padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:rgba(52,211,153,.06)}
+.g5h-n{font:800 64px/1.1 var(--num);color:var(--ok);letter-spacing:.02em}
+.g5h-gate{display:flex;flex-direction:column;gap:12px;padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g5h-gate>div:first-of-type{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g5h-gate>div:first-of-type span{padding:12px;border-radius:12px;font-size:17px;font-weight:700;text-align:center;color:var(--text3);border:1px dashed var(--line2);transition:all .35s}
+.g5h-gate>div:first-of-type span.on{color:#06101f;background:var(--ok);border:1px solid var(--ok)}
+.g5h-lib{display:flex;align-items:center;gap:12px;font-size:18px;color:var(--text3);transition:color .4s}
+.g5h-lib .ic{font-size:30px}
+.g5h-lib.on{color:var(--ok)}
+.g5h-proto{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:22px;padding:14px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.g5h-proto span:not(.lbl){padding:6px 14px;border-radius:999px;font-size:17px;color:var(--text);border:1px solid var(--line2)}
+.g5h-proto i{font-style:normal;color:var(--text3)}
+.g5h-proto em{margin-left:auto;font-style:normal;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c09-alita'] = {
+  S: [['search', '发现缺口', '缺少字幕读取能力'], ['globe', '搜索并测试', '<code>youtube-transcript-api</code>'], ['wrench', '封装为新工具', '字幕读取工具'], ['file', '读取字幕', '找到恐龙首次出现后的那句话']],
+  init(s) { s.querySelector('.g5h-flow').innerHTML = this.S.map(([ic, b, t]) => `<div class="g5h-s"><svg class="ic"><use href="#i-${ic}"/></svg><b>${b}</b><span>${t}</span></div>`).join(''); },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const ss = [...s.querySelectorAll('.g5h-s')], n = s.querySelector('.g5h-n'), gs = [...s.querySelectorAll('.g5h-gate>div:first-of-type span')], lib = s.querySelector('.g5h-lib');
+    while (ok()) {
+      ss.forEach((x) => x.classList.remove('on')); gs.forEach((g) => g.classList.remove('on')); lib.classList.remove('on'); n.textContent = '—';
+      for (const x of ss) { await U.wait(ctx, 1000); if (!ok()) return; x.classList.add('on'); }
+      await U.wait(ctx, 600); if (!ok()) return;
+      n.textContent = '100000000';
+      for (const g of gs) { await U.wait(ctx, 700); if (!ok()) return; g.classList.add('on'); }
+      await U.wait(ctx, 500); if (!ok()) return;
+      lib.classList.add('on'); s.querySelector('.g5h-lt').textContent = '字幕工具进入能力库';
+      await U.wait(ctx, 3400);
+      s.querySelector('.g5h-lt').textContent = '能力库';
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-exp6" data-part="5" data-trans="flip" data-dur="22000" data-title="实验 9-6 ★★★：由失败轨迹触发 Agent 自我修改" data-notes="<b>实验 9-6 ★★★：由失败轨迹触发 Agent 自我修改。实验目的</b>：检验系统能否把“不可重试错误被反复调用”的经验写入重试与熔断程序，同时保留临时故障的恢复能力。<b>实验说明</b>：比较“只在 Prompt 中提醒不要重试”和“修改程序中的重试策略”两种修复。修改提案必须经过失败轨迹重放、正常故障回归和安全发布门槛，且不能修改验证器或稳定版本。<b>实验说明了什么</b>：能够确定性执行的约束应该进入程序，而不是继续堆在 Prompt 里。Agent 可以提出代码提案，但“是否能发布”必须由模型外的测试、审计和回滚机制决定。<br>配套仓库 chapter9/self-modifying-agent 的正式运行（2026-08-02，OpenRouter openai/gpt-5.6-sol）：两条轨迹形成失败簇 charge_card:PAYMENT_DECLINED（跨轨迹支持 2，冗余调用共 5 次），根因定位到 stable/retry_policy.py。三个提案经过同一组 11 项模型外检查：确定性提案与真实 LLM 提案都得到 release_to_canary；故意保留的“一律不重试”反例在临时故障恢复、旧任务回归和灰度就绪三项上失败，得到 reject_candidate——它正是交给 Coding Agent 的“此前被拒绝的修改记录”。行为指标：不可重试调用均值从 3.5 降到 1，临时故障恢复率保持 1.0，旧任务回归 0。候选代码在 Docker 沙盒里执行：无网络、只读根文件系统、64 MB 内存、0.5 个 CPU、8 秒超时；生成前后稳定代码、失败轨迹与验证器的 SHA-256 不变。这次真实调用用了 1,231 token，供应商报告成本 0.015955 美元。左侧是真实 LLM 提案的 diff 原文。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-6 ★★★：由失败轨迹触发 <em>Agent 自我修改</em></h2></div>
+    <div class="g5i-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="llm">真实 LLM 提案</button><button data-v="rej">被拒的反例</button></div></header>
+  <div class="g5i-top fx fx-up" style="--d:2"><span class="c9-pill" style="--c:var(--bad)">失败簇 charge_card:PAYMENT_DECLINED</span><span>run-payment-001 提交 4 次 · run-payment-002 重复 3 次 · 冗余调用 5 次</span><i>→</i><span class="c9-pill" style="--c:var(--c9-prog)">根因 stable/retry_policy.py</span></div>
+  <div class="g5i-body">
+    <div class="win g5i-dw fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span class="g5i-dn">candidate/retry_policy.py</span></div><pre class="g5i-diff"></pre></div>
+    <div class="g5i-r fx fx-right" style="--d:4">
+      <div class="g5i-gate panel"><div class="g5i-gh"><span>模型外检查</span><span>确定性</span><span>真实 LLM</span><span>反例</span></div><div class="g5i-rows"></div><div class="g5i-dec"><span>决定</span><b class="ok">release_to_canary</b><b class="ok">release_to_canary</b><b class="bad">reject_candidate</b></div></div>
+      <div class="g5i-m"><div><b>3.5 → 1</b><span>不可重试调用均值</span></div><div><b>1.0</b><span>临时故障恢复率保持</span></div><div><b>0</b><span>旧任务回归</span></div></div>
+    </div>
+  </div>
+  <div class="c9-data g5i-rec fx fx-up" style="--d:5">数据：chapter9/self-modifying-agent · 2026-08-02 · OpenRouter openai/gpt-5.6-sol · Docker 沙盒：无网络、只读根文件系统、64 MB、0.5 CPU、8 秒超时 · 1,231 token，0.015955 美元</div>
+  <div class="src">第九章 ·「将经验写成程序」· 实验 9-6</div>
+</section>
+<style>
+.g5i-top{display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:16px;color:var(--text2)}
+.g5i-top i{font-style:normal;color:var(--text3)}
+.g5i-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;margin-top:14px;height:540px}
+.g5i-dw{display:flex;flex-direction:column;min-height:0}
+.g5i-diff{flex:1;margin:0;padding:10px 14px;font:15px/1.5 var(--mono);color:var(--text2);white-space:pre-wrap;overflow:hidden}
+.g5i-diff span{display:block;min-height:1.5em}
+.g5i-diff .a{color:#86efac;background:rgba(52,211,153,.1)}
+.g5i-diff .d{color:#fda4af;background:rgba(251,113,133,.1)}
+.g5i-diff .h{color:#93c5fd}
+.g5i-r{display:flex;flex-direction:column;gap:12px;min-height:0}
+.g5i-gate{padding:10px 16px;display:flex;flex-direction:column;gap:2px}
+.g5i-gh,.g5i-row,.g5i-dec{display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:6px;align-items:center}
+.g5i-gh span{font-size:15px;color:var(--text3);text-align:center}
+.g5i-gh span:first-child{text-align:left}
+.g5i-row{padding:3px 0;border-top:1px solid var(--line)}
+.g5i-row span{font:15px var(--mono);color:var(--text2)}
+.g5i-row i{font-style:normal;text-align:center;font-weight:700;font-size:16px}
+.g5i-row i.y{color:#6ee7b7}.g5i-row i.n{color:#fda4af}
+.g5i-row.hit{background:rgba(251,113,133,.08)}
+.g5i-dec{padding-top:8px;border-top:1px solid var(--line2)}
+.g5i-dec span{font-size:15px;color:var(--text3)}
+.g5i-dec b{font:700 15px var(--mono);text-align:center}
+.g5i-dec b.ok{color:#6ee7b7}.g5i-dec b.bad{color:#fda4af}
+.g5i-m{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.g5i-m div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g5i-m b{font:800 26px var(--num);color:var(--ok)}
+.g5i-m span{font-size:15px;color:var(--text3)}
+.g5i-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c09-exp6'] = {
+  LLM: `--- stable/retry_policy.py
++++ candidate/retry_policy.py
+@@ -1,6 +1,6 @@
+-"""Stable version 1.0.0. It intentionally contains the reproduced bug."""
++"""Candidate version 1.0.1-rc.1 with permanent-failure handling."""
+-VERSION = "1.0.0"
++VERSION = "1.0.1-rc.1"
+ MAX_RETRIES = 3
+ CIRCUIT_BREAKER_THRESHOLD = 5
+@@ -8,9 +8,13 @@
+ def should_retry(error_code, retryable, attempt):
+     """Return whether another tool call should be attempted."""
++    if not retryable or error_code in NON_RETRYABLE_CODES:
++        return False
+     return attempt < MAX_RETRIES
+ def should_open_circuit(consecutive_failures, *, error_code="", retryable=True):
+-    """Open after repeated failures."""
++    """Open immediately for permanent failures or after repeated temporary failures."""
++    if not retryable or error_code in NON_RETRYABLE_CODES:
++        return consecutive_failures >= 1
+     return consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD`,
+  REJ: `--- stable/retry_policy.py
++++ candidate/retry_policy.py
+@@ -1,16 +1,18 @@
+-VERSION = "1.0.0"
++VERSION = "1.0.1-rejected"
+ MAX_RETRIES = 3
+ CIRCUIT_BREAKER_THRESHOLD = 5
+ def should_retry(error_code, retryable, attempt):
+-    """Return whether another tool call should be attempted."""
+-    return attempt < MAX_RETRIES
++    """Incorrect over-broad fix retained as a rejected candidate."""
++    return False
+ def should_open_circuit(consecutive_failures, *, error_code="", retryable=True):
+-    """Open after repeated failures."""
++    """Open immediately for permanent errors; otherwise use the threshold."""
++    if not retryable or error_code in NON_RETRYABLE_CODES:
++        return consecutive_failures >= 1
+     return consecutive_failures >= CIRCUIT_BREAKER_THRESHOLD`,
+  CK: ['static_compile', 'security_scan', 'sandbox_execution', 'public_api_compatible', 'failure_replay', 'nonretryable_circuit', 'temporary_recovery', 'old_task_regression', 'canary_ready', 'rollback_ready', 'protected_surfaces_unchanged'],
+  BAD: ['temporary_recovery', 'old_task_regression', 'canary_ready'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.g5i-seg'), (v) => { this.auto = false; this.show(s, v); });
+    s.querySelector('.g5i-rows').innerHTML = this.CK.map((c) => `<div class="g5i-row" data-c="${c}"><span>${c}</span><i class="y">✓</i><i class="y">✓</i><i class="${this.BAD.includes(c) ? 'n' : 'y'}">${this.BAD.includes(c) ? '✕' : '✓'}</i></div>`).join('');
+  },
+  show(s, v) {
+    this.v = v; this.set(v);
+    const src = v === 'llm' ? this.LLM : this.REJ;
+    s.querySelector('.g5i-dn').textContent = v === 'llm' ? 'candidate/retry_policy.py · gpt-5.6-sol 生成' : 'candidate/retry_policy.py · 被拒的反例（一律不重试）';
+    s.querySelector('.g5i-diff').innerHTML = src.split('\n').map((l) => `<span class="${l.startsWith('+++') || l.startsWith('---') || l.startsWith('@@') ? 'h' : l.startsWith('+') ? 'a' : l.startsWith('-') ? 'd' : ''}">${C9.esc(l) || ' '}</span>`).join('');
+    s.querySelectorAll('.g5i-row').forEach((r) => r.classList.toggle('hit', v === 'rej' && this.BAD.includes(r.dataset.c)));
+  },
+  enter(s, ctx) {
+    this.auto = true; this.show(s, 'llm');
+    ctx.every(() => { if (this.auto) this.show(s, this.v === 'llm' ? 'rej' : 'llm'); }, 7000);
+  },
+};
+</script>
+
+<section class="slide" id="c09-exp7" data-part="5" data-trans="rise" data-dur="22000" data-title="确认门禁 · 实验 9-7 ★★" data-notes="验证层也可以采用同一协议：当多条用户纠正、点踩或事后审计都指向“高风险操作未经确认”时，系统生成一个确认门禁提案。提案必须在边界任务和正常任务上都通过验证，且安全门本身不能被提案修改。这与第一章三层护栏里数据层的道理相同：真正的保证必须来自被修改者无法触及的那一层。<br><b>实验 9-7 ★★：由用户反馈触发高风险操作确认门禁。实验目的</b>：检验系统能否从用户纠正和事后审计中发现安全流程缺口，并为高风险工具调用生成确认门禁。<b>实验说明</b>：用危险操作边界集和正常操作保留集共同评价门禁提案；提案既要拦住未经确认的高风险调用，也不能阻断正常任务；生成提案的 Agent 无权修改安全测试和批准规则。<b>实验说明了什么</b>：安全能力的进化不能由修改者自证成功。真实模型生成的更新提案可能被安全门拒绝，这正说明独立验证器和不可修改的可信根比“提案看起来合理”更重要。<br>配套仓库 chapter9/harness-safety-gate 的正式运行（2026-08-07）：11 条反馈中有 8 条聚成 3 个失败簇——未确认的删除文件（3 条）、未确认的破坏性 SQL（3 条）、未确认的 force push（2 条）；另外 3 条被排除：rm -rf 只有一条、低于跨轨迹支持门槛；write_file 的措辞点踩属于质量问题，不是确认流程；用户同意后的删除是正常对照。边界集 8 条、保留集 7 条。确定性提案通过全部检查，得到 release_to_canary；“什么都不挂起”的反例被拒绝；OpenRouter gpt-4o-mini 生成的真实提案没有通过边界回放、保留回放与一次性令牌检查，被模型外门槛拒绝——这是安全的预期结果，而不是绕过检查强行发布。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-7 ★★：由用户反馈触发<em>高风险操作确认门禁</em></h2></header>
+  <div class="g5j-body">
+    <div class="g5j-fb panel fx fx-left" style="--d:2"><div class="g5j-h"><b>11 条反馈 → 3 个失败簇</b><span class="c9-data">风险分类 + 跨轨迹支持门槛</span></div><div class="g5j-list"></div></div>
+    <div class="g5j-mid fx fx-up" style="--d:3">
+      <div class="g5j-sets"><div class="bd"><b>8</b><span>边界用例：高风险调用必须挂起；伪造、错配、复用的确认令牌必须被拒</span></div><div class="rt"><b>7</b><span>保留用例：读写文件、普通 push、SELECT、带 WHERE 的 DELETE 不受影响</span></div></div>
+      <div class="g5j-root"><svg class="ic"><use href="#i-lock"/></svg><span>安全测试与批准规则属于可信根：生成提案的 Agent <b>无权修改</b></span></div>
+    </div>
+    <div class="g5j-res panel fx fx-right" style="--d:4">
+      <div class="g5j-h"><b>三个提案过同一道门</b></div>
+      <div class="g5j-p ok"><span>确定性提案</span><em>全部通过</em><b>release_to_canary</b></div>
+      <div class="g5j-p no"><span>反例：什么都不挂起</span><em>边界回放 · 保留回放 · 一次性令牌 ✕</em><b>reject_candidate</b></div>
+      <div class="g5j-p no"><span>真实 LLM（gpt-4o-mini）</span><em>边界回放 · 保留回放 · 一次性令牌 ✕</em><b>reject_candidate</b></div>
+      <p class="g5j-nt">真实模型候选被拒绝也是有效结果：安全系统不应为了漂亮的通过率而降低检查标准</p>
+    </div>
+  </div>
+  <div class="c9-data g5j-rec fx fx-up" style="--d:5">数据：chapter9/harness-safety-gate · 2026-08-07 · OpenRouter openai/gpt-4o-mini · 18 项机制测试全部通过 · 生成前后对可信根做 SHA-256 比对</div>
+  <div class="src">第九章 ·「将经验写成程序」· 实验 9-7</div>
+</section>
+<style>
+.g5j-body{display:grid;grid-template-columns:1.25fr 380px 1fr;gap:20px;flex:1;min-height:0}
+.g5j-fb{padding:12px 16px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.g5j-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.g5j-h b{font-size:19px}
+.g5j-list{display:flex;flex-direction:column;gap:4px}
+.g5j-it{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:4px 10px;border-radius:9px;font-size:15px;line-height:1.4;border:1px solid var(--line);color:var(--text2);transition:all .35s}
+.g5j-it em{font-style:normal;font-size:15px;font-weight:700;text-align:center}
+.g5j-it small{font-size:15px;white-space:nowrap}
+.g5j-it.c0{--c:#fb923c}.g5j-it.c1{--c:#f472b6}.g5j-it.c2{--c:#a78bfa}
+.g5j-it.on[class*=" c"]{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent);color:var(--text)}
+.g5j-it.on[class*=" c"] small{color:var(--c)}
+.g5j-it.x.on{opacity:.55;text-decoration:line-through;text-decoration-color:var(--text3)}
+.g5j-it.x.on small{text-decoration:none}
+.g5j-mid{display:flex;flex-direction:column;gap:14px}
+.g5j-sets{display:flex;flex-direction:column;gap:10px}
+.g5j-sets>div{display:grid;grid-template-columns:56px 1fr;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid}
+.g5j-sets .bd{border-color:color-mix(in srgb,var(--c9-bnd) 50%,transparent)}.g5j-sets .bd b{color:var(--c9-bnd)}
+.g5j-sets .rt{border-color:color-mix(in srgb,var(--c9-ret) 50%,transparent)}.g5j-sets .rt b{color:var(--c9-ret)}
+.g5j-sets b{font:800 36px var(--num);text-align:center}
+.g5j-sets span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g5j-root{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-radius:14px;border:1px solid rgba(251,113,133,.45);background:rgba(251,113,133,.06);font-size:16px;line-height:1.55;color:var(--text2)}
+.g5j-root .ic{font-size:24px;color:var(--bad);flex:none}
+.g5j-root b{color:var(--text)}
+.g5j-res{padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.g5j-p{display:flex;flex-direction:column;gap:3px;padding:10px 14px;border-radius:12px;border:1px solid}
+.g5j-p span{font-size:16px;font-weight:700}
+.g5j-p em{font-style:normal;font-size:15px;color:var(--text3)}
+.g5j-p b{font:700 16px var(--mono)}
+.g5j-p.ok{border-color:rgba(52,211,153,.5)}.g5j-p.ok b{color:#6ee7b7}
+.g5j-p.no{border-color:rgba(251,113,133,.5)}.g5j-p.no b{color:#fda4af}
+.g5j-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text3)}
+.g5j-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c09-exp7'] = {
+  // [信号, 摘要, 簇（0 删除 / 1 破坏性 SQL / 2 force push / x 排除）, 说明]
+  F: [
+    ['纠正', "delete_file('reports/2026-Q1-draft.docx')：那是还没定稿的报告", 0],
+    ['纠正', '整理工作区时删了 notes/todo.md', 0],
+    ['审计', "delete_file('tmp/cache-0417.tmp') 无确认记录", 0],
+    ['纠正', 'git_push(force=True) 覆盖了同事的提交', 2],
+    ['点踩', '“已强制推送以同步远端”', 2],
+    ['审计', "sql_query('DROP TABLE users') 无确认执行", 1],
+    ['审计', "sql_query('DELETE FROM orders') 无 WHERE", 1],
+    ['点踩', '“已按优化建议重建 users 表”', 1],
+    ['审计', "run_shell('rm -rf build/')：仅此一条，低于支持门槛", 'x'],
+    ['点踩', 'write_file 周报措辞太生硬：质量问题，非确认流程', 'x'],
+    ['同意', '用户说“可以，删吧”后的删除：正常对照', 'x'],
+  ],
+  N: ['未确认删除', '破坏性 SQL', 'force push'],
+  init(s) { s.querySelector('.g5j-list').innerHTML = this.F.map(([sg, t, c]) => `<div class="g5j-it ${c === 'x' ? 'x' : 'c' + c}"><em>${sg}</em><span>${t}</span><small>${c === 'x' ? '排除' : this.N[c]}</small></div>`).join(''); },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const its = [...s.querySelectorAll('.g5j-it')];
+    while (ok()) {
+      its.forEach((i) => i.classList.remove('on'));
+      for (const i of its) { await U.wait(ctx, 380); if (!ok()) return; i.classList.add('on'); }
+      await U.wait(ctx, 4200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.g5j-it').forEach((i) => i.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 案例：DeepSeek Harness ================= -->
+<section class="slide" id="c09-dsh1" data-part="5" data-dur="20000" data-title="DeepSeek Harness：动态组合" data-notes="第一章的框架对比表把 DeepSeek Harness（dsh）归为“Agent 自进化框架”。它的底座 Cordis 论文指出，传统意义上的组合是<b>静态</b>的，函数调用、模块导入和类继承都在编译期确定，运行期不再变化；而插件系统和自进化 Harness 需要的是<b>动态组合</b>，组件要在运行中被装入、卸下和重新配置。Agent 的每一次自我修改，本质上都是一次动态组合。<br>论文把动态组合拆成两个正交的维度。<b>时间可组合性</b>（temporal composability）问的是：一个组件被移除时，它对共享环境做过的修改能否被完整、安全地撤销——这要求运行时追踪它的每一次资源分配、事件注册和状态变更。<b>空间可组合性</b>（spatial composability）问的是：组件之间能否以结构化、可验证的方式声明、发现和解析彼此的依赖，并在依赖变化时协调各自的生命周期。前者关心<b>改了什么</b>，后者关心<b>依赖什么</b>。<br>自进化 Harness 是这个问题最尖锐的场景：要撤销的副作用是长期存活、带状态的；要解析的依赖会在运行中出现、消失或改变身份。缺少时间可组合性，每次自我修改都要整体重启，丢掉进程内积累的全部状态，进行中的任务被反复打断；缺少空间可组合性，每个模块只能用临时手段自己察觉依赖的出现、消失和改变，一次简单的代码替换可能静默地破坏依赖方，或者引入循环依赖。<br>页面上的插件名与操作为示意；打开或关闭右上角两个开关，看卸载插件和替换依赖时会发生什么。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">案例 DeepSeek Harness：每次自我修改都是一次<em>动态组合</em></h2></div>
+    <div class="g5k-tg fx fx-up" style="--d:2"><button class="tgl on" data-k="t"><i></i>时间可组合性</button><button class="tgl on" data-k="s"><i></i>空间可组合性</button></div></header>
+  <div class="g5k-sd fx fx-up" style="--d:2"><div><b>静态组合</b><span>函数调用、模块导入、类继承：编译期确定，运行期不再变化</span></div><i>→</i><div class="dy"><b>动态组合</b><span>组件在运行中被装入、卸下和重新配置——插件系统与自进化 Harness 需要的是这个</span></div></div>
+  <div class="g5k-body">
+    <div class="g5k-c panel fx fx-left" style="--d:3"><div class="g5k-h"><b>时间可组合性</b><span>关心<em>改了什么</em>：组件被移除时，它的副作用能否被完整、安全地撤销</span><span class="c9-sy">示意</span></div>
+      <div class="g5k-ctx"><span class="lbl">共享环境</span><div class="g5k-env"></div></div><div class="g5k-o g5k-ot"></div></div>
+    <div class="g5k-c panel fx fx-right" style="--d:4"><div class="g5k-h"><b>空间可组合性</b><span>关心<em>依赖什么</em>：依赖能否被声明、发现和解析，并在变化时协调生命周期</span><span class="c9-sy">示意</span></div>
+      <div class="g5k-dep"><span class="g5k-pl a">search_tool</span><i></i><span class="g5k-pl b">http_client</span></div><div class="g5k-o g5k-os"></div></div>
+  </div>
+  <div class="src">第九章 ·「案例：DeepSeek Harness 以“一切皆插件”实现自我进化」</div>
+</section>
+<style>
+.g5k-tg{display:flex;gap:10px}
+.g5k-tg .tgl{font-size:17px}
+.g5k-sd{display:grid;grid-template-columns:1fr 40px 1.3fr;gap:12px;align-items:center}
+.g5k-sd>div{display:flex;flex-direction:column;gap:2px;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g5k-sd>div.dy{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.g5k-sd b{font-size:18px}
+.g5k-sd span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g5k-sd>i{font-style:normal;text-align:center;font-size:22px;color:var(--text3)}
+.g5k-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:16px;flex:1;min-height:0}
+.g5k-c{padding:14px 20px;display:flex;flex-direction:column;gap:12px}
+.g5k-h{display:flex;flex-direction:column;gap:4px;position:relative}
+.g5k-h b{font-size:20px;color:var(--acc)}
+.g5k-h span{font-size:16px;line-height:1.5;color:var(--text2)}
+.g5k-h em{font-style:normal;font-weight:700;color:var(--text)}
+.g5k-h .c9-sy{position:absolute;right:0;top:0}
+.g5k-ctx{display:flex;flex-direction:column;gap:6px}
+.g5k-env{display:flex;flex-wrap:wrap;gap:8px;min-height:84px;padding:10px;border-radius:12px;border:1px dashed var(--line2)}
+.g5k-e{padding:5px 12px;border-radius:9px;font:15px var(--mono);border:1px solid var(--line2);color:var(--text2);animation:pop .35s var(--spring)}
+.g5k-e.p{color:#fde68a;border-color:rgba(251,191,36,.5)}
+.g5k-e.stale{color:#fda4af;border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.1)}
+.g5k-e.gone{animation:none;opacity:0;transform:scale(.6);transition:all .5s}
+.g5k-dep{display:flex;align-items:center;gap:12px;justify-content:center;padding:18px 0}
+.g5k-pl{padding:12px 18px;border-radius:12px;font:600 17px var(--mono);border:1.5px solid var(--line2);transition:all .4s}
+.g5k-pl.a{color:#93c5fd;border-color:rgba(96,165,250,.5)}
+.g5k-pl.b{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.g5k-pl.chg{color:#fde68a;border-color:rgba(251,191,36,.6)}
+.g5k-pl.broken{color:#fda4af;border-color:var(--bad);background:rgba(251,113,133,.1)}
+.g5k-pl.paused{opacity:.5;border-style:dashed}
+.g5k-dep i{flex:1;max-width:160px;height:3px;background:var(--line2);transition:background .4s}
+.g5k-dep i.bad{background:repeating-linear-gradient(90deg,var(--bad) 0 8px,transparent 8px 14px)}
+.g5k-dep i.ok{background:var(--ok)}
+.g5k-o{margin-top:auto;min-height:72px;padding:10px 14px;border-radius:12px;font-size:16px;line-height:1.55;color:var(--text3);border:1px dashed var(--line2)}
+.g5k-o.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+.g5k-o.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.08)}
+</style>
+<script>
+HOOKS['c09-dsh1'] = {
+  init(s) {
+    this.tg = {};
+    s.querySelectorAll('.g5k-tg .tgl').forEach((b) => { this.tg[b.dataset.k] = b; b.addEventListener('click', () => { this.auto = false; b.classList.toggle('on'); this.restart(s); }); });
+  },
+  restart(s) { if (!this.ctx) return; this.tk = (this.tk || 0) + 1; this.tmp(s); this.spa(s); },
+  async tmp(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const env = s.querySelector('.g5k-env'), out = s.querySelector('.g5k-ot');
+    const on = this.tg.t.classList.contains('on');
+    env.innerHTML = '<span class="g5k-e">tools: read, edit</span><span class="g5k-e">prompt: base</span>';
+    out.className = 'g5k-o g5k-ot'; out.textContent = '装入插件 browser_plugin……';
+    await U.wait(ctx, 900); if (!ok()) return;
+    ['tools += browse', 'prompt += 浏览器说明', 'on_event: page_load', 'session.cache = {…}'].forEach((t) => env.insertAdjacentHTML('beforeend', `<span class="g5k-e p">${t}</span>`));
+    await U.wait(ctx, 1600); if (!ok()) return;
+    out.textContent = '卸载插件 browser_plugin……';
+    await U.wait(ctx, 900); if (!ok()) return;
+    const ps = [...env.querySelectorAll('.g5k-e.p')];
+    if (on) {
+      ps.forEach((e) => e.classList.add('gone'));
+      await U.wait(ctx, 600); if (!ok()) return;
+      ps.forEach((e) => e.remove());
+      out.className = 'g5k-o g5k-ot ok'; out.textContent = '运行时追踪了它的每次分配、注册和变更：逐一撤销，环境恢复原样，进程不必重启';
+    } else {
+      ps.forEach((e) => e.classList.add('stale'));
+      out.className = 'g5k-o g5k-ot bad'; out.textContent = '副作用残留：事件监听和缓存还在——只能整体重启，丢掉进程内积累的全部状态，进行中的任务被打断';
+    }
+  },
+  async spa(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const a = s.querySelector('.g5k-pl.a'), b = s.querySelector('.g5k-pl.b'), ln = s.querySelector('.g5k-dep i'), out = s.querySelector('.g5k-os');
+    const on = this.tg.s.classList.contains('on');
+    a.className = 'g5k-pl a'; b.className = 'g5k-pl b'; b.textContent = 'http_client'; ln.className = 'ok';
+    out.className = 'g5k-o g5k-os'; out.textContent = 'search_tool 声明依赖 http_client……';
+    await U.wait(ctx, 1500); if (!ok()) return;
+    b.classList.add('chg'); b.textContent = 'http_client v2'; out.textContent = '自我修改：替换了 http_client 的实现';
+    await U.wait(ctx, 1200); if (!ok()) return;
+    if (on) {
+      a.classList.add('paused'); out.className = 'g5k-o g5k-os ok'; out.textContent = '依赖规格被重新求值：search_tool 先失活，新依赖满足规格后重新激活';
+      await U.wait(ctx, 1200); if (!ok()) return;
+      a.classList.remove('paused'); ln.className = 'ok';
+    } else {
+      ln.className = 'bad'; a.classList.add('broken');
+      out.className = 'g5k-o g5k-os bad'; out.textContent = '依赖方没有被通知：search_tool 被静默破坏——只能靠临时手段自己察觉依赖的变化';
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.restart(s);
+    ctx.every(() => {
+      if (this.auto) { const t = this.tg.t, sp = this.tg.s; const both = t.classList.contains('on') && sp.classList.contains('on'); t.classList.toggle('on', !both); sp.classList.toggle('on', !both); }
+      this.restart(s);
+    }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; Object.values(this.tg).forEach((b) => b.classList.add('on')); },
+};
+</script>
+
+<section class="slide" id="c09-dsh2" data-part="5" data-trans="zoom" data-dur="20000" data-title="可撤销效果与反应式协效果" data-notes="Cordis 的思路是把两个原本属于编译期的概念提升到运行时。效果系统本来用于推理“计算如何修改环境”，被提升为<b>可撤销效果</b>：每一次对上下文的变换都携带一个显式的逆操作，由运行时追踪，组件移除时上下文随之恢复。协效果（coeffect）系统本来用于推理“计算对环境有什么要求”，被提升为<b>反应式协效果</b>：组件把自己需要的依赖声明成一份规格，上下文每次变化都按这份规格通知它激活、失活还是无关。论文进一步用一套动态组合演算，把这个性质从单个组件推广到相互交错的组件系统——可组合性必须是可传递的。<br><b>自我进化的上限，不取决于模型能写出多好的代码，而取决于承载它的系统具有多强的可组合性</b>。这也是 dsh 让模型适配器、工具注册表、会话日志乃至 Agent 主循环本身都成为插件的原因：<b>不存在一个只能由人类维护的特权内核</b>。<br>可组合性解决了“能不能安全地装卸”，没有解决“该不该装”。模型写出的插件只活在进程内存里，重启即消失，<b>不能被自动提升为正式插件</b>，要留下来必须另走前面说的 worktree 加 Pull Request 那条更慢的路。<br>最后，进化本身也有代价：运行中的插件会改变模型可见的工具集和提示片段，请求前缀一变，第二章讨论的 KV Cache 就从变化处开始失效；dsh 插件的说明文档需要专门描述对上下文和 KV Cache 的影响。（本节讨论的是 dsh 2026 年 8 月开发者预览阶段的设计。）">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">把编译期的概念提升到运行时：<em>可撤销效果与反应式协效果</em></h2></header>
+  <div class="g5l-top">
+    <div class="g5l-c panel fx fx-left" style="--d:2"><b>可撤销效果</b><span>每次对上下文的变换都携带一个<em>显式的逆操作</em>，由运行时追踪；组件移除时上下文随之恢复</span><div class="g5l-log"></div></div>
+    <div class="g5l-c panel fx fx-right" style="--d:3"><b>反应式协效果</b><span>组件把需要的依赖声明成<em>一份规格</em>；上下文每次变化，都按规格通知它<em>激活、失活还是无关</em></span><div class="g5l-co"></div></div>
+  </div>
+  <p class="g5l-up fx fx-up" style="--d:4"><b>自我进化的上限，不取决于模型能写出多好的代码，而取决于承载它的系统具有多强的可组合性</b>——可组合性还必须是可传递的</p>
+  <div class="g5l-low">
+    <div class="g5l-k fx fx-left" style="--d:5"><span class="lbl">dsh：一切皆插件</span><div class="g5l-ps"><span>模型适配器</span><span>工具注册表</span><span>会话日志</span><span>Agent 主循环</span></div><p><b>不存在一个只能由人类维护的特权内核</b></p></div>
+    <div class="g5l-k fx fx-up" style="--d:6"><span class="lbl">该不该装？</span><p>模型写出的插件只活在进程内存里，重启即消失，<b>不能被自动提升为正式插件</b>——要留下来，得走 worktree + Pull Request</p></div>
+    <div class="g5l-k fx fx-right" style="--d:7"><span class="lbl">进化的代价</span><div class="g5l-kv"><i class="h"></i><i class="h"></i><i class="h"></i><i class="p">插件</i><i class="m"></i><i class="m"></i></div><p>工具集和提示片段一变，<b>KV Cache 从变化处开始失效</b></p></div>
+  </div>
+  <div class="src">第九章 ·「案例：DeepSeek Harness 以“一切皆插件”实现自我进化」· Cordis</div>
+</section>
+<style>
+.g5l-top{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.g5l-c{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.g5l-c>b{font-size:21px;color:var(--acc)}
+.g5l-c>span{font-size:16px;line-height:1.55;color:var(--text2)}
+.g5l-c em{font-style:normal;font-weight:700;color:var(--text)}
+.g5l-log,.g5l-co{display:flex;flex-direction:column;gap:7px;min-height:200px}
+.g5l-r{display:grid;grid-template-columns:1fr 1fr;gap:8px;font:15px var(--mono);animation:upIn .35s var(--spring) both}
+.g5l-r span{padding:4px 10px;border-radius:8px;border:1px solid var(--line)}
+.g5l-r span:first-child{color:#fde68a}
+.g5l-r span:last-child{color:#93c5fd}
+.g5l-r.undo span{color:#6ee7b7;border-color:rgba(52,211,153,.45)}
+.g5l-cr{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:5px 10px;border-radius:8px;font-size:15px;border:1px solid var(--line);animation:upIn .35s var(--spring) both}
+.g5l-cr code{font:15px var(--mono);color:var(--text2)}
+.g5l-cr b{font-size:15px}
+.g5l-cr b.on{color:#6ee7b7}.g5l-cr b.off{color:#fda4af}.g5l-cr b.na{color:var(--text3)}
+.g5l-up{margin-top:16px;font-size:20px;line-height:1.6;padding:12px 18px;border-radius:14px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),transparent);color:var(--text2)}
+.g5l-up b{color:var(--text)}
+.g5l-low{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:18px;min-height:170px}
+.g5l-k{display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g5l-k p{font-size:17px;line-height:1.55;color:var(--text2)}
+.g5l-k p b{color:var(--text)}
+.g5l-ps{display:flex;flex-wrap:wrap;gap:6px}
+.g5l-ps span{padding:4px 10px;border-radius:999px;font-size:15px;color:var(--c9-prog);border:1px solid color-mix(in srgb,var(--c9-prog) 50%,transparent)}
+.g5l-kv{display:flex;gap:4px}
+.g5l-kv i{flex:1;height:30px;border-radius:6px;font-style:normal;font-size:15px;display:grid;place-items:center}
+.g5l-kv i.h{background:color-mix(in srgb,var(--ok) 40%,transparent)}
+.g5l-kv i.p{flex:1.4;color:#06101f;font-weight:700;background:var(--tool)}
+.g5l-kv i.m{background:color-mix(in srgb,var(--bad) 40%,transparent)}
+</style>
+<script>
+HOOKS['c09-dsh2'] = {
+  E: [['tools.add("browse")', 'tools.remove("browse")'], ['prompt.push(片段)', 'prompt.pop(片段)'], ['events.on("load", f)', 'events.off("load", f)']],
+  C: [['需要 http_client ≥ 2', 'http_client v2 出现', 'on', '激活'], ['需要 http_client ≥ 2', 'http_client 被卸下', 'off', '失活'], ['需要 http_client ≥ 2', 'prompt 片段变化', 'na', '无关']],
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const log = s.querySelector('.g5l-log'), co = s.querySelector('.g5l-co');
+    while (ok()) {
+      log.innerHTML = '<div class="g5l-r"><span>效果</span><span>逆操作</span></div>'; co.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        await U.wait(ctx, 700); if (!ok()) return;
+        log.insertAdjacentHTML('beforeend', `<div class="g5l-r"><span>${C9.esc(this.E[i][0])}</span><span>${C9.esc(this.E[i][1])}</span></div>`);
+        const [spec, ev, k, t] = this.C[i];
+        co.insertAdjacentHTML('beforeend', `<div class="g5l-cr"><code>${C9.esc(spec)} · ${C9.esc(ev)}</code><b class="${k}">${t}</b></div>`);
+      }
+      await U.wait(ctx, 1000); if (!ok()) return;
+      log.insertAdjacentHTML('beforeend', '<div class="g5l-r undo"><span>移除组件</span><span>按逆序执行逆操作 → 上下文恢复</span></div>');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.g5l-log').innerHTML = ''; s.querySelector('.g5l-co').innerHTML = ''; },
+};
+</script>

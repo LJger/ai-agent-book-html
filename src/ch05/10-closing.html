@@ -1,0 +1,139 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c05-summary" data-part="10" data-steps="2" data-trans="zoom" data-dur="16000" data-title="本章小结" data-notes="本章讨论的核心始终是同一件事：代码不只是写程序的工具，它是 Agent 形式化思考和精确表达的语言。<br>Harness 工程那一节的核心结论是：Coding Agent 之所以成熟度高，不是因为代码生成模型特别强，而是因为软件工程几十年攒下的基础设施——测试套件、类型系统、版本控制——天然构成了一套强大的 Harness，这个结论值得推广到其他 Agent 场景。故障与错误恢复一节给出了同一主题的另一面：Agent 的可靠性不取决于模型犯不犯错，而取决于每类故障是否都有对应的检测、恢复、接管与终止路径。<br>按 → 第二部分展示了代码生成在编程之外的广泛价值，对应六个维度：<b>思考工具</b>——借助符号计算和约束求解弥补概率思考的不足；<b>业务规则约束</b>——以无歧义方式表达业务规则，在不可逆操作场景中提供确定性安全防线；<b>多媒体生成</b>——通过提议者-审核者机制创建 PPT、视频等多模态内容，代码生成与生成模型的选择取决于产物的内在复杂度与精度要求；<b>系统适配器</b>——跟随格式演化，自动完成日志解析和问题诊断；<b>生成式 UI</b>——动态创建表单、可视化图表甚至完整可定制应用，突破纯文本限制；<b>Agent 自举</b>——用代码修复和创造同类 Agent，实现能创造 Agent 的 Agent。代码对 Agent 的价值在于：它既是完成任务的手段，也是积累知识、创造工具、优化自身的机制。<br>按 → 至此，上下文、知识、工具与代码能力已经组合成通用 Agent 的基础架构，而代码生成正是其中通用性最强的元能力。但前五章仍默认 Agent 与世界轮流行动；第六章将补上“构建 Agent”的最后一块，把观察与动作空间扩展到异步事件、语音、屏幕和物理世界，完成这一步后，第七章再转向评估与持续改进。右侧环上的六个维度可以点击回看。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：代码是 Agent <em>形式化思考和精确表达</em>的语言</h2></header>
+  <div class="q5a-body">
+    <div class="q5a-l">
+      <div class="q5a-r fx fx-up" style="--d:2"><em>Harness</em><div><b>成熟度来自软件工程的基础设施</b><p>测试套件、类型系统、版本控制天然构成一套强大的 Harness——不是因为代码生成模型特别强；这个结论值得推广到其他 Agent 场景</p></div></div>
+      <div class="q5a-r fx fx-up" style="--d:3"><em>可靠性</em><div><b>每类故障都要有路径</b><p>Agent 的可靠性不取决于模型犯不犯错，而取决于每类故障是否都有对应的<b>检测、恢复、接管与终止</b>路径</p></div></div>
+      <div class="q5a-r fx fx-up" data-step="1"><em>元能力</em><div><b>六个维度，由内向外</b><p>代码既是完成任务的手段，也是<b>积累知识、创造工具、优化自身</b>的机制</p></div></div>
+      <div class="q5a-next fx fx-up" data-step="2"><svg class="ic"><use href="#i-wave"/></svg><div><b>第六章：交互——观察与动作空间的扩展</b><p>前五章默认 Agent 与世界轮流行动；下一章扩展到异步事件、语音、屏幕和物理世界</p></div></div>
+    </div>
+    <div class="q5a-ring fx fx-scale" data-step="1"></div>
+  </div>
+  <div class="src">第五章 ·「本章小结」</div>
+</section>
+<style>
+.q5a-body{display:grid;grid-template-columns:1fr 600px;gap:28px;flex:1;min-height:0}
+.q5a-l{display:flex;flex-direction:column;gap:14px}
+.q5a-r{display:grid;grid-template-columns:120px 1fr;gap:20px;align-items:center;padding:16px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.q5a-r em{font-style:normal;font-size:24px;font-weight:800;color:var(--acc);text-align:center}
+.q5a-r b{font-size:22px}
+.q5a-r p{margin-top:6px;font-size:17px;line-height:1.6;color:var(--text2)}
+.q5a-r p b{font-size:inherit;color:var(--text)}
+.q5a-next{display:flex;align-items:center;gap:16px;margin-top:auto;padding:14px 20px;border-radius:16px;border:1px solid color-mix(in srgb,#f472b6 50%,transparent);background:color-mix(in srgb,#f472b6 8%,transparent)}
+.q5a-next .ic{font-size:36px;color:#f472b6;flex:none}
+.q5a-next b{font-size:20px}
+.q5a-next p{margin-top:4px;font-size:16px;line-height:1.55;color:var(--text2)}
+.q5a-ring{width:600px;height:600px;align-self:center}
+#c05-summary .loop-svg .node{cursor:pointer}
+</style>
+<script>
+HOOKS['c05-summary'] = {
+  N: [['思考工具', '#a78bfa', 'c05-math'], ['业务规则约束', '#c084fc', 'c05-rules'], ['多媒体生成', '#f472b6', 'c05-gui'], ['系统适配器', '#fb7185', 'c05-adapter'], ['生成式 UI', '#2dd4bf', 'c05-a2ui'], ['Agent 自举', '#22d3ee', 'c05-fig510']],
+  init(s) {
+    this.svg = U.ring(s.querySelector('.q5a-ring'), {
+      size: 600, labelSize: 21, cometDur: 8,
+      nodes: this.N.map(([label, color]) => ({ label, color })),
+      center: (c) => `<text x="${c}" y="${c - 8}" text-anchor="middle" style="fill:var(--text);font-size:44px;font-weight:800">代码</text><text x="${c}" y="${c + 30}" text-anchor="middle" style="fill:var(--text2);font-size:20px">通用性最强的元能力</text>`,
+    });
+    this.svg.querySelectorAll('.node,.lab').forEach((n) => n.addEventListener('click', () => C5.go(this.N[+n.dataset.i][2])));
+  },
+  enter(s, ctx) {
+    let a = 0;
+    const tick = () => { this.svg.querySelectorAll('.node,.lab').forEach((e) => e.classList.toggle('on', +e.dataset.i === a)); a = (a + 1) % 6; };
+    tick(); ctx.every(tick, 1500);
+  },
+};
+</script>
+
+<section class="slide" id="c05-qa1" data-part="10" data-trans="flip" data-dur="20000" data-title="思考题（一）" data-notes="第五章共 9 道思考题，这一页是第 1–5 题：第 1 题（★★）问代码执行的安全与能力如何平衡；第 2 题（★★★）问 Agent 自举的错误会不会代际累积、如何防止退化；第 3 题（★★）问日志格式变化是该适应还是该报告；第 4 题（★★）问 Reviewer 的偏好与用户不一致时，如何让用户偏好参与循环；第 5 题（★★）问沉淀下来的规则如何做“垃圾回收”，以及为什么一次成功的代码修改还不能算持续进化。点击题目展开参考答案提纲（取自原书附录），不点击时会自动依次展开；“回看”按钮跳到相关页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题（一）</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa q5b-list fx fx-up" style="--d:3"></div>
+  <div class="src">第五章 ·「思考题」1–5 · 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<section class="slide" id="c05-qa2" data-part="10" data-trans="flip" data-dur="20000" data-title="思考题（二）" data-notes="第 6–9 题：第 6 题（★）问你的团队距离“AI-ready”还有多远、最大的障碍是什么；第 7 题（★★★）问同时面对致命三要素和持久记忆四种要素时如何设计安全策略；第 8 题（★★）问 Artifact 模式“Agent 生成代码、系统执行代码”的优劣，以及如何保证生成的 SQL、HTML 安全；第 9 题（★★）问“代码即规则”相比自然语言规则的优势和局限。点击题目展开参考答案提纲（取自原书附录），不点击时会自动依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题（二）</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa q5c-list fx fx-up" style="--d:3"></div>
+  <div class="src">第五章 ·「思考题」6–9 · 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c05-qa1 .qa-q,#c05-qa2 .qa-q{font-size:18px;padding:12px 18px}
+#c05-qa1 .qa-a>div,#c05-qa2 .qa-a>div{font-size:16px;visibility:hidden;transition:visibility 0s linear .5s}
+#c05-qa1 .qa-it.open .qa-a>div,#c05-qa2 .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+#c05-qa1 .qa-a p+p,#c05-qa2 .qa-a p+p{margin-top:6px}
+.q5b-tag{display:inline-block;margin:2px 0 6px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.q5b-go{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:5px 12px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+</style>
+<script>
+window.Q5 = {
+  build(s, host, Q) {
+    host.innerHTML = Q.map((x) => `<div class="qa-it"><button class="qa-q"><em>${x.n}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div><span class="q5b-tag">参考答案提纲 · 原书附录</span>${x.a.map((p) => `<p>${p}</p>`).join('')}<button class="q5b-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    const open = U.qa(host, { single: true });
+    host.querySelectorAll('.q5b-go').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); C5.go(b.dataset.go); }));
+    return open;
+  },
+};
+HOOKS['c05-qa1'] = {
+  Q: [
+    { n: 1, st: '★★', go: ['c05-sandbox', '隔离兜底：沙盒的工程选型'], q: '代码生成被称为 Agent 的“元能力”。但代码执行引入了安全风险——Agent 生成的代码可能包含漏洞、无限循环或资源耗尽。沙盒隔离能解决部分问题，但也限制了代码能力（比如无法访问网络或文件系统）。如何在安全性和能力之间找到最优平衡点？', a: ['沙盒按场景分级隔离（容器 / microVM）；网络默认断网、白名单代理按需放行；源码只读挂载、API key 不要放在沙盒内；沙盒资源限额；沙盒生命周期管理（超时）。'] },
+    { n: 2, st: '★★★', go: ['c05-exp516', '实验 5-16：能创造 Agent 的 Agent'], q: 'Agent 自举——能创造 Agent 的 Agent——实现了“智能的自我繁殖”。但每次自举都可能引入新的偏差或错误，这种错误会在代际间累积吗？如何防止 Agent 自举的退化？', a: ['若每一代都在上一代产物的基础上继续繁殖，一些缺陷可能会累积。关键是要有足够有挑战性的 verifiable task（可验证任务），例如足够困难的编程任务。'] },
+    { n: 3, st: '★★', go: ['c05-exp510', '实验 5-10：自适应的日志解析'], q: '代码生成 Agent 在处理日志解析时，能自动跟随格式演化。但如果格式变化是一个 bug 而非预期改动，Agent 的适应性反而掩盖了问题。Agent 应该如何区分“需要适应的变化”和“需要报告的异常”？', a: ['适应前先诊断：对照架构文档与 PRD 判断新格式是否符合预期（实验 5-11 的思路）；核对版本控制记录，确认变化源自合法的代码提交，还是没有明确来源的漂移；类比 τ-bench 的 log_mismatch，即使选择适应，也要记录告警、自动创建 issue，而非静默兼容；不确定时引入人在回路进行确认。', '原则：适应与报告并行，不能让适应机制吞掉异常信号。'] },
+    { n: 4, st: '★★', go: ['c05-fig55', '图5-5 提议者-审核者机制'], q: '本章在 PPT 生成、视频编辑和日志可视化中反复使用提议者-审核者机制。如果 Reviewer 的审美偏好与目标用户不一致，比如 Reviewer 认为信息密度合理但用户觉得太拥挤，反馈循环会收敛到错误的局部最优。如何让用户的偏好反馈也参与 Reviewer 循环？', a: ['把用户反馈作为最高优先级的结构化事件注入 Agent 轨迹；将用户偏好记录在外部的 MEMORY.md 中，使其能够跨任务生效；交付 HTML 格式的文档而非 Markdown 文档，以便用户查验。'] },
+    { n: 5, st: '★★', go: ['c05-docs', '项目文档化与项目指令文件'], q: '本章展示了 Coding Agent 把执行和调试中获得的经验沉淀回代码库的多种方式——写入知识库文件、更新架构文档、维护项目指令文件、把操作序列固化为代码。如果把这些经验进一步提炼为系统提示词中的规则，规则集会随时间不断膨胀。如何对沉淀下来的规则做“垃圾回收”——识别并清理冗余或过时的条目？为什么一次成功的代码修改还不能直接视为第九章所说的持续进化？', a: ['GC 思路：能编码进 Linter、CI 或工具校验的规则移出提示词；追踪规则命中率和冲突，定期对照代码库重新验证；用 Markdown 与 Git 保留来源、版本和回滚能力。', '一次补丁成功只说明它解决了当前案例；持续进化还要求修改来自可追溯的运行证据，能改善后续任务，并通过旧任务回归与安全验证。'] },
+  ],
+  init(s) { this.open = Q5.build(s, s.querySelector('.q5b-list'), this.Q); s.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; })); },
+  enter(s, ctx) { this.auto = true; let n = 0; ctx.later(() => this.open(0), 800); ctx.every(() => { if (this.auto) { n = (n + 1) % this.Q.length; this.open(n); } }, 6500); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c05-qa2'] = {
+  Q: [
+    { n: 6, st: '★', go: ['c05-docs', '项目文档化与 AI-ready 指标'], q: '“对远程工作友好的团队往往也对 AI Agent 友好。”你所在的团队或组织，在知识文档化方面距离“AI-ready”还有多远？最大的障碍是什么？', a: ['开放题。可用本章的代理指标自查：远程新人只靠仓库和文档能否独立开展工作。检查项：决策是否记录在文档中、上下文是否写进 issue / PR、构建和测试命令是否记录在 CLAUDE.md / AGENTS.md 一类的指令文件中、部落知识是否沉淀为开发者指南。', '最常见的障碍是依赖“问旁边同事”的口头传递与白板文化——Agent 读不到口头约定，只能读到文档。'] },
+    { n: 7, st: '★★★', go: ['c05-trifecta', '致命三要素与持久记忆'], q: 'Simon Willison 提出了 Agent 的“致命三要素”（访问私有数据、暴露于不受信任内容、具备外部通信能力），本章在此基础上增加了第四个——持久记忆。在一个需要同时处理这四种要素的生产环境中，你会如何设计安全策略？', a: ['按四类边界分层设防。数据边界：不挂载凭证，以只读方式挂载源码，尽量缩小可见范围。输入信任边界：标注来源，将外部内容降格为“可参考、无指令效力”的数据（忠诚度守则）。输出影响边界：默认断网并设置白名单出口、解析命令语义而非采用黑名单、使用 Sidecar 独立复核并引入人在回路——关键操作必须由上下文之外的机制复核。跨会话边界：写入 MEMORY.md 的内容需经过与外部内容同等严格的信任审查。', '目标是即使受到提示注入，恶意指令也无法执行。'] },
+    { n: 8, st: '★★', go: ['c05-fig59', '图5-9 Artifact 模式'], q: 'Artifact 模式让 Agent 生成 SQL 或前端代码，由数据库和浏览器直接执行，绕过 LLM 处理大量数据。与传统的“Agent 直接给出答案”相比，这种“Agent 生成代码、系统执行代码”的分工有什么优劣？生成的 SQL 可能执行破坏性操作、生成的 HTML 可能包含漏洞，又该如何确保安全？', a: ['优劣：数据从数据库直达前端，绕过 LLM 这个“中间人”——速度快、节省 token，还能避免抄写大量数据时产生幻觉错误，适合呈现大量数据；代码可审计、可复用，还能组成流水线（SQL 结果直接传给可视化代码）。代价是 LLM 看不到查询结果，无法基于数据内容进一步归纳和决策，不适合需要模型先消化数据再推理的任务。', '安全：SQL 用最小权限只读账号执行，并添加 CPU、内存等资源限制，防止资源耗尽；HTML / UI 优先 A2UI 类声明式协议，Agent 只输出界面描述 JSON，由客户端用受信组件目录渲染；确需任意 HTML 时应在沙盒环境中展示，防止注入。'] },
+    { n: 9, st: '★★', go: ['c05-guard', '两层价值与三重保障'], q: '将业务规则编码为工具内部基于数据库真值的校验，并用参数设计引导模型在调用前核对政策条件，本质上是用代码结构来约束 Agent 行为。这种“代码即规则”的模式相比自然语言规则有什么优势和局限？', a: ['优势：没有歧义、能够确定性执行、擅长处理复杂的条件组合；政策事实取自数据库真值和服务端时钟，不采信模型自报值，幻觉和提示注入都无法绕过，是防止不可逆操作的最后一道防线；expected_* 参数还可兼作强制 checklist，引导模型思考。', '局限：代码不会向用户解释政策，也不会寻找变通方案，而且有维护成本。结论：代码规则与自然语言规则互补，而非相互替代。'] },
+  ],
+  init(s) { this.open = Q5.build(s, s.querySelector('.q5c-list'), this.Q); s.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; })); },
+  enter(s, ctx) { this.auto = true; let n = 0; ctx.later(() => this.open(0), 800); ctx.every(() => { if (this.auto) { n = (n + 1) % this.Q.length; this.open(n); } }, 6500); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<section class="slide" id="c05-end" data-part="10" data-trans="iris" data-title="第五章 · 完" data-notes="第五章到这里结束。本章从 Coding Agent 讲起——七个核心工具、文件系统中枢、工程化流程、Harness 工程、故障与错误恢复、实现技巧、搜索与编辑工具、安全——再把代码当作通用 Agent 的元能力，由内向外展开六个方向：思考工具、业务规则约束、多媒体生成、系统适配器、生成式 UI 与 Agent 自举。下一章《交互：观察与动作空间的扩展》补上“构建 Agent”的最后一块：异步事件、语音、屏幕与物理世界。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <div class="q5d-orbit fx fx-scale" style="--d:3"></div>
+  <div class="q5d-text">
+    <div class="q5d-tag fx fx-up"><i></i>第五章 · 完</div>
+    <h1 class="q5d-title"><span class="split" data-grad="#fde68a,#fbbf24,#fb923c">代码，是通用性最强的元能力</span></h1>
+    <p class="q5d-sub fx fx-up" style="--d:10">下一章：把观察与动作空间扩展到<b>异步事件、语音、屏幕和物理世界</b></p>
+    <div class="end-nav fx fx-up" style="--d:12">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+</section>
+<style>
+#c05-end{justify-content:center;padding-left:150px}
+#c05-end .q5d-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c05-end .q5d-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c05-end .q5d-title{margin-top:26px;font-size:84px;line-height:1.15;font-weight:800;max-width:980px}
+#c05-end .q5d-sub{margin-top:26px;font-size:26px;line-height:1.5;color:var(--text2);max-width:960px}
+#c05-end .q5d-sub b{color:var(--acc)}
+#c05-end .end-nav{margin-top:40px}
+#c05-end .q5d-orbit{position:absolute;right:110px;top:50%;width:600px;height:600px;margin-top:-310px}
+</style>
+<script>
+HOOKS['c05-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.q5d-orbit'), {
+      size: 600, core: 'Code', outer: 'META-CAPABILITY · 元能力 · META-CAPABILITY · 元能力',
+      sats: [
+        { label: '思考', color: '#a78bfa', rx: 0.36, ry: 0.15, tilt: -24, dur: 12, phase: 0 },
+        { label: '表达', color: '#2dd4bf', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.3 },
+        { label: '自举', color: '#fbbf24', rx: 0.3, ry: 0.2, tilt: 88, dur: 10, phase: 0.6 },
+      ],
+    });
+  },
+};
+</script>

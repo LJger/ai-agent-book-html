@@ -1,0 +1,418 @@
+<!-- ================= PART 05 LLM 评判 ================= -->
+<section class="slide chapter" id="c07-d5" data-part="5" data-title="PART 05 · LLM 评判" data-notes="「自动化评估方法」。前面几节讨论的基准测试有一个共同点：验证器几乎都是确定性的。确定性验证只能回答对不对，不能给出错误原因；而生产场景里许多判断根本无法写成代码可检查的断言。这一部分沿“可机械验证程度”的谱系向右移动（图7-4）：LLM-as-a-Judge 的流水线（图7-5）、长度偏差、Rubric 四准则与一个完整的 Rubric，实验 7-3、7-4 把它落到用户记忆评估上（表7-3），再讨论同源模型问题与多源评判、多模态评判，以及实验 7-5 的 TTS 评估流水线。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">LLM 评判</h1>
+  <div class="ch-s fx fx-up" style="--d:3">Rubric 把“好不好”拆成维度，LLM-as-a-Judge 逐维打分</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">Rubric 不只告诉我们“得了多少分”，还会告诉我们下一步该改哪里。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<!-- ================= 自动化评估方法：谱系 ================= -->
+<section class="slide" id="c07-spectrum" data-part="5" data-dur="20000" data-title="图7-4 验证方式的谱系" data-notes="前面几节讨论的基准测试有一个共同点：<b>验证器几乎都是确定性的</b>。SWE-bench 运行测试套件，AndroidWorld 断言最终 UI 状态，GAIA 做精确字符串匹配，τ²-bench 的四层检查同样全部由代码执行。这一选择有充分理由：确定性验证不引入额外的模型开销，结果完全可复现，可以像单元测试一样纳入持续集成，也便于在不同模型之间排名。<br>代价是它只能评估最终结果对不对，但不能给出错误原因。τ²-bench 那条失败的任务最终得 0 分，而这个 0 分不会说明 Agent 是在线路选择环节出错、还是漏掉了流量充值步骤，更不会指出下一步该改什么。对于用于排名的公开基准，这不构成缺陷；对于需要持续改进的生产系统，这恰恰是最需要的信息。生产场景还有另一重困难：许多判断根本无法写成代码可检查的断言。一封投诉回复是否得体，一份调研报告是否遗漏了关键信息，一次记忆检索是否弄错了人物关系，这些既没有唯一终态可供查询，也无法靠关键词匹配来判定。<br>因此，从公开基准测试走向生产环境中的评估，验证方式需要沿一条谱系向右移动，其横轴是任务的<b>可机械验证程度</b>（图7-4）：确定性验证器（终态唯一可查，通过/不通过，如 SWE-bench 跑测试）→ 检查项清单（多项确定性检查，按声明的口径聚合，如 τ²-bench 四层验证）→ Rubric + LLM 评判（维度可拆但无法机械判定，分维度打分并说明理由，如客服质量、报告撰写）→ 配对比较（连维度都难以写出，只判 A 与 B 孰优，如 Chatbot Arena）。谱系右侧的两件工具因此成为生产评估的主体：用 <b>Rubric</b> 把笼统的“好不好”拆成若干个可分别打分的维度，用 <b>LLM-as-a-Judge</b> 在缺乏确定性判据时完成打分。二者合起来，才能把一个笼统的失败率还原为可着手修复的具体问题；再配合本节后半部分的<b>失败归因</b>，构成生产 Agent 评估的完整闭环。<br>需要说明的是，<b>向右移动并不意味着放弃左侧</b>。凡是能写成程序化断言的检查都应当继续用断言，LLM 评判只用于确实无法机械判定的维度。确定性检查更便宜、更稳定，也更适合作为回归测试长期运行。<br>游标沿谱系自动移动，四个站点可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图7-4 验证方式的谱系：<em>从确定性验证到模型评判</em></h2></header>
+  <div class="c7gp-ax fx fx-up" style="--d:2"><span>任务的可机械验证程度：高</span><i></i><span>低</span></div>
+  <div class="c7gp-st fx fx-up" style="--d:3"></div>
+  <div class="c7gp-bt fx fx-up" style="--d:4">
+    <div class="c7gp-g" data-g="0"><b>确定性验证</b><p class="ok">结果完全可复现、可纳入持续集成、成本低</p><p class="bad">代价：只回答对错，不指出问题出在哪里——τ²-bench 那条失败任务的 0 分，说不出是线路选错了还是漏了充值</p></div>
+    <div class="c7gp-g" data-g="1"><b>模型评判</b><p class="ok">可拆出诊断维度，覆盖写不成断言的任务：投诉回复是否得体、报告是否漏了关键信息、记忆是否弄错人物关系</p><p class="bad">代价：引入评判偏差与波动，成本更高</p></div>
+  </div>
+  <p class="c7gp-nt fx fx-up" style="--d:5"><b>向右移动并不意味着放弃左侧</b>：能写成程序化断言的检查继续用断言；LLM 评判只用于确实无法机械判定的维度</p>
+  <div class="src">第七章 ·「自动化评估方法」· 图7-4 验证方式的谱系：从确定性验证到模型评判</div>
+</section>
+<style>
+.c7gp-ax{display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;font-size:16px;color:var(--text3)}
+.c7gp-ax i{height:6px;border-radius:999px;background:linear-gradient(90deg,#34d399,#60a5fa,var(--acc),#f472b6);position:relative}
+.c7gp-ax i::after{content:"";position:absolute;right:-6px;top:-6px;border:9px solid transparent;border-left-color:#f472b6;border-right:none}
+.c7gp-st{position:relative;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:16px}
+.c7gp-s{--c:#34d399;display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:18px;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s,box-shadow .4s,transform .4s}
+.c7gp-s em{font:800 15px var(--num);font-style:normal;color:var(--c);letter-spacing:.1em}
+.c7gp-s b{font-size:21px}
+.c7gp-s span{font-size:16px;line-height:1.5;color:var(--text2)}
+.c7gp-s code{align-self:flex-start;margin-top:4px;padding:3px 10px;border-radius:8px;font:600 15px var(--font);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.c7gp-s.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 11%,rgba(12,18,40,.85));box-shadow:0 0 30px color-mix(in srgb,var(--c) 28%,transparent);transform:translateY(-4px)}
+.c7gp-cur{position:absolute;top:-22px;width:0;height:0;border:10px solid transparent;border-top-color:var(--acc);transition:left .7s var(--ease)}
+.c7gp-bt{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.c7gp-g{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .4s,background .4s}
+.c7gp-g b{font-size:19px}
+.c7gp-g p{font-size:16px;line-height:1.55}
+.c7gp-g p.ok{color:#a7f3d0}
+.c7gp-g p.bad{color:#fecdd3}
+.c7gp-g.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.c7gp-nt{margin-top:16px;font-size:18px;line-height:1.6;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.c7gp-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-spectrum'] = {
+  S: [['确定性验证器', '终态唯一可查', '通过 / 不通过', 'SWE-bench 跑测试', '#34d399'], ['检查项清单', '多项确定性检查', '按声明的口径聚合', 'τ²-bench 四层验证', '#60a5fa'], ['Rubric + LLM 评判', '维度可拆但无法机械判定', '分维度打分并说明理由', '客服质量、报告撰写', '#c084fc'], ['配对比较', '连维度都难以写出', '只判 A 与 B 孰优', 'Chatbot Arena', '#f472b6']],
+  init(s) {
+    const st = s.querySelector('.c7gp-st');
+    st.innerHTML = '<i class="c7gp-cur"></i>' + this.S.map(([b, x, y, z, c], i) => `<button class="c7gp-s" data-i="${i}" style="--c:${c}"><em>0${i + 1}</em><b>${b}</b><span>${x}</span><span>${y}</span><code>${z}</code></button>`).join('');
+    st.querySelectorAll('.c7gp-s').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  pick(s, i) {
+    this.i = i;
+    const bs = [...s.querySelectorAll('.c7gp-s')];
+    bs.forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.c7gp-cur').style.left = (bs[i].offsetLeft + bs[i].offsetWidth / 2 - 10) + 'px';
+    s.querySelectorAll('.c7gp-g').forEach((g) => g.classList.toggle('on', +g.dataset.g === (i < 2 ? 0 : 1)));
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 4, 3000, (i) => this.pick(s, i), 300); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7gp-s,.c7gp-g').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= LLM-as-a-Judge ================= -->
+<section class="slide" id="c07-pipeline" data-part="5" data-trans="zoom" data-dur="22000" data-title="图7-5 LLM-as-a-Judge 流水线" data-notes="<b>为什么需要 LLM-as-a-Judge？</b>对于开放式任务（如生成报告、处理客户投诉、创意内容），没有标准答案可以自动对比，人工评估成本高且难以规模化。LLM-as-a-Judge 通过让语言模型根据专家定义的评分标准（Rubric）进行评判，在自动化规模和人类专业判断之间取得了平衡。<br>图7-5 是它的流水线。输入有三份：<b>Rubric</b>（事实正确性：Essential；逻辑连贯性：Important；完整性：Important；幻觉检测：Veto）、<b>候选回答</b>（Agent 输出“退款已处理，$150 将在 3–5 工作日内到账。”）和可选的<b>参考方案</b>（标准答案 / 评分要点：必须包含退款金额、必须包含到账时间、不可承诺具体日期）。它们一起交给 <b>Judge 模型</b>（GPT-5 / Gemini 2.5，多源异构评判防止同源偏见），输出<b>结构化评估</b>：事实正确性 4/4（金额和时间均准确）、完整性 3/4（缺少退款方式说明）、幻觉检测 PASS（无虚假信息）、逻辑连贯性 4/4（因果关系清晰）。最后按<b>评分聚合策略</b>得到总分：加权平均 Σ(权重×维度分)；一票否决——幻觉 = FAIL 时总分 = 0；多评委——3 个 Judge 取中位数；边界案例标记——分歧大于 2 分转人审。<br>数据包沿流水线流动，右侧四种聚合策略轮流高亮；打开右上角的开关，候选回答被改成承诺了一个具体日期，幻觉检测失败，一票否决把总分清零。加权平均的权重与另外两位评委的分数为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图7-5 <em>LLM-as-a-Judge</em> 流水线</h2></div><button class="tgl c7pl-tg fx fx-up" style="--d:2;--tc:#fb7185"><i></i>让候选回答编造一个到账日期</button></header>
+  <div class="c7pl-stage fx fx-up" style="--d:3">
+    <svg class="c7pl-svg" viewBox="0 0 1660 560"></svg>
+    <div class="c7pl-n c7pl-rub" style="left:0;top:0;width:380px;height:196px"><span class="lbl">Rubric（评分标准）</span><div><span>事实正确性</span><i>Essential</i></div><div><span>逻辑连贯性</span><i>Important</i></div><div><span>完整性</span><i>Important</i></div><div class="v"><span>幻觉检测</span><i>Veto ⚠</i></div></div>
+    <div class="c7pl-n c7pl-cand" style="left:0;top:214px;width:380px;height:126px"><span class="lbl">候选回答 · Agent 输出</span><p class="c7pl-ans"></p></div>
+    <div class="c7pl-n" style="left:0;top:358px;width:380px;height:160px"><span class="lbl">参考方案（可选）· 评分要点</span><ul><li>必须包含退款金额</li><li>必须包含到账时间</li><li>不可承诺具体日期</li></ul></div>
+    <div class="c7pl-n c7pl-j" style="left:520px;top:170px;width:290px;height:180px"><svg class="ic"><use href="#i-scale"/></svg><b>Judge 模型</b><span>GPT-5 / Gemini 2.5</span><small>多源异构评判防止同源偏见</small></div>
+    <div class="c7pl-outs" style="left:950px;top:0;width:330px;height:520px"></div>
+    <div class="c7pl-agg" style="left:1330px;top:0;width:330px;height:520px"><span class="lbl">评分聚合策略</span><div class="c7pl-as"></div><div class="c7pl-tot"><span>总分</span><b>—</b></div></div>
+  </div>
+  <p class="c7pl-why fx fx-up" style="--d:4">开放式任务没有标准答案可以自动对比，人工评估又难以规模化：LLM 评判在<b>自动化规模</b>与<b>人类专业判断</b>之间取得平衡</p>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 图7-5 LLM-as-a-Judge 流水线</div>
+</section>
+<style>
+#c07-pipeline .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c07-pipeline .tgl{font-size:16px}
+.c7pl-stage{position:relative;width:1660px;height:560px}
+.c7pl-svg{position:absolute;inset:0;width:1660px;height:560px;overflow:visible;pointer-events:none}
+.c7pl-ln{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2;stroke-dasharray:6 7;animation:flow 1.2s linear infinite}
+.c7pl-dot{fill:#fff;opacity:0;filter:drop-shadow(0 0 8px var(--acc))}
+.c7pl-n{position:absolute;display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.9)}
+.c7pl-rub>div{display:flex;justify-content:space-between;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.04);font-size:16px}
+.c7pl-rub i{font:600 15px var(--num);font-style:normal;color:var(--acc)}
+.c7pl-rub .v i{color:#fb7185}
+.c7pl-ans{font-size:18px;line-height:1.5;color:var(--text)}
+.c7pl-ans mark{color:#fff;background:rgba(251,113,133,.35);border-radius:4px;padding:0 3px}
+.c7pl-n ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:16px;color:var(--text2)}
+.c7pl-j{align-items:center;justify-content:center;text-align:center;border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.92));transition:box-shadow .3s}
+.c7pl-j .ic{font-size:40px;color:var(--acc)}
+.c7pl-j b{font-size:22px}
+.c7pl-j span{font-size:16px;color:var(--text2)}
+.c7pl-j small{font-size:15px;color:var(--text3)}
+.c7pl-j.on{box-shadow:0 0 40px color-mix(in srgb,var(--acc) 45%,transparent)}
+.c7pl-outs{position:absolute;display:flex;flex-direction:column;justify-content:space-between}
+.c7pl-o{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center;height:112px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.9);transition:border-color .35s}
+.c7pl-o b{font-size:18px}
+.c7pl-o em{grid-row:span 2;font:800 26px var(--num);font-style:normal;color:var(--text3);transition:color .35s}
+.c7pl-o span{font-size:15px;color:var(--text3)}
+.c7pl-o.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.c7pl-o.on em{color:var(--text)}
+.c7pl-o.ok em{color:#34d399}
+.c7pl-o.bad{border-color:rgba(251,113,133,.6)}
+.c7pl-o.bad em{color:#fb7185}
+.c7pl-agg{position:absolute;display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.9)}
+.c7pl-as{display:flex;flex-direction:column;gap:6px}
+.c7pl-a{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);transition:all .35s}
+.c7pl-a b{font-size:16px}
+.c7pl-a span{font-size:15px;line-height:1.45;color:var(--text3)}
+.c7pl-a.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c7pl-a.on span{color:var(--text2)}
+.c7pl-tot{margin-top:auto;display:flex;align-items:baseline;justify-content:space-between;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.05)}
+.c7pl-tot span{font-size:16px;color:var(--text3)}
+.c7pl-tot b{font:800 30px var(--num)}
+.c7pl-tot b.z{color:#fb7185}
+.c7pl-why{margin-top:10px;font-size:17px;color:var(--text2)}
+.c7pl-why b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-pipeline'] = {
+  O: [['事实正确性', '4/4', '金额和时间均准确', 4], ['完整性', '3/4', '缺少退款方式说明', 3], ['幻觉检测', 'PASS', '无虚假信息', 'p'], ['逻辑连贯性', '4/4', '因果关系清晰', 4]],
+  A: [['加权平均', 'Σ(权重 × 维度分)'], ['一票否决', '幻觉 = FAIL → 总分 = 0'], ['多评委', '3 个 Judge 取中位数'], ['边界案例标记', '分歧 > 2 分 → 人审']],
+  init(s) {
+    const sv = s.querySelector('.c7pl-svg');
+    const IN = [[380, 98], [380, 277], [380, 438]], J = [[520, 260], [810, 260]], OUT = [56, 192, 328, 464].map((y) => [950, y]), AG = [1330, 260];
+    let h = IN.map(([x, y], i) => `<path class="c7pl-ln" d="M${x} ${y} C450 ${y}, 450 260, 520 260"/><path class="c7pl-p" data-p="i${i}" d="M${x} ${y} C450 ${y}, 450 260, 520 260" fill="none"/>`).join('');
+    h += OUT.map(([x, y], i) => `<path class="c7pl-ln" d="M810 260 C880 260, 880 ${y}, 950 ${y}"/><path class="c7pl-p" data-p="o${i}" d="M810 260 C880 260, 880 ${y}, 950 ${y}" fill="none"/><path class="c7pl-ln" d="M1280 ${y} C1305 ${y}, 1305 260, 1330 260"/><path class="c7pl-p" data-p="a${i}" d="M1280 ${y} C1305 ${y}, 1305 260, 1330 260" fill="none"/>`).join('');
+    h += Array.from({ length: 4 }, () => '<circle class="c7pl-dot" r="8"/>').join('');
+    sv.innerHTML = h;
+    s.querySelector('.c7pl-outs').innerHTML = this.O.map(([n]) => `<div class="c7pl-o"><b>${n}</b><em>—</em><span></span></div>`).join('');
+    s.querySelector('.c7pl-as').innerHTML = this.A.map(([b, sp]) => `<div class="c7pl-a"><b>${b}</b><span>${sp}</span></div>`).join('');
+    this.tg = s.querySelector('.c7pl-tg');
+    this.tg.addEventListener('click', () => { this.auto = false; this.tg.classList.toggle('on'); this.tk = (this.tk || 0) + 1; this.run(s); });
+  },
+  async run(s) {
+    const ctx = this.ctx; if (!ctx) return;
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk, hal = this.tg.classList.contains('on');
+    const sv = s.querySelector('.c7pl-svg'), dots = [...sv.querySelectorAll('.c7pl-dot')], P = (id) => sv.querySelector(`.c7pl-p[data-p="${id}"]`);
+    const os = [...s.querySelectorAll('.c7pl-o')], as = [...s.querySelectorAll('.c7pl-a')], tot = s.querySelector('.c7pl-tot b'), j = s.querySelector('.c7pl-j');
+    s.querySelector('.c7pl-ans').innerHTML = hal ? '“退款已处理，$150 将在 <mark>3 月 15 日</mark>到账。”' : '“退款已处理，$150 将在 3–5 工作日内到账。”';
+    while (ok()) {
+      os.forEach((o) => { o.className = 'c7pl-o'; o.querySelector('em').textContent = '—'; o.querySelector('span').textContent = ''; });
+      as.forEach((a) => a.classList.remove('on')); tot.textContent = '—'; tot.className = '';
+      await Promise.all([0, 1, 2].map((i) => U.fly(dots[i], P('i' + i), 1000, { ctx, alive: ok, delay: i * 150 }))); if (!ok()) return;
+      j.classList.add('on'); await U.wait(ctx, 700); if (!ok()) return; j.classList.remove('on');
+      await Promise.all([0, 1, 2, 3].map((i) => U.fly(dots[i], P('o' + i), 800, { ctx, alive: ok, delay: i * 120 }))); if (!ok()) return;
+      for (let i = 0; i < 4; i++) {
+        let [, sc, why, v] = this.O[i];
+        if (hal && i === 2) { sc = 'FAIL'; why = '承诺了对话中不存在的具体日期'; }
+        if (hal && i === 0) { sc = '2/4'; why = '金额对，到账时间是编造的'; v = 2; }
+        os[i].className = 'c7pl-o on' + (sc === 'PASS' ? ' ok' : sc === 'FAIL' ? ' bad' : '');
+        os[i].querySelector('em').textContent = sc; os[i].querySelector('span').textContent = why;
+        await U.wait(ctx, 380); if (!ok()) return;
+      }
+      await Promise.all([0, 1, 2, 3].map((i) => U.fly(dots[i], P('a' + i), 600, { ctx, alive: ok }))); if (!ok()) return;
+      // 示意权重：Essential 3、Important 2
+      const f = hal ? 2 : 4, wa = (3 * f + 2 * 4 + 2 * 3) / 7;
+      const T = hal ? ['加权平均 ' + wa.toFixed(2), '0（幻觉否决）', '0（三位评委都判 FAIL）', '无分歧 · 不需人审'] : ['加权平均 ' + wa.toFixed(2), wa.toFixed(2) + '（未触发否决）', '中位数 ' + wa.toFixed(2) + '（3.43 / 3.71 / 3.86）', '最大分歧 1 分 · 不需人审'];
+      for (let i = 0; i < 4; i++) {
+        as.forEach((a, k) => a.classList.toggle('on', k === i));
+        tot.textContent = T[i]; tot.className = hal && i > 0 && i < 3 ? 'z' : '';
+        await U.wait(ctx, 1500); if (!ok()) return;
+      }
+      await U.wait(ctx, 800);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true; this.tg.classList.remove('on'); this.run(s);
+    ctx.every(() => { if (this.auto) { this.tg.classList.toggle('on'); this.tk++; this.run(s); } }, 11000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.tg.classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c07-lenbias" data-part="5" data-dur="20000" data-title="长度偏差：评判模型的已知局限" data-notes="LLM-as-a-Judge 也有已知的局限：评判模型可能有自己的偏见，相同输入多次评判也可能有波动。最典型的是<b>长度偏差</b>，即倾向于给更长、更详尽的回复打高分，哪怕内容并不更正确。就像人类考试时对不会的题就长篇大论的回答，期望能“蒙对”一两个点。<br>常用防范手段有三种：<b>在 Rubric 里显式惩罚冗长、对同类任务规定回答的长度上限</b>；<b>做配对比较时先把两个候选的长度控制到相近再评</b>；以及<b>定期审计评分与回答长度的相关性</b>——如果高分几乎总是伴随长回答，就说明评判已被长度带偏，需要回炉修订 Rubric。为了系统性地应对这些挑战，Rubric 设计必须遵循下一页的四条准则。<br>左侧散点是一组示意数据：每个点是一条回答，横轴是长度，纵轴是评判分数，点的颜色深浅表示（假设已知的）真实质量。打开前两种手段，长度对分数的影响变小；第三种手段是审计，它不改变分数，只负责发现问题。相关系数按散点实时计算。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">长度偏差：越长的回答，<em>分数越高？</em></h2></header>
+  <div class="c7lb-body">
+    <div class="c7lb-ch panel fx fx-left" style="--d:2"><div class="c7lb-h"><b>评判分数 vs 回答长度</b><span class="c7-tag">示意数据</span></div><svg class="c7lb-svg" viewBox="0 0 760 440"></svg><div class="c7lb-r"><div><span>r（长度，分数）</span><b class="c7lb-r1">—</b></div><div><span>r（真实质量，分数）</span><b class="c7lb-r2">—</b></div></div></div>
+    <div class="c7lb-rt fx fx-right" style="--d:3">
+      <div class="c7lb-k"><b>已知局限</b><p>评判模型可能有自己的偏见，相同输入多次评判也可能有波动。最典型的是<b>长度偏差</b>：给更长、更详尽的回复打高分，哪怕内容并不更正确——像考试时对不会的题长篇大论，指望“蒙对”一两个点</p></div>
+      <div class="c7lb-tg">
+        <button class="tgl" data-r="0"><i></i>① Rubric 显式惩罚冗长 + 同类任务规定长度上限</button>
+        <button class="tgl" data-r="1"><i></i>② 配对比较前，先把两个候选的长度控制到相近</button>
+        <button class="tgl" data-r="2"><i></i>③ 定期审计评分与回答长度的相关性</button>
+      </div>
+      <div class="c7lb-au"></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 长度偏差与三种防范手段</div>
+</section>
+<style>
+.c7lb-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.c7lb-ch{padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.c7lb-h{display:flex;align-items:center;justify-content:space-between}
+.c7lb-h b{font-size:19px}
+.c7lb-svg{width:100%;flex:1;min-height:0}
+.c7lb-ax{stroke:rgba(255,255,255,.25);stroke-width:1.5}
+.c7lb-tx{font-size:15px;fill:var(--text3)}
+.c7lb-pt{transition:cy .9s var(--ease)}
+.c7lb-fit{stroke:#fbbf24;stroke-width:3;stroke-dasharray:8 6;transition:all .9s var(--ease)}
+.c7lb-r{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.c7lb-r div{display:flex;align-items:baseline;justify-content:space-between;padding:8px 14px;border-radius:12px;border:1px solid var(--line)}
+.c7lb-r span{font-size:15px;color:var(--text3)}
+.c7lb-r b{font:800 26px var(--num)}
+.c7lb-r1.hi{color:#fb7185}.c7lb-r1.lo{color:#34d399}
+.c7lb-rt{display:flex;flex-direction:column;gap:14px}
+.c7lb-k{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.c7lb-k b{font-size:18px}
+.c7lb-k p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+.c7lb-k p b{font-size:16px;color:var(--text)}
+.c7lb-tg{display:flex;flex-direction:column;gap:10px}
+.c7lb-tg .tgl{font-size:16px;text-align:left;line-height:1.4}
+.c7lb-au{margin-top:auto;min-height:84px;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55;border:1px dashed var(--line2);color:var(--text3)}
+.c7lb-au.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.07)}
+.c7lb-au.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+</style>
+<script>
+HOOKS['c07-lenbias'] = {
+  init(s) {
+    const r = U.rand(42), n = 42;
+    this.D = Array.from({ length: n }, () => ({ L: 80 + r() * 820, q: 1 + r() * 4, e: (r() - 0.5) * 0.8 }));
+    const sv = s.querySelector('.c7lb-svg');
+    let h = '<line class="c7lb-ax" x1="70" y1="380" x2="740" y2="380"/><line class="c7lb-ax" x1="70" y1="20" x2="70" y2="380"/>';
+    h += '<text class="c7lb-tx" x="740" y="410" text-anchor="end">回答长度（token）→</text><text class="c7lb-tx" x="14" y="30">分数</text>';
+    [1, 2, 3, 4, 5].forEach((v) => (h += `<text class="c7lb-tx" x="52" y="${this.Y(v) + 5}" text-anchor="end">${v}</text>`));
+    [100, 300, 500, 700, 900].forEach((v) => (h += `<text class="c7lb-tx" x="${this.X(v)}" y="400" text-anchor="middle">${v}</text>`));
+    h += '<line class="c7lb-fit"/>';
+    h += this.D.map((d) => `<circle class="c7lb-pt" r="7" cx="${this.X(d.L).toFixed(1)}" cy="${this.Y(3)}" fill="hsl(${150 + d.q * 0}, ${20 + d.q * 15}%, ${30 + d.q * 10}%)" stroke="rgba(255,255,255,.5)"/>`).join('');
+    sv.innerHTML = h;
+    this.t = [...s.querySelectorAll('.c7lb-tg .tgl')];
+    this.t.forEach((b) => b.addEventListener('click', () => { this.auto = false; b.classList.toggle('on'); this.apply(s); }));
+  },
+  X: (L) => 70 + ((L - 50) / 900) * 660,
+  Y: (v) => 380 - ((v - 0.5) / 5) * 360,
+  corr(a, b) { const n = a.length, ma = a.reduce((x, y) => x + y) / n, mb = b.reduce((x, y) => x + y) / n; let c = 0, va = 0, vb = 0; for (let i = 0; i < n; i++) { c += (a[i] - ma) * (b[i] - mb); va += (a[i] - ma) ** 2; vb += (b[i] - mb) ** 2; } return c / Math.sqrt(va * vb); },
+  apply(s) {
+    const [r1, r2, au] = this.t.map((b) => b.classList.contains('on'));
+    const k = r1 && r2 ? 0.08 : r1 ? 0.45 : r2 ? 0.3 : 1;
+    const sc = this.D.map((d) => Math.max(1, Math.min(5, 0.35 * d.q + 2.6 * k * ((d.L - 80) / 820) + 1.3 + (1 - k) * 0.55 * (d.q - 3) + d.e * 0.6)));
+    s.querySelectorAll('.c7lb-pt').forEach((p, i) => p.setAttribute('cy', this.Y(sc[i]).toFixed(1)));
+    const Ls = this.D.map((d) => d.L), qs = this.D.map((d) => d.q), rl = this.corr(Ls, sc), rq = this.corr(qs, sc);
+    const mL = Ls.reduce((a, b) => a + b) / Ls.length, mS = sc.reduce((a, b) => a + b) / sc.length;
+    let num = 0, den = 0; for (let i = 0; i < Ls.length; i++) { num += (Ls[i] - mL) * (sc[i] - mS); den += (Ls[i] - mL) ** 2; }
+    const sl = num / den, y0 = mS + sl * (80 - mL), y1 = mS + sl * (900 - mL), fit = s.querySelector('.c7lb-fit');
+    fit.setAttribute('x1', this.X(80)); fit.setAttribute('y1', this.Y(y0)); fit.setAttribute('x2', this.X(900)); fit.setAttribute('y2', this.Y(y1));
+    const e1 = s.querySelector('.c7lb-r1'); e1.textContent = rl.toFixed(2); e1.className = 'c7lb-r1 ' + (rl > 0.5 ? 'hi' : 'lo');
+    s.querySelector('.c7lb-r2').textContent = rq.toFixed(2);
+    const a = s.querySelector('.c7lb-au');
+    if (!au) { a.className = 'c7lb-au'; a.textContent = '（未开启审计：长度偏差即使存在，也没人发现）'; }
+    else if (rl > 0.5) { a.className = 'c7lb-au bad'; a.textContent = `审计：r = ${rl.toFixed(2)}，高分几乎总是伴随长回答 → 评判已被长度带偏，回炉修订 Rubric`; }
+    else { a.className = 'c7lb-au ok'; a.textContent = `审计：r = ${rl.toFixed(2)}，分数主要跟着真实质量走，未发现明显的长度偏差`; }
+  },
+  enter(s, ctx) {
+    this.auto = true; this.t.forEach((b) => b.classList.remove('on')); this.apply(s);
+    const seq = [[0, 0, 1], [1, 0, 1], [1, 1, 1], [0, 0, 0]]; let n = 0;
+    ctx.every(() => { if (!this.auto) return; const c = seq[n++ % seq.length]; this.t.forEach((b, i) => b.classList.toggle('on', !!c[i])); this.apply(s); }, 3800);
+  },
+  reset(s) { this.t.forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c07-criteria" data-part="5" data-trans="flip" data-dur="22000" data-title="Rubric 四准则" data-notes="<b>Rubric（评分标准）：LLM 评判的依据。</b><b>Rubric 四准则</b>（Scale AI，“Rubrics as Rewards”）：（1）<b>基于专家指导</b>——必须反映领域知识，捕捉核心事实和推理步骤。比如医疗问答的 Rubric 需包含诊断标准和必须避免的医学错误，缺乏专业基础的 Rubric 只能捕捉语言流畅度等表面特征。（2）<b>全面覆盖</b>——涵盖事实准确性、逻辑连贯性、完整性、安全性，而且不仅定义正面标准，还要明确<b>陷阱（Pitfall）</b>——即高风险的常见错误，如医疗建议中推荐未经验证的疗法。（3）<b>按重要性加权</b>——分为必要项（Essential）、重要项、可选项、陷阱项。支持<b>一票否决机制（Veto）</b>：比如在客服场景中，幻觉（编造虚假信息）是典型的否决维度——无论其他维度表现多优秀，只要出现虚假信息就必须否决。这也有助于防范关键词堆砌式的奖励作弊。（4）<b>评价标准自包含</b>——每个评价项独立可操作，不依赖评价者的领域知识。要避免“回应展示了深刻理解”这种抽象标准，改为“引用了至少两个权威理论并准确解释如何支持结论”这种可验证的标准。<br>关键实践：为每个维度定义客观可验证的评分档次，提供具体示例和<b>边界案例</b>帮助区分模糊情况。要主动防范<b>奖励作弊（Reward Hacking）</b>——即 Agent 找到了获取高分的“捷径”却没有真正完成任务——明确惩罚幻觉、讨好用户、关键词堆砌、回避棘手问题。Rubric 需要不断迭代：通过试用收集评价者的分歧并逐步完善，最终从抽象准则演化为详尽的判例集。<br>四张卡片依次翻面看例子，也可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Rubric <em>四准则</em></h2>
+  <p class="lead fx fx-up" style="--d:2">Scale AI，“Rubrics as Rewards”：Rubric 是 LLM 评判的依据</p></header>
+  <div class="c7cr-cards fx fx-up" style="--d:3"></div>
+  <div class="c7cr-bot fx fx-up" style="--d:4">
+    <div class="c7cr-pr"><b>关键实践</b><div class="c7cr-ck"></div></div>
+    <div class="c7cr-rh"><b>主动防范奖励作弊（Reward Hacking）</b><span>Agent 找到获取高分的“捷径”，却没有真正完成任务——明确惩罚：</span><div><i>幻觉</i><i>讨好用户</i><i>关键词堆砌</i><i>回避棘手问题</i></div></div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· Rubric 四准则 · 关键实践 · 奖励作弊</div>
+</section>
+<style>
+.c7cr-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;height:400px}
+.c7cr-cards .flip{height:400px}
+.c7cr-cards .flip-f,.c7cr-cards .flip-b{padding:20px 22px;gap:10px}
+.c7cr-cards em{font:800 34px var(--num);font-style:normal;color:var(--acc)}
+.c7cr-cards .flip-f b{font-size:24px}
+.c7cr-cards .flip-f p{font-size:17px;line-height:1.6;color:var(--text2)}
+.c7cr-cards .flip-f small,.c7cr-cards .flip-b small{margin-top:auto;font-size:15px;color:var(--text3)}
+.c7cr-cards .flip-b b{font-size:19px;color:var(--acc)}
+.c7cr-cards .flip-b p{font-size:16px;line-height:1.6;color:var(--text2)}
+.c7cr-cards .bad{color:#fda4af!important}
+.c7cr-cards .good{color:#6ee7b7!important}
+.c7cr-cards .tier{display:flex;flex-wrap:wrap;gap:6px}
+.c7cr-cards .tier span{padding:3px 10px;border-radius:999px;font-size:15px;border:1px solid var(--line2);color:var(--text)}
+.c7cr-cards .tier span.v{color:#fda4af;border-color:rgba(251,113,133,.6)}
+.c7cr-bot{display:grid;grid-template-columns:1.25fr 1fr;gap:16px;margin-top:16px}
+.c7cr-pr,.c7cr-rh{display:flex;flex-direction:column;gap:8px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.c7cr-pr>b,.c7cr-rh>b{font-size:18px}
+.c7cr-ck{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c7cr-ck .chk{padding:8px 12px;gap:10px;font-size:15px;line-height:1.45;color:var(--text2)}
+.c7cr-ck .chk .box{width:24px;height:24px;border-radius:7px}
+.c7cr-ck .chk .box svg{width:15px;height:15px}
+.c7cr-rh{border-color:rgba(251,113,133,.45);background:rgba(251,113,133,.04)}
+.c7cr-rh>b{color:#fda4af}
+.c7cr-rh span{font-size:15px;color:var(--text2)}
+.c7cr-rh div{display:flex;flex-wrap:wrap;gap:8px}
+.c7cr-rh i{font-style:normal;padding:5px 14px;border-radius:999px;font-size:16px;font-weight:700;color:#fecdd3;border:1px solid rgba(251,113,133,.55)}
+</style>
+<script>
+HOOKS['c07-criteria'] = {
+  C: [
+    ['基于专家指导', '必须反映领域知识，捕捉核心事实和推理步骤', '例：医疗问答', '<p>Rubric 需包含<b>诊断标准</b>和<b>必须避免的医学错误</b></p><p class="bad">缺乏专业基础的 Rubric 只能捕捉语言流畅度等表面特征</p>'],
+    ['全面覆盖', '事实准确性、逻辑连贯性、完整性、安全性', '还要明确陷阱（Pitfall）', '<p>不仅定义正面标准，还要写明<b>高风险的常见错误</b></p><p class="bad">例：医疗建议中推荐未经验证的疗法</p>'],
+    ['按重要性加权', '必要项、重要项、可选项、陷阱项', '一票否决（Veto）', '<div class="tier"><span>Essential</span><span>重要项</span><span>可选项</span><span class="v">陷阱项</span></div><p>客服场景里，<b>幻觉</b>是典型的否决维度：其他维度再优秀，出现虚假信息就必须否决——也能防范关键词堆砌式的奖励作弊</p>'],
+    ['评价标准自包含', '每个评价项独立可操作，不依赖评价者的领域知识', '抽象 → 可验证', '<p class="bad">✗ “回应展示了深刻理解”</p><p class="good">✓ “引用了至少两个权威理论，并准确解释如何支持结论”</p>'],
+  ],
+  P: ['为每个维度定义客观可验证的评分档次', '提供具体示例', '提供边界案例，区分模糊情况', '试用中收集评价者的分歧，逐步完善', '从抽象准则演化为详尽的判例集', '明确惩罚奖励作弊'],
+  init(s) {
+    s.querySelector('.c7cr-cards').innerHTML = this.C.map(([t, d, bt, bb], i) => `<div class="flip"><div class="flip-in"><div class="flip-f"><em>${i + 1}</em><b>${t}</b><p>${d}</p><small>点击翻面看例子</small></div><div class="flip-b"><em>${i + 1}</em><b>${bt}</b>${bb}</div></div></div>`).join('');
+    s.querySelectorAll('.c7cr-cards .flip').forEach((f) => f.addEventListener('click', () => { this.auto = false; f.classList.toggle('flipped'); }));
+    s.querySelector('.c7cr-ck').innerHTML = this.P.map((t) => `<div class="chk"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></span><span>${t}</span></div>`).join('');
+    s.querySelectorAll('.c7cr-ck .chk').forEach((c) => c.addEventListener('click', () => c.classList.toggle('done')));
+  },
+  enter(s, ctx) {
+    this.auto = true; const fs = [...s.querySelectorAll('.c7cr-cards .flip')], cs = [...s.querySelectorAll('.c7cr-ck .chk')]; let k = 0;
+    ctx.every(() => { if (!this.auto) return; if (k < 4) fs[k].classList.add('flipped'); else if (k === 6) fs.forEach((f) => f.classList.remove('flipped')); k = (k + 1) % 8; }, 2200);
+    let j = 0; ctx.every(() => { if (j < cs.length) cs[j++].classList.add('done'); }, 900);
+  },
+  reset(s) { s.querySelectorAll('.c7cr-cards .flip').forEach((f) => f.classList.remove('flipped')); s.querySelectorAll('.c7cr-ck .chk').forEach((c) => c.classList.remove('done')); },
+};
+</script>
+
+<section class="slide" id="c07-rubric" data-part="5" data-dur="24000" data-title="一个符合四准则的 Rubric" data-notes="以用户记忆 Agent 为例，展示一个符合四准则的完整 Rubric。测试问题：“我女儿的儿科医生是谁？”答案需要跨两次对话关联：第一次对话提到“女儿叫 Lily”，第二次提到“带 Lily 去看了 Dr. Chen”。Rubric 有四个维度：<b>事实正确性</b>（必要项）——4 优秀：准确回答 Dr. Chen，且关联到女儿 Lily；3 良好：准确回答 Dr. Chen，但未提及是 Lily 的医生；2 及格：给出了正确医生但附带不确定的额外信息；1 不及格：给出错误医生名，或回答不知道。<b>信息完整性</b>（重要项）——4：主动补充相关信息（如上次就诊时间、诊断结果）；3：回答了核心问题，无遗漏；2：回答了核心问题，但遗漏了可用的关联信息；1：关键信息缺失。<b>思考正确性</b>（重要项）——4：正确关联“女儿 = Lily”和“Lily 的医生 = Dr. Chen”两条跨会话信息；3：关联正确但思考路径不够清晰；2：部分关联正确；1：错误关联（如把用户自己的医生当成女儿的医生）。<b>幻觉检测</b>（一票否决项：一旦触发，总分归零）——pass：所有信息均可溯源到历史对话记录；fail：编造了对话中不存在的信息（如虚构就诊日期、诊断结果）。边界案例：如果用户有多个女儿且分别看不同的医生，应追问是哪个女儿；如果记忆中同时存在“Dr. Chen”和“陈医生”，应识别为同一人。<br><b>好的 Rubric vs 坏的 Rubric</b>：上面每个评分档都给出了可验证的具体行为（“准确回答 Dr. Chen”），而非“展示了对记忆的深刻理解”这类无法客观判定的描述。一票否决项明确了底线：即使其他维度全部满分，一旦出现幻觉就直接判零分。将这个 Rubric 和 Agent 的实际回答一起交给评判模型，模型会逐项打分并说明理由。把几十个用例的结果汇总起来，再回看其中的低分轨迹，原本笼统的“成功率下降”就能拆成几类具体问题：是没检索到信息，还是把人物关系想错了，抑或补充了没有依据的内容。这样一来，Rubric 不只告诉我们“得了多少分”，还会告诉我们下一步该改哪里。<br>右侧四个候选回答与它们的落档为示意；总分按“必要项权重 3、重要项权重 2”的示意权重计算。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一个符合四准则的 Rubric：<em>“我女儿的儿科医生是谁？”</em></h2></header>
+  <div class="c7rb-body">
+    <div class="c7rb-l fx fx-left" style="--d:2">
+      <div class="c7rb-ctx"><span class="lbl">要跨两次对话关联</span><span>会话 1：“女儿叫 <b>Lily</b>”</span><span>会话 2：“带 Lily 去看了 <b>Dr. Chen</b>”</span></div>
+      <div class="c7rb-g"></div>
+      <div class="c7rb-edge"><b>边界案例</b><span>有多个女儿、分别看不同医生 → 应追问是哪个女儿</span><span>记忆里同时有“Dr. Chen”和“陈医生” → 应识别为同一人</span></div>
+    </div>
+    <div class="c7rb-r fx fx-right" style="--d:3">
+      <div class="c7rb-cs"></div>
+      <div class="c7rb-tot"><span>总分</span><b>—</b><em class="c7-tag">示意权重：必要项 3 · 重要项 2</em></div>
+      <div class="c7rb-dg"><b>汇总几十个用例、回看低分轨迹</b><div><span data-t="0">没检索到信息</span><span data-t="1">人物关系想错了</span><span data-t="2">补充了没有依据的内容</span></div></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 符合四准则的用户记忆 Rubric · 好的 Rubric vs 坏的 Rubric</div>
+</section>
+<style>
+.c7rb-body{display:grid;grid-template-columns:1.45fr 1fr;gap:22px;flex:1;min-height:0}
+.c7rb-l{display:flex;flex-direction:column;gap:10px;min-height:0}
+.c7rb-ctx{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;font-size:16px;color:var(--text2)}
+.c7rb-ctx b{color:#fde68a}
+.c7rb-g{display:flex;flex-direction:column;gap:5px}
+.c7rb-row{display:grid;grid-template-columns:130px repeat(4,1fr);gap:5px}
+.c7rb-row.hd span{font-size:15px;color:var(--text3);text-align:center}
+.c7rb-row>b{display:flex;flex-direction:column;justify-content:center;padding:6px 10px;border-radius:10px;font-size:16px;background:rgba(255,255,255,.04)}
+.c7rb-row>b small{font:600 15px var(--num);color:var(--acc)}
+.c7rb-row>b small.v{color:#fb7185}
+.c7rb-c{padding:7px 9px;border-radius:10px;font-size:15px;line-height:1.4;color:var(--text3);border:1px solid var(--line);transition:all .35s}
+.c7rb-c.on{color:#06101f;background:var(--acc);border-color:var(--acc);font-weight:600}
+.c7rb-row.vt .c7rb-c{grid-column:span 2}
+.c7rb-row.vt .c7rb-c.on.f{background:#fb7185;border-color:#fb7185}
+.c7rb-row.vt .c7rb-c.on.p{background:#34d399;border-color:#34d399}
+.c7rb-edge{margin-top:auto;display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:12px;border-left:4px solid var(--acc);background:rgba(255,255,255,.03)}
+.c7rb-edge b{font-size:16px;color:var(--acc)}
+.c7rb-edge span{font-size:15px;color:var(--text2)}
+.c7rb-r{display:flex;flex-direction:column;gap:12px}
+.c7rb-cs{display:flex;flex-direction:column;gap:8px}
+.c7rb-a{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center;padding:10px 14px;border-radius:14px;text-align:left;font-size:16px;line-height:1.5;color:var(--text2);border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.c7rb-a em{font:800 18px var(--num);font-style:normal;color:var(--text3)}
+.c7rb-a.on{color:var(--text);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8))}
+.c7rb-a.on em{color:var(--acc)}
+.c7rb-tot{display:flex;align-items:baseline;gap:14px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.05)}
+.c7rb-tot span{font-size:16px;color:var(--text3)}
+.c7rb-tot b{font:800 34px var(--num)}
+.c7rb-tot b.z{color:#fb7185}
+.c7rb-tot em{margin-left:auto}
+.c7rb-dg{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7rb-dg b{font-size:16px}
+.c7rb-dg div{display:flex;flex-wrap:wrap;gap:8px}
+.c7rb-dg span{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2);transition:all .35s}
+.c7rb-dg span.on{color:#06101f;background:#fbbf24;border-color:#fbbf24}
+</style>
+<script>
+HOOKS['c07-rubric'] = {
+  R: [
+    ['事实正确性', 'essential', ['准确回答 Dr. Chen，且关联到女儿 Lily', '准确回答 Dr. Chen，但未提及是 Lily 的医生', '给出了正确医生但附带不确定的额外信息', '给出错误医生名，或回答不知道']],
+    ['信息完整性', 'important', ['主动补充相关信息（如上次就诊时间、诊断结果）', '回答了核心问题，无遗漏', '回答了核心问题，但遗漏了可用的关联信息', '关键信息缺失']],
+    ['思考正确性', 'important', ['正确关联“女儿 = Lily”和“Lily 的医生 = Dr. Chen”', '关联正确但思考路径不够清晰', '部分关联正确', '错误关联（如把用户自己的医生当成女儿的医生）']],
+  ],
+  // [回答, 三维落档（4..1）, 幻觉 p/f, 诊断类别]
+  A: [
+    ['“是 Dr. Chen——你上次带 Lily 去看的就是她。”', [4, 3, 4], 'p', -1],
+    ['“Dr. Chen。”', [3, 3, 3], 'p', -1],
+    ['“是 Dr. Wang。”（用户自己的医生）', [1, 1, 1], 'p', 1],
+    ['“Dr. Chen，Lily 上周三复诊，诊断是中耳炎。”', [4, 4, 4], 'f', 2],
+  ],
+  init(s) {
+    const g = s.querySelector('.c7rb-g');
+    g.innerHTML = '<div class="c7rb-row hd"><span></span><span>4 优秀</span><span>3 良好</span><span>2 及格</span><span>1 不及格</span></div>'
+      + this.R.map(([n, w, t], i) => `<div class="c7rb-row" data-r="${i}"><b>${n}<small>${w === 'essential' ? '必要项' : '重要项'}</small></b>${t.map((x, j) => `<span class="c7rb-c" data-t="${4 - j}">${x}</span>`).join('')}</div>`).join('')
+      + '<div class="c7rb-row vt" data-r="v"><b>幻觉检测<small class="v">一票否决</small></b><span class="c7rb-c p">pass：所有信息均可溯源到历史对话记录</span><span class="c7rb-c f">fail：编造了对话中不存在的信息（如虚构就诊日期、诊断结果）</span></div>';
+    s.querySelector('.c7rb-cs').innerHTML = this.A.map(([a], i) => `<button class="c7rb-a" data-i="${i}"><em>${'ABCD'[i]}</em><span>${a}</span></button>`).join('');
+    s.querySelectorAll('.c7rb-a').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  pick(s, i) {
+    this.i = i;
+    const [, sc, h, dg] = this.A[i];
+    s.querySelectorAll('.c7rb-a').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelectorAll('.c7rb-row[data-r]').forEach((r) => {
+      if (r.dataset.r === 'v') { r.querySelector('.p').classList.toggle('on', h === 'p'); r.querySelector('.f').classList.toggle('on', h === 'f'); return; }
+      const t = sc[+r.dataset.r]; r.querySelectorAll('.c7rb-c').forEach((c) => c.classList.toggle('on', +c.dataset.t === t));
+    });
+    const tot = s.querySelector('.c7rb-tot b'), w = (3 * sc[0] + 2 * sc[1] + 2 * sc[2]) / 7;
+    tot.textContent = h === 'f' ? '0（幻觉否决）' : w.toFixed(2) + ' / 4'; tot.className = h === 'f' ? 'z' : '';
+    s.querySelectorAll('.c7rb-dg span').forEach((x) => x.classList.toggle('on', +x.dataset.t === dg));
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 4, 4200, (i) => this.pick(s, i), 400); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7rb-c,.c7rb-a,.c7rb-dg span').forEach((x) => x.classList.remove('on')); s.querySelector('.c7rb-tot b').textContent = '—'; },
+};
+</script>

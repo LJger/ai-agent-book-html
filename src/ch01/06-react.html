@@ -1,0 +1,460 @@
+<!-- ================= PART 06 ReAct 循环 ================= -->
+<section class="slide chapter" id="c1-d6" data-part="6" data-title="PART 06 · ReAct 循环" data-notes="了解了 Agent 的三大组件后，一个自然的问题是：它们如何协同工作？<b>ReAct 循环</b>就是将 LLM、上下文和工具串联起来的核心机制。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">ReAct 循环</h1>
+  <div class="ch-s fx fx-up" style="--d:3">把 LLM、上下文和工具串联起来</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">想 → 做 → 看 → 想 → 做 → 看……这个循环不断重复，直到任务完成。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c1-react" data-part="6" data-title="思考 · 行动 · 观察" data-notes="Agent 执行任务的核心模式叫做 <b>ReAct</b>（Reasoning + Acting）。虽然名字只体现了思考和行动两个词，但实际循环包含<b>三个环节</b>：模型先<b>思考</b>当前应该做什么，然后调用工具<b>行动</b>，再<b>观察</b>工具返回的结果并继续思考下一步。这个“想→做→看→想→做→看”的循环不断重复，直到任务完成。<br><b>轨迹</b>（trajectory）是 Agent 在执行任务过程中不断积累的消息历史——用户消息、模型回复（包括思考过程和工具调用）、工具执行结果。每一次调用 LLM 时，它接收的完整上下文由<b>静态前缀</b>（系统提示词 + 工具定义）和<b>轨迹</b>（动态消息历史）两部分组成：<b>Agent 的上下文 = 静态前缀 + 轨迹</b>。基于这个完整上下文，LLM 生成下一步的响应，这个响应又追加到轨迹中，供下一次调用使用。右侧会随着循环一轮轮增长。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">ReAct：<em>思考 · 行动 · 观察</em></h2>
+  <p class="lead fx fx-up" style="--d:2">名字只有 Reasoning + Acting，实际循环有三个环节</p></header>
+  <div class="ra-body">
+    <div class="ra-ring fx fx-scale" style="--d:3"></div>
+    <div class="ra-ctx panel fx fx-right" style="--d:4">
+      <div class="ra-eq"><b>上下文</b><i>=</i><span class="c-har">静态前缀</span><i>+</i><span class="c-acc">轨迹</span></div>
+      <div class="ra-pre"><svg class="ic"><use href="#i-lock"/></svg>静态前缀：系统提示词 + 工具定义<small>每次调用自动拼接在轨迹前面</small></div>
+      <div class="ra-tr ml"></div>
+      <div class="ra-st"><span>第 <b class="ra-n">0</b> 轮</span><span class="ra-ph"></span></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「ReAct 循环」</div>
+</section>
+<style>
+.ra-body{display:flex;gap:40px;align-items:center;flex:1;min-height:0;margin-top:-10px}
+.ra-ring{width:600px;height:600px;flex:none}
+.ra-ring .lpc1{fill:var(--text);font-size:34px;font-weight:800;text-anchor:middle}
+.ra-ring .lpc2{fill:var(--text3);font-size:18px;letter-spacing:.2em;text-anchor:middle}
+.ra-ctx{flex:1;height:620px;padding:24px 28px;display:flex;flex-direction:column;gap:14px}
+.ra-eq{display:flex;align-items:center;gap:12px;font-size:28px;font-weight:800}
+.ra-eq i{font-style:normal;color:var(--text3);font-weight:400}
+.ra-pre{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;font-size:19px;color:var(--har);border:1px solid color-mix(in srgb,var(--har) 45%,transparent);background:color-mix(in srgb,var(--har) 10%,transparent)}
+.ra-pre small{margin-left:auto;font-size:15px;color:var(--text3)}
+.ra-tr{flex:1;overflow:hidden;justify-content:flex-end}
+.ra-tr .mr{font-size:17px;padding:8px 14px 8px 16px}
+.ra-st{display:flex;justify-content:space-between;font-size:18px;color:var(--text2)}
+.ra-st b{font:800 24px var(--num);color:var(--acc)}
+.ra-ph{color:var(--acc)}
+</style>
+<script>
+HOOKS['c1-react'] = {
+  init(s) {
+    this.svg = U.ring(s.querySelector('.ra-ring'), {
+      size: 600, labelSize: 22, cometDur: 6,
+      nodes: [{ label: '思考 Reasoning', color: '#a78bfa' }, { label: '行动 Acting', color: '#fbbf24' }, { label: '观察 Observation', color: '#22d3ee' }],
+      center: (c) => `<text class="lpc1" x="${c}" y="${c - 4}">想 → 做 → 看</text><text class="lpc2" x="${c}" y="${c + 32}">直到任务完成</text>`,
+    });
+  },
+  enter(s, ctx) {
+    const tr = s.querySelector('.ra-tr'), n = s.querySelector('.ra-n'), ph = s.querySelector('.ra-ph');
+    const nodes = [...this.svg.querySelectorAll('.node,.lab')];
+    const on = (i) => nodes.forEach((x) => { const o = +x.dataset.i === i; x.classList.toggle('on', o); x.classList.toggle('dim', i >= 0 && !o); });
+    const row = (r, txt) => { tr.insertAdjacentHTML('beforeend', `<div class="mr new" data-r="${r}"><span class="rl">${r}</span><span class="tx">${txt}</span></div>`); while (tr.children.length > 9) tr.firstElementChild.remove(); };
+    const run = async () => {
+      while (ctx.alive) {
+        tr.innerHTML = '';
+        row('user', '用户提出任务');
+        for (let round = 1; round <= 3 && ctx.alive; round++) {
+          n.textContent = round;
+          on(0); ph.textContent = '思考：模型基于完整上下文决定下一步';
+          await U.wait(ctx, 900);
+          if (round === 3) { row('assistant', 'reasoning + content：信息已经足够，给出最终回答'); on(-1); ph.textContent = '没有工具调用 → 任务完成'; await U.wait(ctx, 2600); break; }
+          row('assistant', `reasoning + tool_calls：第 ${round} 轮的行动计划`);
+          await U.wait(ctx, 700);
+          on(1); ph.textContent = '行动：Agent 框架执行工具';
+          await U.wait(ctx, 1000);
+          on(2); ph.textContent = '观察：结果追加到轨迹';
+          row('tool', `第 ${round} 轮的工具执行结果`);
+          await U.wait(ctx, 1100);
+        }
+      }
+    };
+    run();
+  },
+  reset(s) { s.querySelector('.ra-tr').innerHTML = ''; this.svg.querySelectorAll('.node,.lab').forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c1-traj" data-part="6" data-steps="6" data-trans="zoom" data-title="一次完整的轨迹：多币种收入汇总" data-notes="通过一个<b>多币种收入汇总</b>的具体例子理解 Agent 的轨迹（图1-4）。按 → 逐步推进：<br>① 用户给出四个季度、四种货币的收入，要求计算年度总收入和季度平均收入。<br>② <b>第一次迭代</b>：LLM 看到上述轨迹，判断需要将所有货币转换为 USD；它没有直接回复用户（content 为空），而是一次发出三个 convert_currency 工具调用。<br>③ Agent 框架执行工具，把三个结果逐条添加到轨迹。<br>④ <b>第二次迭代</b>：LLM 看到包括工具结果在内的完整轨迹，调用代码解释器汇总计算。<br>⑤ 代码解释器返回 Total: $9,602,895.73, Average: $2,400,723.93。<br>⑥ <b>第三次迭代</b>：所有计算完成，模型不再调用工具，给出最终答案。整个过程只用了 <b>3 次迭代、4 次工具调用</b>。<br>注意，<b>轨迹中没有显示系统提示词和工具定义——它们作为静态前缀，在每次 LLM 调用时都会被自动拼接在轨迹前面</b>。右下角的条形图显示每次调用时送给模型的消息条数：上下文是不断追加的，每次调用都能看到完整的轨迹。左侧就是这次运行后<b>轨迹中保存了什么</b>（消息数据的结构示意，不是循环的实现代码）。（原书图1-4 只画了三个季度，正文是四个季度；这里以正文为准。）">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一次完整的轨迹：<em>多币种收入汇总</em></h2></header>
+  <div class="tj-body">
+    <div class="tj-left panel fx fx-left" style="--d:2">
+      <div class="tj-lh"><b>LLM 每次调用时看到的完整输入</b></div>
+      <div class="tj-pre"><svg class="ic"><use href="#i-lock"/></svg>静态前缀（系统提示词 + 工具定义）· 每次调用自动拼接，不出现在轨迹里</div>
+      <div class="tj-view"><div class="tj-list"></div></div>
+      <div class="tj-sweep"></div>
+    </div>
+    <div class="tj-right">
+      <div class="tj-roles fx fx-right" style="--d:3">
+        <div class="tj-ro" data-r="model" style="--c:var(--llm)"><svg class="ic"><use href="#i-brain"/></svg><b>Model</b><small>决定下一步</small></div>
+        <i class="tj-ar"></i>
+        <div class="tj-ro" data-r="har" style="--c:var(--har)"><svg class="ic"><use href="#i-shield"/></svg><b>Harness</b><small>组装上下文 · 校验并执行</small></div>
+        <i class="tj-ar"></i>
+        <div class="tj-ro" data-r="env" style="--c:var(--env)"><svg class="ic"><use href="#i-globe"/></svg><b>Environment</b><small>产生观察</small></div>
+      </div>
+      <div class="tj-act panel fx fx-right" style="--d:4"><span class="lbl">当前一步</span><p class="tj-at"></p><div class="tj-par"></div></div>
+      <div class="tj-cnt fx fx-right" style="--d:5"><div><b class="tj-it">0</b><span>次迭代</span></div><div><b class="tj-tc">0</b><span>次工具调用</span></div></div>
+      <div class="tj-bars panel fx fx-right" style="--d:6"><span class="lbl">每次调用送给模型的轨迹消息数</span><div class="tj-bs"></div></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「ReAct 循环」· 图1-4</div>
+</section>
+<style>
+.tj-body{display:flex;gap:30px;flex:1;min-height:0;margin-top:-8px}
+.tj-left{position:relative;width:900px;flex:none;padding:20px 22px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.tj-lh b{font-size:21px}
+.tj-pre{padding:10px 14px;border-radius:12px;font-size:16px;color:var(--har);display:flex;align-items:center;gap:10px;border:1px dashed color-mix(in srgb,var(--har) 55%,transparent);background:color-mix(in srgb,var(--har) 8%,transparent)}
+.tj-view{position:relative;flex:1;overflow:hidden}
+.tj-list{position:absolute;left:0;right:0;top:0;display:flex;flex-direction:column;gap:8px;transition:transform .7s var(--ease)}
+.tj-m{--c:var(--text3);position:relative;padding:9px 14px 9px 18px;border-radius:12px;font-size:16px;line-height:1.5;background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.tj-m::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:4px;border-radius:4px;background:var(--c)}
+.tj-m .rl{font:600 14px var(--mono);color:var(--c);margin-right:10px}
+.tj-m[data-r=user]{--c:var(--tool)}.tj-m[data-r=assistant]{--c:var(--llm)}.tj-m[data-r=tool]{--c:var(--env)}
+.tj-m .k{display:block;font:14px/1.6 var(--mono);color:#cbd5f5}
+.tj-m .k em{font-style:normal;color:var(--text3)}
+.tj-m.new{animation:upIn .6s var(--spring) both}
+.tj-sweep{position:absolute;left:0;right:0;top:0;height:100%;pointer-events:none;background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--llm) 22%,transparent) 50%,transparent);opacity:0;transform:translateY(-100%)}
+.tj-sweep.go{animation:tjSweep 1s var(--ease)}
+@keyframes tjSweep{0%{opacity:1;transform:translateY(-100%)}100%{opacity:1;transform:translateY(100%)}}
+.tj-right{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
+.tj-roles{display:flex;align-items:center;gap:8px}
+.tj-ro{flex:1;padding:14px 10px;border-radius:16px;text-align:center;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.85);transition:all .4s var(--ease)}
+.tj-ro .ic{font-size:30px;color:var(--c)}
+.tj-ro b{display:block;font:800 20px var(--num);margin-top:4px}
+.tj-ro small{display:block;font-size:14px;color:var(--text3);margin-top:2px}
+.tj-ro.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,rgba(12,18,40,.9));box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent);translate:0 -4px}
+.tj-ar{flex:none;width:22px;height:2px;background:var(--line2)}
+.tj-act{padding:18px 22px;min-height:150px}
+.tj-at{font-size:20px;line-height:1.6;margin-top:8px}
+.tj-par{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.tj-pb{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;font:14px var(--mono);color:var(--text2)}
+.tj-pb i{height:6px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.tj-pb i::after{content:"";display:block;height:100%;width:100%;background:var(--env);transform-origin:left;transform:scaleX(0);animation:grow .9s var(--ease) forwards;animation-delay:var(--dl)}
+.tj-cnt{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.tj-cnt div{padding:14px 18px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+.tj-cnt b{font:800 46px var(--num);background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.tj-cnt span{font-size:18px;color:var(--text2)}
+.tj-bars{padding:16px 20px;flex:1;display:flex;flex-direction:column}
+.tj-bs{flex:1;display:flex;align-items:flex-end;gap:22px;padding-top:10px}
+.tj-b{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.tj-b i{width:100%;border-radius:10px 10px 4px 4px;background:linear-gradient(var(--acc),color-mix(in srgb,var(--acc) 30%,transparent));height:var(--h);transition:height .7s var(--spring)}
+.tj-b b{font:800 20px var(--num);color:var(--text)}
+</style>
+<script>
+HOOKS['c1-traj'] = {
+  ROWS: [
+    { k: 0, r: 'user', h: '根据公司季度收入：Q1 2.5M 美元，Q2 2.1M 欧元，Q3 1.8M 英镑，Q4 380M 日元，计算公司年度总收入和季度平均收入' },
+    { k: 1, r: 'assistant', h: '第一次迭代', b: ['<em>reasoning:</em> "需要将所有货币转换为 USD..."', '<em>content:</em> ""  <em># 没有直接回复用户</em>', '<em>tool_calls:</em> convert_currency(2100000, EUR→USD)', '            convert_currency(1800000, GBP→USD)', '            convert_currency(380000000, JPY→USD)'] },
+    { k: 2, r: 'tool', h: 'EUR->USD: 2282608.7' },
+    { k: 2, r: 'tool', h: 'GBP->USD: 2278481.01' },
+    { k: 2, r: 'tool', h: 'JPY->USD: 2541806.02' },
+    { k: 3, r: 'assistant', h: '第二次迭代', b: ['<em>reasoning:</em> "已获得转换结果，现在需要汇总计算..."', '<em>tool_calls:</em> code_interpreter(code: "total = 2500000 + 2282608.7 + ...")'] },
+    { k: 4, r: 'tool', h: 'Total: $9,602,895.73, Average: $2,400,723.93...' },
+    { k: 5, r: 'assistant', h: '第三次迭代', b: ['<em>reasoning:</em> "所有计算完成，总结结果..."', '<em>content:</em> "FINAL ANSWER: 总收入$9,602,895.73..."'] },
+  ],
+  ACT: [
+    ['har', '用户提出任务：轨迹里现在只有这一条用户消息。'],
+    ['model', '第一次迭代：LLM 看到“静态前缀 + 轨迹”，判断需要先把三种外币换算成美元，一次发出 3 个工具调用。'],
+    ['env', 'Agent 框架校验并执行这 3 个调用（互不依赖，可以并行），把结果逐条追加到轨迹。'],
+    ['model', '第二次迭代：LLM 看到包括工具结果在内的完整轨迹，调用代码解释器汇总。'],
+    ['env', '代码解释器返回总收入和季度均值，结果追加到轨迹。'],
+    ['model', '第三次迭代：所有计算完成，模型不再调用工具，直接给出最终答案——循环结束。'],
+    ['', '3 次迭代、4 次工具调用。每次调用都能看到完整的轨迹；静态前缀在每次调用时自动拼接在轨迹前面。'],
+  ],
+  CALLS: [[1, 1], [3, 5], [5, 7]],
+  render(s, k, fwd) {
+    const list = s.querySelector('.tj-list');
+    list.innerHTML = this.ROWS.filter((r) => r.k <= k).map((r) => `<div class="tj-m${fwd && r.k === k ? ' new' : ''}" data-r="${r.r}"><span class="rl">${r.r}</span>${r.h}${r.b ? r.b.map((x) => `<span class="k">${x}</span>`).join('') : ''}</div>`).join('');
+    // 列表超出可视区时向上滚动，始终露出最新的消息
+    const view = s.querySelector('.tj-view');
+    requestAnimationFrame(() => { const over = list.scrollHeight - view.clientHeight; list.style.transform = `translateY(${-Math.max(0, over)}px)`; });
+    const [role, txt] = this.ACT[k];
+    s.querySelectorAll('.tj-ro').forEach((r) => r.classList.toggle('on', r.dataset.r === role || (k === 2 || k === 4) && r.dataset.r === 'har'));
+    s.querySelector('.tj-at').textContent = txt;
+    const par = s.querySelector('.tj-par');
+    par.innerHTML = k === 2 ? ['EUR→USD', 'GBP→USD', 'JPY→USD'].map((x, i) => `<div class="tj-pb"><span>✓ 校验 · ${x}</span><i style="--dl:${i * 120}ms"></i></div>`).join('')
+      : k === 4 ? '<div class="tj-pb"><span>✓ 校验 · code_interpreter</span><i style="--dl:0ms"></i></div>' : '';
+    const it = [0, 1, 1, 2, 2, 3, 3][k], tc = [0, 0, 3, 3, 4, 4, 4][k];
+    s.querySelector('.tj-it').textContent = it;
+    s.querySelector('.tj-tc').textContent = tc;
+    s.querySelector('.tj-bs').innerHTML = this.CALLS.map(([at, n], i) => `<div class="tj-b"><b>${at <= k ? n : ''}</b><i style="--h:${at <= k ? n * 30 : 4}px"></i>第 ${i + 1} 次调用</div>`).join('');
+    if (fwd && (k === 1 || k === 3 || k === 5)) U.restart(s.querySelector('.tj-sweep'), 'go');
+  },
+  enter(s, ctx, k) { this.render(s, k, false); },
+  step(s, ctx, k, dir) { this.render(s, k, dir > 0); },
+  reset(s) { s.querySelector('.tj-list').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c1-skel" data-part="6" data-trans="flip" data-title="最小运行骨架" data-dur="14000" data-notes="最小运行骨架说明的是<b>机制如何运行</b>：<b>Model 只负责决定下一步，Harness 负责组装上下文、校验并执行工具，Environment 负责产生真实状态变化和观察</b>。本书后续也沿用 Python 风格伪代码；伪代码不能直接运行，也不对应某个 SDK，具体的可执行代码在本书配套代码仓库中。左侧代码会逐行高亮，右侧同步显示是谁在工作；独立的工具调用可以并行执行。<br>在这种最基本的设计中，上下文是不断追加的：每次调用 LLM 都能看到完整的轨迹，因而它清楚任务进行到了哪一步、此前尝试过什么、得到了什么结果。轨迹的结构化也让系统<b>易于解释和调试</b>——用户消息、模型回复（思考过程 + 工具调用）和工具执行结果彼此分明。更进一步，分析大量轨迹可以发现 Agent 的行为模式、优化决策路径、改进工具设计；轨迹还可以<b>沉淀进知识库，或用于强化学习训练更好的模型</b>，形成从经验中学习的闭环。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">最小运行骨架：<em>谁在什么时候做什么</em></h2></header>
+  <div class="sk-body">
+    <div class="sk-code win fx fx-left" style="--d:2">
+      <div class="win-bar"><i></i><i></i><i></i><span>Python 风格伪代码（不能直接运行，也不对应某个 SDK）</span></div>
+      <div class="code sk-pre"></div>
+    </div>
+    <div class="sk-right">
+      <div class="sk-ro" data-r="m" style="--c:var(--llm)"><svg class="ic"><use href="#i-brain"/></svg><div><b>Model</b><p>只负责决定下一步</p></div></div>
+      <div class="sk-ro" data-r="h" style="--c:var(--har)"><svg class="ic"><use href="#i-shield"/></svg><div><b>Harness</b><p>组装上下文、校验并执行工具</p></div></div>
+      <div class="sk-ro" data-r="e" style="--c:var(--env)"><svg class="ic"><use href="#i-globe"/></svg><div><b>Environment</b><p>产生真实状态变化和观察</p></div></div>
+      <div class="sk-tl"><span class="lbl">trajectory</span><div class="sk-tr"></div></div>
+    </div>
+  </div>
+  <div class="sk-val fx fx-up" style="--d:5"><span class="lbl">轨迹的价值</span><span class="chip">易于解释和调试</span><span class="chip">发现行为模式</span><span class="chip">优化决策路径</span><span class="chip">改进工具设计</span><span class="chip acc">沉淀进知识库</span><span class="chip acc">用于强化学习训练</span><b>→ 从经验中学习的闭环</b></div>
+  <div class="src">第一章 ·「ReAct 循环」· 最小运行骨架</div>
+</section>
+<style>
+.sk-body{display:flex;gap:30px;flex:1;min-height:0;margin-bottom:20px}
+.sk-code{width:1000px;flex:none}
+.sk-pre{font-size:20px;line-height:1.75;padding:22px 26px}
+.sk-right{flex:1;display:flex;flex-direction:column;gap:12px}
+.sk-ro{display:flex;gap:16px;align-items:center;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 30%,transparent);background:rgba(12,18,40,.85);transition:all .35s var(--ease)}
+.sk-ro .ic{font-size:34px;color:var(--c)}
+.sk-ro b{font:800 22px var(--num)}
+.sk-ro p{font-size:17px;color:var(--text2);margin-top:2px}
+.sk-ro.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,rgba(12,18,40,.9));box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent);translate:-6px 0}
+.sk-tl{flex:1;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.sk-tr{display:flex;flex-wrap:wrap;gap:6px}
+.sk-tr span{padding:4px 10px;border-radius:8px;font:14px var(--mono);border:1px solid var(--line2);animation:upIn .4s var(--spring) both}
+.sk-tr .u{color:var(--tool)}.sk-tr .a{color:var(--llm)}.sk-tr .t{color:var(--env)}
+.sk-val{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
+.sk-val .chip{font-size:17px}
+.sk-val b{font-size:19px;color:var(--acc);margin-left:6px}
+</style>
+<script>
+HOOKS['c1-skel'] = {
+  CODE: [
+    '<span class="t-p">trajectory</span> = [user_request]',
+    '',
+    '<span class="t-k">repeat</span>:',
+    '    context = stable_prefix + trajectory',
+    '    decision = <span class="t-h">Model</span>(context)',
+    '    trajectory.append(decision)',
+    '',
+    '    <span class="t-k">if</span> decision has no tool call:',
+    '        <span class="t-k">return</span> decision.answer',
+    '',
+    '    <span class="t-k">for</span> call <span class="t-k">in</span> decision.tool_calls:   <span class="t-c"># independent calls may run in parallel</span>',
+    '        validated_call = <span class="t-p">Harness</span>.validate(call)',
+    '        observation = <span class="t-g">Environment</span>.execute(validated_call)',
+    '        trajectory.append(observation)',
+  ],
+  init(s) { s.querySelector('.sk-pre').innerHTML = this.CODE.map((l) => `<span class="ln">${l || ' '}</span>`).join(''); },
+  enter(s, ctx) {
+    const lines = [...s.querySelectorAll('.sk-pre .ln')], ro = (r) => s.querySelectorAll('.sk-ro').forEach((x) => x.classList.toggle('on', x.dataset.r === r));
+    const tr = s.querySelector('.sk-tr'), add = (c, t) => tr.insertAdjacentHTML('beforeend', `<span class="${c}">${t}</span>`);
+    const hl = (i, r) => { lines.forEach((l, j) => l.classList.toggle('hl', j === i)); ro(r); };
+    // 两轮带工具调用的迭代，第三轮直接返回答案
+    const seq = [[0, 'h', () => { tr.innerHTML = ''; add('u', 'user'); }]];
+    for (let it = 0; it < 3; it++) {
+      seq.push([2, 'h'], [3, 'h'], [4, 'm'], [5, 'h', () => add('a', it < 2 ? 'assistant + tool_calls' : 'assistant（答案）')], [7, 'h']);
+      if (it === 2) { seq.push([8, 'h']); break; }
+      seq.push([10, 'h'], [11, 'h'], [12, 'e'], [13, 'h', () => add('t', 'tool 结果')]);
+    }
+    const run = async () => {
+      while (ctx.alive) {
+        for (const [i, r, f] of seq) {
+          if (!ctx.alive) return;
+          hl(i, r);
+          if (f) f();
+          await U.wait(ctx, i === 4 || i === 12 ? 1100 : 650);
+        }
+        await U.wait(ctx, 1600);
+      }
+    };
+    run();
+  },
+  reset(s) { s.querySelectorAll('.hl,.on').forEach((x) => x.classList.remove('hl', 'on')); s.querySelector('.sk-tr').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c1-native" data-part="6" data-steps="1" data-trans="zoom" data-title="模型即 Agent：循环跑在哪里" data-notes="<b>实验 1-2 ★</b> 展示 Kimi K3 的原生 Agent 能力，<b>实验 1-3 ★</b> 展示 GPT-5.6 借助 Responses API 内置工具形成的 Deep Research 闭环（图1-5）。<br>这里需要厘清一个常见的误解，关键在于分清两件事的归属：<b>强化学习写进参数的是决策</b>——何时该调用工具、调用哪个、传入什么参数、拿到结果后是否继续、如何把几十上百次调用串联成连贯的推理；<b>工具本身及其执行则由 Agent 框架（或 API 内置工具）提供</b>——web_search、code_runner 的真实实现、代码沙盒环境、调用的发起与结果回传，都在模型之外的基础设施里完成（Kimi 通过名为 Formula 的服务端脚本引擎运行这些官方工具）。<br>因此<b>编排循环并没有消失，只是决策权交给了模型</b>；至于循环本身跑在哪里，取决于接入方式。在实验 1-3 的 Responses API 路径中，搜索、代码执行和多轮编排整体在服务端闭环完成；而在实验 1-2 的 Kimi 路径中，Formula 只负责在服务端执行搜索本身，“调用模型 → 追加工具结果 → 再次调用”的 ReAct 循环仍由客户端代码驱动（chapter1/web-search-agent/agent.py 中的 while 循环）。图1-5 中“客户端无需手写 ReAct 循环”只对 Responses API 路径成立。按 → 或点击上方开关切换两条路径。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型即 Agent：<em>循环跑在哪里？</em></h2></div>
+    <div class="nv-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="kimi">实验 1-2 · Kimi K3</button><button data-v="resp">实验 1-3 · Responses API</button></div></header>
+  <div class="nv-body">
+    <div class="nv-stage fx fx-scale" style="--d:3">
+      <div class="nv-b nv-cl"><svg class="ic"><use href="#i-term"/></svg><b>客户端代码</b><span class="nv-tag nv-t0">while 循环在这里（agent.py）</span><span class="nv-tag nv-t1">只发一次请求，无需手写循环</span></div>
+      <div class="nv-b nv-md"><svg class="ic"><use href="#i-brain"/></svg><b>模型</b><span>决定何时调用、调哪个、传什么</span></div>
+      <div class="nv-b nv-tl"><svg class="ic"><use href="#i-server"/></svg><b>服务端工具</b><span class="nv-tk">Formula：web_search · code_runner</span><span class="nv-tr">内置：web_search · code_interpreter</span></div>
+      <div class="nv-srv"><span>服务端闭环</span></div>
+      <svg class="nv-svg" viewBox="0 0 1060 520" width="1060" height="520">
+        <path class="nv-p k1" d="M300 150 C 360 110, 400 110, 440 150"/>
+        <path class="nv-p k2" d="M440 210 C 400 250, 360 250, 300 210"/>
+        <path class="nv-p k3" d="M170 260 C 170 420, 760 440, 870 300"/>
+        <path class="nv-p k4" d="M840 300 C 740 400, 220 400, 200 260"/>
+        <path class="nv-p r1" d="M300 180 H440"/>
+        <path class="nv-p r2" d="M640 160 C 680 120, 720 120, 760 160"/>
+        <path class="nv-p r3" d="M760 200 C 720 240, 680 240, 640 200"/>
+        <path class="nv-p r4" d="M440 200 H300"/>
+        <circle class="pk nv-d" r="10"/>
+      </svg>
+      <div class="nv-log"></div>
+    </div>
+    <div class="nv-key panel fx fx-right" style="--d:4">
+      <b>先分清两件事的归属</b>
+      <div class="nv-k" style="--c:var(--llm)"><em>强化学习写进参数的</em><p>决策：何时调用、调用哪个、传什么参数、拿到结果后是否继续、如何把几十上百次调用串联成连贯的推理</p></div>
+      <div class="nv-k" style="--c:var(--har)"><em>模型之外的基础设施提供</em><p>工具本身及其执行：web_search、code_runner 的真实实现、代码沙盒、调用的发起与结果回传</p></div>
+      <p class="nv-con">编排循环并没有消失，只是<span>决策权交给了模型</span>；循环跑在哪里，取决于接入方式</p>
+    </div>
+  </div>
+  <div class="src">第一章 ·「ReAct 循环」· 实验 1-2 · 实验 1-3 · 图1-5</div>
+</section>
+<style>
+#c1-native .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.nv-body{display:flex;gap:30px;flex:1;min-height:0}
+.nv-stage{position:relative;width:1060px;height:600px;flex:none}
+.nv-b{position:absolute;width:300px;padding:20px 22px;border-radius:20px;display:flex;flex-direction:column;gap:6px;border:2px solid var(--line2);background:rgba(12,18,40,.9);transition:all .5s var(--ease)}
+.nv-b .ic{font-size:36px}
+.nv-b b{font-size:26px}
+.nv-b span{font-size:16px;color:var(--text2)}
+.nv-cl{left:0;top:90px;height:170px;--c:var(--tool)}.nv-cl .ic{color:var(--tool)}
+.nv-md{left:440px;top:90px;width:200px;height:170px;border-color:color-mix(in srgb,var(--llm) 60%,transparent)}.nv-md .ic{color:var(--llm)}
+.nv-tl{left:760px;top:90px;height:210px;--c:var(--env)}.nv-tl .ic{color:var(--env)}
+.nv-tag{padding:6px 10px;border-radius:10px;font-size:15px!important;color:var(--tool)!important;border:1px solid color-mix(in srgb,var(--tool) 45%,transparent);background:color-mix(in srgb,var(--tool) 10%,transparent)}
+.nv-t1,.nv-tr{display:none}
+#c1-native[data-m=resp] .nv-t0,#c1-native[data-m=resp] .nv-tk{display:none}
+#c1-native[data-m=resp] .nv-t1,#c1-native[data-m=resp] .nv-tr{display:block}
+#c1-native[data-m=kimi] .nv-cl{border-color:var(--tool);box-shadow:0 0 34px color-mix(in srgb,var(--tool) 35%,transparent)}
+.nv-srv{position:absolute;left:420px;top:60px;width:660px;height:270px;border-radius:26px;border:2px dashed color-mix(in srgb,var(--env) 60%,transparent);opacity:0;transition:opacity .6s;pointer-events:none}
+.nv-srv span{position:absolute;right:18px;top:-14px;padding:2px 12px;border-radius:999px;font-size:15px;color:var(--env);background:var(--bg)}
+#c1-native[data-m=resp] .nv-srv{opacity:1}
+.nv-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.nv-p{fill:none;stroke-width:3;stroke-dasharray:6 8;stroke:rgba(255,255,255,.12);transition:stroke .4s,opacity .4s}
+#c1-native[data-m=kimi] .nv-p.k1,#c1-native[data-m=kimi] .nv-p.k2,#c1-native[data-m=kimi] .nv-p.k3,#c1-native[data-m=kimi] .nv-p.k4{stroke:var(--tool);animation:flow 1s linear infinite}
+#c1-native[data-m=resp] .nv-p.r1,#c1-native[data-m=resp] .nv-p.r2,#c1-native[data-m=resp] .nv-p.r3,#c1-native[data-m=resp] .nv-p.r4{stroke:var(--env);animation:flow 1s linear infinite}
+#c1-native[data-m=kimi] .nv-p[class*=" r"],#c1-native[data-m=resp] .nv-p[class*=" k"]{opacity:.15}
+.nv-d{fill:#fff;filter:drop-shadow(0 0 8px #fff)}
+.nv-log{position:absolute;left:0;right:0;bottom:0;height:150px;padding:14px 18px;border-radius:16px;background:rgba(5,9,22,.8);border:1px solid var(--line);font:16px/1.7 var(--mono);color:#cbd5f5;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end}
+.nv-log div{animation:upIn .4s var(--spring) both}
+.nv-key{flex:1;padding:26px 28px;display:flex;flex-direction:column;gap:16px}
+.nv-key>b{font-size:24px;color:var(--acc)}
+.nv-k{padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 9%,transparent)}
+.nv-k em{font-style:normal;font-size:19px;font-weight:700;color:var(--c)}
+.nv-k p{font-size:17px;line-height:1.65;margin-top:6px}
+.nv-con{font-size:19px;line-height:1.65;margin-top:auto}
+.nv-con span{color:var(--acc);font-weight:700}
+</style>
+<script>
+HOOKS['c1-native'] = {
+  init(s) { this.set = U.seg(s.querySelector('.nv-seg'), (v) => this.mode(s, v)); },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    s.dataset.m = m;
+    this.set(m);
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, d = s.querySelector('.nv-d'), log = s.querySelector('.nv-log'), P = (c) => s.querySelector('.nv-p.' + c);
+    const say = (t) => { log.insertAdjacentHTML('beforeend', `<div>${t}</div>`); while (log.children.length > 5) log.firstElementChild.remove(); };
+    log.innerHTML = '';
+    const run = async () => {
+      while (ok()) {
+        if (m === 'kimi') {
+          say('客户端 → 模型：发送消息');
+          await U.fly(d, P('k1'), 800, { ctx, alive: ok }); if (!ok()) return;
+          say('模型 → 客户端：tool_calls = web_search(...)');
+          await U.fly(d, P('k2'), 800, { ctx, alive: ok }); if (!ok()) return;
+          say('客户端 → Formula：在服务端执行搜索');
+          await U.fly(d, P('k3'), 1100, { ctx, alive: ok }); if (!ok()) return;
+          say('Formula → 客户端：搜索结果；客户端把结果追加到消息，再次调用模型');
+          await U.fly(d, P('k4'), 1100, { ctx, alive: ok }); if (!ok()) return;
+        } else {
+          say('客户端 → 服务端：一次请求');
+          await U.fly(d, P('r1'), 700, { ctx, alive: ok }); if (!ok()) return;
+          for (let i = 0; i < 2; i++) {
+            say(`服务端：模型调用内置工具（第 ${i + 1} 次）→ 结果回到模型`);
+            await U.fly(d, P('r2'), 700, { ctx, alive: ok }); if (!ok()) return;
+            await U.fly(d, P('r3'), 700, { ctx, alive: ok }); if (!ok()) return;
+          }
+          say('服务端 → 客户端：最终回答（搜索、代码执行、多轮编排都在服务端闭环）');
+          await U.fly(d, P('r4'), 700, { ctx, alive: ok }); if (!ok()) return;
+        }
+        await U.wait(ctx, 900);
+      }
+    };
+    run();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 'resp' : 'kimi'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'resp' : 'kimi'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.m = ''; s.querySelector('.nv-log').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c1-obs12" data-part="6" data-title="两个实验的观察点" data-dur="14000" data-notes="<b>实验 1-2：Kimi K3</b> 是一个约 2.8 万亿参数的混合专家（MoE, Mixture of Experts）模型——可以把 MoE 想象成一个专家团队：面对不同类型的问题，系统会自动选择最合适的几位专家来作答，而不需要所有专家同时上阵，这样既保证了能力又提高了效率。它拥有 100 万 token 的上下文窗口、原生的视觉理解能力，以及始终开启的“思考模式”。关键观察：模型自己决定何时搜索、搜索什么，能根据搜索结果动态调整策略、自主判断信息是否充足。它在 Agent 任务中的一个突出优势是<b>长链工具调用的稳定性</b>——能够连续执行 200～300 次工具调用而保持思考的一致性，远超多数模型在数十次调用后就开始退化的表现。K3 发布时提供 K3 Max（面向对话与 Agent 任务）与 K3 Swarm Max（面向大规模并行处理）两个规格；作为开源模型，它证明了通过强化学习赋予模型原生 Agent 能力这条路线的有效性。<br><b>实验 1-3</b> 使用 <b>OpenAI GPT-5.6</b>。它的一个便利特性是<b>自由格式工具调用</b>（Freeform Tool Calling，API 中通过 type: &quot;custom&quot; 声明）：允许模型直接向工具发送原始文本（比如一段 Python 代码、一条 SQL 查询），省去了 JSON 转义的麻烦。这是 API 参数格式的演进，而非模型架构的革新——客户端的工具调用循环逻辑保持不变。配合 Responses API 的网络搜索和代码解释器内置工具，实现“搜索 → 阅读 → 分析 → 再搜索”的迭代研究，例如计算东盟 10 国首都之间最近的一对首都距离、对比特币做技术分析（移动平均线、RSI、MACD）。GPT-5.6 还将 <b>OpenAI Deep Research</b> 产品的设计理念内化到了模型层面，引入了<b>意图澄清过程</b>：不会立即动手，而是先通过一系列问题澄清用户的真实意图，让“用户说了什么”和“用户真正想要什么”之间的差距在执行之前就得到弥合。<br>这个实验并不绑定某一家厂商：阿里云百炼 qwen3.7-plus 的 Responses API 同样内置 web_search 与 code_interpreter；Kimi K3 的 Formula 托管搜索与 code_runner 也属于同类能力。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">两个实验的<em>观察点</em></h2></header>
+  <div class="o12-body">
+    <div class="o12-col panel fx fx-left" style="--d:2">
+      <div class="o12-h"><span class="badge" style="--c:var(--acc)">实验 1-2 ★</span><b>Kimi K3 原生 Agent 能力</b></div>
+      <div class="o12-spec"><span class="chip">约 2.8 万亿参数 MoE</span><span class="chip">100 万 token 上下文</span><span class="chip">原生视觉</span><span class="chip">始终开启思考模式</span></div>
+      <div class="o12-moe"><div class="o12-tok"></div><div class="o12-rt"><svg class="ic"><use href="#i-route"/></svg>路由</div><div class="o12-ex"></div></div>
+      <p class="cap">MoE：每个输入只激活最合适的几位“专家”（示意）</p>
+      <div class="o12-bar"><span>Kimi K3 长链工具调用</span><i style="--w:100%"><b>200–300 次仍保持一致</b></i></div>
+      <div class="o12-bar dim"><span>多数模型</span><i style="--w:16%"><b>数十次后开始退化</b></i></div>
+    </div>
+    <div class="o12-col panel fx fx-right" style="--d:3">
+      <div class="o12-h"><span class="badge" style="--c:var(--acc)">实验 1-3 ★</span><b>GPT-5.6 原生 Deep Research</b></div>
+      <div class="o12-ff">
+        <div class="o12-fa"><span class="lbl">传统：参数打包成 JSON（需转义）</span><pre class="code">{"code": "import math\nprint(\"距离:\", round(d, 1))"}</pre></div>
+        <div class="o12-fb"><span class="lbl">自由格式：type: "custom"，直接发原始文本</span><pre class="code">import math
+print("距离:", round(d, 1))</pre></div>
+      </div>
+      <p class="cap">API 参数格式的演进，而非模型架构的革新：客户端循环不变</p>
+      <div class="o12-chat"><div class="o12-u">搜索最近一个月的比特币走势，做技术分析</div><div class="o12-a"><b>意图澄清</b>你偏好使用哪个数据源？需要分析哪些技术指标？</div></div>
+    </div>
+  </div>
+  <p class="o12-ven fx fx-up" style="--d:5"><svg class="ic"><use href="#i-link"/></svg>不绑定厂商：阿里云百炼 qwen3.7-plus 的 Responses API 同样内置 web_search 与 code_interpreter；Kimi K3 的 Formula 托管搜索与 code_runner 也属于同类能力</p>
+  <div class="src">第一章 ·「ReAct 循环」· 实验 1-2 · 实验 1-3</div>
+</section>
+<style>
+.o12-body{display:grid;grid-template-columns:1fr 1fr;gap:30px;flex:1;min-height:0}
+.o12-col{padding:24px 28px;display:flex;flex-direction:column;gap:14px}
+.o12-h{display:flex;align-items:center;gap:14px}
+.o12-h b{font-size:25px}
+.o12-spec{display:flex;flex-wrap:wrap;gap:8px}
+.o12-spec .chip{font-size:16px}
+.o12-moe{display:grid;grid-template-columns:120px 90px 1fr;align-items:center;gap:14px;padding:14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);height:190px}
+.o12-tok{display:flex;flex-direction:column;gap:8px}
+.o12-tok span{padding:6px 10px;border-radius:9px;font:15px var(--mono);text-align:center;border:1px solid var(--line2);animation:upIn .4s var(--spring) both}
+.o12-rt{width:80px;height:80px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;color:var(--acc);border:2px solid var(--acc)}
+.o12-rt .ic{font-size:26px}
+.o12-ex{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.o12-ex span{height:68px;border-radius:12px;display:grid;place-items:center;font-size:15px;color:var(--text3);border:1px solid var(--line);transition:all .3s}
+.o12-ex span.on{color:#06101f;font-weight:700;background:var(--llm);border-color:var(--llm);box-shadow:0 0 20px color-mix(in srgb,var(--llm) 60%,transparent)}
+.o12-bar{display:grid;grid-template-columns:200px 1fr;align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.o12-bar i{position:relative;height:36px;border-radius:10px;background:rgba(255,255,255,.05);overflow:hidden}
+.o12-bar i::before{content:"";position:absolute;inset:0;width:0;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 60%,transparent),var(--acc));transition:width 1.6s var(--ease) .8s}
+.active .o12-bar i::before{width:var(--w)}
+.o12-bar.dim i::before{background:linear-gradient(90deg,rgba(148,163,184,.4),rgba(148,163,184,.7))}
+.o12-bar b{position:relative;z-index:1;display:block;padding:0 14px;line-height:36px;font-size:16px;color:var(--text);white-space:nowrap}
+.o12-ff{display:flex;flex-direction:column;gap:12px}
+.o12-ff pre{margin-top:6px;padding:12px 16px;border-radius:12px;font-size:17px;line-height:1.6;background:rgba(5,9,22,.85);border:1px solid var(--line)}
+.o12-fa pre{color:#fda4af}.o12-fb pre{color:#86efac}
+.o12-chat{display:flex;flex-direction:column;gap:10px;margin-top:auto}
+.o12-u{align-self:flex-end;max-width:80%;padding:10px 16px;border-radius:14px;font-size:18px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.32)}
+.o12-a{max-width:86%;padding:10px 16px;border-radius:14px;font-size:18px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.26)}
+.o12-a b{display:block;font-size:15px;color:var(--ctx);margin-bottom:4px}
+.o12-ven{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:18px;color:var(--text2)}
+.o12-ven .ic{color:var(--acc);font-size:22px}
+</style>
+<script>
+HOOKS['c1-obs12'] = {
+  init(s) { s.querySelector('.o12-ex').innerHTML = Array.from({ length: 8 }, (_, i) => `<span>专家 ${i + 1}</span>`).join(''); },
+  enter(s, ctx) {
+    const tok = s.querySelector('.o12-tok'), ex = [...s.querySelectorAll('.o12-ex span')];
+    const words = ['代码', '数学', '搜索', '图像', '对话', '规划'];
+    let n = 0;
+    const tick = () => {
+      const w = words[n++ % words.length];
+      tok.insertAdjacentHTML('beforeend', `<span>“${w}”</span>`);
+      while (tok.children.length > 3) tok.firstElementChild.remove();
+      const a = Math.floor(Math.random() * 8);
+      let b = Math.floor(Math.random() * 7);
+      if (b >= a) b++;
+      ex.forEach((e, i) => e.classList.toggle('on', i === a || i === b));
+    };
+    tick();
+    ctx.every(tick, 1200);
+  },
+  reset(s) { s.querySelector('.o12-tok').innerHTML = ''; s.querySelectorAll('.o12-ex span').forEach((e) => e.classList.remove('on')); },
+};
+</script>

@@ -1,0 +1,426 @@
+<!-- ================= 第十章共用小件（前缀 k10-，全章各页可直接使用） ================= -->
+<style>
+/* 示意标签：演示用的虚构数值、对话、界面、曲线 */
+.k10-sim{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:8px;font-size:15px;line-height:1.4;font-weight:500;color:#fdba74;border:1px dashed rgba(251,146,60,.6);background:rgba(251,146,60,.08);white-space:nowrap;vertical-align:middle}
+/* 数据来源行 */
+.k10-data{display:flex;align-items:center;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+.k10-data .ic{flex:none;color:var(--acc)}
+/* 实验徽标：<span class="k10-exp">实验 10-2<i>★★</i></span> */
+.k10-exp{display:inline-flex;align-items:center;gap:8px;padding:5px 14px;border-radius:10px;font:700 17px var(--num);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent);white-space:nowrap}
+.k10-exp i{font-style:normal;color:var(--tool);letter-spacing:-.05em}
+/* Agent 头像节点：<div class="k10-ag" style="--c:颜色"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>名称</b><small>说明</small></div> */
+.k10-ag{--c:var(--acc);position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;transition:opacity .4s,filter .4s}
+.k10-av{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:30px;color:var(--c);background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid color-mix(in srgb,var(--c) 70%,transparent);box-shadow:0 0 0 5px color-mix(in srgb,var(--c) 10%,transparent);transition:box-shadow .4s,background .4s,border-color .4s,color .4s}
+.k10-ag b{font-size:18px;color:var(--text);line-height:1.3}
+.k10-ag small{font-size:15px;color:var(--text3);line-height:1.3}
+.k10-ag.on .k10-av{background:color-mix(in srgb,var(--c) 22%,#0a1024);box-shadow:0 0 0 6px color-mix(in srgb,var(--c) 18%,transparent),0 0 34px color-mix(in srgb,var(--c) 55%,transparent)}
+.k10-ag.dim{opacity:.4}
+.k10-ag.bad .k10-av{border-color:var(--bad);color:var(--bad);box-shadow:0 0 26px color-mix(in srgb,var(--bad) 50%,transparent)}
+.k10-ag.ok .k10-av{border-color:var(--ok);color:var(--ok)}
+/* 可交互表格：<div class="k10-tbl" style="--cols:200px 1fr 1fr"><div class="k10-tr k10-th">…</div><div class="k10-tr" data-i="0">…</div></div> */
+.k10-tbl{display:flex;flex-direction:column;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);overflow:hidden}
+.k10-tr{display:grid;grid-template-columns:var(--cols,1fr 1fr);gap:18px;align-items:center;padding:13px 22px;border-left:4px solid transparent;font-size:19px;line-height:1.5;color:var(--text2);transition:background .35s,border-color .35s,color .35s;cursor:pointer}
+.k10-tr+.k10-tr{border-top:1px solid var(--line)}
+.k10-th{font-size:16px;letter-spacing:.08em;color:var(--text3);cursor:default;background:rgba(255,255,255,.03)}
+.k10-tr.on{color:var(--text);border-left-color:var(--acc);background:color-mix(in srgb,var(--acc) 11%,transparent)}
+</style>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c10-cover" data-part="0" data-title="封面" data-notes="前九章围绕单个 Agent 展开：先构建上下文、知识、工具与交互能力，再通过评估、后训练和持续进化让它长期变好。本章把问题从<b>“如何构建和改进一个 Agent”</b>推进到<b>“如何组织多个 Agent”</b>——让它们通过<b>分工、通信与相互验证</b>完成单个 Agent 难以承担的任务。<br>右侧的网络就是本章的主线画面：每个 Agent 都带着自己的私有上下文（转动的虚线环），通过中间的共享空间——共享文件系统与消息总线——交换产物和消息，也可以点对点直接通信；外圈是本章最后要讲的 Agent 社会。图中的角色都来自本章的案例：管理者、提议者与审核者、翻译 Agent、电话与电脑 Agent。">
+  <div class="kv-net fx fx-scale" style="--d:4"></div>
+  <div class="kv-text">
+    <div class="kv-tag fx fx-up"><i></i>深入理解 AI Agent · 第十章</div>
+    <h1 class="kv-title"><span class="split">多 Agent</span><span class="split" data-off="8" data-grad="#34d399,#22d3ee,#a78bfa">协作</span></h1>
+    <p class="kv-sub fx fx-up" style="--d:12">让多个 Agent 通过分工、通信与相互验证，<br>完成单个 Agent 难以承担的任务</p>
+    <div class="kv-meta fx fx-up" style="--d:14"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="kv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c10-cover{justify-content:center;padding-left:150px}
+.kv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.kv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.kv-title{margin-top:30px;font-size:136px;line-height:1.1;font-weight:800;letter-spacing:.01em}
+.kv-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.kv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.kv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.kv-net{position:absolute;right:100px;top:50%;width:740px;height:740px;margin-top:-382px}
+.kv-svg{width:100%;height:100%;overflow:visible}
+.kv-outer{fill:none;stroke:color-mix(in srgb,var(--acc) 38%,transparent);stroke-width:1.5;stroke-dasharray:2 10;transform-box:fill-box;transform-origin:center;animation:spin 120s linear infinite}
+.kv-outer-t{fill:color-mix(in srgb,var(--acc) 70%,#fff);font:600 17px var(--num);letter-spacing:.42em}
+.kv-sp{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2;stroke-dasharray:5 7;animation:flow 1.6s linear infinite}
+.kv-pe{fill:none;stroke:color-mix(in srgb,var(--acc) 45%,transparent);stroke-width:2;stroke-dasharray:3 8}
+.kv-pk{filter:drop-shadow(0 0 6px currentColor)}
+.kv-hub{fill:rgba(8,14,32,.94);stroke:var(--acc);stroke-width:2.5}
+.kv-wave{fill:none;stroke:var(--acc);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:pulse 3.2s ease-out infinite}
+.kv-hub-t{fill:var(--text);font-size:26px;font-weight:800;text-anchor:middle;dominant-baseline:central}
+.kv-hub-s{fill:var(--text3);font-size:16px;text-anchor:middle;dominant-baseline:central;letter-spacing:.06em}
+.kv-ctx{fill:none;stroke:var(--c);stroke-width:1.6;stroke-dasharray:4 7;opacity:.75;transform-box:fill-box;transform-origin:center;animation:spin 16s linear infinite}
+.kv-core{fill:rgba(10,16,36,.95);stroke:var(--c);stroke-width:2.6;animation:kvHi 7.2s ease-in-out infinite;animation-delay:calc(var(--i)*1.2s)}
+@keyframes kvHi{0%,26%,100%{fill:rgba(10,16,36,.95)}10%{fill:color-mix(in srgb,var(--c) 34%,#0a1024)}}
+.kv-ic{fill:none;stroke:var(--c);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.kv-lab{fill:var(--c);font-size:21px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#050816;stroke-width:6px}
+.kv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.kv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c10-cover'] = {
+  // 六个角色都来自本章案例；虚线环 = 各自的私有上下文
+  A: [
+    { n: '管理者', ic: 'crown', c: '#818cf8' },
+    { n: '提议者', ic: 'edit', c: '#fbbf24' },
+    { n: '审核者', ic: 'eye', c: '#4ade80' },
+    { n: '翻译', ic: 'lang', c: '#22d3ee' },
+    { n: '电话', ic: 'phone', c: '#f472b6' },
+    { n: '电脑', ic: 'browser', c: '#60a5fa' },
+  ],
+  init(s) {
+    const S = 740, c = 370, R = 252, f = (n) => n.toFixed(1);
+    const P = this.A.map((a, i) => { const t = ((-90 + i * 60) * Math.PI) / 180; return [c + R * Math.cos(t), c + R * Math.sin(t)]; });
+    let h = `<svg class="kv-svg" viewBox="0 0 ${S} ${S}"><defs>
+      <radialGradient id="kvg"><stop offset="0" stop-color="#34d399" stop-opacity=".5"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></radialGradient>
+      <path id="kvo" d="M${c - 352} ${c}A352 352 0 0 1 ${c + 352} ${c}" fill="none"/></defs>`;
+    h += `<circle class="kv-outer" cx="${c}" cy="${c}" r="352"/><text class="kv-outer-t"><textPath href="#kvo" startOffset="50%" text-anchor="middle">AGENT SOCIETY · Agent 社会 · AGENT SOCIETY</textPath></text>`;
+    h += `<circle cx="${c}" cy="${c}" r="170" fill="url(#kvg)"/>`;
+    // 辐条：Agent ⇄ 共享空间（两个方向各一条路径，供数据包往返）
+    P.forEach(([x, y], i) => {
+      const dx = x - c, dy = y - c, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+      const x1 = c + ux * 84, y1 = c + uy * 84, x2 = x - ux * 62, y2 = y - uy * 62;
+      h += `<path id="kvs${i}" class="kv-sp" d="M${f(x2)} ${f(y2)}L${f(x1)} ${f(y1)}"/><path id="kvr${i}" d="M${f(x1)} ${f(y1)}L${f(x2)} ${f(y2)}" fill="none"/>`;
+    });
+    // 点对点：提议者 ⇄ 审核者，电话 ⇄ 电脑
+    [[1, 2], [4, 5]].forEach(([a, b], k) => {
+      const [x1, y1] = P[a], [x2, y2] = P[b], mx = (x1 + x2) / 2, my = (y1 + y2) / 2, dx = mx - c, dy = my - c, L = Math.hypot(dx, dy);
+      h += `<path id="kvp${k}" class="kv-pe" d="M${f(x1)} ${f(y1)}Q${f(mx + (dx / L) * 92)} ${f(my + (dy / L) * 92)} ${f(x2)} ${f(y2)}"/>`;
+    });
+    const op = (d, b) => `<animate attributeName="opacity" values="0;1;1;0" keyTimes="0;.12;.88;1" dur="${d}s" begin="${b}s" repeatCount="indefinite"/>`;
+    P.forEach((p, i) => {
+      const col = this.A[i].c, d = (2.4 + (i % 3) * 0.5).toFixed(1), b1 = (-i * 0.9).toFixed(1), b2 = (-i * 0.9 - 1.3).toFixed(1);
+      h += `<circle class="kv-pk" r="6" fill="${col}" style="color:${col}">${op(d, b1)}<animateMotion dur="${d}s" begin="${b1}s" repeatCount="indefinite"><mpath href="#kvs${i}"/></animateMotion></circle>`;
+      h += `<circle class="kv-pk" r="5" fill="#e9edf8" style="color:#e9edf8">${op(d, b2)}<animateMotion dur="${d}s" begin="${b2}s" repeatCount="indefinite"><mpath href="#kvr${i}"/></animateMotion></circle>`;
+    });
+    [0, 1].forEach((k) => {
+      h += `<circle class="kv-pk" r="6" fill="#fff" style="color:#fff"><animateMotion dur="3.6s" begin="${-k * 1.7}s" repeatCount="indefinite" keyPoints="0;1;0" keyTimes="0;.5;1" calcMode="linear"><mpath href="#kvp${k}"/></animateMotion></circle>`;
+    });
+    h += `<circle class="kv-hub" cx="${c}" cy="${c}" r="84"/><circle class="kv-wave" cx="${c}" cy="${c}" r="84"/>`;
+    h += `<text class="kv-hub-t" x="${c}" y="${c - 14}">共享空间</text><text class="kv-hub-s" x="${c}" y="${c + 22}">文件 · 消息总线</text>`;
+    P.forEach(([x, y], i) => {
+      const a = this.A[i];
+      h += `<g style="--c:${a.c};--i:${i}" transform="translate(${f(x)} ${f(y)})"><circle class="kv-ctx" r="56"/><circle class="kv-core" r="40"/><use class="kv-ic" href="#i-${a.ic}" x="-17" y="-17" width="34" height="34"/><text class="kv-lab" y="${y > c + 10 ? 88 : -66}">${a.n}</text></g>`;
+    });
+    s.querySelector('.kv-net').innerHTML = h + '</svg>';
+  },
+};
+</script>
+
+<section class="slide" id="c10-levels" data-part="0" data-steps="2" data-trans="rise" data-dur="9000" data-title="五级 AI 能力框架里的“组织”" data-notes="在 OpenAI 曾提出的<b>五级 AI 能力框架</b>（Level 1 对话者、Level 2 思考者（Reasoners）、Level 3 智能体、Level 4 创新者、Level 5 组织（Organizations））中，多 Agent 协作常被类比为<b>通向第五级的路径之一</b>。<br>需要说明的是，此处 Organizations 指的是<b>“AI 能完成整个组织的工作”这一能力级别</b>，而非对系统架构的要求——足够强大的单个 Agent 理论上也能达到。<br>但就今天的工程现实而言，单个 Agent 终究受限于<b>自身模型的能力边界</b>和<b>上下文窗口</b>。<br>按 → 依次展开这两层说明；点击任一台阶可以重播攀升动画。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">通向“组织”级 AI 的<em>路径之一</em></h2>
+  <p class="lead fx fx-up" style="--d:2">OpenAI 曾提出的五级 AI 能力框架</p></header>
+  <div class="lv-body">
+    <div class="lv-st fx fx-up" style="--d:3"></div>
+    <div class="lv-side">
+      <div class="lv-c fx fx-right" style="--d:5"><b class="lv-h"><svg class="ic"><use href="#i-nodes"/></svg>常见的类比</b><p>多 Agent 协作常被类比为<b>通向第五级的路径之一</b></p></div>
+      <div class="lv-c lv-c1 fx fx-up" data-step="1"><b class="lv-h"><svg class="ic"><use href="#i-alert"/></svg>需要说明</b>
+        <p>Organizations 指的是<b>“AI 能完成整个组织的工作”这一能力级别</b>，而非对系统架构的要求</p>
+        <div class="lv-or"><span class="chip acc">多 Agent 协作</span><i>或</i><span class="chip">足够强大的单个 Agent</span></div>
+        <p class="lv-sm">理论上都可能达到这一级别</p></div>
+      <div class="lv-c lv-c2 fx fx-up" data-step="2"><b class="lv-h"><svg class="ic"><use href="#i-gauge"/></svg>今天的工程现实</b>
+        <p>单个 Agent 终究受限于：</p>
+        <div class="lv-m"><span>自身模型的能力边界</span><div class="lv-bar"><i></i><em></em></div></div>
+        <div class="lv-m"><span>上下文窗口</span><div class="lv-bar"><i></i><em></em></div></div></div>
+    </div>
+  </div>
+  <div class="src">第十章 · 章首</div>
+</section>
+<style>
+.lv-body{display:grid;grid-template-columns:1050px 1fr;gap:44px;margin-top:4px}
+.lv-st{position:relative;height:610px}
+.lv-s{--c:var(--acc);position:absolute;bottom:0;width:196px;height:var(--h);border-radius:18px 18px 6px 6px;border:1px solid var(--line2);background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.015));cursor:pointer;transition:border-color .5s,background .5s,box-shadow .5s,opacity .5s;opacity:.55}
+.lv-s.on{opacity:1;border-color:color-mix(in srgb,var(--c) 60%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 22%,transparent),rgba(255,255,255,.02) 70%);box-shadow:0 -10px 40px -14px color-mix(in srgb,var(--c) 60%,transparent)}
+.lv-top{padding:18px 18px 0;display:flex;flex-direction:column;gap:4px}
+.lv-top em{font:800 40px var(--num);font-style:normal;color:var(--c)}
+.lv-top b{font-size:26px}
+.lv-top small{font-size:16px;color:var(--text3);font-family:var(--num)}
+.lv-x{position:absolute;left:0;right:0;top:150px;display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;transform:translateY(12px);transition:opacity .6s,transform .6s}
+.lv-s.on .lv-x{opacity:1;transform:none}
+.lv-dots{display:grid;grid-template-columns:repeat(3,44px);gap:8px}
+.lv-dots span{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;color:var(--c);border:2px solid color-mix(in srgb,var(--c) 60%,transparent);background:rgba(10,16,36,.9);animation:floaty 3s ease-in-out infinite;animation-delay:calc(var(--k)*.3s)}
+.lv-x p{font-size:17px;color:var(--text2);text-align:center;line-height:1.5;padding:0 12px}
+.lv-side{display:flex;flex-direction:column;gap:18px}
+.lv-c{padding:20px 24px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.lv-h{display:flex;align-items:center;gap:10px;font-size:22px;color:var(--acc)}
+.lv-c p{font-size:20px;line-height:1.6;margin-top:8px}
+.lv-c p b{color:var(--acc)}
+.lv-or{display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap}
+.lv-or i{font-style:normal;color:var(--text3);font-size:18px}
+.lv-sm{font-size:17px!important;color:var(--text2)}
+.lv-m{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center;margin-top:12px}
+.lv-m span{font-size:18px;color:var(--text2)}
+.lv-bar{position:relative;height:16px;border-radius:999px;background:rgba(255,255,255,.07)}
+.lv-bar i{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--bad));transition:width 1.8s var(--ease) .5s}
+.lv-bar em{position:absolute;right:-3px;top:-7px;bottom:-7px;width:4px;border-radius:3px;background:var(--bad);box-shadow:0 0 12px var(--bad)}
+.lv-c2.on .lv-bar i{width:100%}
+</style>
+<script>
+HOOKS['c10-levels'] = {
+  L: [['L1', '对话者', ''], ['L2', '思考者', 'Reasoners'], ['L3', '智能体', ''], ['L4', '创新者', ''], ['L5', '组织', 'Organizations']],
+  init(s) {
+    s.querySelector('.lv-st').innerHTML = this.L.map(([k, n, e], i) => `
+      <div class="lv-s" data-i="${i}" style="left:${i * 213}px;--h:${170 + i * 100}px${i === 4 ? ';--c:#34d399' : ''}">
+        <div class="lv-top"><em>${k}</em><b>${n}</b><small>${e || '&nbsp;'}</small></div>
+        ${i === 4 ? `<div class="lv-x"><div class="lv-dots">${[0, 1, 2, 3, 4, 5].map((k2) => `<span style="--k:${k2}"><svg class="ic"><use href="#i-robot"/></svg></span>`).join('')}</div><p>多 Agent 协作？</p></div>` : ''}
+      </div>`).join('');
+    s.querySelector('.lv-st').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) this.climb(s, +b.dataset.i); });
+  },
+  // 台阶逐级点亮到第 n 级
+  climb(s, n) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    const st = [...s.querySelectorAll('.lv-s')];
+    st.forEach((x) => x.classList.remove('on'));
+    if (!ctx) return;
+    st.forEach((x, i) => { if (i <= n) ctx.later(() => tk === this.tk && x.classList.add('on'), 300 + i * 420); });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.climb(s, 4);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.lv-s').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-crowd" data-part="0" data-trans="zoom" data-dur="15000" data-title="群体的智能可以高于个体" data-notes="让多个 Agent 协同工作，意义远不止让不同专长的 Agent“取长补短”。更根本的一点是：<b>群体的智能可以高于个体</b>。人类文明便是明证——单个人的智力有限，但经由<b>分工、协作、辩论和知识的代际累积</b>，人类社会作为整体所展现的智能，远超任何一位天才个体。Agent 群体同样可能涌现出这样的集体智能：哪怕每一个 Agent 都只相当于人类专家的水平，只要组织得当，其整体能力也可能超过所有人类专家的总和。<br>Google DeepMind 在《从 AGI 到 ASI》中正把<b>“大规模多 Agent 集体”</b>列为通往超级智能（ASI）的关键路径之一——正如人类的通用智能能聚合成超越个体的社会与组织实体，众多 AGI 级 Agent 协同形成的“群体智能”，也可能表现出远超其成员简单相加的认知能力。<br>因此，多 Agent 协作不只是突破单个模型上下文窗口与能力边界的工程手段，更可能是从“专家级 AI”迈向“超越人类整体”的一条根本路径。<br>左侧是示意动画：四个开关依次打开分工、协作、辩论、知识的代际累积，也可以手动点选。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>群体的智能</em>可以高于个体</h2>
+  <p class="lead fx fx-up" style="--d:2">多个 Agent 协同工作，意义远不止让不同专长的 Agent“取长补短”</p></header>
+  <div class="cw-body">
+    <div class="cw-stage panel fx fx-left" style="--d:3">
+      <canvas class="cw-cv"></canvas>
+      <span class="k10-sim cw-sim">示意动画</span>
+      <span class="cw-state">个体</span>
+      <div class="cw-tg">
+        <button class="tgl" data-k="div" style="--tc:#22d3ee"><i></i>分工</button>
+        <button class="tgl" data-k="col" style="--tc:#34d399"><i></i>协作</button>
+        <button class="tgl" data-k="deb" style="--tc:#fbbf24"><i></i>辩论</button>
+        <button class="tgl" data-k="acc" style="--tc:#a78bfa"><i></i>知识的代际累积</button>
+      </div>
+    </div>
+    <div class="cw-side">
+      <div class="cw-card fx fx-right" style="--d:4"><b><svg class="ic"><use href="#i-users"/></svg>人类文明便是明证</b><p>单个人的智力有限，但经由分工、协作、辩论和知识的代际累积，人类社会作为整体所展现的智能，远超任何一位天才个体</p></div>
+      <div class="cw-card fx fx-right" style="--d:5"><b><svg class="ic"><use href="#i-nodes"/></svg>Agent 群体同样可能涌现集体智能</b><p>哪怕每一个 Agent 都只相当于人类专家的水平，只要组织得当，整体能力也可能超过所有人类专家的总和</p></div>
+      <div class="cw-card dm fx fx-right" style="--d:6"><b><svg class="ic"><use href="#i-rocket"/></svg>Google DeepMind《从 AGI 到 ASI》</b><p>把“大规模多 Agent 集体”列为通往超级智能（ASI）的<em>关键路径之一</em></p></div>
+    </div>
+  </div>
+  <p class="tagline cw-tag fx fx-up" style="--d:8">不只是突破上下文窗口与能力边界的<b>工程手段</b>，更可能是从“专家级 AI”迈向“超越人类整体”的一条<b>根本路径</b></p>
+  <div class="src">第十章 · 章首 · 脚注：Google DeepMind, From AGI to ASI, arXiv:2606.12683, 2026</div>
+</section>
+<style>
+.cw-body{display:grid;grid-template-columns:1000px 1fr;gap:34px}
+.cw-stage{position:relative;height:540px;overflow:hidden;padding:0}
+.cw-cv{position:absolute;left:0;top:0;width:1000px;height:540px}
+.cw-sim{position:absolute;left:18px;top:16px}
+.cw-state{position:absolute;right:20px;top:14px;font:800 28px var(--num);color:var(--acc);letter-spacing:.1em;transition:color .5s}
+.cw-tg{position:absolute;left:18px;right:18px;bottom:16px;display:flex;gap:12px;justify-content:center}
+.cw-side{display:flex;flex-direction:column;gap:16px}
+.cw-card{padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.cw-card b{display:flex;align-items:center;gap:10px;font-size:21px;color:var(--acc)}
+.cw-card p{font-size:19px;line-height:1.6;margin-top:8px;color:var(--text)}
+.cw-card.dm{border-color:color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 9%,rgba(12,18,40,.8))}
+.cw-card.dm b{color:var(--llm)}
+.cw-card em{font-style:normal;color:var(--llm);font-weight:700}
+.cw-tag{margin-top:22px;font-size:23px}
+</style>
+<script>
+HOOKS['c10-crowd'] = {
+  W: 1000, H: 540,
+  G: ['#22d3ee', '#34d399', '#fbbf24', '#f472b6'],
+  init(s) {
+    const cv = s.querySelector('.cw-cv');
+    cv.width = this.W * 2; cv.height = this.H * 2;
+    this.g = cv.getContext('2d');
+    this.g.setTransform(2, 0, 0, 2, 0, 0);
+    this.on = { div: false, col: false, deb: false, acc: false };
+    s.querySelectorAll('.cw-tg .tgl').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.set(s, b.dataset.k, !this.on[b.dataset.k]); }));
+  },
+  set(s, k, v) {
+    this.on[k] = v;
+    s.querySelector(`.cw-tg [data-k=${k}]`).classList.toggle('on', v);
+    const n = Object.values(this.on).filter(Boolean).length;
+    s.querySelector('.cw-state').textContent = n === 4 ? '群体' : n ? '组织中' : '个体';
+  },
+  seed() {
+    const r = U.rand(11);
+    this.P = Array.from({ length: 48 }, (_, i) => ({ x: 60 + r() * (this.W - 120), y: 60 + r() * (this.H - 150), vx: (r() - 0.5) * 0.6, vy: (r() - 0.5) * 0.6, g: i % 4 }));
+    this.pulses = [];
+    this.know = 0;
+  },
+  frame() {
+    const g = this.g, W = this.W, H = this.H, P = this.P, on = this.on;
+    g.clearRect(0, 0, W, H);
+    const A = [[260, 170], [740, 170], [260, 360], [740, 360]];
+    // 知识的代际累积：中心逐层增长的“知识层”
+    if (on.acc) this.know = Math.min(1, this.know + 0.0016); else this.know = Math.max(0, this.know - 0.01);
+    if (this.know > 0) {
+      for (let k = 0; k < 6; k++) {
+        const rr = 26 + k * 22 * this.know;
+        g.strokeStyle = `rgba(167,139,250,${(0.5 - k * 0.07) * this.know})`;
+        g.lineWidth = 3;
+        g.beginPath(); g.arc(W / 2, H / 2 - 10, rr, 0, Math.PI * 2); g.stroke();
+      }
+      g.fillStyle = `rgba(167,139,250,${0.18 * this.know})`;
+      g.beginPath(); g.arc(W / 2, H / 2 - 10, 26 + 110 * this.know, 0, Math.PI * 2); g.fill();
+    }
+    for (const p of P) {
+      if (on.div) { const [ax, ay] = A[p.g]; p.vx += (ax - p.x) * 0.0006; p.vy += (ay - p.y) * 0.0006; }
+      p.vx *= 0.985; p.vy *= 0.985;
+      p.vx += (Math.random() - 0.5) * 0.05; p.vy += (Math.random() - 0.5) * 0.05;
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 20 || p.x > W - 20) p.vx *= -1;
+      if (p.y < 50 || p.y > H - 80) p.vy *= -1;
+      p.x = Math.max(20, Math.min(W - 20, p.x)); p.y = Math.max(50, Math.min(H - 80, p.y));
+    }
+    // 协作：不同专长之间的连线
+    const links = [];
+    if (on.col) {
+      g.lineWidth = 1.2;
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+        const a = P[i], b = P[j];
+        if (a.g === b.g) continue;
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < 230) {
+          links.push([a, b]);
+          g.strokeStyle = `rgba(52,211,153,${(1 - d / 230) * 0.45})`;
+          g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke();
+        }
+      }
+    }
+    // 辩论：沿连线往返的观点脉冲
+    if (on.deb && links.length && Math.random() < 0.12) { const [a, b] = links[(Math.random() * links.length) | 0]; this.pulses.push({ a, b, t: 0 }); }
+    this.pulses = this.pulses.filter((q) => q.t <= 2);
+    for (const q of this.pulses) {
+      q.t += 0.035;
+      const u = q.t <= 1 ? q.t : 2 - q.t, x = q.a.x + (q.b.x - q.a.x) * u, y = q.a.y + (q.b.y - q.a.y) * u;
+      g.fillStyle = q.t <= 1 ? '#fbbf24' : '#fb7185';
+      g.beginPath(); g.arc(x, y, 3.6, 0, Math.PI * 2); g.fill();
+    }
+    for (const p of P) {
+      const c = on.div ? this.G[p.g] : '#cbd5e1';
+      g.fillStyle = c;
+      g.shadowColor = c; g.shadowBlur = on.div ? 10 : 0;
+      g.beginPath(); g.arc(p.x, p.y, 6, 0, Math.PI * 2); g.fill();
+    }
+    g.shadowBlur = 0;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.seed();
+    Object.keys(this.on).forEach((k) => this.set(s, k, false));
+    ctx.raf(() => this.frame());
+    const order = ['div', 'col', 'deb', 'acc'];
+    let n = 0;
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (n < 4) this.set(s, order[n], true);
+      else if (n === 7) { order.forEach((k) => this.set(s, k, false)); n = -1; }
+      n++;
+    }, 2000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { s.querySelectorAll('.cw-tg .tgl').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-map" data-part="0" data-trans="flip" data-dur="14000" data-title="本章导览" data-notes="本章先给出多 Agent 系统的两个核心设计维度——<b>上下文是否共享</b>与<b>协作拓扑</b>；再回答一个更根本的问题：什么时候真正需要多个 Agent？这个答案是后文所有工程方案的总体参照。<br>接着沿第一个维度展开：共享上下文的继承式协作（角色转换、Skill）；不共享上下文的显式协作——先讲与拓扑无关的两套基础设施（共享文件系统构成的<b>数据平面</b>、通信与控制机制构成的<b>控制平面</b>），再分别讲<b>对等协作、管理者模式、去中心化模式</b>，以及跨组织的 A2A 协议。<br>然后讨论多 Agent 协作特有的<b>失败模式</b>；最后把视角从目标明确的任务协作切换到大量 Agent 长期共存时涌现的 <b>Agent 社会</b>。<br>路线图会自动依次介绍各部分；鼠标悬停查看简介，点击节点直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：从<em>两个维度</em>到 Agent 社会</h2>
+  <p class="lead fx fx-up" style="--d:2">先建坐标、定判据，再沿“共享 / 不共享上下文”展开架构，最后看失败与涌现</p></header>
+  <div class="mp-stage fx fx-scale" style="--d:3">
+    <svg class="mp-svg" viewBox="0 0 1660 560" width="1660" height="560"></svg>
+    <div class="mp-nodes"></div>
+  </div>
+  <div class="mp-info fx fx-up" style="--d:6"><em class="mp-ik"></em><b class="mp-in"></b><span class="mp-id"></span></div>
+  <div class="src">第十章 · 全章结构</div>
+</section>
+<style>
+.mp-stage{position:relative;width:1660px;height:560px;margin-top:-6px}
+.mp-svg{position:absolute;inset:0;overflow:visible}
+.mp-e{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2.4;stroke-dasharray:6 8;animation:flow 1.4s linear infinite}
+.mp-e.hot{stroke:var(--acc);stroke-width:3;filter:drop-shadow(0 0 6px var(--acc))}
+.mp-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff)}
+.mp-n{--c:var(--acc);position:absolute;width:236px;height:104px;margin:-52px 0 0 -118px;padding:12px 16px 12px 70px;border-radius:18px;text-align:left;background:rgba(12,18,40,.9);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:border-color .4s,box-shadow .4s,background .4s,translate .4s var(--ease);opacity:0;scale:.6}
+.active .mp-n{animation:mpIn .7s var(--spring) forwards;animation-delay:calc(var(--i)*110ms + 400ms)}
+@keyframes mpIn{to{opacity:1;scale:1}}
+.mp-n em{position:absolute;left:14px;top:50%;width:44px;height:44px;margin-top:-22px;border-radius:50%;display:grid;place-items:center;font:800 18px var(--num);font-style:normal;color:var(--c);border:2px solid var(--c);background:rgba(5,9,22,.9)}
+.mp-n b{display:block;font-size:21px;line-height:1.3;color:var(--text)}
+.mp-n small{display:block;font-size:15px;line-height:1.4;color:var(--text3);margin-top:4px}
+.mp-n.on,.mp-n:hover{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent);translate:0 -4px}
+.mp-n.on em,.mp-n:hover em{background:var(--c);color:#06101f}
+.mp-info{display:flex;align-items:baseline;gap:16px;margin-top:20px;padding:16px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-height:64px}
+.mp-ik{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.mp-in{font-size:22px;white-space:nowrap}
+.mp-id{font-size:19px;color:var(--text2);line-height:1.55}
+.mp-info.sw b,.mp-info.sw span{animation:swIn .45s var(--ease) both}
+</style>
+<script>
+HOOKS['c10-map'] = {
+  // [部分序号, x, y, 名称, 副标题, 简介]
+  N: [
+    [1, 128, 280, '分类框架', '共享？× 拓扑', '两个核心设计维度：上下文是否共享（共享 / 不共享）× 协作拓扑（对等 / 管理者 / 去中心化）'],
+    [2, 408, 280, '何时优于单 Agent', '是否引入新信息', '总体参照：协作是否引入了单个 Agent 生成时无法获得的新信息？收益能否覆盖额外的 token 成本？'],
+    [3, 700, 96, '共享上下文', '继承式协作', '每个阶段切换系统提示词和工具集，但保留前任的全部轨迹；角色转换是替换 system prompt，还是加载 Skill？'],
+    [4, 700, 380, '数据平面与控制平面', '不共享上下文的基础', '与拓扑无关的两套基础设施：共享文件系统（数据平面）与消息、状态、终止、调度（控制平面）'],
+    [5, 990, 230, '对等协作', '相互制衡 · 迭代改进', 'Loop 工程、提议者-审核者、辩论、头脑风暴、专家小组：2–3 个平等 Agent 的迭代循环'],
+    [6, 990, 370, '管理者模式', '中心化协调', 'Manager 拆解与调度：顺序 / 并行协调，书籍翻译、电话 + 电脑、多网站并行搜索、生成 Agent 工作流'],
+    [7, 990, 510, '去中心化与 A2A', '编舞 · 跨组织', '没有运行时的中心控制者：MetaGPT、AutoGen 群聊、Swarm handoff；跨组织协作用 A2A 协议'],
+    [8, 1272, 280, '失败模式', '协作带来的新失败', '并发冲突、级联放大、同质趋同、互相扯皮、循环失控，以及人的失败：理解债与认知投降'],
+    [9, 1540, 280, 'Agent 社会', '涌现 · 经济 · 博弈', 'AI 小镇、Agentopia、Moltbook、Vending-Bench Arena、Pinchwork 与 RentAHuman、语音狼人杀'],
+  ],
+  E: [[0, 1], [1, 2], [1, 3], [3, 4], [3, 5], [3, 6], [2, 7], [4, 7], [5, 7], [6, 7], [7, 8]],
+  init(s) {
+    const N = this.N, hw = 118;
+    const path = (a, b) => {
+      const [, x1, y1] = N[a], [, x2, y2] = N[b], sx = x1 + hw, ex = x2 - hw, m = (sx + ex) / 2;
+      return `M${sx} ${y1}C${m} ${y1} ${m} ${y2} ${ex} ${y2}`;
+    };
+    let h = '';
+    this.E.forEach(([a, b], i) => { h += `<path class="mp-e" data-e="${i}" d="${path(a, b)}"/>`; });
+    // 彗星沿主线（分类 → 判据 → 双平面 → 管理者 → 失败 → 社会），穿过节点本身
+    const chain = [0, 1, 3, 5, 7, 8];
+    let main = `M${N[0][1] - hw} ${N[0][2]}`;
+    for (let i = 0; i < chain.length - 1; i++) main += `L${N[chain[i]][1] + hw} ${N[chain[i]][2]}` + path(chain[i], chain[i + 1]).replace(/^M[\d.]+ [\d.]+/, '');
+    main += `L${N[8][1] + hw} ${N[8][2]}`;
+    h += `<path id="mpmain" d="${main}" fill="none"/>`;
+    h += `<circle class="mp-comet" r="7"><animateMotion dur="9s" repeatCount="indefinite"><mpath href="#mpmain"/></animateMotion></circle>`;
+    s.querySelector('.mp-svg').innerHTML = h;
+    const P = window.DECK_CFG.parts;
+    s.querySelector('.mp-nodes').innerHTML = N.map(([p, x, y, n, sub], i) =>
+      `<button class="mp-n" data-p="${p}" data-k="${i}" style="left:${x}px;top:${y}px;--c:${P[p].acc};--i:${i}"><em>0${p}</em><b>${n}</b><small>${sub}</small></button>`).join('');
+    const box = s.querySelector('.mp-nodes');
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-p]');
+      if (!b) return;
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +b.dataset.p);
+      if (idx >= 0) DECK.go(idx, 0);
+    });
+    box.querySelectorAll('.mp-n').forEach((b) => b.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +b.dataset.k); }));
+  },
+  show(s, k) {
+    this.k = k;
+    const [p, , , n, , d] = this.N[k];
+    s.querySelectorAll('.mp-n').forEach((b) => b.classList.toggle('on', +b.dataset.k === k));
+    s.querySelectorAll('.mp-e').forEach((e) => { const [a, b] = this.E[+e.dataset.e]; e.classList.toggle('hot', b === k); });
+    s.querySelector('.mp-ik').textContent = 'PART 0' + p;
+    s.querySelector('.mp-in').textContent = n;
+    s.querySelector('.mp-id').textContent = d;
+    U.restart(s.querySelector('.mp-info'), 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 1500);
+    ctx.every(() => { if (this.auto) this.show(s, (this.k + 1) % this.N.length); }, 1500);
+  },
+  reset(s) {
+    s.querySelectorAll('.mp-n,.mp-e').forEach((x) => x.classList.remove('on', 'hot'));
+    ['.mp-ik', '.mp-in', '.mp-id'].forEach((q) => (s.querySelector(q).textContent = ''));
+  },
+};
+</script>

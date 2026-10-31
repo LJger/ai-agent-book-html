@@ -1,0 +1,1215 @@
+<!-- ================= PART 05 · 实现技巧与工具 ================= -->
+<section class="slide chapter" id="c05-d5" data-part="5" data-title="PART 05 · 实现技巧与工具" data-notes="上面的工作流程是理想状态。要让它在实践中真正跑起来，还需要几个具体的实现技巧——在保证思考质量的前提下，把响应速度提上去、把上下文消耗降下来。它们是第二章、第四章讨论的通用 Agent 技术在编程领域的具体应用。<br>本部分分三块：先是五个实现技巧——并行与流式、上下文管理、环境感知、状态持久化、即时反馈；然后是在庞大代码库中定位代码的搜索工具（图5-3）；最后是文件编辑工具（图5-4），以及“为人设计的编辑器”与模型工作模式之间的张力。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">实现技巧<br>与工具</h1>
+  <div class="ch-s fx fx-up" style="--d:3">并行与流式 · 上下文管理 · 环境感知 · 状态持久化 · 即时反馈 · 搜索 · 编辑</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">让 Agent 能够像经验丰富的开发者那样流畅地工作。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c05-stream" data-part="5" data-dur="16000" data-title="并行、流式与级联中止" data-notes="<b>并行工具调用、流式执行与级联中止。</b>传统 Agent 实现往往采用串行模式：生成一个工具调用，执行完，拿到结果，再决定下一步。这种严格的排队等待浪费了大量时间。<br>现代 Coding Agent 应充分利用流式响应：第二章在讨论模型输出顺序时介绍了这一机制——第一个工具调用的参数一经完整生成并通过校验，即可立即开始执行，无需等待模型生成后续的工具调用。例如，模型在一次推理中要连续输出搜索代码、查配置文件、读日志三个工具调用，第一个调用的参数刚一完整通过校验就能立即启动，与后两个调用的生成过程重叠进行；彼此独立的调用之间还可并行执行而非排队等待。这种重叠执行显著降低了端到端延迟，使 Agent 的响应更加敏捷。<br>并行执行的另一面是故障处理。每个工具定义应声明自己是否支持并发执行（默认为否，失败安全）；当某个调用失败时，通过级联中止机制终止同一批并行启动且依赖该结果的其他调用，但不波及独立的调用和父级操作——这正是 Harness 工程一节中“故障边界控制”原则的具体实现。<br>甘特图里的时长、下方的工具声明与失败情景都是示意；右上角可以切换两种模式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">并行、流式与<em>级联中止</em></h2></div>
+    <div class="p5b-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="ser">串行</button><button data-v="par">流式 + 并行</button></div></header>
+  <div class="p5b-gantt panel fx fx-up" style="--d:3">
+    <div class="p5b-hd"><b>模型在一次推理中要连续输出三个工具调用</b><span class="c5-tag demo">示意</span><span class="p5b-cap"></span></div>
+    <div class="p5b-grid">
+      <div class="p5b-lab"><i></i>模型输出</div><div class="p5b-trk" data-r="gen"></div>
+      <div class="p5b-lab"><span class="c5-tool">Grep</span>搜索代码</div><div class="p5b-trk" data-r="0"></div>
+      <div class="p5b-lab"><span class="c5-tool">Read</span>查配置文件</div><div class="p5b-trk" data-r="1"></div>
+      <div class="p5b-lab"><span class="c5-tool">Read</span>读日志</div><div class="p5b-trk" data-r="2"></div>
+      <div class="p5b-lab p5b-u">时间（秒）</div><div class="p5b-axis"></div>
+      <div class="p5b-phw"><i class="p5b-ph"></i></div>
+    </div>
+    <div class="p5b-cmp">
+      <div data-k="ser"><span>串行 · 端到端</span><i><b></b></i><em>—</em></div>
+      <div data-k="par"><span>流式 + 并行 · 端到端</span><i><b></b></i><em>—</em></div>
+    </div>
+  </div>
+  <div class="p5b-low">
+    <div class="p5b-casc panel fx fx-up" style="--d:4">
+      <div class="p5b-hd"><b>级联中止：故障只沿依赖关系传播</b><span class="c5-tag demo">示意</span></div>
+      <div class="p5b-par"><svg class="ic"><use href="#i-refresh"/></svg><span>父级操作 · 本轮 Agent 循环</span><em class="st">等待这一批结果</em></div>
+      <div class="p5b-batch">
+        <div class="p5b-call"><b>①</b><span>查配置文件<small>Read config.yaml</small></span><em class="st">排队</em><i class="pg"><s></s></i></div>
+        <div class="p5b-call"><b>②</b><span>校验配置项<small>依赖 ① 的结果</small></span><em class="st">排队</em><i class="pg"><s></s></i></div>
+        <div class="p5b-call"><b>③</b><span>搜索代码<small>独立</small></span><em class="st">排队</em><i class="pg"><s></s></i></div>
+        <div class="p5b-call"><b>④</b><span>读日志<small>独立</small></span><em class="st">排队</em><i class="pg"><s></s></i></div>
+      </div>
+    </div>
+    <div class="p5b-decl panel fx fx-up" style="--d:5">
+      <div class="p5b-hd"><b>每个工具都声明：能否并发</b><span class="c5-tag demo">示意</span></div>
+      <div class="p5b-dl">
+        <div><span class="c5-tool">Grep</span><em class="y"><svg class="ic"><use href="#i-check"/></svg>支持并发</em></div>
+        <div><span class="c5-tool">Read</span><em class="y"><svg class="ic"><use href="#i-check"/></svg>支持并发</em></div>
+        <div><span class="c5-tool">Edit</span><em class="n"><svg class="ic"><use href="#i-x"/></svg>未声明 → 否</em></div>
+        <div><span class="c5-tool">Bash</span><em class="n"><svg class="ic"><use href="#i-x"/></svg>未声明 → 否</em></div>
+      </div>
+      <p class="p5b-dn"><b>默认为否，失败安全</b>：没有声明的工具一律排队执行</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的实现技巧」· 并行工具调用、流式执行与级联中止</div>
+</section>
+<style>
+#c05-stream .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.p5b-gantt{padding:14px 24px;display:flex;flex-direction:column;gap:12px}
+.p5b-hd{display:flex;align-items:center;gap:12px}
+.p5b-hd b{font-size:20px}
+.p5b-cap{margin-left:auto;font-size:17px;color:var(--acc)}
+.p5b-grid{position:relative;display:grid;grid-template-columns:190px 1fr;column-gap:16px;row-gap:8px;align-items:center}
+.p5b-lab{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--text2);white-space:nowrap}
+.p5b-lab>i{width:12px;height:12px;border-radius:50%;background:var(--llm);box-shadow:0 0 10px var(--llm)}
+.p5b-lab .c5-tool{font-size:15px;padding:0 8px}
+.p5b-lab.p5b-u{font-size:15px;color:var(--text3)}
+.p5b-trk{position:relative;height:44px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.p5b-bar{position:absolute;top:5px;bottom:5px}
+.p5b-bar>i{position:absolute;inset:0;border-radius:8px;transform:scaleX(0);transform-origin:left center}
+.p5b-bar.gen>i{background:linear-gradient(90deg,color-mix(in srgb,var(--llm) 55%,transparent),color-mix(in srgb,var(--llm) 88%,transparent));box-shadow:0 0 14px color-mix(in srgb,var(--llm) 40%,transparent)}
+.p5b-bar.ex>i{background:linear-gradient(90deg,color-mix(in srgb,var(--tool) 55%,transparent),color-mix(in srgb,var(--tool) 92%,transparent));box-shadow:0 0 14px color-mix(in srgb,var(--tool) 35%,transparent)}
+.p5b-bar>span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#0b1020;opacity:0;white-space:nowrap}
+.p5b-grid.go .p5b-bar>i{transform:scaleX(1);transition:transform var(--du) linear var(--dl)}
+.p5b-grid.go .p5b-bar>span{opacity:1;transition:opacity .3s var(--dl)}
+.p5b-ck{position:absolute;right:-13px;top:50%;width:26px;height:26px;margin-top:-13px;border-radius:50%;display:grid;place-items:center;background:var(--ok);color:#06101f;font-size:15px;opacity:0;transform:scale(.4);z-index:2}
+.p5b-grid.go .p5b-ck{opacity:1;transform:none;transition:opacity .3s var(--dl),transform .35s var(--spring) var(--dl)}
+.p5b-axis{position:relative;height:22px}
+.p5b-axis span{position:absolute;top:0;transform:translateX(-50%);font:15px/22px var(--num);color:var(--text3)}
+.p5b-phw{position:absolute;left:206px;right:0;top:0;bottom:30px;pointer-events:none}
+.p5b-ph{position:absolute;top:-4px;bottom:-4px;left:0;width:2px;border-radius:2px;background:var(--acc);box-shadow:0 0 12px var(--acc);opacity:0}
+.p5b-grid.go .p5b-ph{opacity:1}
+.p5b-cmp{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.p5b-cmp>div{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.p5b-cmp [data-k=ser]{--c:var(--bad)}.p5b-cmp [data-k=par]{--c:var(--ok)}
+.p5b-cmp i{height:12px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.p5b-cmp b{display:block;height:100%;width:0;border-radius:999px;background:var(--c);transition:width .9s var(--ease)}
+.p5b-cmp em{min-width:64px;text-align:right;font:700 18px var(--num);font-style:normal;color:var(--c)}
+.p5b-low{display:grid;grid-template-columns:1.55fr 1fr;gap:20px;margin-top:18px;flex:1;min-height:0}
+.p5b-casc,.p5b-decl{padding:14px 22px;display:flex;flex-direction:column;gap:12px}
+.p5b-par{display:flex;align-items:center;gap:12px;padding:9px 16px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03);font-size:18px;transition:all .4s}
+.p5b-par .ic{color:var(--acc);font-size:22px}
+.p5b-par .st{margin-left:auto;font-style:normal;font-size:16px;color:var(--text3);transition:color .3s}
+.p5b-par.ok{border-color:var(--ok);background:rgba(52,211,153,.08)}
+.p5b-par.ok .st{color:#6ee7b7}
+.p5b-batch{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.p5b-call{position:relative;display:flex;align-items:center;gap:12px;padding:8px 14px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:17px;transition:border-color .4s,background .4s,opacity .4s}
+.p5b-call>b{font-size:19px;color:var(--acc)}
+.p5b-call>span{display:flex;flex-direction:column;line-height:1.35}
+.p5b-call small{font-size:15px;color:var(--text3);font-family:var(--mono)}
+.p5b-call .st{margin-left:auto;font-style:normal;font-size:15px;color:var(--text3);white-space:nowrap}
+.p5b-call .pg{position:absolute;left:12px;right:12px;bottom:5px;height:4px;border-radius:4px;background:rgba(255,255,255,.06)}
+.p5b-call .pg s{display:block;height:100%;width:0;border-radius:4px;background:var(--acc);transition:width var(--t,1.2s) linear}
+.p5b-call.run .st{color:var(--acc)}
+.p5b-call.fail{border-color:var(--bad);background:rgba(251,113,133,.1);animation:shake .5s}
+.p5b-call.fail .st{color:#fda4af}.p5b-call.fail .pg s{background:var(--bad)}
+.p5b-call.abort{border-color:var(--warn);border-style:dashed;opacity:.72}
+.p5b-call.abort .st{color:var(--warn)}.p5b-call.abort .pg s{background:var(--warn)}
+.p5b-call.done{border-color:color-mix(in srgb,var(--ok) 60%,transparent)}
+.p5b-call.done .st{color:#6ee7b7}.p5b-call.done .pg s{background:var(--ok)}
+.p5b-dl{display:flex;flex-direction:column;gap:7px}
+.p5b-dl>div{display:flex;align-items:center;justify-content:space-between;padding:5px 12px;border-radius:10px;background:rgba(255,255,255,.03)}
+.p5b-dl em{display:inline-flex;align-items:center;gap:6px;font-style:normal;font-size:16px}
+.p5b-dl em.y{color:#6ee7b7}.p5b-dl em.n{color:#fda4af}
+.p5b-dn{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2)}
+.p5b-dn b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-stream'] = {
+  T: 9, K: 420,
+  // 时间单位：秒（示意）。串行：生成一个调用 → 执行完 → 再生成下一个；流式：参数完整即启动，独立调用并行
+  M: {
+    ser: { tot: 8.5, cap: '生成一个调用 → 执行完 → 拿到结果 → 再决定下一步', gen: [[0, 1], [3.5, 4.5], [5.5, 6.5]], ex: [[1, 3.5], [4.5, 5.5], [6.5, 8.5]] },
+    par: { tot: 5, cap: '参数完整并通过校验就立即执行，与后续调用的生成重叠', gen: [[0, 1], [1, 2], [2, 3]], ex: [[1, 3.5], [2, 3], [3, 5]] },
+  },
+  init(s) {
+    this.set = U.seg(s.querySelector('.p5b-seg'), (v) => { this.auto = false; this.run(s, v); });
+    s.querySelector('.p5b-axis').innerHTML = Array.from({ length: this.T + 1 }, (_, i) => `<span style="left:${((i / this.T) * 100).toFixed(2)}%">${i}</span>`).join('');
+  },
+  run(s, v) {
+    if (!this.ctx) return;
+    const m = this.M[v], K = this.K, pc = (t) => ((t / this.T) * 100).toFixed(2);
+    const rk = (this.rk = (this.rk || 0) + 1);
+    this.v = v; this.set(v);
+    s.querySelector('.p5b-cap').textContent = m.cap;
+    const bar = (a, b, cls, txt, ck) => `<div class="p5b-bar ${cls}" style="left:${pc(a)}%;width:${pc(b - a)}%;--dl:${a * K}ms;--du:${(b - a) * K}ms"><i></i><span>${txt}</span>${ck ? `<em class="p5b-ck" style="--dl:${b * K}ms"><svg class="ic"><use href="#i-check"/></svg></em>` : ''}</div>`;
+    s.querySelector('[data-r=gen]').innerHTML = m.gen.map(([a, b], i) => bar(a, b, 'gen', `调用${'①②③'[i]} 参数`, v === 'par')).join('');
+    m.ex.forEach(([a, b], i) => { s.querySelector(`[data-r="${i}"]`).innerHTML = bar(a, b, 'ex', '执行'); });
+    const g = s.querySelector('.p5b-grid'), ph = s.querySelector('.p5b-ph');
+    g.classList.remove('go'); ph.style.transition = 'none'; ph.style.left = '0%';
+    void g.offsetWidth;
+    g.classList.add('go');
+    ph.style.transition = `left ${m.tot * K}ms linear`; ph.style.left = pc(m.tot) + '%';
+    this.ctx.later(() => {
+      if (rk !== this.rk) return;
+      const row = s.querySelector(`.p5b-cmp [data-k=${v}]`);
+      row.querySelector('b').style.width = ((m.tot / this.T) * 100).toFixed(1) + '%';
+      row.querySelector('em').textContent = m.tot.toFixed(1) + ' s';
+    }, m.tot * K + 200);
+  },
+  // 级联中止：① 失败 → 依赖它的 ② 被中止；③④ 独立，照常完成；父级不受影响
+  async casc(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cs = [...s.querySelectorAll('.p5b-call')], par = s.querySelector('.p5b-par');
+    const set = (c, cls, txt, w, t) => {
+      c.className = 'p5b-call' + (cls ? ' ' + cls : '');
+      c.querySelector('.st').textContent = txt;
+      if (w != null) { c.style.setProperty('--t', (t || 0) + 'ms'); c.querySelector('.pg s').style.width = w; }
+    };
+    while (ok()) {
+      cs.forEach((c) => set(c, '', '排队', '0%', 0));
+      par.className = 'p5b-par'; par.querySelector('.st').textContent = '等待这一批结果';
+      await U.wait(ctx, 700); if (!ok()) return;
+      [45, 30, 60, 50].forEach((w, i) => set(cs[i], 'run', '运行中', w + '%', 1200));
+      await U.wait(ctx, 1300); if (!ok()) return;
+      set(cs[0], 'fail', '失败：文件不存在');
+      await U.wait(ctx, 500); if (!ok()) return;
+      set(cs[1], 'abort', '级联中止');
+      set(cs[2], 'run', '运行中', '100%', 1000); set(cs[3], 'run', '运行中', '100%', 1400);
+      await U.wait(ctx, 1050); if (!ok()) return;
+      set(cs[2], 'done', '完成');
+      await U.wait(ctx, 400); if (!ok()) return;
+      set(cs[3], 'done', '完成');
+      await U.wait(ctx, 500); if (!ok()) return;
+      par.className = 'p5b-par ok'; par.querySelector('.st').textContent = '不受影响：收到 ① 的错误、② 的中止说明和 ③④ 的结果';
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true;
+    this.run(s, 'ser');
+    let n = 0;
+    ctx.every(() => { if (this.auto) { n++; this.run(s, n % 2 ? 'par' : 'ser'); } }, 5600);
+    ctx.later(() => this.casc(s), 900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1; this.rk = (this.rk || 0) + 1;
+    s.querySelector('.p5b-grid').classList.remove('go');
+    s.querySelectorAll('.p5b-cmp b').forEach((b) => (b.style.width = '0'));
+    s.querySelectorAll('.p5b-cmp em').forEach((e) => (e.textContent = '—'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-ctxmgmt" data-part="5" data-trans="rise" data-dur="16000" data-title="上下文的精细化管理" data-notes="<b>上下文的精细化管理。</b>Coding Agent 面临的根本挑战是代码库通常很大，但模型上下文窗口有限。即使先进模型号称支持百万级 token，把整个代码库一股脑塞进上下文既不经济也没必要。智能的上下文管理需在多个层面展开。<br>在文件读取层面，Agent 不应总是读取文件全部内容。对大型文件，工具应支持按行号范围读取特定片段，比如只读第 100 到 150 行，而不是把几千行的文件全部加载。更重要的是，<b>返回内容时附加行号标注，每行代码都以实际行号作为前缀</b>。这个看似简单的设计带来巨大价值：模型可精确引用“在 src/main.py 的第 42 行”，减少歧义并使后续编辑操作更可靠。<br>在命令执行层面，终端输出的处理同样需要谨慎。编译或测试可能产生数千行输出，如果全部注入上下文会迅速耗尽预算。第四章介绍的长输出截断与持久化机制在这里广泛应用：保留输出的前若干行（通常包含错误上下文）和后若干行（通常包含错误总结），中间以一行提示替代，并说明完整输出已保存到临时文件供按需查看。<br>页面上的文件内容、行数、token 数与测试输出都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">上下文的<em>精细化管理</em>：只放进需要的那一段</h2></header>
+  <div class="p5c-body">
+    <div class="p5c-l panel fx fx-left" style="--d:2">
+      <div class="p5c-hd"><b>文件读取：按行号范围，带行号返回</b><div class="p5c-seg seg"><i class="knob"></i><button data-v="num">带行号</button><button data-v="raw">不带行号</button></div></div>
+      <div class="p5c-call"><span class="c5-tool">Read</span><code>src/main.py · 第 100–150 行</code><span class="c5-tag demo">示意</span></div>
+      <div class="p5c-file">
+        <div class="p5c-mini"><span>1</span><div class="p5c-bar"><i></i></div><span>3200</span></div>
+        <div class="win p5c-cw"><div class="c5-code p5c-code"></div><div class="p5c-more">…… 一直读到第 150 行为止</div></div>
+      </div>
+      <div class="p5c-say"><svg class="ic"><use href="#i-brain"/></svg><p></p></div>
+      <div class="p5c-ms">
+        <div><span>整个文件 3,200 行</span><div class="meter" style="--c:var(--bad)"><i></i></div><em>≈ 38k token</em></div>
+        <div><span>只读第 100–150 行</span><div class="meter" style="--c:var(--ok)"><i></i></div><em>≈ 0.6k token</em></div>
+      </div>
+    </div>
+    <div class="p5c-r panel fx fx-right" style="--d:3">
+      <div class="p5c-hd"><b>命令输出：保留头尾，中间落盘</b><div class="p5c-seg2 seg"><i class="knob"></i><button data-v="all">全部注入</button><button data-v="cut">头尾截断</button></div></div>
+      <div class="win p5c-tw"><div class="win-bar"><i></i><i></i><i></i><span>pytest -v</span><span class="c5-tag demo">示意</span></div><div class="c5-term p5c-term" data-clip-ok></div></div>
+      <div class="p5c-bud"><span class="lbl">上下文预算占用</span><div class="meter"><i></i></div><em class="p5c-bv">0%</em></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的实现技巧」· 上下文的精细化管理</div>
+</section>
+<style>
+.p5c-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1;min-height:0}
+.p5c-l,.p5c-r{padding:16px 22px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.p5c-hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.p5c-hd b{font-size:20px}
+.p5c-hd .seg button{padding:7px 18px;font-size:17px}
+.p5c-call{display:flex;align-items:center;gap:12px;font-size:17px}
+.p5c-call code{font:16px var(--mono);color:var(--text2)}
+.p5c-call .c5-tag{margin-left:auto}
+.p5c-file{display:grid;grid-template-columns:44px 1fr;gap:12px}
+.p5c-mini{display:flex;flex-direction:column;align-items:center;gap:6px;font:15px var(--num);color:var(--text3)}
+.p5c-bar{position:relative;flex:1;width:14px;border-radius:7px;background:rgba(255,255,255,.07)}
+.p5c-bar i{position:absolute;left:-3px;right:-3px;top:3%;height:10px;border-radius:4px;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+.p5c-code{font-size:16px;padding:12px 10px 6px}
+.p5c-code .ln{transition:background .3s}
+.p5c-more{padding:0 18px 12px;font-size:15px;color:var(--text3)}
+.p5c-say{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:rgba(52,211,153,.06);transition:all .4s}
+.p5c-say .ic{flex:none;font-size:24px;color:var(--llm);margin-top:2px}
+.p5c-say p{font-size:17px;line-height:1.6}
+.p5c-say p b{color:#6ee7b7}
+.p5c-say code{font:16px var(--mono);color:#fde68a}
+.p5c-say.bad{border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:rgba(251,113,133,.06)}
+.p5c-say.bad p b{color:#fda4af}
+.p5c-ms{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.p5c-ms>div{display:grid;grid-template-columns:170px 1fr 116px;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.p5c-ms em,.p5c-bud em{font:600 16px var(--num);font-style:normal;color:var(--text);text-align:right}
+.p5c-tw{flex:1;min-height:0;display:flex;flex-direction:column}
+.p5c-tw .win-bar .c5-tag{margin-left:auto}
+.p5c-term{flex:1;min-height:0;font-size:16px}
+.p5c-bud{display:grid;grid-template-columns:auto 1fr 60px;align-items:center;gap:14px}
+.p5c-bud .meter{height:16px}
+</style>
+<script>
+HOOKS['c05-ctxmgmt'] = {
+  SRC: `def fetch_orders(user_id, since=None):
+    """拉取用户订单，按时间倒序"""
+    params = {"uid": user_id}
+    if since:
+        params["since"] = since.isoformat()
+    resp = http.get(ORDERS_URL, params=params)
+    resp.raise_for_status()
+    orders = resp.json()["items"]
+    for o in orders:
+        o["total"] = round(o["price"] * o["qty"], 2)
+    orders.sort(key=lambda o: o["ts"], reverse=True)
+    return orders`,
+  SAY: {
+    num: '问题在 <code>src/main.py</code> 的<b>第 105 行</b>：<code>http.get</code> 没有传 timeout，网络卡住时会一直挂起',
+    raw: '问题在那个 <code>http.get</code> 调用……就是 <code>if since</code> 下面那一行——<b>位置只能靠描述</b>，后续编辑容易改错地方',
+  },
+  CUT: [
+    { c: 'cmd', t: 'pytest -v' },
+    { c: 'dim', t: 'collected 1284 items' },
+    { c: 'err', t: 'tests/test_api.py::test_timeout FAILED   [  0%]' },
+    { c: 'err', t: 'E       assert 5 == 10' },
+    { c: 'err', t: 'E        +  where 5 = get_timeout()' },
+    { c: 'sys hl', t: '…… 中间 2,871 行已省略；完整输出已保存到 /tmp/agent-out-3f9a.log，可按需查看 ……' },
+    { c: 'err', t: 'FAILED tests/test_api.py::test_timeout - assert 5 == 10' },
+    { c: 'dim', t: '======= 1 failed, 1283 passed in 48.21s =======' },
+    { c: 'ag', t: '头部是错误上下文，尾部是错误总结；要看细节再去读临时文件' },
+    { c: 'call', t: 'Read /tmp/agent-out-3f9a.log · 第 1200–1240 行' },
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.p5c-seg'), (v) => { this.auto = false; this.mode(s, v); });
+    this.set2 = U.seg(s.querySelector('.p5c-seg2'), (v) => { this.auto2 = false; this.out(s, v); });
+    this.T = C5.term(s.querySelector('.p5c-term'), { max: 12 });
+  },
+  mode(s, v) {
+    this.v = v; this.set(v);
+    const ln = C5.code(s.querySelector('.p5c-code'), this.SRC, 'py', v === 'num' ? { num: true, from: 100 } : {});
+    if (v === 'num') ln[5].classList.add('hl');
+    s.querySelector('.p5c-say p').innerHTML = this.SAY[v];
+    s.querySelector('.p5c-say').classList.toggle('bad', v === 'raw');
+  },
+  async out(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v2 = v; this.set2(v);
+    this.T.clear();
+    const bv = s.querySelector('.p5c-bv'), bm = s.querySelector('.p5c-bud .meter');
+    const bud = (p) => { bm.style.setProperty('--c', p > 60 ? 'var(--bad)' : 'var(--ok)'); bm.querySelector('i').style.setProperty('--v', p + '%'); bv.textContent = p + '%'; };
+    bud(0);
+    if (v === 'all') {
+      const L = [{ c: 'cmd', t: 'pytest -v' }, { c: 'dim', t: 'collected 1284 items', w: 200 }];
+      const mods = ['api', 'auth', 'cache', 'orders', 'retry', 'utils'];
+      for (let i = 0; i < 24; i++) L.push({ c: 'dim', t: `tests/test_${mods[i % 6]}.py::test_case_${String(i * 7 + 3).padStart(3, '0')} PASSED`, w: 80, fn: () => bud(Math.min(92, 4 + i * 4)) });
+      L.push({ c: 'err', t: '…… 2,900 行输出全部进入上下文，预算只剩 8%' });
+      await C5.play(this.T, L, ctx, ok, { gap: 300 });
+    } else {
+      await C5.play(this.T, this.CUT, ctx, ok, { gap: 420 });
+      if (ok()) bud(4);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.auto2 = true;
+    this.mode(s, 'num');
+    const ms = s.querySelectorAll('.p5c-ms .meter i');
+    ctx.later(() => { ms[0].style.setProperty('--v', '100%'); ms[1].style.setProperty('--v', '2%'); }, 600);
+    ctx.every(() => { if (this.auto) this.mode(s, this.v === 'num' ? 'raw' : 'num'); }, 4800);
+    this.out(s, 'all');
+    ctx.every(() => { if (this.auto2) this.out(s, this.v2 === 'all' ? 'cut' : 'all'); }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.rk = (this.rk || 0) + 1; this.T.clear();
+    s.querySelectorAll('.p5c-ms .meter i').forEach((m) => m.style.setProperty('--v', '0%'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-envshell" data-part="5" data-trans="zoom" data-dur="18000" data-title="环境感知与状态持久化" data-notes="<b>环境信息的动态注入。</b>这是第二章介绍的 Agent 状态栏技术在 Coding Agent 中的集中体现。与通用 Agent 不同，Coding Agent 高度依赖执行环境的状态。每次推理前应在上下文末尾以 Agent 状态栏形式注入以下关键环境信息：<b>当前工作目录</b>——确保路径引用不会出错；<b>git 分支</b>——知道自己在主分支还是特性分支上工作；<b>最近提交记录</b>——了解项目的演化脉络；<b>未暂存和已暂存的变更概览</b>——清楚已经做了哪些修改。这些信息不应硬编码在静态系统提示词中——那样会破坏 KV Cache 效率——而应作为动态的、追加式的 Agent 状态栏实时生成并注入。Agent 由此获得“环境感知”能力，每个决策都基于对当前状态的准确理解，而非过时的假设。<br><b>命令执行环境的状态持久化。</b>许多操作依赖环境状态：切换目录、激活虚拟环境、设置环境变量、启动后台服务。如果每次命令都在全新 shell 中执行，这些状态都会丢失——Agent 刚用 cd 切到项目目录，下一条命令又回到了根目录；激活 Python 虚拟环境的效果也只在当前 shell 会话中有效，无法跨会话传递。因此应维护一个持久化的终端会话，在 Agent 启动时创建并在整个交互过程中保持活跃，保留工作目录、环境变量和会话状态，这更符合人类开发者在长期运行的终端窗口中工作的习惯。Agent 也应保留启动隔离终端的能力以支持并行任务，但持久化会话应是默认模式。<br>左边打开开关，看状态写进系统提示词时前缀缓存如何失效；右边切换两种 shell 模式（路径、提交号等均为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>环境感知</em>与<em>状态持久化</em></h2></header>
+  <div class="p5d-body">
+    <div class="p5d-l panel fx fx-left" style="--d:2">
+      <div class="p5d-hd"><b>环境信息的动态注入</b><button class="tgl p5d-tgl" style="--tc:var(--bad)"><i></i>写进系统提示词</button></div>
+      <div class="p5d-stack">
+        <div class="p5d-row" data-k="sys"><span class="p5d-c"></span><div class="mr" data-r="system"><span class="rl">system</span><div class="tx">静态系统提示词 + 项目指令文件<div class="p5d-st p5d-in"></div></div></div></div>
+        <div class="p5d-row"><span class="p5d-c"></span><div class="mr" data-r="tools"><span class="rl">tools</span><span class="tx">Read · Edit · Grep · Bash …</span></div></div>
+        <div class="p5d-row"><span class="p5d-c"></span><div class="mr" data-r="user"><span class="rl">user</span><span class="tx">把超时改成 10 秒，并补一个测试</span></div></div>
+        <div class="p5d-row"><span class="p5d-c"></span><div class="mr" data-r="assistant"><span class="rl">历史轮次</span><span class="tx">Edit / Bash 调用与结果（逐轮追加）</span></div></div>
+        <div class="p5d-row" data-k="tail"><span class="p5d-c"></span><div class="mr" data-r="status"><span class="rl">状态栏</span><div class="tx p5d-st"></div></div></div>
+      </div>
+      <div class="p5d-cache"></div>
+    </div>
+    <div class="p5d-r panel fx fx-right" style="--d:3">
+      <div class="p5d-hd"><b>命令执行环境的状态持久化</b><div class="p5d-seg seg"><i class="knob"></i><button data-v="new">每次新 shell</button><button data-v="keep">持久会话</button></div></div>
+      <div class="win p5d-tw"><div class="win-bar"><i></i><i></i><i></i><span>Agent 的终端</span><span class="c5-tag demo">示意</span></div><div class="c5-term p5d-term" data-clip-ok></div></div>
+      <div class="p5d-procs"><span class="lbl">SHELL 进程</span><div class="p5d-pl"></div></div>
+      <p class="p5d-note">持久化会话应是<b>默认模式</b>；同时保留启动<b>隔离终端</b>的能力，以支持并行任务</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的实现技巧」· 环境信息的动态注入 · 命令执行环境的状态持久化</div>
+</section>
+<style>
+.p5d-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1;min-height:0}
+.p5d-l,.p5d-r{padding:16px 22px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.p5d-hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.p5d-hd b{font-size:20px}
+.p5d-hd .tgl{font-size:17px}
+.p5d-hd .seg button{padding:7px 18px;font-size:17px}
+.p5d-stack{display:flex;flex-direction:column;gap:8px}
+.p5d-row{display:grid;grid-template-columns:8px 1fr;gap:10px}
+.p5d-row .mr{font-size:17px;padding:8px 14px 8px 16px}
+.p5d-row .mr .rl{min-width:78px;font-size:15px}
+.p5d-c{border-radius:4px;background:rgba(255,255,255,.1);transition:background .4s,box-shadow .4s}
+.p5d-c.hit{background:var(--ok)}
+.p5d-c.new{background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.p5d-c.miss{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.p5d-c.fl{animation:p5dfl .9s ease}
+@keyframes p5dfl{0%{filter:brightness(2.4)}100%{filter:none}}
+.p5d-in{display:none;margin-top:8px}
+.p5d-stack.sys .p5d-in{display:block}
+.p5d-stack.sys .p5d-row[data-k=tail]{display:none}
+.p5d-sl{display:grid;grid-template-columns:112px 1fr auto;gap:10px;align-items:center;font-size:15px;line-height:1.75}
+.p5d-sl em{font-style:normal;color:var(--text3)}
+.p5d-sl code{font:15px var(--mono);color:var(--text);border-radius:6px;padding:0 6px;justify-self:start}
+.p5d-sl code.chg{animation:p5dchg 1.4s ease}
+@keyframes p5dchg{0%,40%{background:color-mix(in srgb,var(--acc) 35%,transparent)}100%{background:transparent}}
+.p5d-sl span{color:var(--text3)}
+.p5d-cache{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:rgba(52,211,153,.07);display:flex;flex-direction:column;gap:4px;transition:all .4s}
+.p5d-cache b{font-size:19px;color:#6ee7b7}
+.p5d-cache span{font-size:16px;line-height:1.55;color:var(--text2)}
+.p5d-cache.bad{border-color:color-mix(in srgb,var(--bad) 50%,transparent);background:rgba(251,113,133,.08)}
+.p5d-cache.bad b{color:#fda4af}
+.p5d-tw{flex:1;min-height:0;display:flex;flex-direction:column}
+.p5d-tw .win-bar .c5-tag{margin-left:auto}
+.p5d-term{flex:1;min-height:0;font-size:16px}
+.p5d-term .l.p5d-cl{color:var(--text)}
+.p5d-pr{color:var(--ok)}
+.p5d-procs{display:flex;align-items:center;gap:14px;min-height:36px}
+.p5d-pl{display:flex;flex-wrap:wrap;gap:8px}
+.p5d-pc{display:inline-flex;align-items:center;padding:4px 12px;border-radius:999px;font:15px var(--mono);border:1px solid var(--line2);animation:pop .4s var(--spring)}
+.p5d-pc.live{color:#6ee7b7;border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:rgba(52,211,153,.08)}
+.p5d-pc.dead{color:var(--text3);text-decoration:line-through}
+.p5d-note{font-size:17px;line-height:1.6;color:var(--text2)}
+.p5d-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-envshell'] = {
+  K: ['当前工作目录', 'git 分支', '最近提交记录', '变更概览'],
+  P: ['路径引用不出错', '主分支还是特性分支', '项目的演化脉络', '已经做了哪些修改'],
+  ST: [
+    ['/srv/shop-api', 'feature/timeout', 'a1f3c2e 修复重试逻辑', '未暂存 1 个文件'],
+    ['/srv/shop-api', 'feature/timeout', 'a1f3c2e 修复重试逻辑', '未暂存 2 个文件'],
+    ['/srv/shop-api', 'feature/timeout', 'a1f3c2e 修复重试逻辑', '已暂存 2 个文件'],
+    ['/srv/shop-api', 'feature/timeout', '7c0d9b2 超时改为 10 秒', '工作区干净'],
+  ],
+  NEW: [
+    { p: '/', c: 'cd /srv/shop-api' },
+    { p: '/', c: 'source .venv/bin/activate' },
+    { r: 'err', t: 'bash: .venv/bin/activate: No such file or directory' },
+    { r: 'ag', t: '又回到了根目录，只好再 cd 一次' },
+    { p: '/', c: 'cd /srv/shop-api && source .venv/bin/activate' },
+    { p: '/', c: 'pytest tests/test_config.py' },
+    { r: 'err', t: 'bash: pytest: command not found' },
+    { r: 'ag', t: '虚拟环境只在上一个 shell 里有效，每条命令都得从头来一遍' },
+  ],
+  KEEP: [
+    { p: '/', c: 'cd /srv/shop-api' },
+    { p: '/srv/shop-api', c: 'source .venv/bin/activate' },
+    { p: '(.venv) /srv/shop-api', c: 'pytest tests/test_config.py' },
+    { r: 'ok', t: '12 passed in 1.84s' },
+    { r: 'ag', t: '工作目录、环境变量和会话状态一直都在' },
+  ],
+  init(s) {
+    this.tg = s.querySelector('.p5d-tgl');
+    this.tg.addEventListener('click', () => { this.auto = false; this.sys(s, !this.tg.classList.contains('on')); });
+    this.set = U.seg(s.querySelector('.p5d-seg'), (v) => { this.auto2 = false; this.sh(s, v); });
+    this.T = C5.term(s.querySelector('.p5d-term'), { max: 14 });
+    this.i = 0; this.n = 1;
+  },
+  paint(s, prev) {
+    const st = this.ST[this.i], on = this.tg.classList.contains('on');
+    const h = st.map((v, j) => `<div class="p5d-sl"><em>${this.K[j]}</em><code${prev && prev[j] !== v ? ' class="chg"' : ''}>${C5.esc(v)}</code><span>${this.P[j]}</span></div>`).join('');
+    s.querySelectorAll('.p5d-st').forEach((e) => (e.innerHTML = h));
+    s.querySelectorAll('.p5d-row').forEach((r) => {
+      const c = r.querySelector('.p5d-c');
+      c.className = 'p5d-c ' + (on ? 'miss' : r.dataset.k === 'tail' ? 'new' : 'hit');
+      if (prev && (on || r.dataset.k === 'tail')) U.restart(c, 'fl');
+    });
+    const cb = s.querySelector('.p5d-cache');
+    cb.classList.toggle('bad', on);
+    cb.innerHTML = on
+      ? `<b>前缀缓存失效</b><span>第 ${this.n} 轮推理：状态一变，系统提示词就跟着变——从第一个 token 起全部重算</span>`
+      : `<b>前缀缓存命中</b><span>第 ${this.n} 轮推理：前面的内容一字未变，只有末尾追加的状态栏是新的</span>`;
+  },
+  sys(s, on) { this.tg.classList.toggle('on', on); s.querySelector('.p5d-stack').classList.toggle('sys', on); this.paint(s); },
+  tick(s) { const prev = this.ST[this.i]; this.i = (this.i + 1) % this.ST.length; this.n++; this.paint(s, prev); },
+  async sh(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const T = this.T, pl = s.querySelector('.p5d-pl');
+    T.clear();
+    pl.innerHTML = v === 'keep' ? '<span class="p5d-pc live">bash #1 · 一直存活</span>' : '';
+    let n = 0, chip = null;
+    const kill = () => { if (chip) { chip.className = 'p5d-pc dead'; chip.textContent = `bash #${n} · 已退出`; } };
+    for (const x of v === 'new' ? this.NEW : this.KEEP) {
+      if (x.c) {
+        if (v === 'new') { kill(); n++; pl.insertAdjacentHTML('beforeend', `<span class="p5d-pc live">bash #${n}</span>`); chip = pl.lastElementChild; }
+        await T.line('p5d-cl', `<span class="p5d-pr">${C5.esc(x.p)} $</span> ${C5.esc(x.c)}`, { html: true });
+      } else await T.line(x.r, x.t);
+      await U.wait(ctx, x.r === 'ag' ? 1000 : 700);
+      if (!ok()) return;
+    }
+    kill();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.auto2 = true; this.i = 0; this.n = 1;
+    this.sys(s, false);
+    let k = 0;
+    ctx.every(() => { this.tick(s); k++; if (this.auto && k % 4 === 0) this.sys(s, !this.tg.classList.contains('on')); }, 2300);
+    this.sh(s, 'new');
+    ctx.every(() => { if (this.auto2) this.sh(s, this.v === 'new' ? 'keep' : 'new'); }, 9500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.rk = (this.rk || 0) + 1; this.T.clear();
+    s.querySelector('.p5d-pl').innerHTML = '';
+    this.tg.classList.remove('on'); s.querySelector('.p5d-stack').classList.remove('sys');
+  },
+};
+</script>
+
+<section class="slide" id="c05-lint" data-part="5" data-dur="16000" data-title="即时的语法反馈机制" data-notes="<b>即时的语法反馈机制。</b>这再次体现了 Agent 状态栏技术的价值。Agent 修改代码后，不应等到用户明确要求测试时才检查语法。更高效的做法是：文件写入操作一完成，工具层就自动运行相应的 linter 或语法检查器，将检查结果作为工具返回值的一部分呈现给 Agent。如果检测到语法错误，Agent 在下一轮推理中立即看到详细错误信息——就像程序员在 IDE 中打错一个括号，编辑器立刻画红线提醒一样。这种即时反馈机制显著降低了错误修复成本，因为 Agent 可以在错误引入的那一刻就进行修正，而不需要等到运行测试时才发现问题。<br>这五个实现技巧——并行与流式、上下文管理、环境感知、状态持久化、即时反馈——共同构成了高效 Coding Agent 的技术基础。它们不是孤立的优化点，而是相互配合的设计决策，指向同一个目标：让 Agent 能够像经验丰富的开发者那样流畅地工作。<br>左边两条轨迹的轮数是示意；右边的环可以点击，回到对应技巧的页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">即时的<em>语法反馈</em>：在错误引入的那一刻修正</h2></header>
+  <div class="p5e-body">
+    <div class="p5e-ide panel fx fx-up" style="--d:2">
+      <span class="p5e-fn"><svg class="ic"><use href="#i-file"/></svg>src/api.py</span>
+      <div class="p5e-ln"><span class="p5e-no">42</span><code class="p5e-cd">    return int(cfg.get("timeout", 5)<span class="p5e-fix">)</span></code><span class="p5e-tip"><i class="e">'(' was never closed</i><i class="k">语法检查通过</i></span></div>
+      <span class="p5e-cap">像 IDE 一样：打错一个括号，立刻画红线</span>
+    </div>
+    <div class="p5e-lane bad panel fx fx-left" style="--d:3"><div class="p5e-lh"><b>等到跑测试才发现</b><span class="p5e-rd">第 <b>0</b> 轮</span></div><div class="c5-term p5e-term" data-clip-ok></div><div class="p5e-res"></div></div>
+    <div class="p5e-lane good panel fx fx-left" style="--d:4"><div class="p5e-lh"><b>写入后自动语法检查</b><span class="p5e-rd">第 <b>0</b> 轮</span></div><div class="c5-term p5e-term" data-clip-ok></div><div class="p5e-res"></div></div>
+    <div class="p5e-ring fx fx-scale" style="--d:5"><span class="lbl">五个实现技巧</span><div class="p5e-rg"></div><p>它们不是孤立的优化点，而是<b>相互配合</b>的设计决策：让 Agent 像经验丰富的开发者那样<b>流畅地工作</b></p></div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的实现技巧」· 即时的语法反馈机制</div>
+</section>
+<style>
+.p5e-body{display:grid;grid-template-columns:1fr 1fr 470px;grid-template-rows:auto 1fr;gap:18px 20px;flex:1;min-height:0}
+.p5e-ide{grid-column:1/3;display:flex;align-items:center;gap:20px;padding:14px 22px}
+.p5e-fn{display:inline-flex;align-items:center;gap:8px;font:16px var(--mono);color:var(--text3)}
+.p5e-ln{display:flex;align-items:center;gap:14px;flex:1;min-width:0}
+.p5e-no{font:16px var(--mono);color:var(--text3)}
+.p5e-cd{font:18px var(--mono);color:var(--text);white-space:pre;text-decoration:underline wavy transparent;text-underline-offset:7px;transition:text-decoration-color .3s}
+.p5e-ln.err .p5e-cd{text-decoration-color:var(--bad)}
+.p5e-fix{display:none;color:var(--ok);font-weight:700}
+.p5e-ln.fix .p5e-fix{display:inline}
+.p5e-tip{position:relative;font-size:15px;white-space:nowrap}
+.p5e-tip i{font-style:normal;padding:3px 10px;border-radius:8px;display:none}
+.p5e-tip .e{color:#fda4af;background:rgba(251,113,133,.14);border:1px solid rgba(251,113,133,.45);font-family:var(--mono)}
+.p5e-tip .k{color:#6ee7b7;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.45)}
+.p5e-ln.err .p5e-tip .e{display:inline-block;animation:pop .35s var(--spring)}
+.p5e-ln.fix .p5e-tip .k{display:inline-block;animation:pop .35s var(--spring)}
+.p5e-cap{font-size:16px;color:var(--text3);white-space:nowrap}
+.p5e-lane{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0;border-top:3px solid var(--lc)}
+.p5e-lane.bad{--lc:var(--bad)}.p5e-lane.good{--lc:var(--ok)}
+.p5e-lh{display:flex;align-items:center;justify-content:space-between}
+.p5e-lh>b{font-size:20px;color:var(--lc)}
+.p5e-rd{font-size:16px;color:var(--text3)}
+.p5e-rd b{font:700 22px var(--num);color:var(--text)}
+.p5e-term{flex:1;min-height:0;font-size:16px;padding:6px 0;background:rgba(5,9,22,.6);border-radius:12px}
+.p5e-res{min-height:52px;padding:8px 14px;border-radius:12px;font-size:17px;line-height:1.5;color:var(--text2);border:1px dashed var(--line2);opacity:.4;transition:opacity .4s}
+.p5e-res.on{opacity:1;border-style:solid;border-color:color-mix(in srgb,var(--lc) 50%,transparent);background:color-mix(in srgb,var(--lc) 8%,transparent)}
+.p5e-res b{color:var(--lc)}
+.p5e-ring{grid-column:3;grid-row:1/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+.p5e-rg{width:320px;height:320px}
+#c05-lint .loop-svg .node{cursor:pointer}
+.p5e-ring p{font-size:18px;line-height:1.65;color:var(--text2);text-align:center;max-width:430px}
+.p5e-ring p b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-lint'] = {
+  A: [
+    { r: 1, c: 'call', t: 'Edit src/api.py' },
+    { c: 'res', t: '已写入' },
+    { r: 2, c: 'call', t: 'Edit src/retry.py' },
+    { c: 'res', t: '已写入' },
+    { r: 3, c: 'call', t: 'Edit tests/test_api.py' },
+    { c: 'res', t: '已写入' },
+    { r: 4, c: 'call', t: 'Bash pytest' },
+    { c: 'err', t: 'File "src/api.py", line 42' },
+    { c: 'err', t: "SyntaxError: '(' was never closed" },
+    { r: 5, c: 'ag', t: '错误是三轮之前引入的，先回头定位' },
+    { c: 'call', t: 'Read src/api.py · 第 30–60 行' },
+    { r: 6, c: 'call', t: 'Edit src/api.py  补上右括号' },
+  ],
+  B: [
+    { r: 1, c: 'call', t: 'Edit src/api.py' },
+    { c: 'res', t: '已写入' },
+    { c: 'err', t: "语法检查：src/api.py:42  SyntaxError: '(' was never closed" },
+    { r: 2, c: 'call', t: 'Edit src/api.py  补上右括号' },
+    { c: 'ok', t: '已写入 · 语法检查通过' },
+    { r: 3, c: 'call', t: 'Edit src/retry.py' },
+    { c: 'ok', t: '已写入 · 语法检查通过' },
+    { r: 4, c: 'call', t: 'Edit tests/test_api.py' },
+    { c: 'ok', t: '已写入 · 语法检查通过' },
+  ],
+  GO: ['c05-stream', 'c05-ctxmgmt', 'c05-envshell', 'c05-envshell', 'c05-lint'],
+  init(s) {
+    this.L = [...s.querySelectorAll('.p5e-lane')].map((x) => ({ T: C5.term(x.querySelector('.p5e-term'), { max: 14 }), rd: x.querySelector('.p5e-rd b'), res: x.querySelector('.p5e-res') }));
+    this.svg = U.ring(s.querySelector('.p5e-rg'), {
+      size: 320, labelSize: 18, cometDur: 7,
+      nodes: [{ label: '并行与流式', color: '#22d3ee' }, { label: '上下文管理', color: '#a78bfa' }, { label: '环境感知', color: '#34d399' }, { label: '状态持久化', color: '#60a5fa' }, { label: '即时反馈', color: '#fbbf24' }],
+      center: (c) => `<text x="${c}" y="${c - 6}" text-anchor="middle" style="fill:var(--text);font-size:24px;font-weight:800">流畅地</text><text x="${c}" y="${c + 26}" text-anchor="middle" style="fill:var(--text);font-size:24px;font-weight:800">工作</text>`,
+    });
+    this.svg.querySelectorAll('.node').forEach((n) => n.addEventListener('click', () => C5.go(this.GO[+n.dataset.i])));
+  },
+  clear(o) { o.T.clear(); o.rd.textContent = '0'; o.res.className = 'p5e-res'; o.res.textContent = ''; },
+  async lane(j, ctx, ok) {
+    const o = this.L[j];
+    this.clear(o);
+    for (const x of j ? this.B : this.A) {
+      if (!ok()) return;
+      if (x.r) o.rd.textContent = x.r;
+      await o.T.line(x.c, x.t);
+      await U.wait(ctx, 560);
+    }
+    if (!ok()) return;
+    o.res.className = 'p5e-res on';
+    o.res.innerHTML = j ? '第 1 轮引入错误，<b>第 2 轮就修好</b>' : '第 1 轮引入错误，第 4 轮跑测试才发现，<b>第 6 轮才修好</b>';
+  },
+  async loop() {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      await Promise.all([this.lane(0, ctx, ok), this.lane(1, ctx, ok)]);
+      if (!ok()) return;
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1;
+    this.loop();
+    const ln = s.querySelector('.p5e-ln');
+    const cyc = () => { ln.classList.remove('err', 'fix'); ctx.later(() => ln.classList.add('err'), 700); ctx.later(() => { ln.classList.remove('err'); ln.classList.add('fix'); }, 2700); };
+    cyc(); ctx.every(cyc, 4800);
+    let a = 4;
+    const nd = () => { this.svg.querySelectorAll('.node,.lab').forEach((e) => e.classList.toggle('on', +e.dataset.i === a)); a = (a + 1) % 5; };
+    nd(); ctx.every(nd, 1600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.L.forEach((o) => this.clear(o));
+    s.querySelector('.p5e-ln').classList.remove('err', 'fix');
+  },
+};
+</script>
+
+<!-- ================= Coding Agent 中的搜索工具 ================= -->
+<section class="slide" id="c05-fig53" data-part="5" data-dur="24000" data-title="图5-3 搜索工具对比" data-notes="在庞大的代码库中定位相关代码是 Coding Agent 工作的起点。图5-3 对比了四类互补的搜索工具，说明成熟 Coding Agent 应如何根据任务性质选择检索方式。<br><b>正则表达式内容匹配</b>（grep/ripgrep）：最传统的搜索方式，逐行扫描文件内容做模式匹配。知道要查找的具体文本（函数名、变量名、错误消息）时，能快速准确地定位所有出现位置；正则表达式还能描述结构，如 def handle.* 匹配所有以 handle 开头的函数定义；实际使用中还应支持文件类型过滤（只搜 Python 文件）和路径模式过滤（排除测试目录）以减少噪音。根本局限是只能找到字面上匹配的内容——搜索“用户认证”，找不到没有“认证”二字但确实处理登录逻辑的函数。<br><b>文件名模式匹配</b>（glob）：不看文件内容，只在路径结构中查找，如 **/*.test.ts 递归找到所有 TypeScript 测试文件、src/components/**/Button.tsx 在 components 下任意深度查找；不需要打开和读取文件，速度快得多，是 Agent 探索项目结构的第一步。<br><b>语义代码搜索</b>试图理解查询和代码的“意义”，要解决两个关键问题：<b>结构感知的分块</b>——按函数、类、方法等完整语义单元切分，而非按固定字符数盲目切割；<b>混合检索</b>——向量嵌入擅长找到语义相似但用词不同的代码（搜“验证用户身份”能找到 check_credentials），关键词匹配擅长精确匹配函数名和变量名，两者并行执行后通过重排序模型（reranker）合并排序。它特别适合在不熟悉的代码库中寻找“与数据库交互”“处理用户输入验证”这类探索性任务。<br><b>符号级定义与引用查找</b>：类似 IDE 的“跳转到定义”“查找所有引用”，能区分同名符号的定义和调用——authenticate 在第 42 行是函数定义、在第 189 行是调用，而文本搜索只能找到所有包含该字符串的行。目前主流 coding agent 并未采用这一方法。<br>查询与结果取自原书图5-3。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图5-3 四类<em>互补</em>的搜索工具</h2></div>
+    <div class="p5f-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="grep">正则 grep</button><button data-v="glob">文件名 glob</button><button data-v="sem">语义搜索</button><button data-v="sym">符号查找</button></div></header>
+  <div class="p5f-body">
+    <div class="p5f-l">
+      <div class="win p5f-q fx fx-up" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span class="p5f-tn"></span></div>
+        <div class="p5f-qb">
+          <div class="p5f-row"><span class="lbl">查询</span><code class="p5f-qt"></code></div>
+          <div class="p5f-row"><span class="lbl">结果</span><div class="p5f-rs"></div></div>
+          <div class="p5f-ft"></div>
+        </div>
+      </div>
+      <div class="p5f-tree panel fx fx-up" style="--d:4"><div class="p5f-th"><span class="lbl">示例仓库</span><span class="p5f-how"></span></div><div class="p5f-cols"></div></div>
+    </div>
+    <div class="p5f-info panel fx fx-right" style="--d:4"></div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 中的搜索工具」· 图5-3 Coding Agent 搜索工具对比</div>
+</section>
+<style>
+#c05-fig53 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c05-fig53 .seg button{padding:9px 20px;font-size:18px}
+.p5f-body{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;flex:1;min-height:0}
+.p5f-l{display:flex;flex-direction:column;gap:18px;min-height:0}
+.p5f-qb{padding:14px 20px 16px;display:flex;flex-direction:column;gap:10px}
+.p5f-row{display:grid;grid-template-columns:56px 1fr;gap:12px;align-items:start}
+.p5f-row .lbl{line-height:30px}
+.p5f-qt{font:18px/30px var(--mono);color:#fde68a;min-height:30px}
+.p5f-qt::after{content:"▍";color:var(--acc);animation:blink 1s steps(1) infinite}
+.p5f-rs{display:flex;flex-direction:column;gap:6px;min-height:172px}
+.p5f-r{display:flex;align-items:center;gap:12px;font:17px/1.6 var(--mono);color:var(--text);animation:upIn .45s var(--spring) both}
+.p5f-loc{color:#93c5fd}
+.p5f-r code{color:var(--text)}
+.p5f-sc{font:700 16px var(--num);color:var(--acc);min-width:40px}
+.p5f-sb{width:90px;height:8px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.p5f-sb i{display:block;height:100%;width:var(--w);background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.p5f-k{font:600 15px var(--font);padding:1px 10px;border-radius:8px;border:1px solid}
+.p5f-k.def{color:#6ee7b7;border-color:rgba(110,231,183,.5)}
+.p5f-k.ref{color:#c4b5fd;border-color:rgba(196,181,253,.5)}
+.p5f-ft{min-height:28px;font-size:17px;color:var(--acc);padding-left:68px}
+.p5f-tree{padding:14px 20px;flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.p5f-th{display:flex;align-items:center;justify-content:space-between}
+.p5f-how{font-size:16px;color:var(--text2)}
+.p5f-cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.p5f-dir{display:flex;align-items:center;gap:8px;font:600 17px var(--mono);color:var(--text2);margin-bottom:4px}
+.p5f-f{display:flex;align-items:center;gap:8px;padding:3px 10px 3px 26px;border-radius:8px;font:16px/1.6 var(--mono);color:var(--text3);transition:all .3s}
+.p5f-f .ic{font-size:15px}
+.p5f-f.scan{background:rgba(255,255,255,.08);color:var(--text)}
+.p5f-f.path{color:var(--text2)}
+.p5f-f.chunk{background:rgba(167,139,250,.1);color:var(--text2)}
+.p5f-f.hit{color:#06101f;background:var(--acc);box-shadow:0 0 14px color-mix(in srgb,var(--acc) 45%,transparent)}
+.p5f-f.def{color:#06101f;background:var(--ok)}
+.p5f-f.ref{color:#06101f;background:#c4b5fd}
+.p5f-info{padding:20px 24px;display:flex;flex-direction:column;gap:16px;min-height:0}
+.p5f-ih{display:flex;align-items:center;gap:14px}
+.p5f-ih .ic{font-size:36px;color:var(--acc)}
+.p5f-ih b{display:block;font-size:26px}
+.p5f-ih span{font-size:16px;color:var(--text3)}
+.p5f-sec ul{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.p5f-sec li{position:relative;padding-left:18px;font-size:17px;line-height:1.6;color:var(--text2)}
+.p5f-sec li::before{content:"";position:absolute;left:0;top:.65em;width:7px;height:7px;border-radius:50%;background:var(--ok)}
+.p5f-sec b{color:var(--text)}
+.p5f-sec code{font:15px var(--mono);color:#fde68a}
+.p5f-sec.bad{padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);background:rgba(251,113,133,.06)}
+.p5f-sec.bad p{margin-top:6px;font-size:17px;line-height:1.6;color:var(--text2)}
+.p5f-sec.bad b{color:#fda4af}
+.p5f-pipe{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:16px}
+.p5f-pipe span{padding:4px 12px;border-radius:10px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.p5f-pipe span.r{border-color:var(--acc);color:var(--acc)}
+.p5f-pipe i{font-style:normal;color:var(--text3)}
+</style>
+<script>
+HOOKS['c05-fig53'] = {
+  TREE: [['src/', ['api.py', 'ws.py', 'validators.py', 'forms.py', 'api/routes.py', 'services/user.py']], ['tests/', ['test_api.py', 'test_auth.py', 'test_user.py', 'unit/test_parser.py']]],
+  D: {
+    grep: {
+      tool: 'grep / ripgrep', q: 'rg "def handle_.*" --type py', how: '逐行扫描每个文件的内容', foot: '精确文本 → 所有出现位置', pre: 'scan',
+      res: [
+        { f: 'src/api.py', h: '<span class="p5f-loc">src/api.py:42:</span><code>def handle_request(..)</code>' },
+        { f: 'src/api.py', h: '<span class="p5f-loc">src/api.py:89:</span><code>def handle_timeout(..)</code>' },
+        { f: 'src/ws.py', h: '<span class="p5f-loc">src/ws.py:15:</span><code>def handle_connect(..)</code>' },
+      ],
+      ic: 'search', n: '正则表达式内容匹配', sub: 'grep / ripgrep · 逐行扫描文件内容',
+      good: ['知道要查的<b>具体文本</b>（函数名、变量名、错误消息）时，快速准确地定位所有出现位置', '能描述结构：<code>def handle.*</code> 匹配所有以 handle 开头的函数定义', '支持<b>文件类型过滤</b>（只搜 Python）与<b>路径模式过滤</b>（排除测试目录），减少噪音'],
+      bad: '只能找到<b>字面上匹配</b>的内容：搜“用户认证”，找不到没有“认证”二字、却确实处理登录逻辑的函数',
+    },
+    glob: {
+      tool: 'glob', q: 'glob: **/test_*.py', how: '只看路径结构，不打开文件', foot: '路径模式 → 不读取文件内容', pre: 'path',
+      res: [{ f: 'tests/test_api.py', h: '<span class="p5f-loc">tests/test_api.py</span>' }, { f: 'tests/test_auth.py', h: '<span class="p5f-loc">tests/test_auth.py</span>' }, { f: 'tests/unit/test_parser.py', h: '<span class="p5f-loc">tests/unit/test_parser.py</span>' }],
+      ic: 'folder', n: '文件名模式匹配', sub: 'glob · 只在路径结构中查找',
+      good: ['<code>**/*.test.ts</code> 递归找到所有 TypeScript 测试文件', '<code>src/components/**/Button.tsx</code> 在 components 下任意深度查找 Button.tsx', '不需要打开和读取文件，速度比内容搜索<b>快得多</b>——Agent 探索项目结构的<b>第一步</b>'],
+      bad: '<b>不看文件内容</b>：只能按名字和位置找文件，建立的是项目的组织框架',
+    },
+    sem: {
+      tool: '语义检索 · 向量 + BM25', q: '"处理用户输入验证"', how: '按函数切块 → 嵌入 + 关键词 → 重排序', foot: '自然语言 → 向量+BM25混合', pre: 'chunk',
+      res: [
+        { f: 'src/validators.py', h: '<span class="p5f-sc">0.91</span><span class="p5f-sb"><i style="--w:91%"></i></span><span class="p5f-loc">src/validators.py:validate_input()</span>' },
+        { f: 'src/forms.py', h: '<span class="p5f-sc">0.87</span><span class="p5f-sb"><i style="--w:87%"></i></span><span class="p5f-loc">src/forms.py:sanitize_fields()</span>' },
+        { f: 'src/api.py', h: '<span class="p5f-sc">0.82</span><span class="p5f-sb"><i style="--w:82%"></i></span><span class="p5f-loc">src/api.py:check_params()</span>' },
+      ],
+      ic: 'brain', n: '语义代码搜索', sub: '理解查询和代码的“意义”',
+      good: ['<b>结构感知的分块</b>：按函数、类、方法等完整语义单元切分，而非按固定字符数盲目切割', '<b>混合检索</b>：向量嵌入找语义相似、用词不同的代码（搜“验证用户身份”能找到 <code>check_credentials</code>）；关键词匹配精确命中函数名和变量名', '特别适合<b>探索性任务</b>：在不熟悉的代码库里找“与数据库交互”的代码'],
+      pipe: true,
+      bad: '要为代码<b>建嵌入索引</b>——值不值得，业界有路线之争（下一页）',
+    },
+    sym: {
+      tool: 'find_references', q: 'find_references: UserService', how: '解析语法树：区分定义与引用', foot: 'AST级 → 消除同名歧义', pre: '',
+      res: [
+        { f: 'src/services/user.py', k: 'def', h: '<span class="p5f-k def">定义</span><span class="p5f-loc">src/services/user.py:12</span>' },
+        { f: 'src/api/routes.py', k: 'ref', h: '<span class="p5f-k ref">引用</span><span class="p5f-loc">src/api/routes.py:34</span><code>(import)</code>' },
+        { f: 'src/api/routes.py', k: 'ref', h: '<span class="p5f-k ref">引用</span><span class="p5f-loc">src/api/routes.py:56</span><code>(调用)</code>' },
+        { f: 'tests/test_user.py', k: 'ref', h: '<span class="p5f-k ref">引用</span><span class="p5f-loc">tests/test_user.py:8</span><code>(测试)</code>' },
+      ],
+      ic: 'tree', n: '符号级定义与引用查找', sub: '类似 IDE 的“跳转到定义”“查找所有引用”',
+      good: ['能区分同名符号的<b>定义</b>和<b>调用</b>：<code>authenticate</code> 在第 42 行是函数定义、在第 189 行是调用', '文本搜索只能找到所有包含该字符串的行'],
+      bad: '目前主流 coding agent <b>并未采用</b>这一方法',
+    },
+  },
+  init(s) {
+    this.set = U.seg(s.querySelector('.p5f-seg'), (v) => { this.auto = false; this.show(s, v); });
+    s.querySelector('.p5f-cols').innerHTML = this.TREE.map(([d, fs]) => `<div><div class="p5f-dir"><svg class="ic"><use href="#i-folder"/></svg>${d}</div>${fs.map((f) => `<div class="p5f-f" data-f="${d}${f}"><svg class="ic"><use href="#i-file"/></svg>${f}</div>`).join('')}</div>`).join('');
+  },
+  info(d) {
+    return `<div class="p5f-ih"><svg class="ic"><use href="#i-${d.ic}"/></svg><div><b>${d.n}</b><span>${d.sub}</span></div></div>`
+      + `<div class="p5f-sec"><span class="lbl">长处</span><ul>${d.good.map((x) => `<li>${x}</li>`).join('')}</ul></div>`
+      + (d.pipe ? '<div class="p5f-pipe"><span>向量嵌入</span><i>∥</i><span>关键词匹配</span><i>→</i><span class="r">重排序模型 reranker</span><i>→</i><span>合并排序</span></div>' : '')
+      + `<div class="p5f-sec bad"><span class="lbl">局限</span><p>${d.bad}</p></div>`;
+  },
+  async show(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const d = this.D[v]; this.v = v; this.set(v);
+    s.querySelector('.p5f-tn').textContent = d.tool;
+    s.querySelector('.p5f-info').innerHTML = this.info(d);
+    s.querySelector('.p5f-how').textContent = d.how;
+    const qt = s.querySelector('.p5f-qt'), rs = s.querySelector('.p5f-rs'), ft = s.querySelector('.p5f-ft');
+    const fs = [...s.querySelectorAll('.p5f-f')];
+    fs.forEach((f) => (f.className = 'p5f-f'));
+    rs.innerHTML = ''; ft.textContent = ''; qt.textContent = '';
+    for (let i = 1; i <= d.q.length; i++) { qt.textContent = d.q.slice(0, i); await U.wait(ctx, 34); if (!ok()) return; }
+    if (d.pre === 'scan') {
+      for (const f of fs) { f.classList.add('scan'); await U.wait(ctx, 80); if (!ok()) return; f.classList.remove('scan'); }
+    } else if (d.pre) {
+      fs.forEach((f) => f.classList.add(d.pre)); await U.wait(ctx, 600); if (!ok()) return;
+      fs.forEach((f) => f.classList.remove(d.pre));
+    }
+    for (const r of d.res) {
+      rs.insertAdjacentHTML('beforeend', `<div class="p5f-r">${r.h}</div>`);
+      const f = s.querySelector(`.p5f-f[data-f="${r.f}"]`);
+      if (f) f.classList.add(r.k || 'hit');
+      await U.wait(ctx, 380); if (!ok()) return;
+    }
+    ft.textContent = d.foot;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true;
+    const K = ['grep', 'glob', 'sem', 'sym']; let i = 0;
+    this.show(s, K[0]);
+    ctx.every(() => { if (this.auto) { i = (i + 1) % 4; this.show(s, K[i]); } }, 6500);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c05-searchroute" data-part="5" data-trans="flip" data-dur="16000" data-title="路线之争与从粗到细" data-notes="不过，是否值得为语义搜索建立嵌入索引，业界存在明显的路线之争。以 Claude Code 为代表的终端型 Agent 刻意<b>不建嵌入索引</b>，纯靠 agentic 的 grep + glob 现场检索——这样既不必维护随代码演化而不断陈旧的索引，也省掉了一整套索引基础设施。Cursor 这类 IDE 型工具早期则走相反路线：愿意为<b>跨文件的语义召回</b>付出建索引的成本，靠嵌入索引在大型代码库中快速找到语义相关但用词不同的片段。目前 Cursor 等 IDE 也改用 grep + glob 现场检索了。<br>四种搜索方式构成互补的工具箱，实践中往往组合使用：先用语义搜索找到相关模块，再用正则匹配精确定位具体代码行，最后通过符号搜索追踪调用链——“从粗到细、从语义到语法”的渐进式策略。<br>左边的提交节奏与索引新鲜度、右边漏斗里的数量都是示意；漏斗的三层可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">路线之争：<em>建不建嵌入索引</em>？</h2></header>
+  <div class="p5g-body">
+    <div class="p5g-l">
+      <div class="p5g-tl panel fx fx-up" style="--d:2"><span class="lbl">代码在不断演化</span><div class="p5g-cm"></div><span class="c5-tag demo">示意</span></div>
+      <div class="p5g-two">
+        <div class="p5g-card a panel fx fx-left" style="--d:3">
+          <div class="p5g-ch"><b>终端型 Agent</b><span>以 Claude Code 为代表</span></div>
+          <div class="p5g-big">不建嵌入索引</div>
+          <div class="p5g-loop"><span class="c5-tool">glob</span><i>→</i><span class="c5-tool">grep</span><i>→</i><span class="c5-tool">read</span><em>现场检索</em></div>
+          <div class="p5g-fresh"><span>读到的代码</span><div class="meter" style="--c:var(--ok)"><i></i></div><em>永远最新</em></div>
+          <ul><li>不必维护随代码演化而<b>不断陈旧</b>的索引</li><li>省掉一整套<b>索引基础设施</b></li></ul>
+        </div>
+        <div class="p5g-card b panel fx fx-right" style="--d:4">
+          <div class="p5g-ch"><b>IDE 型工具</b><span>Cursor 早期的路线</span></div>
+          <div class="p5g-big">建嵌入索引</div>
+          <div class="p5g-idx"><svg class="ic"><use href="#i-db"/></svg><span class="p5g-is">索引已同步</span></div>
+          <div class="p5g-fresh"><span>索引新鲜度</span><div class="meter"><i></i></div><em class="p5g-fv">100%</em></div>
+          <ul><li>为<b>跨文件的语义召回</b>付出建索引的成本</li><li>在大型代码库中快速找到语义相关、用词不同的片段</li></ul>
+        </div>
+      </div>
+      <div class="p5g-now fx fx-up" style="--d:5"><svg class="ic"><use href="#i-refresh"/></svg><span>目前 Cursor 等 IDE 也改用 <b>grep + glob 现场检索</b>了</span></div>
+    </div>
+    <div class="p5g-r panel fx fx-right" style="--d:4">
+      <div class="p5g-rh"><b>实践中组合使用</b><span class="c5-tag demo">示意</span></div>
+      <p class="p5g-sub">从粗到细、从语义到语法</p>
+      <div class="p5g-fun">
+        <div class="p5g-st" data-i="0"><b>语义搜索</b><span>找到相关模块</span><em>整个仓库 → 3 个模块</em></div>
+        <div class="p5g-st" data-i="1"><b>正则匹配</b><span>精确定位具体代码行</span><em>→ 5 行</em></div>
+        <div class="p5g-st" data-i="2"><b>符号搜索</b><span>追踪调用链</span><em>→ 定义 1 处 · 调用 4 处</em></div>
+      </div>
+      <p class="p5g-nt"><svg class="ic"><use href="#i-alert"/></svg>符号级查找：目前主流 coding agent 并未采用</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 中的搜索工具」· 路线之争与组合使用</div>
+</section>
+<style>
+.p5g-body{display:grid;grid-template-columns:1.5fr 1fr;gap:24px;flex:1;min-height:0}
+.p5g-l{display:flex;flex-direction:column;gap:16px;min-height:0}
+.p5g-tl{display:flex;align-items:center;gap:16px;padding:10px 18px}
+.p5g-cm{flex:1;display:flex;gap:10px;min-height:32px}
+.p5g-c{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line2);animation:pop .4s var(--spring)}
+.p5g-c i{width:8px;height:8px;border-radius:50%;background:var(--acc)}
+.p5g-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;flex:1;min-height:0}
+.p5g-card{padding:16px 20px;display:flex;flex-direction:column;gap:14px;transition:border-color .4s,box-shadow .4s}
+.p5g-card.a{border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.p5g-card.b.stale{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
+.p5g-card.b.re{box-shadow:0 0 28px color-mix(in srgb,var(--warn) 25%,transparent)}
+.p5g-ch b{display:block;font-size:22px}
+.p5g-ch span{font-size:16px;color:var(--text3)}
+.p5g-big{font-size:28px;font-weight:800;color:var(--acc)}
+.p5g-card.b .p5g-big{color:var(--tool)}
+.p5g-loop{display:flex;align-items:center;gap:8px;min-height:40px}
+.p5g-loop i{font-style:normal;color:var(--text3)}
+.p5g-loop em{margin-left:auto;font-style:normal;font-size:15px;color:#6ee7b7}
+.p5g-loop.go .c5-tool{animation:p5gpl 1.2s ease both}
+.p5g-loop.go .c5-tool:nth-of-type(2){animation-delay:.3s}.p5g-loop.go .c5-tool:nth-of-type(3){animation-delay:.6s}
+@keyframes p5gpl{30%{background:rgba(251,191,36,.35);box-shadow:0 0 14px rgba(251,191,36,.5)}}
+.p5g-idx{display:flex;align-items:center;gap:10px;min-height:40px;font-size:17px;color:var(--text2)}
+.p5g-idx .ic{font-size:26px;color:var(--tool)}
+.p5g-card.b.re .p5g-idx .ic{animation:spin 1.2s linear infinite}
+.p5g-fresh{display:grid;grid-template-columns:90px 1fr 76px;align-items:center;gap:10px;font-size:16px;color:var(--text2)}
+.p5g-fresh em{font:600 16px var(--num);font-style:normal;text-align:right;color:var(--text)}
+.p5g-card ul{display:flex;flex-direction:column;gap:6px;margin-top:auto}
+.p5g-card li{position:relative;padding-left:16px;font-size:17px;line-height:1.55;color:var(--text2)}
+.p5g-card li::before{content:"";position:absolute;left:0;top:.65em;width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.p5g-card li b{color:var(--text)}
+.p5g-now{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent);font-size:19px}
+.p5g-now .ic{font-size:24px;color:var(--acc)}
+.p5g-now b{color:var(--acc)}
+.p5g-r{padding:18px 24px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.p5g-rh{display:flex;align-items:center;justify-content:space-between}
+.p5g-rh b{font-size:22px}
+.p5g-sub{font-size:18px;color:var(--acc)}
+.p5g-fun{display:flex;flex-direction:column;align-items:center;gap:12px;flex:1;justify-content:center}
+.p5g-st{--w:100%;width:var(--w);padding:16px 10% 18px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;cursor:pointer;clip-path:polygon(0 0,100% 0,93% 100%,7% 100%);background:rgba(255,255,255,.05);transition:background .4s}
+.p5g-st[data-i="1"]{--w:84%}.p5g-st[data-i="2"]{--w:68%}
+.p5g-st b{font-size:22px}
+.p5g-st span{font-size:16px;color:var(--text2)}
+.p5g-st em{font:600 16px var(--num);font-style:normal;color:var(--text3);opacity:0;transition:opacity .4s}
+.p5g-st.on{background:color-mix(in srgb,var(--acc) 22%,rgba(12,18,40,.6))}
+.p5g-st.on em{opacity:1;color:var(--text)}
+.p5g-st.cur{background:color-mix(in srgb,var(--acc) 38%,rgba(12,18,40,.6))}
+.p5g-nt{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text3)}
+.p5g-nt .ic{color:var(--warn)}
+</style>
+<script>
+HOOKS['c05-searchroute'] = {
+  init(s) {
+    s.querySelectorAll('.p5g-st').forEach((st) => st.addEventListener('click', () => { this.auto = false; this.lit(s, +st.dataset.i); }));
+  },
+  lit(s, i) { s.querySelectorAll('.p5g-st').forEach((st, j) => { st.classList.toggle('on', j <= i); st.classList.toggle('cur', j === i); }); },
+  // 代码不断提交：现场检索永远读到最新代码；嵌入索引逐渐落后，落后太多就要重建
+  async evo(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cm = s.querySelector('.p5g-cm'), card = s.querySelector('.p5g-card.b'), fm = card.querySelector('.meter'), fv = s.querySelector('.p5g-fv'), is = s.querySelector('.p5g-is');
+    const loop = s.querySelector('.p5g-loop');
+    s.querySelector('.p5g-card.a .meter i').style.setProperty('--v', '100%');
+    let f = 100, n = 0, base = 0;
+    const setF = (v) => { f = v; fm.style.setProperty('--c', v < 50 ? 'var(--bad)' : v < 80 ? 'var(--warn)' : 'var(--ok)'); fm.querySelector('i').style.setProperty('--v', v + '%'); fv.textContent = v + '%'; };
+    setF(100); cm.innerHTML = ''; is.textContent = '索引已同步'; card.classList.remove('stale', 're');
+    while (ok()) {
+      await U.wait(ctx, 1400); if (!ok()) return;
+      n++;
+      cm.insertAdjacentHTML('beforeend', `<span class="p5g-c"><i></i>commit ${n}</span>`);
+      while (cm.children.length > 7) cm.firstElementChild.remove();
+      U.restart(loop, 'go');
+      setF(Math.max(0, f - 17)); is.textContent = `索引落后 ${n - base} 次提交`; card.classList.add('stale');
+      if (f < 40) {
+        await U.wait(ctx, 800); if (!ok()) return;
+        is.textContent = '重建索引中……'; card.classList.add('re');
+        await U.wait(ctx, 1600); if (!ok()) return;
+        base = n; setF(100); is.textContent = '索引已同步'; card.classList.remove('re', 'stale');
+      }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true;
+    this.evo(s);
+    let i = -1;
+    const fn = () => { if (this.auto) { i = (i + 1) % 4; this.lit(s, i === 3 ? -1 : i); } };
+    fn(); ctx.every(fn, 1500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.lit(s, -1); s.querySelector('.p5g-cm').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= Coding Agent 中的文件编辑工具 ================= -->
+<section class="slide" id="c05-fig54" data-part="5" data-dur="24000" data-title="图5-4 五种文件编辑方案" data-notes="文件编辑的难点不在于操作本身，而在于如何让 LLM 以高效又可靠的方式告诉系统“改哪里、怎么改”。图5-4 对比了五种方案，展示人类语言表达与机器精确执行之间的根本张力。<br><b>差异描述 + Apply Model</b>：模型生成一份变更描述（git diff 式的差异文本，或带“此处保持不变”省略标记的代码骨架），交给专门的应用模型——通常是另一个更小、更快的 LLM——与原文件合并、产出完整的新文件。职责分离让主模型专注高层代码逻辑，但合并环节脆弱：描述与文件实际代码有微小出入时需判断是否同一位置，存在多个相似片段时可能合并到错误的地方。Cursor 是这条路线的代表，但近期由于基础模型能力的提升，也不再使用这条路线了。<br><b>旧字符串到新字符串</b>（Old String → New String）：Claude Code、Codex 和今天的 Cursor 采用的方案。old string 在文件中存在且唯一则成功，否则失败，可预测、透明；代价是删除大段代码时需完整输出所有原始内容，一个字符的偏差就会匹配失败，同一代码出现多次时需要更长的上下文消除歧义。<br><b>行号定位</b>（Old Line Numbers → New String）：“删除第 X 到 Y 行，插入新内容”，精确无歧义，大段删除只需首尾两个数字；但每次编辑后后续行号都会变化，一次输出多处编辑时要像 diff 一样统一使用初始行号定位。<br><b>类 Vim 编辑命令</b>：支持复制、剪切、粘贴等丰富操作，重组代码非常高效；但命令语法学习负担较大，最强的模型能较好使用，较小的模型错误率明显上升，而且对一次输出多个编辑命令并不友好。<br><b>字符串首尾匹配</b>（Old String Start + End → New String）：只提供要删除内容的开头几行和结尾几行，首尾组合在文件中唯一就能准确定位；综合了文本替换的可靠性和行号方案的效率，模型犯错的风险相对较低。<br>打开右上角的开关，看每种方案的典型失败方式（示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图5-4 五种<em>文件编辑</em>方案</h2></div>
+    <button class="tgl p5h-tgl fx fx-up" style="--d:2;--tc:var(--bad)"><i></i>看典型失败方式</button></header>
+  <div class="p5h-body">
+    <div class="p5h-list fx fx-left" style="--d:3"></div>
+    <div class="p5h-main fx fx-up" style="--d:4">
+      <div class="p5h-io">
+        <div class="win p5h-out"><div class="win-bar"><i></i><i></i><i></i><span>模型输出</span></div><div class="c5-code p5h-oc"></div></div>
+        <div class="p5h-arw"><svg class="ic"><use href="#i-arrow"/></svg><span class="p5h-at"></span></div>
+        <div class="win p5h-file"><div class="win-bar"><i></i><i></i><i></i><span>utils.py</span><span class="c5-tag demo">示意</span></div><div class="c5-code p5h-fc"></div><div class="p5h-msg"></div></div>
+      </div>
+      <div class="p5h-pc"><div class="p5h-pro"><span class="lbl">优势</span><p></p></div><div class="p5h-con"><span class="lbl">劣势</span><p></p></div></div>
+    </div>
+  </div>
+  <div class="p5h-adopt fx fx-up" style="--d:6"><span class="lbl">实际采用情况</span>
+    <span class="p5h-ad"><b>Old → New</b>Claude Code、Codex、今天的 Cursor</span>
+    <span class="p5h-ad"><b>行号定位</b>IDE 深度集成场景</span>
+    <span class="p5h-ad"><b>Diff + Apply</b>Cursor（近期已不再使用）</span>
+    <span class="p5h-ad"><b>首尾匹配</b>部分定制方案</span>
+    <span class="p5h-ad"><b>Vim 命令</b>实验性方案</span>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 中的文件编辑工具」· 图5-4 五种文件编辑方案对比</div>
+</section>
+<style>
+#c05-fig54 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.p5h-body{display:grid;grid-template-columns:300px 1fr;gap:22px;flex:1;min-height:0}
+.p5h-list{display:flex;flex-direction:column;gap:10px}
+.p5h-b{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:11px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);text-align:left;transition:all .35s}
+.p5h-b b{font-size:19px;color:var(--text)}
+.p5h-b span{font:15px var(--mono);color:var(--text3)}
+.p5h-b.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.8));box-shadow:0 0 22px color-mix(in srgb,var(--acc) 25%,transparent);translate:6px 0}
+.p5h-b.on b{color:var(--acc)}
+.p5h-main{display:flex;flex-direction:column;gap:16px;min-height:0}
+.p5h-io{display:grid;grid-template-columns:1fr 130px 1fr;align-items:stretch}
+.p5h-oc,.p5h-fc{font-size:16px}
+.p5h-oc .ln{transition:opacity .3s}
+.p5h-oc .ln.p5h-hide{opacity:0}
+.p5h-oc .ln.p5h-m{color:#fda4af}
+.p5h-oc .ln.p5h-p{color:#6ee7b7}
+.p5h-fc .ln.tgt{background:rgba(251,191,36,.18);box-shadow:inset 3px 0 0 var(--tool)}
+.p5h-fc .ln.amb{background:rgba(251,146,60,.14);box-shadow:inset 3px 0 0 var(--warn);outline:1px dashed var(--warn)}
+.p5h-fc .ln.del{background:rgba(251,113,133,.16);text-decoration:line-through;text-decoration-color:var(--bad);opacity:.7}
+.p5h-fc .ln.nw{background:rgba(52,211,153,.16);box-shadow:inset 3px 0 0 var(--ok);animation:upIn .45s var(--spring) both}
+.p5h-fc .ln.bad{background:rgba(251,113,133,.2);box-shadow:inset 3px 0 0 var(--bad)}
+.p5h-arw{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--text3);text-align:center}
+.p5h-arw .ic{font-size:34px;transition:color .3s,transform .4s var(--spring)}
+.p5h-arw span{font-size:15px;line-height:1.45;padding:0 6px}
+.p5h-arw.go .ic{color:var(--acc);transform:translateX(8px)}
+.p5h-arw.go span{color:var(--text)}
+.p5h-msg{margin:0 14px 14px;padding:9px 14px;border-radius:12px;font-size:16px;line-height:1.55;min-height:48px;color:var(--text3);border:1px dashed var(--line2)}
+.p5h-msg.on{animation:upIn .45s var(--spring) both;border-style:solid}
+.p5h-msg.ok{color:#6ee7b7;border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+.p5h-msg.warn{color:#fdba74;border-color:rgba(251,146,60,.5);background:rgba(251,146,60,.08)}
+.p5h-msg.bad{color:#fda4af;border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.08)}
+.p5h-msg code{font:15px var(--mono)}
+.p5h-msg b{color:var(--text)}
+.p5h-pc{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.p5h-pc>div{padding:12px 16px;border-radius:14px;background:rgba(12,18,40,.72);border:1px solid var(--line)}
+.p5h-pro{border-top:3px solid var(--ok) !important}.p5h-con{border-top:3px solid var(--bad) !important}
+.p5h-pc p{margin-top:4px;font-size:17px;line-height:1.6;color:var(--text2)}
+.p5h-pc b{color:var(--text)}
+.p5h-adopt{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.p5h-adopt .lbl{margin-right:4px}
+.p5h-ad{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.p5h-ad b{color:var(--acc);font-weight:700}
+</style>
+<script>
+HOOKS['c05-fig54'] = {
+  F: ['import math', '', 'def foo(x):', '    return x', '', 'def foo_old(x):', '    return x', '', 'def bar(x):', '    return foo(x) * 2'],
+  NEW: ['def foo(x, y=0):', '    return x + y'],
+  S: [
+    {
+      b: '差异描述 + Apply Model', sub: 'Diff + Apply',
+      pro: '关注点分离：主模型专注高层代码逻辑，<b>应用模型</b>（另一个更小、更快的 LLM）专注底层文本操作',
+      con: '微小偏差致错位：描述与实际代码有出入，或存在<b>多个相似片段</b>时，可能合并到错误的地方',
+      ok: { out: ['- def foo(x):', '-   return x', '+ def foo(x, y=0):', '+   return x + y'], at: '小模型定位并应用', hit: [42, 43], rep: [42, 43], lv: 'ok', msg: '应用模型找到第 42–43 行，与原文件合并出完整的新文件' },
+      no: { out: ['- def foo(x) :', '-   return x', '+ def foo(x, y=0):', '+   return x + y'], at: '小模型猜测位置', hit: [45, 46], rep: [45, 46], bad: 1, lv: 'bad', msg: '描述和原文差了一个空格，应用模型把改动合并到了相似片段 <code>foo_old</code> 上——<b>合并错位</b>' },
+    },
+    {
+      b: '旧字符串 → 新字符串', sub: 'Old String → New String',
+      pro: '可预测、透明：old 在文件中<b>存在且唯一</b>则成功，否则失败，不存在模棱两可',
+      con: '删除大段代码需完整输出原文；<b>一个字符的偏差</b>就会匹配失败；同一代码出现多次时要给更长的上下文',
+      ok: { out: ['old: "def foo(x):\\n    return x"', 'new: "def foo(x, y=0):\\n    return x + y"'], at: '字符串精确匹配替换', hit: [42, 43], rep: [42, 43], lv: 'ok', msg: 'old 在文件中存在且唯一 → 替换成功' },
+      no: { out: ['old: "def foo(x):\\n  return x"', 'new: "def foo(x, y=0):\\n    return x + y"'], at: '字符串精确匹配替换', hit: [], lv: 'warn', msg: 'old 里的缩进少了两个空格，在文件中找不到 → <b>匹配失败</b>，只能报错重来' },
+    },
+    {
+      b: '行号定位', sub: 'Old Line Numbers → New String',
+      pro: '行号精确无歧义：大段删除只需<b>首尾两个数字</b>，前提是读文件工具提供了行号',
+      con: '长文件里行号容易错；<b>每次编辑后后续行号都会变化</b>，多处编辑要统一用初始行号',
+      ok: { out: ['删除行 42-43，插入:', '  def foo(x, y=0):', '    return x + y'], at: '行号精确指定范围', hit: [42, 43], rep: [42, 43], lv: 'ok', msg: '第 42–43 行被替换：两个数字就指定了范围' },
+      no: { out: ['删除行 43-44，插入:', '  def foo(x, y=0):', '    return x + y'], at: '行号精确指定范围', hit: [43, 44], rep: [43, 44], bad: 1, mark: [[42, 'bad']], lv: 'bad', msg: '行号差了一位：删掉的是 <code>return x</code> 和空行，<code>def foo(x):</code> 被晾在原地——代码坏了' },
+    },
+    {
+      b: '类 Vim 编辑命令', sub: '42G · cw · dd · yy/p',
+      pro: '丰富的编辑语义：复制、剪切、粘贴，<b>移动和重组代码</b>非常高效',
+      con: '命令语法学习负担大，<b>较小的模型错误率明显上升</b>；每条命令都会改变行号，不适合一次输出多条',
+      ok: { out: ['42G          跳到第 42 行', 'cc def foo(x, y=0):', 'j            下移一行', 'cc     return x + y'], at: '逐条执行编辑命令', hit: [42, 43], rep: [42, 43], lv: 'ok', msg: '四条命令逐条执行，改动落在第 42–43 行' },
+      no: { out: ['42G', 'dd', 'dd', '46G          想跳到 foo_old 的函数体'], at: '逐条执行编辑命令', hit: [42, 43], del: [42, 43], mark: [[46, 'bad']], lv: 'bad', msg: '两次 dd 之后行号整体上移，46G 落在了 <code>def bar(x):</code> 上——<b>模型很难提前算出修改后的行号</b>' },
+    },
+    {
+      b: '字符串首尾匹配', sub: 'Start + End → New String',
+      pro: '只需给出<b>边界</b>：大段删除不必输出数百行原文；仍基于内容匹配，模型犯错的风险较低',
+      con: '<b>首尾组合必须唯一</b>，边界给得太短就会同时匹配多处',
+      ok: { out: ['start: "def foo(x):"', 'end:   "    return x"', 'new:   "def foo(x, y=0):\\n    return x + y"'], at: '只需边界即可定位', hit: [42, 43], rep: [42, 43], lv: 'ok', msg: '首尾组合唯一 → 定位到第 42–43 行并替换' },
+      no: { out: ['start: "def foo"', 'end:   "    return x"', 'new:   "def foo(x, y=0):\\n    return x + y"'], at: '只需边界即可定位', hit: [42, 43, 45, 46], amb: 1, lv: 'warn', msg: 'start 太短：<code>def foo</code> 同时匹配 foo 和 foo_old，首尾组合不唯一 → 拒绝执行，要求补充边界' },
+    },
+  ],
+  init(s) {
+    const L = s.querySelector('.p5h-list');
+    L.innerHTML = this.S.map((x, i) => `<button class="p5h-b" data-i="${i}"><b>${x.b}</b><span>${x.sub}</span></button>`).join('');
+    L.querySelectorAll('.p5h-b').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.play(s, +b.dataset.i); }));
+    this.tg = s.querySelector('.p5h-tgl');
+    this.tg.addEventListener('click', () => { this.auto = false; this.tg.classList.toggle('on'); this.play(s, this.i || 0); });
+    this.draw(s, this.F);
+  },
+  draw(s, L, mk = {}) {
+    const ln = C5.code(s.querySelector('.p5h-fc'), L.join('\n'), 'py', { num: true, from: 40 });
+    Object.entries(mk).forEach(([n, c]) => { const e = ln[n - 40]; if (e) e.classList.add(...c.split(' ')); });
+  },
+  async play(s, i) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const sc = this.S[i], d = this.tg.classList.contains('on') ? sc.no : sc.ok;
+    this.i = i;
+    s.querySelectorAll('.p5h-b').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.p5h-at').textContent = d.at;
+    s.querySelector('.p5h-pro p').innerHTML = sc.pro;
+    s.querySelector('.p5h-con p').innerHTML = sc.con;
+    const msg = s.querySelector('.p5h-msg'), arw = s.querySelector('.p5h-arw');
+    msg.className = 'p5h-msg'; msg.textContent = '等待应用……'; arw.classList.remove('go');
+    const L = this.F.slice();
+    this.draw(s, L);
+    const ol = C5.code(s.querySelector('.p5h-oc'), d.out.join('\n'), 'py');
+    ol.forEach((l) => { const t = l.textContent; l.classList.add('p5h-hide'); if (/^- /.test(t)) l.classList.add('p5h-m'); if (/^\+ /.test(t)) l.classList.add('p5h-p'); });
+    for (const l of ol) { await U.wait(ctx, 240); if (!ok()) return; l.classList.remove('p5h-hide'); }
+    await U.wait(ctx, 300); if (!ok()) return;
+    arw.classList.add('go');
+    await U.wait(ctx, 700); if (!ok()) return;
+    const mk = {};
+    d.hit.forEach((n) => (mk[n] = d.amb ? 'amb' : d.bad ? 'tgt bad' : 'tgt'));
+    this.draw(s, L, mk);
+    await U.wait(ctx, 900); if (!ok()) return;
+    const span = d.rep || d.del;
+    if (span) {
+      const [a, b] = span, m2 = {};
+      for (let n = a; n <= b; n++) m2[n] = 'del';
+      this.draw(s, L, m2);
+      await U.wait(ctx, 650); if (!ok()) return;
+      L.splice(a - 40, b - a + 1, ...(d.rep ? this.NEW : []));
+      const m3 = {};
+      if (d.rep) for (let n = a; n < a + this.NEW.length; n++) m3[n] = d.bad ? 'nw bad' : 'nw';
+      (d.mark || []).forEach(([n, c]) => (m3[n] = c));
+      this.draw(s, L, m3);
+    }
+    msg.className = 'p5h-msg on ' + d.lv; msg.innerHTML = d.msg;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true;
+    this.tg.classList.remove('on');
+    this.play(s, 0);
+    ctx.every(() => {
+      if (!this.auto) return;
+      let i = this.i + 1;
+      if (i >= this.S.length) { i = 0; this.tg.classList.toggle('on'); }
+      this.play(s, i);
+    }, 6200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; this.tg.classList.remove('on'); this.i = 0; },
+};
+</script>
+
+<section class="slide" id="c05-vim" data-part="5" data-trans="rise" data-dur="18000" data-title="为人设计的编辑器 vs 模型的工作模式" data-notes="类 Vim 编辑命令对模型一次思考输出多个编辑命令并不友好：Vim 每次编辑后文件内容和行号都会发生改变，而模型很难提前计算修改后的行号。行号定位方案也有同样的问题，所以要像 diff 一样，让模型在多次编辑中都使用初始行号来定位；基于内容匹配的方案则不受行号漂移的影响。<br>更深层的思考是，Vim 等代码编辑器是为人类设计的，<b>人类需要不断看到当前的状态，并规划下一步的简单操作</b>（例如，写一行代码，或者删除几行代码）。但今天<b>模型的工作模式是经过较长时间的思考，再批量进行较为复杂的操作</b>（例如，写几百行代码）。<br>上方两条时间线对比两种工作模式；下方演示：模型在一次思考里按初始文件规划了三处编辑。逐条执行、每条都按当时的行号定位时，第一处插入两行之后，后两处就落到了错误的位置；统一按初始行号，或者按内容匹配，三处都能落对（文件为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">编辑器为人设计，<em>模型却批量工作</em></h2></div>
+    <div class="p5i-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="drift">按当时行号</button><button data-v="init">按初始行号</button><button data-v="match">按内容匹配</button></div></header>
+  <div class="p5i-tls panel fx fx-up" style="--d:3">
+    <div class="p5i-tl"><span class="p5i-who"><svg class="ic"><use href="#i-user"/></svg>人类</span><div class="p5i-trk h"></div></div>
+    <p class="p5i-cap"><b>人类需要不断看到当前的状态，并规划下一步的简单操作</b>（写一行代码，或者删除几行代码）</p>
+    <div class="p5i-tl"><span class="p5i-who"><svg class="ic"><use href="#i-robot"/></svg>模型</span><div class="p5i-trk m"></div></div>
+    <p class="p5i-cap"><b>模型的工作模式是经过较长时间的思考，再批量进行较为复杂的操作</b>（写几百行代码）</p>
+  </div>
+  <div class="p5i-lab">
+    <div class="p5i-plan panel fx fx-left" style="--d:4">
+      <div class="p5i-ph"><b>一次思考，规划三处编辑</b><span class="c5-tag demo">示意</span></div>
+      <p class="p5i-pn">三条编辑都是对着<b>编辑前</b>的文件写的</p>
+      <div class="p5i-ed"><em>E1</em><span>在第 2 行后插入 2 行日志设置</span><i class="p5i-r"></i></div>
+      <div class="p5i-ed"><em>E2</em><span>删除第 7 行的调试输出</span><i class="p5i-r"></i></div>
+      <div class="p5i-ed"><em>E3</em><span>第 11 行：超时 5 → 10</span><i class="p5i-r"></i></div>
+      <div class="p5i-sum"></div>
+    </div>
+    <div class="win p5i-file fx fx-right" style="--d:5"><div class="win-bar"><i></i><i></i><i></i><span>fetch.py</span></div><div class="c5-code p5i-fc"></div></div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 中的文件编辑工具」· 类 Vim 编辑命令 · 行号定位</div>
+</section>
+<style>
+#c05-vim .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c05-vim .seg button{padding:9px 20px;font-size:18px}
+.p5i-tls{padding:14px 24px;display:grid;grid-template-columns:1fr;gap:6px}
+.p5i-tl{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:14px}
+.p5i-who{display:inline-flex;align-items:center;gap:8px;font-size:19px;font-weight:600}
+.p5i-who .ic{font-size:22px;color:var(--acc)}
+.p5i-trk{display:flex;gap:4px;height:36px}
+.p5i-trk>span{position:relative;flex:var(--f,1);border-radius:8px;overflow:hidden;background:rgba(255,255,255,.03)}
+.p5i-trk>span>i{position:absolute;inset:0;transform:scaleX(0);transform-origin:left center}
+.p5i-trk>span>em{position:relative;display:flex;align-items:center;justify-content:center;height:100%;font-style:normal;font-size:15px;font-weight:600;white-space:nowrap;opacity:0}
+.p5i-tls.go .p5i-trk>span>i{transform:scaleX(1);transition:transform var(--du) linear var(--dl)}
+.p5i-tls.go .p5i-trk>span>em{opacity:1;transition:opacity .3s var(--dl)}
+.p5i-trk .see>i{background:color-mix(in srgb,var(--acc) 30%,transparent)}
+.p5i-trk .op>i{background:color-mix(in srgb,var(--tool) 55%,transparent)}
+.p5i-trk .see>em{color:#a5f3fc}.p5i-trk .op>em{color:#0b1020}
+.p5i-trk .think>i{background:linear-gradient(90deg,color-mix(in srgb,var(--llm) 25%,transparent),color-mix(in srgb,var(--llm) 60%,transparent))}
+.p5i-trk .batch>i{background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--tool) 85%,transparent) 0 14px,color-mix(in srgb,var(--tool) 55%,transparent) 14px 18px)}
+.p5i-trk .think>em{color:#ddd6fe}.p5i-trk .batch>em{color:#0b1020}
+.p5i-cap{padding-left:124px;font-size:16px;line-height:1.5;color:var(--text2)}
+.p5i-cap b{color:var(--text)}
+.p5i-lab{display:grid;grid-template-columns:1fr 1.1fr;gap:22px;margin-top:18px;flex:1;min-height:0}
+.p5i-plan{padding:16px 22px;display:flex;flex-direction:column;gap:10px}
+.p5i-ph{display:flex;align-items:center;justify-content:space-between}
+.p5i-ph b{font-size:20px}
+.p5i-pn{font-size:16px;color:var(--text3)}
+.p5i-pn b{color:var(--text2)}
+.p5i-ed{display:grid;grid-template-columns:44px 1fr;gap:4px 12px;align-items:center;padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.p5i-ed em{grid-row:span 2;font:700 19px var(--num);font-style:normal;color:var(--acc)}
+.p5i-ed span{font-size:17px}
+.p5i-r{font-style:normal;font-size:15px;color:var(--text3);min-height:22px}
+.p5i-ed.cur{border-color:var(--tool);background:rgba(251,191,36,.08)}
+.p5i-ed.ok{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.p5i-ed.ok .p5i-r{color:#6ee7b7}
+.p5i-ed.bad{border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:rgba(251,113,133,.07)}
+.p5i-ed.bad .p5i-r{color:#fda4af}
+.p5i-sum{margin-top:auto;padding:10px 14px;min-height:48px;border-radius:12px;font-size:17px;line-height:1.5;color:var(--text3);border:1px dashed var(--line2)}
+.p5i-sum.on{border-style:solid;animation:upIn .45s var(--spring) both}
+.p5i-sum.ok{color:#6ee7b7;border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+.p5i-sum.bad{color:#fda4af;border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.08)}
+.p5i-file{display:flex;flex-direction:column;min-height:0}
+.p5i-fc{font-size:16px}
+.p5i-fc .ln.tgt{background:rgba(251,191,36,.18);box-shadow:inset 3px 0 0 var(--tool)}
+.p5i-fc .ln.del{background:rgba(251,113,133,.16);text-decoration:line-through;text-decoration-color:var(--bad)}
+.p5i-fc .ln.nw{background:rgba(52,211,153,.16);box-shadow:inset 3px 0 0 var(--ok);animation:upIn .45s var(--spring) both}
+.p5i-fc .ln.bad{background:rgba(251,113,133,.22);box-shadow:inset 3px 0 0 var(--bad)}
+</style>
+<script>
+HOOKS['c05-vim'] = {
+  F: ['import os', 'import time', '', 'def fetch(url):', '    resp = http.get(url)', '    data = resp.json()', '    print("debug:", data)', '    return data', '', 'def config():', '    return {"timeout": 5}'],
+  // at：编辑前的行号；m：按内容匹配时用的片段
+  E: [
+    { k: 'ins', at: 2, m: 'import time', t: ['import logging', 'log = logging.getLogger(__name__)'] },
+    { k: 'del', at: 7, m: 'print("debug:", data)' },
+    { k: 'sub', at: 11, m: '"timeout": 5', t: '    return {"timeout": 10}' },
+  ],
+  SUM: {
+    drift: ['bad', '1 / 3 落对：第一处插入两行之后，后面的行号全部下移了两行'],
+    init: ['ok', '3 / 3 落对：像 diff 一样，多处编辑都按初始行号定位'],
+    match: ['ok', '3 / 3 落对：按内容定位，不受行号漂移影响'],
+  },
+  H: [['看', 'see'], ['改一行', 'op'], ['看', 'see'], ['删两行', 'op'], ['看', 'see'], ['改一行', 'op'], ['看', 'see'], ['加一行', 'op'], ['看', 'see'], ['改一行', 'op']],
+  init(s) {
+    this.set = U.seg(s.querySelector('.p5i-seg'), (v) => { this.auto = false; this.run(s, v); });
+    s.querySelector('.p5i-trk.h').innerHTML = this.H.map(([t, c], i) => `<span class="${c}" style="--dl:${(i * 0.38).toFixed(2)}s;--du:.34s"><i></i><em>${t}</em></span>`).join('');
+    s.querySelector('.p5i-trk.m').innerHTML = '<span class="think" style="--f:6;--dl:0s;--du:2.3s"><i></i><em>较长时间的思考</em></span><span class="batch" style="--f:4;--dl:2.3s;--du:1.3s"><i></i><em>批量进行复杂操作：几百行代码</em></span>';
+    this.draw(s, this.F.map((t, i) => ({ id: i + 1, t })));
+  },
+  draw(s, L, mk = {}) {
+    const ln = C5.code(s.querySelector('.p5i-fc'), L.map((x) => x.t).join('\n'), 'py', { num: true });
+    Object.entries(mk).forEach(([j, c]) => { if (ln[j]) ln[j].classList.add(...c.split(' ')); });
+  },
+  async run(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const L = this.F.map((t, i) => ({ id: i + 1, t }));
+    const eds = [...s.querySelectorAll('.p5i-ed')], sum = s.querySelector('.p5i-sum');
+    eds.forEach((e) => { e.className = 'p5i-ed'; e.querySelector('.p5i-r').textContent = ''; });
+    sum.className = 'p5i-sum'; sum.textContent = '逐条执行中……';
+    this.draw(s, L);
+    await U.wait(ctx, 700); if (!ok()) return;
+    for (let k = 0; k < 3; k++) {
+      const e = this.E[k], el = eds[k];
+      el.classList.add('cur');
+      const j = v === 'drift' ? e.at - 1 : v === 'init' ? L.findIndex((x) => x.id === e.at) : L.findIndex((x) => x.t.includes(e.m));
+      const right = j >= 0 && L[j].id === e.at;
+      this.draw(s, L, { [j]: right ? 'tgt' : 'tgt bad' });
+      await U.wait(ctx, 900); if (!ok()) return;
+      let why;
+      if (e.k === 'ins') {
+        L.splice(j + 1, 0, ...e.t.map((t, q) => ({ id: 'n' + q, t })));
+        this.draw(s, L, { [j + 1]: 'nw', [j + 2]: 'nw' });
+        why = right ? '插入位置正确' : '插错了位置';
+      } else if (e.k === 'del') {
+        this.draw(s, L, { [j]: right ? 'del' : 'del bad' });
+        await U.wait(ctx, 650); if (!ok()) return;
+        why = right ? '删掉了调试输出' : `删掉的却是 ${L[j].t.trim()}`;
+        L.splice(j, 1);
+        this.draw(s, L);
+      } else {
+        why = right ? '超时改成了 10' : `覆盖了 ${L[j].t.trim()}`;
+        L[j] = { id: L[j].id, t: e.t };
+        this.draw(s, L, { [j]: right ? 'nw' : 'nw bad' });
+      }
+      el.classList.remove('cur'); el.classList.add(right ? 'ok' : 'bad');
+      el.querySelector('.p5i-r').textContent = why;
+      await U.wait(ctx, 800); if (!ok()) return;
+    }
+    const [lv, t] = this.SUM[v];
+    sum.className = 'p5i-sum on ' + lv; sum.textContent = t;
+  },
+  tl(s) { const w = s.querySelector('.p5i-tls'); w.classList.remove('go'); void w.offsetWidth; w.classList.add('go'); },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true;
+    this.run(s, 'drift'); this.tl(s);
+    ctx.every(() => this.tl(s), 6500);
+    const M = ['drift', 'init', 'match']; let m = 0;
+    ctx.every(() => { if (this.auto) { m = (m + 1) % 3; this.run(s, M[m]); } }, 9000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; s.querySelector('.p5i-tls').classList.remove('go'); },
+};
+</script>

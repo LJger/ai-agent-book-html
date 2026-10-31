@@ -1,0 +1,407 @@
+<!-- ================= PART 10 知识发现与多模态 ================= -->
+<section class="slide chapter" id="c03-d10" data-part="10" data-title="PART 10 · 知识发现与多模态" data-notes="到目前为止，我们讨论的 RAG 技术都基于一个前提：知识以非结构化或半结构化的文档形式存在。这一部分先看另一种情形：知识以隐性、分散的形式蕴含在海量结构化案例数据中——从“信息检索”到“知识发现”（图3-15），并用实验 3-12 在 CAIL2018 刑事判决数据上演示两阶段的知识提取与因子分析，同时如实看它的验收记录；最后是前沿探索：一张脸的模样、一个人的嗓音很难用文字描述，该如何存成多模态记忆。">
+  <div class="ch-k fx fx-up">PART 10</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">知识发现<br>与多模态</h1>
+  <div class="ch-s fx fx-up" style="--d:3">从判例中提炼判决经验 · 实验 3-12 · 多模态记忆</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">Agent 不一定要把知识库当成一个只能检索的静态仓库——它可以先把数据“读懂”。</blockquote>
+  <div class="ch-loop" data-node="9" data-num="10"></div>
+</section>
+
+<!-- ================= 从数据集中提取深度知识：从信息检索到知识发现 ================= -->
+<section class="slide" id="c03-discover" data-part="10" data-dur="18000" data-title="图3-15 从信息检索到知识发现" data-notes="到目前为止，我们讨论的 RAG 技术都基于一个前提：知识以非结构化或半结构化的文档形式存在。然而在许多专业领域，知识更多以隐性、分散的形式蕴含在海量结构化案例数据中。例如在司法领域，决定判决结果的“知识”并非仅写在法条里，更多体现在成千上万份判例中法官如何权衡犯罪动机、伤害程度、自首情节、社会影响等各种复杂甚至相互冲突因素的经验中。这就像资深医生的“直觉”——背后是无数病例的经验积累而非仅仅教科书理论。<br>从这类数据集中学习，需要全新的 RAG 范式。不能满足于简单的文本检索，必须深入数据内部，通过统计分析和模式识别将隐藏在数据中的隐性知识“挖掘”出来，转化为 Agent 可以理解和运用的结构化决策逻辑。这本质上是从“<b>信息检索</b>”到“<b>知识发现</b>”的飞跃。过程分两阶段：<b>第一阶段：知识提取与结构化。</b>利用 LLM 强大的理解和归纳能力，将每个案例的非结构化描述（如案情陈述）转换为包含所有关键判决因素的标准化 JSON 对象，核心挑战在于定义一个既全面又一致的数据模式（Schema）。<b>第二阶段：因子分析与重要性建模。</b>在获得大规模结构化数据后，运用数据分析技术发现模式、提炼规律，识别出哪些因素对最终结果具有最显著影响并量化其权重，构建“判决因子重要性层次模型”——这就是从海量案例中提炼出的可供 Agent 使用的“判决经验”。<br>图3-15：阶段一，原始判例文书（CAIL2018 数据集）→ LLM 因子发现（自下而上 Schema）→ 结构化 JSON → 模块化数据模式（核心模式 + 罪名扩展模式）；阶段二，特征向量化（独热编码 + 多热编码 + 对数变换 + 标准化）→ KMeans 聚类（发现“案件原型”）→ 因子重要性模型；应用是对话式法律咨询 Agent：按因子重要性引导提问 → 检索相似案件原型 → 数据驱动的量刑分析。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-15 从信息检索到<em>知识发现</em></h2></header>
+  <div class="wab-top fx fx-up" style="--d:2">
+    <div><b>到目前为止</b><span>知识以非结构化或半结构化的<em>文档</em>形式存在，检索就够</span></div>
+    <div class="hot"><b>许多专业领域</b><span>知识隐性、分散地蕴含在<em>海量结构化案例</em>里：法官如何权衡犯罪动机、伤害程度、自首情节、社会影响——像资深医生的“直觉”</span></div>
+  </div>
+  <div class="wab-fig panel fx fx-up" style="--d:3"><svg class="wab-svg" viewBox="0 0 1600 430"></svg></div>
+  <div class="src">第三章 ·「从数据集中提取深度知识：从信息检索到知识发现」· 图3-15 结构化知识提取流水线</div>
+</section>
+<style>
+.wab-top{display:grid;grid-template-columns:1fr 1.6fr;gap:18px}
+.wab-top div{display:flex;flex-direction:column;gap:4px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.wab-top div.hot{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.wab-top b{font-size:18px}
+.wab-top span{font-size:16px;line-height:1.55;color:var(--text2)}
+.wab-top em{font-style:normal;font-weight:700;color:var(--text)}
+.wab-fig{margin-top:16px;flex:1;min-height:0;padding:12px 18px;display:flex}
+.wab-svg{width:100%;height:100%}
+.wab-st{font-size:19px;font-weight:800;fill:var(--acc)}
+.wab-n rect{fill:rgba(12,18,40,.95);stroke:color-mix(in srgb,var(--c) 55%,transparent);stroke-width:2;transition:fill .35s,stroke .35s}
+.wab-n text{font-size:20px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central}
+.wab-n text.s{font-size:16px;font-weight:500;fill:var(--text2)}
+.wab-n text.m{font:15px var(--mono);fill:#fde68a}
+.wab-n.on rect{fill:color-mix(in srgb,var(--c) 24%,rgba(12,18,40,.95));stroke:var(--c);filter:drop-shadow(0 0 8px var(--c))}
+.wab-ln{fill:none;stroke:rgba(255,255,255,.28);stroke-width:2.5;stroke-dasharray:7 7;animation:flow 1.2s linear infinite}
+.wab-dot{fill:#fff;opacity:0;filter:drop-shadow(0 0 8px var(--acc))}
+.wab-app rect{fill:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.95));stroke:var(--acc);stroke-width:2;transition:fill .4s}
+.wab-app text{font-size:19px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central}
+.wab-app.on rect{fill:color-mix(in srgb,var(--acc) 26%,rgba(12,18,40,.95))}
+</style>
+<script>
+HOOKS['c03-discover'] = {
+  init(s) {
+    const sv = s.querySelector('.wab-svg');
+    const N = (id, x, y, w, h, c, lines) => `<g class="wab-n" data-n="${id}" style="--c:${c}"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14"/>${lines.map(([t, cls], i) => `<text class="${cls || ''}" x="${x + w / 2}" y="${y + h / 2 + (i - (lines.length - 1) / 2) * 27}">${t}</text>`).join('')}</g>`;
+    const P = 'M170 105 L1420 105 L1420 170 C1420 205, 220 205, 220 240 L220 295 L1340 295 L1340 380';
+    let h = `<path class="wab-ln" d="${P}"/>`;
+    h += '<text class="wab-st" x="20" y="28">阶段一：知识提取与结构化</text><text class="wab-st" x="20" y="226">阶段二：因子分析与知识建模</text>';
+    h += N('a1', 20, 50, 300, 110, '#94a3b8', [['原始判例文书'], ['CAIL2018 数据集', 's']]) + N('a2', 420, 50, 300, 110, '#a78bfa', [['LLM 因子发现'], ['自下而上 Schema', 's']]) + N('a3', 800, 50, 360, 110, '#fbbf24', [['结构化 JSON'], ['{自首:true, 赔偿:50万,', 'm'], ['伤害等级:重伤二级}', 'm']]) + N('a4', 1240, 38, 340, 134, '#2dd4bf', [['模块化数据模式'], ['核心模式（自首/赔偿/前科）', 's'], ['+ 罪名扩展模式', 's'], ['（盗窃→涉案金额，伤害→伤害等级）', 's']]);
+    h += N('b1', 20, 240, 400, 110, '#60a5fa', [['特征向量化'], ['独热编码 + 多热编码', 's'], ['+ 对数变换 + 标准化', 's']]) + N('b2', 560, 240, 400, 110, '#f472b6', [['KMeans 聚类'], ['发现“案件原型”', 's'], ['如：口角徒手致轻伤', 's']]) + N('b3', 1100, 240, 480, 110, '#34d399', [['因子重要性模型'], ['量化各因素权重', 's'], ['构建量刑决策逻辑', 's']]);
+    h += '<g class="wab-app"><rect x="20" y="382" width="1560" height="46" rx="12"/><text x="800" y="405">应用：对话式法律咨询 Agent —— 按因子重要性引导提问 → 检索相似案件原型 → 数据驱动的量刑分析</text></g>';
+    h += `<path class="wab-p" d="${P}" fill="none" stroke="none"/>` + [0, 1, 2].map(() => '<circle class="wab-dot" r="9" cx="170" cy="105"/>').join('');
+    sv.innerHTML = h;
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const sv = s.querySelector('.wab-svg'), p = sv.querySelector('.wab-p'), dots = [...sv.querySelectorAll('.wab-dot')], app = sv.querySelector('.wab-app');
+    const T = [['a1', 0], ['a2', 600], ['a3', 1300], ['a4', 2000], ['b1', 3000], ['b2', 3700], ['b3', 4400]];
+    while (ok()) {
+      sv.querySelectorAll('.wab-n').forEach((n) => n.classList.remove('on')); app.classList.remove('on');
+      T.forEach(([id, t]) => ctx.later(() => { if (ok()) sv.querySelector(`.wab-n[data-n="${id}"]`).classList.add('on'); }, t + 300));
+      await Promise.all(dots.map((d, i) => U.fly(d, p, 5200, { ctx, alive: ok, linear: true, delay: i * 380 }))); if (!ok()) return;
+      app.classList.add('on');
+      await U.wait(ctx, 3000);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-exp312" data-part="10" data-trans="zoom" data-dur="22000" data-title="实验 3-12 ★★★：从结构化数据中提取隐性知识" data-notes="<b>实验 3-12 ★★★：从结构化数据中提取隐性知识：以司法判例分析为例。</b>structured-knowledge-extraction 项目以大规模的 CAIL2018 中文刑事判决数据集为基础，构建了一个从判例中学习“判决经验”的智能法律顾问。实验的核心在于其创新的数据驱动知识工程方法。<b>知识提取</b>阶段没有采用预先定义好的僵化数据模式，而是采用“自下而上”因子发现策略——通过让 LLM 分析数百个样本案例并自由列出所有可能影响判决的关键因素，项目组得以构建一个更贴合数据本身、而非人类先验知识的模块化数据模式。这个模式包含适用于所有案件的“核心模式”（如自首、赔偿等情节）以及针对不同罪名（如盗窃罪、故意伤害罪）的“扩展模式”（如涉案金额、伤害等级）。<br><b>因子分析</b>阶段没有直接让 AI 预测刑期（那样会产生一个“黑箱”——能给出答案但说不清为什么），而是先把案件信息翻译成计算机擅长处理的数字格式。翻译方法很直观：对于“犯罪类型”这样有多个选项的字段，给每个选项一个独立的开关位——盗窃 = [1,0,0]、抢劫 = [0,1,0]、诈骗 = [0,0,1]（之所以不用 1、2、3，是因为数字大小会让算法误以为“诈骗比盗窃严重 3 倍”，而开关位只表示“是哪一类”，不暗示大小关系）。对于“是否自首”“是否赔偿”这样的是非题，1 表示是、0 表示否。这样每个案件就变成一串数字，然后利用聚类算法在数据中寻找自然的“案件原型”。例如，把故意伤害罪的案件放在一起聚类，算法会依据冲突起因、作案方式、伤害后果等特征，把它们分成若干组内部相似的案件，每一组就是一种典型模式，如“轻微口角引发的徒手斗殴致人轻伤”“有预谋的团伙持械围殴致人重伤”。通过分析定义聚类的关键特征，构建数据驱动的“因子重要性层次模型”。<br>左栏的因子名取自验收记录（LLM 读了 360 个训练样本后发现的 16 个核心因子与三个罪名的扩展因子）；中栏可以自己切换罪名和是非题，看编码怎么变；右栏的聚类散点与坐标为示意，原型名取自原书。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-12 ★★★：从判例里<em>提炼判决经验</em></h2></header>
+  <div class="wac-cols">
+    <div class="wac-c fx fx-up" style="--d:2">
+      <div class="wac-h"><em>1</em><b>自下而上的因子发现</b></div>
+      <p class="wac-p">不预设僵化的 Schema：让 LLM 读数百个样本案例，<b>自由列出</b>可能影响判决的因素</p>
+      <div class="wac-rd"><span>已读样本</span><b class="wac-n">0</b><span>/ 360</span></div>
+      <span class="lbl">核心模式 · 适用于所有案件</span><div class="wac-core"></div>
+      <span class="lbl">扩展模式 · 按罪名</span><div class="wac-ext"></div>
+      <span class="wac-tag">因子名取自验收记录</span>
+    </div>
+    <div class="wac-c fx fx-up" style="--d:3">
+      <div class="wac-h"><em>2</em><b>先翻译成数字</b></div>
+      <p class="wac-p">不直接让 AI 预测刑期——那会是一个能给答案、却<b>说不清为什么</b>的“黑箱”</p>
+      <div class="wac-seg seg"><i class="knob"></i><button data-v="0">盗窃</button><button data-v="1">抢劫</button><button data-v="2">诈骗</button></div>
+      <div class="wac-tg"><button class="tgl"><i></i>是否自首</button><button class="tgl"><i></i>是否赔偿</button></div>
+      <div class="wac-vec"><span class="lbl">这个案件变成一串数字</span><div class="wac-v"></div><div class="wac-vl"><span>盗窃</span><span>抢劫</span><span>诈骗</span><span>自首</span><span>赔偿</span></div></div>
+      <div class="wac-bad"><b>为什么不用 1、2、3？</b><div class="wac-d"><span>编号</span><i style="--w:50%"></i><em>盗窃↔抢劫 = 1</em></div><div class="wac-d"><span>编号</span><i style="--w:100%"></i><em>盗窃↔诈骗 = 2</em></div><p>数字大小会让算法误以为“诈骗比盗窃严重 3 倍”；开关位只表示“是哪一类”，任意两类距离都相同</p></div>
+    </div>
+    <div class="wac-c fx fx-up" style="--d:4">
+      <div class="wac-h"><em>3</em><b>聚类找“案件原型”</b><span class="c3-shi">示意</span></div>
+      <p class="wac-p">把故意伤害罪的案件放在一起，按冲突起因、作案方式、伤害后果分成若干组内部相似的案件</p>
+      <svg class="wac-sc" viewBox="0 0 420 300"></svg>
+      <div class="wac-it">第 <b>0</b> 轮迭代</div>
+      <p class="wac-p">分析<b>定义聚类的关键特征</b> → 数据驱动的“因子重要性层次模型”</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「从数据集中提取深度知识：从信息检索到知识发现」· 实验 3-12</div>
+</section>
+<style>
+.wac-cols{display:grid;grid-template-columns:1.08fr 1fr 1fr;gap:18px;flex:1;min-height:0}
+.wac-c{display:flex;flex-direction:column;gap:9px;padding:14px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);min-height:0}
+.wac-h{display:flex;align-items:center;gap:10px}
+.wac-h em{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font:800 16px var(--num);font-style:normal;color:#06101f;background:var(--acc)}
+.wac-h b{font-size:19px}
+.wac-h .c3-shi{margin-left:auto}
+.wac-p{font-size:15px;line-height:1.6;color:var(--text2)}
+.wac-p b{color:var(--text)}
+.wac-rd{display:flex;align-items:baseline;gap:6px;font-size:15px;color:var(--text3)}
+.wac-rd b{font:800 26px var(--num);color:var(--acc)}
+.wac-core,.wac-ext{display:flex;flex-wrap:wrap;gap:5px}
+.wac-core span,.wac-ext span{padding:2px 9px;border-radius:999px;font-size:15px;line-height:1.5;color:var(--text2);border:1px solid var(--line2);opacity:0;transition:opacity .3s}
+.wac-core span.on,.wac-ext span.on{opacity:1}
+.wac-core span.m{color:#6ee7b7;border-color:rgba(52,211,153,.45)}
+.wac-core span.a{color:#fda4af;border-color:rgba(251,113,133,.45)}
+.wac-ext span em{font-style:normal;font-weight:700;color:var(--acc);margin-right:4px}
+.wac-tag{margin-top:auto;align-self:flex-start;font-size:15px;color:var(--env)}
+.wac-seg{align-self:flex-start}
+.wac-seg button{padding:7px 18px;font-size:17px}
+.wac-tg{display:flex;gap:8px;flex-wrap:wrap}
+.wac-tg .tgl{font-size:16px}
+.wac-vec{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;background:rgba(5,9,22,.6);border:1px solid var(--line)}
+.wac-v,.wac-vl{display:grid;grid-template-columns:repeat(3,1fr) 12px repeat(2,1fr);gap:6px;align-items:center}
+.wac-v i{display:grid;place-items:center;height:44px;border-radius:10px;font:800 24px var(--num);font-style:normal;color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+.wac-v i.on{color:#06101f;background:var(--acc);border-color:var(--acc)}
+.wac-v s{text-decoration:none;text-align:center;color:var(--text3)}
+.wac-vl span{text-align:center;font-size:15px;color:var(--text3)}
+.wac-vl span:nth-child(4){grid-column:5}
+.wac-bad{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;border:1px solid rgba(251,113,133,.45);background:rgba(251,113,133,.05)}
+.wac-bad b{font-size:16px;color:#fda4af}
+.wac-d{display:grid;grid-template-columns:40px 1fr 130px;gap:8px;align-items:center;font-size:15px;color:var(--text3)}
+.wac-d i{height:10px;width:var(--w);border-radius:999px;background:#fb7185}
+.wac-d em{font-style:normal;color:var(--text2)}
+.wac-bad p{font-size:15px;line-height:1.55;color:var(--text2)}
+.wac-sc{width:100%;flex:1;min-height:0}
+.wac-pt{transition:fill .5s;fill:#64748b}
+.wac-ce{transition:transform .8s var(--ease)}
+.wac-ce path{stroke:#fff;stroke-width:2}
+.wac-lb{font-size:15px;font-weight:700;opacity:0;transition:opacity .5s}
+.wac-sc.done .wac-lb{opacity:1}
+.wac-it{font-size:15px;color:var(--text3)}
+.wac-it b{font:800 20px var(--num);color:var(--acc)}
+</style>
+<script>
+HOOKS['c03-exp312'] = {
+  CORE: [['自首', 'm'], ['如实供述', 'm'], ['赔偿被害人损失', 'm'], ['被害人谅解', 'm'], ['共同犯罪', ''], ['前科情况', 'a'], ['到案方式', ''], ['退赃情况', 'm'], ['犯罪次数', 'a'], ['犯罪金额', 'a'], ['认罪态度', 'm'], ['初犯', 'm'], ['累犯', 'a'], ['犯罪形态', ''], ['赃款赃物处理情况', ''], ['被害人数量', 'a']],
+  EXT: [['盗窃罪', 12, '盗窃数额 · 入户盗窃 · 盗窃方式 · 盗窃工具……'], ['故意伤害罪', 12, '损伤程度 · 伤害工具 · 犯罪起因 · 互殴情节……'], ['诈骗罪', 11, '诈骗数额 · 诈骗手段 · 诈骗对象 · 赃款用途……']],
+  K: ['#f472b6', '#38bdf8', '#fbbf24'],
+  init(s) {
+    s.querySelector('.wac-core').innerHTML = this.CORE.map(([t, c]) => `<span class="${c}">${t}</span>`).join('');
+    s.querySelector('.wac-ext').innerHTML = this.EXT.map(([t, n, d]) => `<span><em>${t} ${n}</em>${d}</span>`).join('');
+    this.set = U.seg(s.querySelector('.wac-seg'), (v) => { this.auto = false; this.ch = +v; this.vec(s); });
+    this.tg = [...s.querySelectorAll('.wac-tg .tgl')];
+    this.tg.forEach((b) => b.addEventListener('click', () => { this.auto = false; b.classList.toggle('on'); this.vec(s); }));
+    // 示意散点：三团故意伤害案件
+    const r = U.rand(7), g = () => { let u = 0; for (let i = 0; i < 4; i++) u += r(); return (u - 2) / 2; };
+    const B = [[118, 168, 34, 26], [306, 86, 26, 16], [300, 228, 30, 18]];
+    this.P = B.flatMap(([x, y, sd, n]) => Array.from({ length: n }, () => [Math.max(12, Math.min(408, x + g() * sd * 1.6)), Math.max(12, Math.min(288, y + g() * sd * 1.6))]));
+    let h = this.P.map(([x, y], i) => `<circle class="wac-pt" r="5" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}"/>`).join('');
+    h += this.K.map((c) => `<g class="wac-ce"><path d="M-9 0 L9 0 M0 -9 L0 9" style="stroke:${c};stroke-width:4"/><circle r="6" fill="${c}" stroke="#fff" stroke-width="2"/></g>`).join('');
+    h += '<text class="wac-lb" x="18" y="24" fill="#f472b6">轻微口角引发的徒手斗殴致人轻伤</text><text class="wac-lb" x="402" y="34" text-anchor="end" fill="#38bdf8">有预谋的团伙持械围殴致人重伤</text><text class="wac-lb" x="402" y="292" text-anchor="end" fill="#fbbf24">……</text>';
+    s.querySelector('.wac-sc').innerHTML = h;
+  },
+  vec(s) {
+    this.set(String(this.ch));
+    const bits = [0, 1, 2].map((i) => +(i === this.ch)).concat(this.tg.map((b) => +b.classList.contains('on')));
+    s.querySelector('.wac-v').innerHTML = bits.slice(0, 3).map((b) => `<i class="${b ? 'on' : ''}">${b}</i>`).join('') + '<s>|</s>' + bits.slice(3).map((b) => `<i class="${b ? 'on' : ''}">${b}</i>`).join('');
+  },
+  async km(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const sv = s.querySelector('.wac-sc'), pts = [...sv.querySelectorAll('.wac-pt')], ce = [...sv.querySelectorAll('.wac-ce')], it = s.querySelector('.wac-it b');
+    while (ok()) {
+      sv.classList.remove('done'); pts.forEach((p) => (p.style.fill = '#64748b'));
+      let C = [[60, 60], [200, 270], [380, 150]];
+      const put = () => ce.forEach((g, k) => (g.style.transform = `translate(${C[k][0]}px,${C[k][1]}px)`));
+      put(); it.textContent = '0';
+      await U.wait(ctx, 900); if (!ok()) return;
+      for (let n = 1; n <= 5; n++) {
+        const A = this.P.map(([x, y]) => { let b = 0, bd = 1e9; C.forEach(([cx, cy], k) => { const d = (x - cx) ** 2 + (y - cy) ** 2; if (d < bd) { bd = d; b = k; } }); return b; });
+        pts.forEach((p, i) => (p.style.fill = this.K[A[i]]));
+        it.textContent = String(n);
+        await U.wait(ctx, 700); if (!ok()) return;
+        C = C.map((c, k) => { const m = this.P.filter((_, i) => A[i] === k); return m.length ? [m.reduce((a, p) => a + p[0], 0) / m.length, m.reduce((a, p) => a + p[1], 0) / m.length] : c; });
+        put();
+        await U.wait(ctx, 800); if (!ok()) return;
+      }
+      sv.classList.add('done');
+      await U.wait(ctx, 3600); if (!ok()) return;
+    }
+  },
+  async read(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const n = s.querySelector('.wac-n'), cs = [...s.querySelectorAll('.wac-core span')], es = [...s.querySelectorAll('.wac-ext span')];
+    cs.concat(es).forEach((x) => x.classList.remove('on'));
+    U.count(n, 360, { dur: 2600, ctx });
+    for (const x of cs.concat(es)) { await U.wait(ctx, 170); if (!ok()) return; x.classList.add('on'); }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true; this.ch = 0; this.tg.forEach((b) => b.classList.remove('on')); this.vec(s);
+    this.read(s); this.km(s);
+    const seq = [[1, 0, 0], [1, 1, 0], [2, 1, 1], [2, 0, 1], [0, 0, 0]]; let k = 0;
+    ctx.every(() => { if (!this.auto) return; const [c, a, b] = seq[k++ % seq.length]; this.ch = c; this.tg[0].classList.toggle('on', !!a); this.tg[1].classList.toggle('on', !!b); this.vec(s); }, 2400);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.wac-n').textContent = '0'; },
+};
+</script>
+
+<section class="slide" id="c03-exp312b" data-part="10" data-dur="26000" data-title="实验 3-12：对话式信息收集与验收记录" data-notes="最终，该“因子重要性层次模型”成为 Agent <b>对话式信息收集</b>的核心驱动力。当用户描述案情时，Agent 利用该模型智能地、按重要性顺序向用户提出引导性问题补全所有关键判决因素。信息收集完毕后，Agent 在知识库中检索最相似的案件原型，基于该原型的统计数据（如典型刑期范围）提供数据驱动的、有充分判例支持的分析和解释。这个实验说明了一件事：<b>Agent 不一定要把知识库当成一个只能检索的静态仓库——它可以先把数据“读懂”，提炼出结构化的决策逻辑，再基于这个逻辑来回答问题。</b><br>左侧的对话为示意：问题取自验收记录里自动发现的 Schema，按重要性模型的得分排序；回答取自一条真实的留出案件（被告人持撬棍打伤对方右臂，轻伤二级，事后主动投案自首、全额赔偿并取得谅解，实际判刑 12 个月）；原型匹配与建议是验收记录原文：匹配到“故意伤害罪-prototype-1”（100 个训练案件，刑期中位数 8 个月，四分位区间 6–12 个月），建议里主动提醒自首、全额赔偿、谅解等从轻情节没有进入原型的定义特征，并附免责声明。<br>右侧是验收记录（2026-07-30）：CAIL2018 官方数据，三个罪名各抽 120 个训练、20 个留出案件；LLM 自下而上发现 16 个核心因子，扩展因子盗窃罪 12、故意伤害罪 12、诈骗罪 11；KMeans 的 k 按轮廓系数在 2–5 之间选，盗窃罪 k = 5（0.061）、故意伤害罪 k = 4（0.217）、诈骗罪 k = 2（0.143），共 11 个原型。12 条留出建议由评委按 1–4 分打分，均值 3.75、3.58、3.75、3.58。需要如实说明：轮廓系数都很低，聚类结构较弱；11 个原型里有 4 个只含 1–2 个案件（例如由“盗窃工具 = 筷子”这一罕见取值定义的原型），重要性得分排在最前面的几项也来自这些离群原型；12 条留出案件里只有 5 条的实际刑期落在所匹配原型的四分位区间内；提取也会出错，这条案情写着“持撬棍”，抽取结果的伤害工具却是空值；还有一条建议的四项分都是 1，评语却是正面的，与实验 3-8 的模板回显问题相同。这些都说明原型统计只能作为有不确定性的参考，原书的思考题 8 也讨论了数据驱动规则的这些局限。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">对话式信息收集：<em>先把数据读懂</em>，再回答</h2></header>
+  <div class="wad-body">
+    <div class="wad-l panel fx fx-left" style="--d:2">
+      <div class="wad-h"><b>按重要性顺序提问</b><span class="c3-shi">对话示意 · 问题与原型为验收记录</span></div>
+      <div class="wad-chat"></div>
+      <div class="wad-m"><div class="wad-mh"><b>匹配原型：故意伤害罪-prototype-1</b><span>100 个训练案件 · 匹配距离 0.155</span></div><div class="wad-iqr"><i class="wad-ax"></i><i class="wad-box"></i><i class="wad-med"></i><i class="wad-act"></i><span class="wad-t0">3</span><span class="wad-t1">中位数 8 个月 · 四分位 6–12</span><span class="wad-t2">36</span><span class="wad-ta">实际 12 个月</span></div>
+        <p class="wad-adv">“……需注意，案件中<b>自首、全额赔偿、被害人谅解、认罪认罚等从轻情节未被纳入原型定义特征</b>，可能导致实际刑期与统计区间存在差异，不确定性较高。【免责声明】本结果仅用于数据分析教学，不构成法律意见或量刑承诺。”</p></div>
+    </div>
+    <div class="wad-r c3-data fx fx-right" style="--d:3">
+      <div class="c3-data-h"><svg class="ic"><use href="#i-clipboard"/></svg>验收记录 · CAIL2018 · 360 训练 / 60 留出</div>
+      <div class="wad-kv"><span>Schema</span><b>16 个核心因子 · 扩展：盗窃 12 · 伤害 12 · 诈骗 11</b></div>
+      <div class="wad-kv"><span>聚类</span><b>KMeans，k 按轮廓系数选：盗窃 5（0.061）· 伤害 4（0.217）· 诈骗 2（0.143）→ 11 个原型</b></div>
+      <div class="wad-pt"></div>
+      <div class="wad-js"><span>留出建议 · 评委 1–4 分</span><div><em>3.75</em>原型依据</div><div><em>3.58</em>数字忠实</div><div><em>3.75</em>不确定性提示</div><div><em>3.58</em>对留出案件有用</div></div>
+      <div class="wad-cv"><b>如实说明</b><span>轮廓系数都很低，聚类结构较弱；4 个原型只有 1–2 个案件（如“盗窃工具 = 筷子”），重要性排在最前的几项也来自它们</span><span>12 条留出案件只有 5 条的实际刑期落在所匹配原型的四分位区间内</span><span>提取会出错：案情写着“持撬棍”，抽取的伤害工具却是空值；另有一条建议四项 1 分、评语却是正面的</span></div>
+      <div class="c3-data-s">structured-knowledge-extraction · doubao-seed-1-6-250615 · 评委 moonshot-v1-32k · seed 37 · 2026-07-30</div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「从数据集中提取深度知识：从信息检索到知识发现」· 实验 3-12 · 配套仓库验收记录</div>
+</section>
+<style>
+.wad-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.wad-l{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.wad-h{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.wad-h b{font-size:19px}
+.wad-chat{display:flex;flex-direction:column;gap:5px}
+.wad-qa{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:6px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);animation:upIn .4s var(--ease) both}
+.wad-qa span{font-size:16px;color:var(--text2)}
+.wad-qa span em{font:700 15px var(--num);font-style:normal;color:var(--acc);margin-right:8px}
+.wad-qa b{font-size:16px;color:#fde68a}
+.wad-m{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.06);opacity:0;transition:opacity .5s}
+.wad-m.on{opacity:1}
+.wad-mh{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.wad-mh b{font:700 17px var(--mono);color:#6ee7b7}
+.wad-mh span{font-size:15px;color:var(--text3)}
+.wad-iqr{position:relative;height:58px}
+.wad-iqr i{position:absolute;display:block}
+.wad-ax{left:0;right:0;top:20px;height:2px;background:rgba(255,255,255,.2)}
+.wad-box{left:9.1%;width:18.2%;top:10px;height:22px;border-radius:6px;background:rgba(52,211,153,.3);border:1px solid #34d399}
+.wad-med{left:15.2%;top:6px;width:3px;height:30px;background:#fff}
+.wad-act{left:27.3%;top:2px;width:3px;height:38px;background:#fbbf24;box-shadow:0 0 10px #fbbf24}
+.wad-iqr span{position:absolute;top:38px;font-size:15px;color:var(--text3);white-space:nowrap}
+.wad-t0{left:0}.wad-t2{right:0}
+.wad-t1{left:9%;color:#a7f3d0!important}
+.wad-ta{left:29%;top:-2px!important;color:#fcd34d!important}
+.wad-adv{font-size:15px;line-height:1.6;color:var(--text2)}
+.wad-adv b{color:var(--text)}
+.wad-r{display:flex;flex-direction:column;gap:10px}
+.wad-kv{display:grid;grid-template-columns:62px 1fr;gap:10px;align-items:baseline}
+.wad-kv span{font-size:15px;color:var(--text3)}
+.wad-kv b{font-size:15px;font-weight:600;line-height:1.55}
+.wad-pt{display:flex;flex-wrap:wrap;gap:5px}
+.wad-pt span{padding:3px 9px;border-radius:8px;font-size:15px;color:var(--text2);border:1px solid var(--line2);animation:upIn .35s var(--ease) both;animation-delay:calc(var(--i) * 70ms)}
+.wad-pt span b{color:var(--text)}
+.wad-pt span.sm{color:#fda4af;border-color:rgba(251,113,133,.45);border-style:dashed}
+.wad-js{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wad-js>span{grid-column:1/-1;font-size:15px;color:var(--text3)}
+.wad-js div{display:flex;flex-direction:column;align-items:center;padding:6px;border-radius:10px;border:1px solid var(--line);font-size:15px;color:var(--text2)}
+.wad-js em{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.wad-cv{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.05)}
+.wad-cv b{font-size:16px;color:#fcd34d}
+.wad-cv span{font-size:15px;line-height:1.5;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-exp312b'] = {
+  // 问题来自验收记录发现的 Schema；顺序参照重要性模型得分；回答取自留出案件 cail2018-0317ae92dc821b04 的案情
+  QA: [['伤害后果是什么？', '轻伤', 0.96], ['被害人损伤程度是什么？', '轻伤二级', 0.77], ['犯罪起因是什么？', '交接货车时因扣工资起争执', 0.51], ['使用的伤害工具是什么？', '撬棍', 0.16], ['赔偿情况如何？', '全额赔偿', 0.18], ['被害人是否对被告人表示谅解？', '是', 0.14], ['被告人是否具有自首情节？', '主动投案自首', 0.11]],
+  PT: [['伤害-1', 100, '8 [6–12]'], ['伤害-0', 18, '36 [24–38]'], ['伤害-2', 1, '8'], ['伤害-3', 1, '18'], ['盗窃-0', 58, '8 [4–13]'], ['盗窃-4', 53, '7 [6–9]'], ['盗窃-2', 6, '7 [7–10]'], ['盗窃-3', 2, '7.5'], ['盗窃-1', 1, '4'], ['诈骗-1', 98, '18 [8–38]'], ['诈骗-0', 22, '45 [11–59]']],
+  init(s) {
+    s.querySelector('.wad-pt').innerHTML = this.PT.map(([t, n, m], i) => `<span class="${n <= 2 ? 'sm' : ''}" style="--i:${i}"><b>${t}</b> · ${n} 例 · ${m} 月</span>`).join('');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const ch = s.querySelector('.wad-chat'), m = s.querySelector('.wad-m');
+    while (ok()) {
+      ch.innerHTML = ''; m.classList.remove('on');
+      for (let i = 0; i < this.QA.length; i++) {
+        await U.wait(ctx, 750); if (!ok()) return;
+        const [q, a, sc] = this.QA[i];
+        ch.insertAdjacentHTML('beforeend', `<div class="wad-qa"><span><em>${sc.toFixed(2)}</em>${q}</span><b>${a}</b></div>`);
+      }
+      await U.wait(ctx, 900); if (!ok()) return;
+      m.classList.add('on');
+      await U.wait(ctx, 7000); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 前沿探索：多模态记忆 ================= -->
+<section class="slide" id="c03-mm" data-part="10" data-trans="flip" data-dur="24000" data-title="前沿探索：多模态记忆" data-notes="一张脸的模样、一个人的嗓音等很难用文字描述，本章前面的文本记忆机制是无法存储的。如何跨越上下文的边界，存储此类多模态记忆，仍处于学术界前沿。<br><b>思路一：存储原始多模态数据和文本描述。</b>例如，Agent 看到一张没有见过的人脸后，可以调用工具，剪切出图片中的人脸部分，然后以图片格式把人脸保存下来，再用文本加以描述和索引，例如在 Markdown 中引用这张图片。在检索时，如果 Agent 看到一张人脸并需要辨认这是谁，可以先通过文本描述检索到相关图片，再读取原始图片，判断是否为同一个人。<br><b>思路二：把多模态信息的嵌入压缩存储到上下文中。</b>思路一虽然用文本描述多模态信息，却无法彻底解决有些多模态信息难以用文本表达的问题。思路二是当 Agent 看到一张没有见过的人脸后，可以调用工具，剪切出图片中的人脸部分，然后计算其嵌入，并将嵌入保存到上下文中。上下文中维护一个区域，保存多个多模态信息（如多张人脸、多个人的声纹）各自的嵌入。这样在检索时，Agent 可以始终在上下文中看到所有多模态信息，并利用注意力机制找到最相关的信息。相比存储文本描述，<b>存储嵌入的方法对每张人脸、每个人的声纹一般只需存储一个嵌入，在上下文中只占用 1 个 token 的空间，效率很高</b>。一段 1000 token 的上下文区域，就足以容纳 1000 张人脸。<br><b>思路三：把多模态信息的嵌入压缩存储到模型参数中。</b>一个自然的念头，是干脆把需要存储的多模态信息写进模型权重，比如为每个用户训练一个专属的 LoRA。但这样训练出的 fact-LoRA，直接提问时几乎能完美复述，可一旦需要在这些事实之上做<b>间接推理</b>便告失灵，因为冻结的骨干模型从未学过如何去“查阅”这样一个临时挂载上来的适配器。换句话说，把事实存进去是一回事，让模型知道何时该取用它，则是另一回事。User as Engram 针对的正是这一点：它并不训练 LoRA，而是把多模态信息的嵌入精准地写入 Engram 模型中一个空闲的<b>哈希 N-gram 槽位</b>。这类模型在预训练阶段便已学会通过哈希查表来调取记忆，并由一个能感知上下文的门控机制决定何时调取；于是新写入的事实会自然而然地在该被想起的时候被想起。相比思路二，这种存储到 engram 的方法扩展性更强，但需要预训练模型本身支持 Engram，并且查准率可能不如思路二。（设计与评测见 Li, Bojie. User as Engram: Internalizing Per-User Memory as Local Parametric Edits. arXiv:2606.19172, 2026。）<br>右上角切换三种思路；演示中的人物、文件名与问题均为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">前沿探索：<em>多模态记忆</em></h2></div>
+    <div class="wae-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">思路一 · 原图 + 文本</button><button data-v="1">思路二 · 嵌入进上下文</button><button data-v="2">思路三 · 嵌入进参数</button></div></header>
+  <p class="lead fx fx-up wae-lead" style="--d:2">一张脸的模样、一个人的嗓音很难用文字描述——如何跨越上下文的边界存储多模态记忆，仍处于学术界前沿</p>
+  <div class="wae-body">
+    <div class="wae-st panel fx fx-left" style="--d:3"><div class="wae-sh"><b class="wae-t"></b><span class="c3-shi">示意</span></div><div class="wae-v"></div></div>
+    <div class="wae-r fx fx-right" style="--d:4">
+      <div class="wae-k" data-k="0"><b>思路一 · 原始数据 + 文本描述</b><p>剪出人脸存成图片，在 Markdown 里引用并描述；检索时先按描述找到图片，再读原图判断是不是同一个人</p><span>局限：有些多模态信息难以用文本表达</span></div>
+      <div class="wae-k" data-k="1"><b>思路二 · 嵌入存进上下文</b><p>在上下文里维护一个区域，每张人脸、每个声纹<b>一个嵌入、只占 1 个 token</b>；注意力直接找最相关的那一个</p><span>1000 token 的区域 ≈ 1000 张人脸</span></div>
+      <div class="wae-k" data-k="2"><b>思路三 · 嵌入存进模型参数</b><p>fact-LoRA 直接问能复述，<b>间接推理</b>就失灵；User as Engram 把嵌入写进空闲的<b>哈希 N-gram 槽位</b>，由感知上下文的门控决定何时调取</p><span>比思路二扩展性更强；但需要模型本身支持 Engram，查准率可能不如思路二</span></div>
+      <p class="wae-ref">Li, Bojie. <i>User as Engram: Internalizing Per-User Memory as Local Parametric Edits.</i> arXiv:2606.19172, 2026</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「前沿探索：多模态记忆」· 思路一 / 二 / 三 · User as Engram</div>
+</section>
+<style>
+#c03-mm .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-mm .seg button{padding:8px 14px;font-size:16px}
+.wae-lead{font-size:21px;margin:-14px 0 16px}
+.wae-body{display:grid;grid-template-columns:1.25fr 1fr;gap:24px;flex:1;min-height:0}
+.wae-st{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.wae-sh{display:flex;align-items:center;justify-content:space-between}
+.wae-sh b{font-size:20px}
+.wae-v{position:relative;flex:1;min-height:0}
+.wae-fc{width:88px;height:104px;flex:none}
+.wae-row{display:flex;align-items:center;gap:14px}
+.wae-ar{font-size:22px;color:var(--text3)}
+.wae-box{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:12px;border:1px solid var(--line2);background:rgba(5,9,22,.6);font-size:16px;color:var(--text2);animation:upIn .45s var(--ease) both;animation-delay:var(--dl,0s)}
+.wae-box code{font:15px/1.55 var(--mono);color:#fde68a}
+.wae-box b{color:var(--text)}
+.wae-box.ok{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.07)}
+.wae-box.ok b{color:#6ee7b7}
+.wae-box.bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.07)}
+.wae-box.bad b{color:#fda4af}
+.wae-col{display:flex;flex-direction:column;gap:10px}
+.wae-grid{display:grid;grid-template-columns:repeat(25,1fr);gap:3px;padding:10px;border-radius:12px;border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 5%,transparent)}
+.wae-grid i{aspect-ratio:1;border-radius:3px;background:rgba(255,255,255,.07);transition:background .3s,box-shadow .3s}
+.wae-grid i.f{background:rgba(167,139,250,.55)}
+.wae-grid i.n{background:#fbbf24;box-shadow:0 0 8px #fbbf24}
+.wae-grid i.hit{background:#34d399;box-shadow:0 0 10px #34d399}
+.wae-gl{display:flex;justify-content:space-between;font-size:15px;color:var(--text3)}
+.wae-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.wae-two>div{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.6)}
+.wae-two h4{margin:0;font-size:17px}
+.wae-slots{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.wae-slots i{height:18px;border-radius:4px;background:rgba(255,255,255,.08);transition:background .4s,box-shadow .4s}
+.wae-slots i.w{background:#a78bfa}
+.wae-slots i.g{background:#34d399;box-shadow:0 0 8px #34d399}
+.wae-r{display:flex;flex-direction:column;gap:12px}
+.wae-k{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .35s,background .35s,opacity .35s;opacity:.6}
+.wae-k b{font-size:18px}
+.wae-k p{font-size:15px;line-height:1.6;color:var(--text2)}
+.wae-k p b{font-size:15px;color:var(--text)}
+.wae-k span{font-size:15px;color:var(--text3)}
+.wae-k.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8))}
+.wae-k.on>b{color:var(--acc)}
+.wae-ref{margin-top:auto;font-size:15px;line-height:1.5;color:var(--text3)}
+</style>
+<script>
+HOOKS['c03-mm'] = {
+  T: ['把人脸剪下来存成图片，用文本描述和索引', '每张人脸一个嵌入，常驻上下文里的一块区域', 'fact-LoRA 与 User as Engram'],
+  face(c) { return `<svg class="wae-fc" viewBox="0 0 88 104"><rect x="1" y="1" width="86" height="102" rx="12" fill="rgba(5,9,22,.7)" stroke="${c}" stroke-width="2" stroke-dasharray="5 4"/><circle cx="44" cy="40" r="20" fill="none" stroke="${c}" stroke-width="3"/><path d="M14 92 C18 70, 70 70, 74 92" fill="none" stroke="${c}" stroke-width="3"/><circle cx="37" cy="38" r="3" fill="${c}"/><circle cx="51" cy="38" r="3" fill="${c}"/></svg>`; },
+  init(s) { this.set = U.seg(s.querySelector('.wae-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  async show(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(String(v));
+    s.querySelector('.wae-t').textContent = this.T[v];
+    s.querySelectorAll('.wae-k').forEach((k) => k.classList.toggle('on', +k.dataset.k === v));
+    const V = s.querySelector('.wae-v');
+    if (v === 0) {
+      V.innerHTML = `<div class="wae-col"><div class="wae-row">${this.face('#fbbf24')}<span class="wae-ar">→</span><div class="wae-box" style="--dl:.3s"><span class="lbl">剪出人脸，存成图片</span><code>memories/faces/2024-11-03-zhang.jpg</code></div></div>
+        <div class="wae-box" style="--dl:.9s"><span class="lbl">在 Markdown 里引用并描述</span><code>![张经理](faces/2024-11-03-zhang.jpg)</code><span>张经理：圆框眼镜、短发；2024-11-03 在客户会议上认识</span></div>
+        <div class="wae-row"><div class="wae-box" style="--dl:1.6s"><span class="lbl">再次见到一张脸 · 需要辨认</span><span>① 按描述检索：<b>“圆框眼镜 短发”</b> → 找到相关图片</span><span>② 读取原图，判断是否为同一个人</span></div>${this.face('#34d399')}</div>
+        <div class="wae-box bad" style="--dl:2.3s"><b>局限</b><span>有些多模态信息难以用文本表达——描述得再细，也写不尽一张脸</span></div></div>`;
+    } else if (v === 1) {
+      V.innerHTML = `<div class="wae-col"><div class="wae-row">${this.face('#fbbf24')}<span class="wae-ar">→</span><div class="wae-box"><span class="lbl">计算嵌入</span><code>[0.12, -0.83, 0.47, …]</code><span>一张人脸 = <b>1 个嵌入 = 1 个 token</b></span></div></div>
+        <div><div class="wae-gl"><span>上下文里的多模态区域 · 200 个槽位（示意）</span><span class="wae-cnt"></span></div><div class="wae-grid">${'<i></i>'.repeat(200)}</div></div>
+        <div class="wae-box ok wae-res" style="opacity:0"><b>注意力直接找到最相关的那一个</b><span>所有人脸始终在上下文里可见；一段 1000 token 的区域就足以容纳 1000 张人脸</span></div></div>`;
+      const cells = [...V.querySelectorAll('.wae-grid i')], cnt = V.querySelector('.wae-cnt'), res = V.querySelector('.wae-res');
+      const r = U.rand(3), filled = new Set(); while (filled.size < 120) filled.add(Math.floor(r() * 200));
+      let n = 0;
+      for (const i of filled) { cells[i].classList.add('f'); n++; if (n % 12 === 0) { cnt.textContent = `已存 ${n} 张`; await U.wait(ctx, 60); if (!ok()) return; } }
+      const nw = [...Array(200).keys()].find((i) => !filled.has(i)); cells[nw].classList.add('n'); cnt.textContent = '新的一张：占 1 个 token';
+      await U.wait(ctx, 1300); if (!ok()) return;
+      const hit = [...filled][37]; cells[hit].classList.add('hit'); cnt.textContent = '辨认一张脸：注意力命中';
+      res.style.transition = 'opacity .5s'; res.style.opacity = 1;
+    } else {
+      V.innerHTML = `<div class="wae-two"><div><h4>fact-LoRA · 为每个用户训练一个 LoRA</h4><div class="wae-box ok" style="--dl:.3s"><span class="lbl">直接提问</span><span>“张经理戴什么眼镜？”</span><b>→ 圆框眼镜（几乎完美复述）</b></div><div class="wae-box bad" style="--dl:1.1s"><span class="lbl">间接推理</span><span>“照片里这个人，上次开会提到过哪家客户？”</span><b>→ 失灵</b></div><p class="cap">冻结的骨干模型从未学过如何去“查阅”临时挂载的适配器：存进去是一回事，知道何时取用是另一回事</p></div>
+        <div><h4>User as Engram · 不训练 LoRA</h4><span class="lbl">写入 Engram 模型中空闲的哈希 N-gram 槽位</span><div class="wae-slots">${'<i></i>'.repeat(32)}</div><div class="wae-box ok wae-g" style="--dl:1.8s"><b>感知上下文的门控决定何时调取</b><span>预训练时已学会哈希查表取记忆：新写入的事实在该被想起的时候被想起</span></div><p class="cap">扩展性比思路二更强；但需要模型本身支持 Engram，查准率可能不如思路二</p></div></div>`;
+      const sl = [...V.querySelectorAll('.wae-slots i')];
+      [3, 11, 17, 26].forEach((i) => sl[i].classList.add('w'));
+      await U.wait(ctx, 1200); if (!ok()) return;
+      sl[21].classList.add('w');
+      await U.wait(ctx, 1200); if (!ok()) return;
+      sl[21].classList.add('g');
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, (this.v + 1) % 3); }, 7500); },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>

@@ -1,0 +1,544 @@
+<!-- ================= PART 05 稀疏与混合检索 ================= -->
+<section class="slide chapter" id="c03-d5" data-part="5" data-title="PART 05 · 稀疏与混合检索" data-notes="检索器的第二条技术路线是稀疏嵌入：根植于传统信息检索，核心是精确的关键词匹配。这一部分从词袋模型和 TF-IDF 讲到 BM25（图3-8），用实验 3-5 从零实现一个 BM25 搜索引擎；再看稠密与稀疏各自的盲区，以及如何把它们组合成“并行检索 → 结果融合 → 神经重排序”的混合检索流水线（图3-9），用表3-3 的三个指标度量检索质量，最后是实验 3-6 的混合检索流水线。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">稀疏与<br>混合检索</h1>
+  <div class="ch-s fx fx-up" style="--d:3">词袋 · TF-IDF · BM25 · RRF 融合 · 跨编码器重排序</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">没有哪种单一检索策略在所有场景下都可靠。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c03-sparse" data-part="5" data-dur="18000" data-title="稀疏嵌入：词袋与 TF-IDF" data-notes="与捕捉语义相似性的稠密嵌入不同，稀疏嵌入（Sparse Embedding）根植于传统信息检索，核心是精确的关键词匹配。它将文档表示为极高维度的向量，绝大多数维度为零，只有与文档中出现的词汇对应的维度具有非零值。理论基石是经典的词袋模型（Bag of Words, BoW）——它把一段文本看作一个“装满词的袋子”，只关心哪些词出现了、出现了几次，完全忽略词序。例如“猫追狗”和“狗追猫”在词袋模型中是完全相同的。在此基础上，又逐步发展出更复杂的词项加权与排序算法。<br>TF-IDF（词频–逆文档频率）的核心直觉是：一个词在当前文档中出现得越多、在整个语料库中越少见，它对检索越重要。假设 100 篇文章中有 60 篇包含“模型”，只有 3 篇包含“蒸馏”，那么“蒸馏”更能区分哪些文章真正与“模型蒸馏”相关。TF-IDF(t, d) = TF(t, d) × IDF(t)，IDF(t) = ln(N / DF(t))。以最朴素的实现为例，原始词频随出现次数线性增长，而且没有校正文档长度：同一个词出现 10 次会得到出现 5 次的两倍词频，长文档也容易仅仅因为字数更多而获得高分——BM25 正是对这两个局限的修正。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">稀疏嵌入：<em>词袋</em>与 <em>TF-IDF</em></h2></header>
+  <div class="w5b-body">
+    <div class="w5b-bow panel fx fx-left" style="--d:2">
+      <div class="w5b-h"><b>词袋模型 Bag of Words</b><span>只关心出现了哪些词、几次，完全忽略词序</span></div>
+      <div class="w5b-two"><div class="w5b-s"><b>猫追狗</b><div class="w5b-v" data-k="0"></div></div><div class="w5b-s"><b>狗追猫</b><div class="w5b-v" data-k="1"></div></div></div>
+      <p class="w5b-eq">两个向量<b>完全相同</b>——词序丢了</p>
+      <div class="w5b-dim"><span class="lbl">极高维度，绝大多数为 0</span><div class="w5b-cells"></div></div>
+    </div>
+    <div class="w5b-tf panel fx fx-right" style="--d:3">
+      <div class="w5b-h"><b>TF-IDF</b><span>在当前文档出现得越多、在语料里越少见，越重要</span></div>
+      <code class="w5b-f">TF-IDF(t, d) = TF(t, d) × IDF(t)　　IDF(t) = ln(N / DF(t))</code>
+      <div class="w5b-ex"><span class="lbl">100 篇文章</span>
+        <div class="w5b-row"><b>模型</b><i><s style="--w:60%"></s></i><span>60 篇含有</span><em>IDF = ln(100/60) ≈ 0.51</em></div>
+        <div class="w5b-row hi"><b>蒸馏</b><i><s style="--w:3%"></s></i><span>3 篇含有</span><em>IDF = ln(100/3) ≈ 3.51</em></div>
+      </div>
+      <div class="w5b-lim"><span class="lbl">朴素实现的两个局限 → BM25 来修正</span><div><b>线性词频</b><span>出现 10 次 = 出现 5 次的两倍</span></div><div><b>没有长度校正</b><span>长文档仅因字数多就得高分</span></div></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「稀疏嵌入：精确匹配的关键词检索」·「从 TF-IDF 到 BM25」</div>
+</section>
+<style>
+.w5b-body{display:grid;grid-template-columns:1fr 1.1fr;gap:24px;flex:1;min-height:0}
+.w5b-bow,.w5b-tf{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.w5b-h b{font-size:20px}
+.w5b-h span{display:block;margin-top:2px;font-size:15px;color:var(--text3)}
+.w5b-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.w5b-s{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w5b-s>b{font-size:26px;text-align:center;letter-spacing:.1em}
+.w5b-v{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.w5b-v span{display:flex;flex-direction:column;align-items:center;padding:6px;border-radius:10px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);font-size:16px;animation:pop .4s var(--spring) both}
+.w5b-v span em{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.w5b-eq{text-align:center;font-size:18px;color:var(--text2)}
+.w5b-eq b{color:var(--warn)}
+.w5b-cells{display:grid;grid-template-columns:repeat(24,1fr);gap:3px;margin-top:6px}
+.w5b-cells i{height:22px;border-radius:4px;background:rgba(255,255,255,.06)}
+.w5b-cells i.nz{background:var(--acc)}
+.w5b-f{font:16px var(--mono);color:#fde68a;padding:10px 12px;border-radius:12px;background:rgba(5,9,22,.7);border:1px solid var(--line)}
+.w5b-ex{display:flex;flex-direction:column;gap:8px}
+.w5b-row{display:grid;grid-template-columns:60px 1fr 90px 210px;gap:10px;align-items:center;font-size:16px;color:var(--text2)}
+.w5b-row b{font-size:19px;color:var(--text)}
+.w5b-row i{height:14px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.w5b-row i s{display:block;height:100%;width:var(--w);border-radius:999px;background:var(--text3)}
+.w5b-row em{font:600 16px var(--num);font-style:normal;color:var(--text)}
+.w5b-row.hi i s{background:var(--acc)}
+.w5b-row.hi em{color:var(--acc)}
+.w5b-lim{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.w5b-lim div{display:grid;grid-template-columns:130px 1fr;gap:10px;align-items:baseline;padding:8px 12px;border-radius:12px;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.05)}
+.w5b-lim b{font-size:17px;color:var(--warn)}
+.w5b-lim span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-sparse'] = {
+  init(s) {
+    const v = [['猫', 1], ['追', 1], ['狗', 1]];
+    s.querySelectorAll('.w5b-v').forEach((h) => (h.innerHTML = v.map(([w, n], i) => `<span style="animation-delay:${i * 120}ms">${w}<em>${n}</em></span>`).join('')));
+    const nz = [3, 9, 17];
+    s.querySelector('.w5b-cells').innerHTML = Array.from({ length: 24 }, (_, i) => `<i class="${nz.includes(i) ? 'nz' : ''}"></i>`).join('');
+  },
+};
+</script>
+
+<section class="slide" id="c03-bm25" data-part="5" data-trans="zoom" data-dur="18000" data-title="BM25：词频饱和与长度归一化" data-notes="BM25 可以看作对朴素 TF-IDF 两个局限的经典修正：它保留 IDF 对稀有词的加权，同时引入词频饱和与长度归一化：Score(Q, D) = Σ IDF_BM25(q_i) · TF(q_i, D)(k1 + 1) / (TF(q_i, D) + k1(1 − b + b·|D|/avgdl))。其中 q_i 是查询中的词，|D| 是文档长度，avgdl 是语料库的平均文档长度。式中的 IDF_BM25 和 TF-IDF 的 IDF 并不是同一个公式：IDF_BM25(t) = ln((N − DF(t) + 0.5) / (DF(t) + 0.5))。直觉没有变，仍然是“词越稀有，权重越高”；分子从“文档总数 N”换成“不含该词的文档数 N − DF(t)”，于是这个比值直接反映“不含该词的文档是含它的文档的多少倍”；分子分母各加 0.5 做平滑，使 DF(t) 取到 0 或 N 这两个极端时公式仍然有定义。代价是当一个词出现在超过半数文档中时，取值会变成负数，因此实现中通常给它设一个下限。<br>如图3-8 所示，k1 控制词频饱和速度，使重复出现的边际贡献逐渐降低；b 控制长度归一化强度，使不同长度的文档更公平地比较：b = 0 不考虑长度，b = 1 完全归一化。因此，一个词出现 10 次通常不会比出现 5 次贡献整整两倍，而相同词频在较长文档中的权重也会更低。图中的例子：“的”的 IDF ≈ 0，“量刑”的 IDF ≈ 5.2——稀有词权重远大于常见词。<br>拖动三个滑块，曲线按公式实时重绘（IDF 取 1）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-8 BM25：<em>词频饱和</em>与<em>长度归一化</em></h2></header>
+  <code class="w5c-f fx fx-up" style="--d:2">Score(Q,D) = Σ IDF(qᵢ) × TF(qᵢ,D)·(k₁+1) / ( TF + k₁·(1 − b + b·|D|/avgdl) )</code>
+  <div class="w5c-body">
+    <div class="w5c-plot panel fx fx-left" style="--d:3">
+      <svg class="w5c-svg" viewBox="0 0 620 360"><line class="w5c-ax" x1="50" y1="320" x2="600" y2="320"/><line class="w5c-ax" x1="50" y1="320" x2="50" y2="20"/><text class="w5c-at" x="600" y="345" text-anchor="end">词频 TF →</text><text class="w5c-at" x="56" y="30">单词贡献</text><path class="w5c-tf"/><path class="w5c-bm"/><g class="w5c-tk"></g></svg>
+      <div class="w5c-lg"><span class="a">朴素 TF（线性）</span><span class="b">BM25（饱和）</span><span class="w5c-r"></span></div>
+    </div>
+    <div class="w5c-r fx fx-right" style="--d:4">
+      <div class="w5c-sl"><span>k₁ 饱和速度</span><input class="rng" data-k="k1" type="range" min="0.2" max="3" step="0.1" value="1.5"><em data-v="k1">1.5</em></div>
+      <div class="w5c-sl"><span>b 长度归一化</span><input class="rng" data-k="b" type="range" min="0" max="1" step="0.05" value="0.75"><em data-v="b">0.75</em></div>
+      <div class="w5c-sl"><span>|D| / avgdl</span><input class="rng" data-k="len" type="range" min="0.25" max="4" step="0.05" value="1"><em data-v="len">1.00</em></div>
+      <div class="w5c-cards"><div><b>词频饱和（TF）</b><span>出现次数翻倍，得分不会线性翻倍</span></div><div><b>逆文档频率（IDF）</b><span>“的” → IDF ≈ 0 · “量刑” → IDF ≈ 5.2</span></div><div><b>长度归一化（b）</b><span>b=0 不考虑长度 · b=1 完全归一化</span></div></div>
+      <div class="w5c-idf"><b>IDF_BM25 = ln((N − DF + 0.5) / (DF + 0.5))</b><span>分子是“不含该词的文档数”；+0.5 做平滑；DF &gt; N/2 时会变负，实现中设下限</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「从 TF-IDF 到 BM25」· 图3-8 BM25 评分机制</div>
+</section>
+<style>
+.w5c-f{display:block;padding:10px 16px;border-radius:12px;font:18px var(--mono);color:#fde68a;background:rgba(5,9,22,.7);border:1px solid var(--line);text-align:center}
+.w5c-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;margin-top:14px;flex:1;min-height:0}
+.w5c-plot{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.w5c-svg{width:100%;flex:1;min-height:0}
+.w5c-ax{stroke:var(--line2);stroke-width:1.5}
+.w5c-at{font-size:15px;fill:var(--text3)}
+.w5c-tf{fill:none;stroke:#94a3c4;stroke-width:3;stroke-dasharray:7 6}
+.w5c-bm{fill:none;stroke:var(--acc);stroke-width:4;stroke-linecap:round}
+.w5c-tk text{font:15px var(--num);fill:var(--text3);text-anchor:middle}
+.w5c-lg{display:flex;gap:18px;align-items:center;font-size:16px;color:var(--text2)}
+.w5c-lg span.a::before,.w5c-lg span.b::before{content:"";display:inline-block;width:18px;height:4px;margin-right:6px;vertical-align:middle;border-radius:2px}
+.w5c-lg span.a::before{background:#94a3c4}.w5c-lg span.b::before{background:var(--acc)}
+.w5c-r{display:flex;flex-direction:column;gap:12px}
+.w5c-lg .w5c-r{margin-left:auto;font:600 16px var(--num);color:var(--text)}
+.w5c-sl{display:grid;grid-template-columns:130px 1fr 54px;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+.w5c-sl em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w5c-cards{display:flex;flex-direction:column;gap:8px}
+.w5c-cards div{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w5c-cards b{font-size:17px;color:var(--acc)}
+.w5c-cards span{font-size:15px;color:var(--text2)}
+.w5c-idf{margin-top:auto;display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:12px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.05)}
+.w5c-idf b{font:600 15px var(--mono);color:#fde68a}
+.w5c-idf span{font-size:15px;line-height:1.5;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-bm25'] = {
+  init(s) {
+    this.p = { k1: 1.5, b: 0.75, len: 1 };
+    s.querySelectorAll('.w5c-sl input').forEach((r) => r.addEventListener('input', () => { this.auto = false; this.p[r.dataset.k] = +r.value; this.draw(s); }));
+    s.querySelector('.w5c-tk').innerHTML = [0, 2, 4, 6, 8, 10].map((t) => `<text x="${50 + t * 55}" y="340">${t}</text>`).join('');
+    this.draw(s);
+  },
+  draw(s) {
+    const { k1, b, len } = this.p, X = (t) => 50 + t * 55, Y = (v) => 320 - v * 50;
+    const bm = (t) => (t * (k1 + 1)) / (t + k1 * (1 - b + b * len));
+    const P = [], T = [];
+    for (let t = 0; t <= 10; t += 0.25) { P.push(`${X(t).toFixed(1)} ${Y(bm(t)).toFixed(1)}`); T.push(`${X(t).toFixed(1)} ${Math.max(20, Y(t * 0.55)).toFixed(1)}`); }
+    s.querySelector('.w5c-bm').setAttribute('d', 'M' + P.join(' L'));
+    s.querySelector('.w5c-tf').setAttribute('d', 'M' + T.join(' L'));
+    s.querySelectorAll('.w5c-sl input').forEach((r) => { r.value = this.p[r.dataset.k]; r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min)) * 100 + '%'); });
+    s.querySelector('[data-v="k1"]').textContent = k1.toFixed(1); s.querySelector('[data-v="b"]').textContent = b.toFixed(2); s.querySelector('[data-v="len"]').textContent = len.toFixed(2);
+    s.querySelector('.w5c-lg .w5c-r').textContent = `TF=10 / TF=5 的贡献比：${(bm(10) / bm(5)).toFixed(2)}×`;
+  },
+  enter(s, ctx) {
+    this.auto = true; let t = 0;
+    ctx.every(() => { if (!this.auto) return; t += 0.05; this.p.k1 = +(1.6 + Math.sin(t) * 1.2).toFixed(1); this.p.len = +(1.6 + Math.sin(t * 0.7 + 1) * 1.3).toFixed(2); this.draw(s); }, 120);
+  },
+};
+</script>
+
+<section class="slide" id="c03-exp35" data-part="5" data-trans="flip" data-dur="22000" data-title="实验 3-5 ★★：从零实现 BM25 搜索引擎" data-notes="<b>实验 3-5 ★★：探究稀疏检索：从零实现 BM25 搜索引擎。</b>sparse-embedding 项目以教学为目的，从零实现了基于 BM25 算法的稀疏向量搜索引擎，核心价值在于完整展示内部过程：文本预处理（分词，并去除“的”“了”这类几乎不携带检索价值的停用词）、构建倒排索引、计算 TF 和 IDF 值。所谓倒排索引（Inverted Index），就是一个从词到文档的反向映射表——普通索引是“给定文档，列出它包含的词”，倒排索引则反过来，“给定一个词，立刻找到所有包含它的文档”，好比一本书后面的术语索引页。<br>原书给出了一段查询“模型蒸馏”的运行日志（N = 10、k1 = 1.5、b = 0.75、avgdl = 250）：“模型”命中 3 篇（IDF = 0.76），“蒸馏”命中 2 篇（IDF = 1.22，更稀有）；doc_1 中“蒸馏”的词频（3）低于“模型”（5），但贡献 2.15 反而超过 1.52——这正是 BM25 的核心逻辑；doc_1 同时命中两个词、总分 3.67 遥遥领先，最终排序 doc_1 (3.67) > doc_7 (1.68) > doc_5 (1.22) > doc_3 (0.82)。实验清楚地揭示了稀疏检索的优缺点：精确的关键词匹配在技术代码、人名等查询上表现极佳，却读不懂同义表达。<br>右侧引擎移植自配套仓库的 bm25_engine.py，在验收语料（10 篇英文文档）上实时计算，可以调 k1、b 并切换查询。验收记录（2026-07-29）：手算校验与引擎结果误差为 0；精确关键词查询 recall@5 = 1.0、MRR = 1.0；只靠同义词的“cat”查询 recall@5 = 0——文档里写的是 kitten 和 feline。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-5 ★★：从零实现 <em>BM25 搜索引擎</em></h2></header>
+  <div class="w5d-body">
+    <div class="w5d-log panel fx fx-left" style="--d:2">
+      <div class="w5d-h"><b>原书运行日志 · 查询“模型蒸馏”</b><span>N=10 · k1=1.5 · b=0.75 · avgdl=250</span></div>
+      <pre class="w5d-pre"></pre>
+      <p class="w5d-k">doc_1 中“蒸馏”TF=3 低于“模型”TF=5，但<b>更稀有、IDF 更高</b>，贡献 2.15 反超 1.52——这正是 BM25 的核心逻辑</p>
+    </div>
+    <div class="w5d-live panel fx fx-right" style="--d:3">
+      <div class="w5d-h"><b>在验收语料上实时计算</b><span>移植自 bm25_engine.py · 10 篇英文文档</span></div>
+      <div class="w5d-qs tabs"></div>
+      <div class="w5d-ctl"><span>k1</span><input class="rng w5d-k1" type="range" min="0.2" max="3" step="0.1" value="1.5"><em class="w5d-k1v">1.5</em><span>b</span><input class="rng w5d-b" type="range" min="0" max="1" step="0.05" value="0.75"><em class="w5d-bv">0.75</em></div>
+      <div class="w5d-inv"><span class="lbl">倒排索引：词 → 文档</span><div class="w5d-pl"></div></div>
+      <div class="w5d-res"></div>
+      <div class="w5d-acc"><span class="c3-tag" style="--c:var(--ok)">手算校验误差 0</span><span class="c3-tag" style="--c:var(--ok)">精确关键词 recall@5 = 1.0</span><span class="c3-tag" style="--c:var(--bad)">同义词“cat” recall@5 = 0</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「从 TF-IDF 到 BM25」· 实验 3-5</div>
+</section>
+<style>
+.w5d-body{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;flex:1;min-height:0}
+.w5d-log,.w5d-live{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.w5d-h{display:flex;flex-direction:column;gap:2px}
+.w5d-h b{font-size:19px}
+.w5d-h span{font-size:15px;color:var(--text3)}
+.w5d-pre{margin:0;padding:10px 14px;border-radius:12px;font:15px/1.6 var(--mono);color:#cbd5f5;background:rgba(5,9,22,.7);border:1px solid var(--line);white-space:pre-wrap}
+.w5d-pre .hl{color:#fde68a}
+.w5d-pre .rk{color:#6ee7b7;font-weight:700}
+.w5d-k{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2)}
+.w5d-k b{color:var(--text)}
+.w5d-qs button{font:600 15px var(--mono);padding:6px 12px}
+.w5d-ctl{display:grid;grid-template-columns:24px 1fr 44px 18px 1fr 50px;gap:10px;align-items:center;font:16px var(--mono);color:var(--text2)}
+.w5d-ctl em{font:700 16px var(--num);font-style:normal;color:var(--text)}
+.w5d-pl{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;min-height:30px}
+.w5d-pl span{padding:3px 10px;border-radius:8px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line2)}
+.w5d-pl span b{color:var(--acc)}
+.w5d-res{display:flex;flex-direction:column;gap:6px;flex:1;min-height:0}
+.w5d-r{display:grid;grid-template-columns:30px 1fr 70px;gap:10px;align-items:center;padding:6px 10px;border-radius:10px;font-size:15px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w5d-r em{font:700 16px var(--num);font-style:normal;color:var(--acc)}
+.w5d-r b{font-size:16px;color:var(--text)}
+.w5d-r small{display:block;font:15px var(--mono);color:var(--text3)}
+.w5d-r i{font:700 16px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w5d-r.rel{border-color:rgba(52,211,153,.5)}
+.w5d-none{padding:10px 12px;border-radius:10px;font-size:16px;color:#fda4af;border:1px dashed rgba(251,113,133,.5)}
+.w5d-acc{display:flex;flex-wrap:wrap;gap:8px}
+</style>
+<script>
+HOOKS['c03-exp35'] = {
+  LOG: '查询分词: ["模型", "蒸馏"]\n\n词 "模型" → 命中 3 篇 (df=3, <span class="hl">IDF=0.76</span>)\n  doc_1: TF=5, 长度=200, 贡献=1.52\n  doc_3: TF=2, 长度=500, 贡献=0.82\n  doc_7: TF=8, 长度=150, 贡献=1.68\n\n词 "蒸馏" → 命中 2 篇 (df=2, <span class="hl">IDF=1.22</span>, 更稀有)\n  doc_1: TF=3, 长度=200, 贡献=<span class="hl">2.15</span>\n  doc_5: TF=1, 长度=250, 贡献=1.22\n\n<span class="rk">最终排序: doc_1 (3.67) > doc_7 (1.68) > doc_5 (1.22) > doc_3 (0.82)</span>',
+  DOCS: [
+    ['doc_1', 'Python Language', 'Python is a high-level programming language known for readability and a simple syntax.'],
+    ['doc_2', 'JavaScript Runtime', 'JavaScript runs in the browser and on servers via Node.js for full-stack web development.'],
+    ['doc_3', 'Model Distillation', 'Model distillation compresses a large teacher model into a smaller student model while preserving accuracy.'],
+    ['doc_4', 'Knowledge Distillation', 'Knowledge distillation transfers knowledge from a big neural network to a compact model for efficient inference.'],
+    ['doc_5', 'BM25 Ranking', 'BM25 is a probabilistic ranking function using term frequency and inverse document frequency.'],
+    ['doc_6', 'HTTP Errors', 'The HTTP 404 error code means the requested resource was not found on the web server.'],
+    ['doc_7', 'A Playful Kitten', 'A cute kitten chased a ball of yarn across the living room floor all afternoon.'],
+    ['doc_8', 'Silent Hunter', 'The feline predator stalked its prey silently through the tall grass at dusk.'],
+    ['doc_9', 'Hardware Fault', 'Error code XK9-2B4-7Q1 indicates a hardware fault in the storage controller board.'],
+    ['doc_10', 'Transformers', 'Transformer models use self-attention to process input sequences in parallel efficiently.'],
+  ],
+  Q: [['model distillation', ['doc_3', 'doc_4']], ['HTTP 404 error', ['doc_6']], ['XK9-2B4-7Q1', ['doc_9']], ['BM25 ranking function', ['doc_5']], ['cat', ['doc_7', 'doc_8']]],
+  init(s) {
+    s.querySelector('.w5d-pre').innerHTML = this.LOG;
+    this.docs = this.DOCS.map(([id, t, x]) => ({ id, title: t, text: x }));
+    const qs = s.querySelector('.w5d-qs');
+    qs.innerHTML = this.Q.map(([q], i) => `<button data-i="${i}">${q}</button>`).join('');
+    qs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.qi = +b.dataset.i; this.run(s); }));
+    s.querySelectorAll('.w5d-ctl input').forEach((r) => r.addEventListener('input', () => { this.auto = false; this.run(s); }));
+    this.qi = 0; this.run(s);
+  },
+  run(s) {
+    const k1 = +s.querySelector('.w5d-k1').value, b = +s.querySelector('.w5d-b').value;
+    s.querySelector('.w5d-k1v').textContent = k1.toFixed(1); s.querySelector('.w5d-bv').textContent = b.toFixed(2);
+    s.querySelectorAll('.w5d-ctl input').forEach((r) => r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min)) * 100 + '%'));
+    s.querySelectorAll('.w5d-qs button').forEach((x, j) => x.classList.toggle('on', j === this.qi));
+    const [q, rel] = this.Q[this.qi], eng = C3.bm25(this.docs, { k1, b }), out = eng.search(q);
+    s.querySelector('.w5d-pl').innerHTML = out.terms.map((t) => `<span>${C3.esc(t)} → <b>${[...(eng.index.get(t) || [])].join(', ') || '∅'}</b></span>`).join('');
+    const by = {}; this.docs.forEach((d) => (by[d.id] = d));
+    s.querySelector('.w5d-res').innerHTML = out.res.length ? out.res.slice(0, 5).map((r, i) => `<div class="w5d-r${rel.includes(r.id) ? ' rel' : ''}"><em>#${i + 1}</em><span><b>${r.id} · ${by[r.id].title}</b><small>${r.parts.filter((p) => p.tf).map((p) => `${p.t}: TF=${p.tf}, +${p.c.toFixed(2)}`).join(' · ')}</small></span><i>${r.score.toFixed(2)}</i></div>`).join('') : '<div class="w5d-none">没有任何文档包含“cat”：kitten、feline 读不懂——稀疏检索的盲区</div>';
+  },
+  enter(s, ctx) { this.auto = true; this.qi = 0; this.run(s); ctx.every(() => { if (this.auto) { this.qi = (this.qi + 1) % this.Q.length; this.run(s); } }, 3800); },
+};
+</script>
+
+<!-- ================= 混合检索：两全其美的艺术 ================= -->
+<section class="slide" id="c03-blind" data-part="5" data-dur="18000" data-title="两种检索的盲区" data-notes="两种方法各有盲区：稠密检索懂语义但可能漏掉关键词（搜“HTTP-403”可能返回“服务器错误”的泛泛讨论），稀疏检索精确匹配但读不懂同义词（搜“kitty”找不到只写了“cat”的文档）。混合检索的思路很简单——两个引擎都跑，结果合并——难点在于如何把分布迥异的两组得分整合成一个有意义的排序。<br>左右两列对同一条查询给出两路结果：稀疏一列是在实验 3-5 验收语料上的真实 BM25 计算；稠密一列是示意（用概念相近程度模拟语义匹配）。切换上方查询，看哪一路会失手。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">两种检索的<em>盲区</em></h2></header>
+  <div class="w5e-qs tabs fx fx-up" style="--d:2"></div>
+  <div class="w5e-body">
+    <div class="w5e-col panel fx fx-left" style="--d:3"><div class="w5e-h"><b>稀疏检索 · BM25</b><span class="c3-tag" style="--c:var(--ok)">真实计算</span></div><p class="w5e-d">精确匹配，读不懂同义词</p><div class="w5e-res" data-k="sp"></div></div>
+    <div class="w5e-col panel fx fx-right" style="--d:4"><div class="w5e-h"><b>稠密检索 · 语义向量</b><span class="c3-shi">示意</span></div><p class="w5e-d">懂语义，可能漏掉关键词</p><div class="w5e-res" data-k="de"></div></div>
+  </div>
+  <p class="w5e-say fx fx-up" style="--d:5"></p>
+  <div class="src">第三章 ·「混合检索：两全其美的艺术」</div>
+</section>
+<style>
+.w5e-qs button{font:600 16px var(--mono);padding:7px 14px}
+.w5e-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:14px;flex:1;min-height:0}
+.w5e-col{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.w5e-h{display:flex;align-items:center;justify-content:space-between}
+.w5e-h b{font-size:20px}
+.w5e-d{font-size:15px;color:var(--text3)}
+.w5e-res{display:flex;flex-direction:column;gap:6px}
+.w5e-r{display:grid;grid-template-columns:34px 1fr 64px;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);animation:upIn .35s var(--spring) both}
+.w5e-r em{font:700 16px var(--num);font-style:normal;color:var(--text3)}
+.w5e-r i{font:700 15px var(--num);font-style:normal;color:var(--text2);text-align:right}
+.w5e-r.rel{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.06)}
+.w5e-r.rel em{color:var(--ok)}
+.w5e-miss{padding:12px 14px;border-radius:10px;font-size:16px;color:#fda4af;border:1px dashed rgba(251,113,133,.5)}
+.w5e-say{margin-top:14px;min-height:32px;font-size:19px;text-align:center;color:var(--acc)}
+</style>
+<script>
+HOOKS['c03-blind'] = {
+  Q: [
+    { q: 'XK9-2B4-7Q1', rel: ['doc_9'], de: [['doc_6', 'HTTP Errors', 0.61], ['doc_9', 'Hardware Fault', 0.58], ['doc_2', 'JavaScript Runtime', 0.33]], say: '稠密检索把相关文档排到了第 2：错误码这类“字面”信息，正是稀疏检索的强项（右列为示意）' },
+    { q: 'cat', rel: ['doc_7', 'doc_8'], de: [['doc_7', 'A Playful Kitten', 0.82], ['doc_8', 'Silent Hunter', 0.74], ['doc_1', 'Python Language', 0.12]], say: '只写了 kitten、feline 的文档，BM25 一篇也找不到；语义检索能把它们找回来' },
+    { q: 'model distillation', rel: ['doc_3', 'doc_4'], de: [['doc_3', 'Model Distillation', 0.88], ['doc_4', 'Knowledge Distillation', 0.84], ['doc_10', 'Transformers', 0.46]], say: '这一条两路都答对了——盲区只在部分查询上出现' },
+  ],
+  init(s) {
+    this.docs = HOOKS['c03-exp35'].DOCS.map(([id, t, x]) => ({ id, title: t, text: x }));
+    const qs = s.querySelector('.w5e-qs');
+    qs.innerHTML = this.Q.map((x, i) => `<button data-i="${i}">${x.q}</button>`).join('');
+    qs.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.show(s, +b.dataset.i); }));
+  },
+  show(s, i) {
+    const Q = this.Q[i]; this.i = i;
+    s.querySelectorAll('.w5e-qs button').forEach((b, j) => b.classList.toggle('on', j === i));
+    const by = {}; this.docs.forEach((d) => (by[d.id] = d));
+    const out = C3.bm25(this.docs).search(Q.q).res.slice(0, 3);
+    s.querySelector('[data-k="sp"]').innerHTML = out.length ? out.map((r, j) => `<div class="w5e-r${Q.rel.includes(r.id) ? ' rel' : ''}"><em>#${j + 1}</em><span>${r.id} · ${by[r.id].title}</span><i>${r.score.toFixed(2)}</i></div>`).join('') : '<div class="w5e-miss">没有任何文档包含这个词：0 条结果</div>';
+    s.querySelector('[data-k="de"]').innerHTML = Q.de.map(([id, t, v], j) => `<div class="w5e-r${Q.rel.includes(id) ? ' rel' : ''}"><em>#${j + 1}</em><span>${id} · ${t}</span><i>${v.toFixed(2)}</i></div>`).join('');
+    s.querySelector('.w5e-say').textContent = Q.say;
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.Q.length); }, 4500); },
+};
+</script>
+
+<section class="slide" id="c03-fusion" data-part="5" data-trans="zoom" data-dur="20000" data-title="混合检索与重排序流水线" data-notes="典型的混合检索流水线包含三个阶段，三者各司其职、层层递进。第一阶段是<b>并行检索</b>：系统同时向稠密和稀疏两个引擎发送查询，各自召回一部分候选文档。第二阶段是<b>结果融合</b>：把两路结果合成一个统一的候选池。难点在于两路得分不可直接比较：稠密检索的余弦相似度（通常 0 到 1）和稀疏检索的 BM25 得分（可能是 0 到几十的任意值），尺度和分布完全不同。常用的融合方法是<b>倒数排名融合</b>（Reciprocal Rank Fusion, RRF），完全抛开原始得分、只看排名：每个文档的综合得分是它在各路结果中排名的平滑倒数之和，即 Σ 1/(k + rank)，k 是平滑常数（常取 60），用于压低排名最靠前几个位置之间的得分差距。RRF 简单且稳健，但只利用了排名信息，丢失了原始得分中蕴含的丰富相关性信号。<br>要强调的是，第三阶段<b>神经重排序（Neural Reranking）</b>并不是为了“补救 RRF 丢掉的得分”才存在的：无论前一步用哪种方式融合，重排序都值得加，因为它换用了一种更强的匹配范式——让跨编码器对查询和文档做深度交互匹配，对融合候选池中排名靠前的 N 个候选（如前 50 个）逐一精确打分，产生最终排序。重排序并不<b>替代</b>融合：融合负责从两路结果中产生统一的候选池，重排序负责在这个候选池上精排。<br>图3-9 的例子：查询“kitty behavior”，稠密检索返回 doc3（0.87）、doc7（0.82）、doc1（0.71），稀疏检索返回 doc5（8.4）、doc9（6.1）、doc2（3.2）。拖动 k 滑块，RRF 得分按公式实时计算；重排序分数为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-9 混合检索与<em>重排序</em>流水线</h2></header>
+  <div class="w5f-q fx fx-up" style="--d:2"><span class="lbl">用户查询</span><code>"kitty behavior"</code><div class="w5f-k"><span>RRF 平滑常数 k</span><input class="rng w5f-rng" type="range" min="1" max="100" value="60"><em class="w5f-kv">60</em></div></div>
+  <div class="w5f-body">
+    <div class="w5f-in fx fx-left" style="--d:3">
+      <div class="w5f-src"><b>稠密检索</b><span>语义匹配：kitty ≈ cat</span><div class="w5f-l" data-k="de"></div></div>
+      <div class="w5f-src"><b>稀疏检索 BM25</b><span>精确匹配“kitty”关键词</span><div class="w5f-l" data-k="sp"></div></div>
+    </div>
+    <div class="w5f-mid fx fx-up" style="--d:4"><span class="lbl">① 并行检索 → ② 结果融合 RRF：Σ 1/(k + rank)</span><div class="w5f-rrf"></div><p class="w5f-n">RRF 只看排名、不看原始得分：两路尺度不可比（0–1 vs 0–几十）</p></div>
+    <div class="w5f-out fx fx-right" style="--d:5"><span class="lbl">③ 神经重排序：跨编码器精排</span><span class="c3-shi">分数示意</span><div class="w5f-rr"></div><p class="w5f-n">重排序<b>不替代</b>融合：融合产生候选池，重排序在池上精排</p></div>
+  </div>
+  <div class="src">第三章 ·「混合检索：两全其美的艺术」· 图3-9 混合检索与重排序流水线</div>
+</section>
+<style>
+.w5f-q{display:flex;align-items:center;gap:16px;padding:10px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w5f-q code{font:20px var(--mono);color:#fde68a}
+.w5f-k{margin-left:auto;display:grid;grid-template-columns:auto 260px 40px;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+.w5f-k em{font:800 20px var(--num);font-style:normal;color:var(--acc)}
+.w5f-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:14px;flex:1;min-height:0}
+.w5f-in{display:flex;flex-direction:column;gap:12px}
+.w5f-src{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.w5f-src b{font-size:18px}
+.w5f-src>span{font-size:15px;color:var(--text3)}
+.w5f-l{display:flex;flex-direction:column;gap:4px}
+.w5f-it{display:grid;grid-template-columns:28px 1fr 64px;gap:8px;align-items:center;font-size:15px;color:var(--text2)}
+.w5f-it em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.w5f-it i{font:700 15px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w5f-mid,.w5f-out{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:rgba(12,18,40,.72)}
+.w5f-out .c3-shi{align-self:flex-start}
+.w5f-rrf,.w5f-rr{display:flex;flex-direction:column;gap:5px}
+.w5f-row{display:grid;grid-template-columns:52px 1fr 80px;gap:8px;align-items:center;font-size:15px;color:var(--text2);padding:4px 8px;border-radius:8px;background:rgba(255,255,255,.03);transition:all .4s}
+.w5f-row b{font:700 16px var(--mono);color:var(--text)}
+.w5f-row i{font:700 15px var(--num);font-style:normal;color:var(--acc);text-align:right}
+.w5f-row small{font-size:15px;color:var(--text3)}
+.w5f-n{margin-top:auto;font-size:15px;line-height:1.5;color:var(--text3)}
+.w5f-n b{color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-fusion'] = {
+  DE: [['doc3', 'feline habits and cat play...', 0.87], ['doc7', 'cat grooming patterns...', 0.82], ['doc1', 'pet care basics...', 0.71]],
+  SP: [['doc5', 'kitty litter training...', 8.4], ['doc9', 'kitty adoption guide...', 6.1], ['doc2', 'kitten health tips...', 3.2]],
+  RR: [['doc3', 9.1], ['doc7', 8.6], ['doc2', 7.9], ['doc5', 6.2], ['doc1', 5.8]],
+  init(s) {
+    s.querySelector('[data-k="de"]').innerHTML = this.DE.map(([d, t, v], i) => `<div class="w5f-it"><em>#${i + 1}</em><span><b>${d}</b> ${t}</span><i>cos ${v}</i></div>`).join('');
+    s.querySelector('[data-k="sp"]').innerHTML = this.SP.map(([d, t, v], i) => `<div class="w5f-it"><em>#${i + 1}</em><span><b>${d}</b> ${t}</span><i>${v}</i></div>`).join('');
+    s.querySelector('.w5f-rr').innerHTML = this.RR.map(([d, v], i) => `<div class="w5f-row"><b>#${i + 1}</b><span>${d}</span><i>${v.toFixed(1)}</i></div>`).join('');
+    this.rg = s.querySelector('.w5f-rng');
+    this.rg.addEventListener('input', () => { this.auto = false; this.calc(s); });
+    this.calc(s);
+  },
+  calc(s) {
+    const k = +this.rg.value; this.rg.style.setProperty('--p', ((k - 1) / 99) * 100 + '%');
+    s.querySelector('.w5f-kv').textContent = k;
+    const sc = {};
+    this.DE.forEach(([d], i) => (sc[d] = (sc[d] || 0) + 1 / (k + i + 1)));
+    this.SP.forEach(([d], i) => (sc[d] = (sc[d] || 0) + 1 / (k + i + 1)));
+    const rows = Object.entries(sc).sort((a, b) => b[1] - a[1]);
+    s.querySelector('.w5f-rrf').innerHTML = rows.map(([d, v], i) => `<div class="w5f-row"><b>#${i + 1}</b><span>${d}<small> · ${this.DE.findIndex((x) => x[0] === d) >= 0 ? '稠密第 ' + (this.DE.findIndex((x) => x[0] === d) + 1) : '—'} / ${this.SP.findIndex((x) => x[0] === d) >= 0 ? '稀疏第 ' + (this.SP.findIndex((x) => x[0] === d) + 1) : '—'}</small></span><i>${v.toFixed(4)}</i></div>`).join('');
+  },
+  enter(s, ctx) {
+    this.auto = true; let t = 0;
+    ctx.every(() => { if (!this.auto) return; t += 0.05; this.rg.value = Math.round(50 + Math.sin(t) * 49); this.calc(s); }, 160);
+  },
+};
+</script>
+
+<section class="slide" id="c03-xenc" data-part="5" data-dur="16000" data-title="双编码器与跨编码器" data-notes="打个比方：求职者把简历交给猎头快速筛选，是双编码器；面试官与每位候选人深谈，是跨编码器。前者依靠预先抽取的特征做大规模初筛，后者则让查询和候选文档“面对面”逐字斟酌。重排序器采用的正是“跨编码器（Cross-Encoder）”架构，与检索阶段的“双编码器（Bi-Encoder）”形成鲜明对比。<br><b>双编码器</b>为查询和文档独立生成向量，通过向量运算计算相似度，速度极快，但无法捕捉深层的匹配关系，适合从海量数据中做初步筛选。<b>跨编码器</b>则把查询和候选文档<b>拼接成一段完整的文字</b>送入模型，让模型逐词比对、输出一个综合的相关性得分，慢得多，但判断更准确。常用的重排序模型如 BAAI/bge-reranker-v2-m3 就采用这种架构。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>双编码器</em>与<em>跨编码器</em>：猎头与面试官</h2></header>
+  <div class="w5g-body">
+    <div class="w5g-c panel fx fx-left" style="--d:2">
+      <div class="w5g-h"><svg class="ic"><use href="#i-search"/></svg><div><b>双编码器 Bi-Encoder</b><span>猎头快速筛简历：依靠预先抽取的特征做大规模初筛</span></div></div>
+      <div class="w5g-arch" data-clip-ok>
+        <div class="w5g-lane"><span class="w5g-tx q">查询</span><i></i><span class="w5g-enc">编码器</span><i></i><span class="w5g-vec">[0.2, …]</span></div>
+        <div class="w5g-lane"><span class="w5g-tx d">文档</span><i></i><span class="w5g-enc">编码器</span><i></i><span class="w5g-vec">[0.3, …]</span><small>可预先算好</small></div>
+        <div class="w5g-cos">余弦相似度 → 0.82</div>
+      </div>
+      <div class="w5g-pc"><span class="y">速度极快</span><span class="n">捕捉不到深层的匹配关系</span><span>适合从海量数据中初筛</span></div>
+    </div>
+    <div class="w5g-c panel fx fx-right" style="--d:3">
+      <div class="w5g-h"><svg class="ic"><use href="#i-users"/></svg><div><b>跨编码器 Cross-Encoder</b><span>面试官与每位候选人深谈：查询和文档“面对面”逐字斟酌</span></div></div>
+      <div class="w5g-arch" data-clip-ok>
+        <div class="w5g-cat"><span class="w5g-tx q">查询</span><b>+</b><span class="w5g-tx d">文档</span><em>拼接成一段完整的文字</em></div>
+        <div class="w5g-big">Transformer 逐词比对</div>
+        <div class="w5g-cos">相关性得分 → 9.1</div>
+      </div>
+      <div class="w5g-pc"><span class="y">判断更准确</span><span class="n">慢得多</span><span>重排序：BAAI/bge-reranker-v2-m3</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「混合检索：两全其美的艺术」· 双编码器与跨编码器</div>
+</section>
+<style>
+.w5g-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1;min-height:0}
+.w5g-c{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.w5g-h{display:flex;gap:14px;align-items:center}
+.w5g-h .ic{font-size:34px;color:var(--acc);flex:none}
+.w5g-h b{font-size:21px}
+.w5g-h span{display:block;margin-top:2px;font-size:15px;line-height:1.5;color:var(--text2)}
+.w5g-arch{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px}
+.w5g-lane{display:flex;align-items:center;gap:8px}
+.w5g-lane i{flex:1;height:2px;background:var(--line2);position:relative;overflow:hidden}
+.w5g-lane i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--acc),transparent);animation:w5gfl 1.6s linear infinite}
+@keyframes w5gfl{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.w5g-lane small{font-size:15px;color:var(--text3)}
+.w5g-tx{padding:8px 14px;border-radius:10px;font-size:17px;font-weight:700}
+.w5g-tx.q{color:#06101f;background:var(--tool)}
+.w5g-tx.d{color:#06101f;background:#60a5fa}
+.w5g-enc{padding:10px 16px;border-radius:12px;font-size:16px;border:1.5px solid var(--acc);color:var(--acc)}
+.w5g-vec{font:16px var(--mono);color:#fde68a}
+.w5g-cos{align-self:center;padding:10px 18px;border-radius:12px;font-size:18px;font-weight:700;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.w5g-cat{display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap}
+.w5g-cat b{font-size:22px;color:var(--text3)}
+.w5g-cat em{width:100%;text-align:center;font-style:normal;font-size:16px;color:var(--acc)}
+.w5g-big{align-self:center;padding:22px 34px;border-radius:16px;font-size:19px;font-weight:700;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent);animation:glowPulse 2.4s ease-in-out infinite}
+.w5g-pc{display:flex;flex-wrap:wrap;gap:8px}
+.w5g-pc span{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2)}
+.w5g-pc .y{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.w5g-pc .n{color:#fda4af;border-color:rgba(251,113,133,.5)}
+</style>
+<script>
+HOOKS['c03-xenc'] = {};
+</script>
+
+<section class="slide" id="c03-metrics" data-part="5" data-trans="rise" data-dur="18000" data-title="如何度量检索质量" data-notes="<b>如何度量检索质量？</b>调优多阶段流水线需要客观的度量指标，最核心的有三个（均在带标注答案的测试查询集上计算），即表3-3：recall@k（召回率@k）——包含正确答案的文档出现在前 k 个检索结果中的查询比例，回答“该找的找到了吗”，是最贴近 RAG 需求的指标：只要相关文档进入上下文，LLM 就有机会利用它；MRR（平均倒数排名）——每个查询取第一个相关文档排名的倒数，再对所有查询取平均，回答“找到得够不够靠前”：排第 1 得 1 分，排第 10 只得 0.1 分；nDCG（归一化折损累积增益）——综合考虑所有相关文档的排名与相关程度，排名越靠后的相关文档得分折扣越大，回答“整个排序列表的质量如何”。<br>原书脚注：严格说，书中这里定义的“recall@k”实为<b>命中率</b>（hit rate，也叫 success@k）——只要前 k 个结果里有一篇相关文档就算命中；学术上标准的 recall@k 指<b>相关文档被召回的比例</b>（前 k 个结果中相关文档数 ÷ 该查询全部相关文档数），一个查询有多篇相关文档时两者并不相等。书中沿用这一简化口径，是为了与 Anthropic“Contextual Retrieval”的报告口径一致。工业界的报告中还常见<b>检索失败率</b>：正确信息未出现在 top-20 检索结果中的查询比例。<br>左侧是一条示意查询的检索结果：点击结果切换“是否相关”，三个指标实时计算；k 可以调。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表3-3 如何<em>度量检索质量</em></h2></header>
+  <div class="w5h-body">
+    <div class="w5h-l panel fx fx-left" style="--d:2">
+      <div class="w5h-h"><b>一条查询的检索结果</b><span class="c3-shi">示意 · 点击切换是否相关</span></div>
+      <div class="w5h-list"></div>
+      <div class="w5h-k"><span>k</span><input class="rng w5h-rng" type="range" min="1" max="8" value="5"><em class="w5h-kv">5</em></div>
+    </div>
+    <div class="w5h-r fx fx-right" style="--d:3">
+      <div class="w5h-th"><span>指标</span><span>·</span><span>直觉解释</span><span>本例</span></div>
+      <div class="w5h-m" data-m="rec"><div><b>recall@k</b><span>该找的找到了吗？前 k 个里有相关文档就算命中</span></div><em>—</em></div>
+      <div class="w5h-m" data-m="mrr"><div><b>MRR</b><span>找到得够不够靠前？第一个相关文档排名的倒数</span></div><em>—</em></div>
+      <div class="w5h-m" data-m="ndcg"><div><b>nDCG@k</b><span>整个排序列表的质量如何？越靠后的相关文档折扣越大</span></div><em>—</em></div>
+      <div class="w5h-fn"><b>脚注：口径</b><p>书中的 recall@k 实为<b>命中率</b>（hit rate / success@k）；标准 recall@k 是<b>相关文档被召回的比例</b>：本例为 <span class="w5h-std">—</span></p></div>
+      <div class="w5h-fail"><b>检索失败率</b><span>正确信息未出现在 top-20 检索结果中的查询比例</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「混合检索：两全其美的艺术」· 表3-3 检索质量的三个核心指标</div>
+</section>
+<style>
+.w5h-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.w5h-l{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.w5h-h{display:flex;align-items:center;justify-content:space-between}
+.w5h-h b{font-size:19px}
+.w5h-list{display:flex;flex-direction:column;gap:5px}
+.w5h-it{display:grid;grid-template-columns:40px 1fr 70px;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;font-size:16px;text-align:left;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .3s}
+.w5h-it em{font:700 16px var(--num);font-style:normal;color:var(--text3)}
+.w5h-it i{font-style:normal;font-size:15px;text-align:right;color:var(--text3)}
+.w5h-it.rel{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.08);color:var(--text)}
+.w5h-it.rel i{color:#6ee7b7}
+.w5h-it.out{opacity:.35}
+.w5h-k{display:grid;grid-template-columns:20px 1fr 40px;gap:12px;align-items:center;font:16px var(--mono);color:var(--text2);margin-top:auto}
+.w5h-k em{font:800 20px var(--num);font-style:normal;color:var(--acc)}
+.w5h-r{display:flex;flex-direction:column;gap:10px}
+.w5h-th{display:flex;gap:12px;padding:0 16px;font-size:15px;letter-spacing:.08em;color:var(--text3)}
+.w5h-th span:nth-child(4){margin-left:auto}
+.w5h-m{display:grid;grid-template-columns:1fr 110px;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.w5h-m b{font-size:19px;color:var(--acc)}
+.w5h-m span{display:block;font-size:15px;line-height:1.45;color:var(--text2)}
+.w5h-m em{font:800 32px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w5h-fn{padding:10px 14px;border-radius:12px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.05)}
+.w5h-fn b{font-size:16px;color:var(--tool)}
+.w5h-fn p{margin-top:4px;font-size:15px;line-height:1.55;color:var(--text2)}
+.w5h-fn p b{color:var(--text);font-size:inherit}
+.w5h-std{font:700 15px var(--num);color:var(--text)}
+.w5h-fail{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.w5h-fail b{font-size:16px}
+.w5h-fail span{font-size:15px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-metrics'] = {
+  T: ['退款政策总则', '会员积分规则', '退款操作步骤', '物流时效说明', '发票开具流程', '退款到账时间', '售后联系方式', '优惠券使用说明'],
+  init(s) {
+    this.rel = [false, false, true, false, false, true, false, false];
+    const L = s.querySelector('.w5h-list');
+    L.innerHTML = this.T.map((t, i) => `<button class="w5h-it" data-i="${i}"><em>#${i + 1}</em><span>${t}</span><i></i></button>`).join('');
+    L.querySelectorAll('.w5h-it').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.rel[+b.dataset.i] = !this.rel[+b.dataset.i]; this.calc(s); }));
+    this.rg = s.querySelector('.w5h-rng');
+    this.rg.addEventListener('input', () => { this.auto = false; this.calc(s); });
+    this.calc(s);
+  },
+  calc(s) {
+    const k = +this.rg.value; this.rg.style.setProperty('--p', ((k - 1) / 7) * 100 + '%'); s.querySelector('.w5h-kv').textContent = k;
+    s.querySelectorAll('.w5h-it').forEach((b, i) => { b.classList.toggle('rel', this.rel[i]); b.classList.toggle('out', i >= k); b.querySelector('i').textContent = this.rel[i] ? '相关' : ''; });
+    const top = this.rel.slice(0, k), first = this.rel.indexOf(true);
+    const hit = top.some(Boolean) ? 1 : 0, mrr = first >= 0 ? 1 / (first + 1) : 0;
+    const dcg = top.reduce((a, r, i) => a + (r ? 1 / Math.log2(i + 2) : 0), 0), nrel = this.rel.filter(Boolean).length;
+    const idcg = Array.from({ length: Math.min(nrel, k) }, (_, i) => 1 / Math.log2(i + 2)).reduce((a, b) => a + b, 0);
+    s.querySelector('[data-m="rec"] em').textContent = hit.toFixed(2);
+    s.querySelector('[data-m="mrr"] em').textContent = mrr.toFixed(2);
+    s.querySelector('[data-m="ndcg"] em').textContent = idcg ? (dcg / idcg).toFixed(2) : '0.00';
+    s.querySelector('.w5h-std').textContent = nrel ? `${top.filter(Boolean).length} / ${nrel} = ${(top.filter(Boolean).length / nrel).toFixed(2)}` : '—';
+  },
+  enter(s, ctx) {
+    this.auto = true; let t = 0;
+    const seq = [[5, [2, 5]], [2, [2, 5]], [5, [0, 5]], [8, [6]], [3, [2, 5]]];
+    ctx.every(() => { if (!this.auto) return; t = (t + 1) % seq.length; this.rg.value = seq[t][0]; this.rel = this.rel.map((_, i) => seq[t][1].includes(i)); this.calc(s); }, 3000);
+  },
+};
+</script>
+
+<section class="slide" id="c03-exp36" data-part="5" data-trans="flip" data-dur="22000" data-title="实验 3-6 ★★：混合检索流水线" data-notes="<b>实验 3-6 ★★：混合检索流水线：结合稀疏、稠密与重排序。</b>retrieval-pipeline 项目构建了一套完整的教育性检索流水线，包含稠密检索、稀疏检索和神经重排序。test_client.py 中的测试案例正对应前面“混合检索”一节指出的几类挑战——语义相似、精确名称、多语言查询、技术代码——可直接观察稠密与稀疏两路在每类查询下各自的胜负。原书写道：最引人注目的是重排序器在提升最终结果质量上的显著作用，系统不仅返回重排序列表，还展示每个文档在原始稠密和稀疏检索中的排名以及重排序后的变化；没有哪种单一检索策略在所有场景下都可靠，把稠密、稀疏和重排序组合起来，才是构建生产级 RAG 系统的正确做法。<br>配套仓库的验收（2026-07-29，稠密 Qwen/Qwen3-Embedding-0.6B，重排序 cross-encoder/ms-marco-MiniLM-L-6-v2，稀疏 rank_bm25；20 篇文档切成 22 块，12 条带标注的查询，eval_k = 3，RRF k = 60，重排序候选池 10）：稀疏检索漏掉 2 条（一条是不含原词的语义查询，一条是中文查询），recall@3 0.83、MRR 0.79；稠密与 RRF 融合三项指标都是 1.0；加权融合 MRR 0.96；重排序后 recall@3 仍为 1.0，但 MRR 降到 0.90——有两条查询的相关文档被排到了第 2、第 3。这次的小规模验收里，所用的英文 MS MARCO 小型重排序模型没有带来提升；结论仍以原书为准。下方表格是每条查询第一个相关文档的排名，可以按类别筛选。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-6 ★★：<em>混合检索流水线</em></h2></div>
+    <div class="w5i-f tabs fx fx-up" style="--d:2"><button data-c="all" class="on">全部</button><button data-c="technical-code">技术代码</button><button data-c="exact-name">精确名称</button><button data-c="semantic">语义</button><button data-c="multilingual">多语言</button></div></header>
+  <div class="w5i-body">
+    <div class="w5i-t panel fx fx-left" style="--d:3">
+      <div class="w5i-th"><span>查询</span><span>稀疏</span><span>稠密</span><span>RRF</span><span>加权</span><span>重排序</span></div>
+      <div class="w5i-rows"></div>
+      <p class="w5i-nt">数字 = 第一个相关文档的排名；— = 没有检索到</p>
+    </div>
+    <div class="w5i-s c3-data fx fx-right" style="--d:4">
+      <div class="c3-data-h"><svg class="ic"><use href="#i-clipboard"/></svg>验收汇总 · eval_k = 3</div>
+      <div class="w5i-sum"></div>
+      <div class="w5i-neg"><span class="c3-tag" style="--c:var(--warn)">与原书预期不同</span><p>重排序后 MRR 从 1.00 降到 0.90：英文 MS MARCO 小模型在这 12 条查询上把两条相关文档排到了第 2、3。小规模验收，结论以原书为准</p></div>
+      <div class="c3-data-s">Qwen3-Embedding-0.6B + ms-marco-MiniLM-L-6-v2 + rank_bm25 · 20 篇 / 22 块 · 12 条查询 · RRF k = 60 · 2026-07-29</div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「混合检索：两全其美的艺术」· 实验 3-6</div>
+</section>
+<style>
+#c03-exp36 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.w5i-f button{font-size:16px;padding:7px 14px}
+.w5i-body{display:grid;grid-template-columns:1.35fr 1fr;gap:22px;flex:1;min-height:0}
+.w5i-t{padding:12px 16px;display:flex;flex-direction:column;gap:4px;min-height:0}
+.w5i-th,.w5i-r{display:grid;grid-template-columns:1fr repeat(5,64px);gap:6px;align-items:center}
+.w5i-th span{font-size:15px;color:var(--text3);text-align:center}
+.w5i-th span:first-child{text-align:left}
+.w5i-r{padding:4px 0;border-top:1px solid var(--line);transition:opacity .3s}
+.w5i-r.hide{display:none}
+.w5i-r>span{font-size:15px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.w5i-r>span small{display:block;font-size:15px;color:var(--text3)}
+.w5i-r b{display:grid;place-items:center;height:30px;border-radius:7px;font:700 16px var(--num)}
+.w5i-r b.r1{color:#06101f;background:rgba(52,211,153,.85)}
+.w5i-r b.r2{color:#06101f;background:rgba(251,191,36,.85)}
+.w5i-r b.r3{color:#06101f;background:rgba(251,146,60,.9)}
+.w5i-r b.miss{color:#fda4af;border:1px dashed rgba(251,113,133,.6)}
+.w5i-nt{font-size:15px;color:var(--text3);margin-top:auto}
+.w5i-s{display:flex;flex-direction:column;gap:10px}
+.w5i-sum{display:flex;flex-direction:column;gap:5px}
+.w5i-sr{display:grid;grid-template-columns:80px repeat(3,1fr);gap:6px;align-items:center;font-size:15px;color:var(--text2)}
+.w5i-sr.h span{color:var(--text3)}
+.w5i-sr b{font:700 17px var(--num);color:var(--text)}
+.w5i-neg{display:flex;flex-direction:column;gap:6px}
+.w5i-neg .c3-tag{align-self:flex-start}
+.w5i-neg p{font-size:15px;line-height:1.55;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-exp36'] = {
+  R: [['XR-7003', 'technical-code', [1, 1, 1, 1, 1]], ['XR-7005', 'technical-code', [1, 1, 1, 1, 1]], ['HTTP-403', 'technical-code', [1, 1, 1, 1, 1]], ['HTTP-400', 'technical-code', [1, 1, 1, 1, 1]], ['Alexander Humphrey', 'exact-name', [1, 1, 1, 1, 1]], ['a beginner friendly language with tidy syntax', 'semantic', [1, 1, 1, 1, 1]], ['reclaiming unused heap space without programmer effort', 'semantic', [0, 1, 1, 1, 2]], ['how vegetation turns light into food', 'semantic', [2, 1, 1, 2, 1]], ['hiding a note so eavesdroppers cannot understand it', 'semantic', [1, 1, 1, 1, 1]], ['植物如何把阳光转化为食物', 'multilingual', [0, 1, 1, 1, 3]], ['how does water move between the ocean and the sky', 'semantic', [1, 1, 1, 1, 1]], ['how are volcanoes formed from molten rock', 'semantic', [1, 1, 1, 1, 1]]],
+  S: [['稀疏', '0.83', '0.79', '0.80'], ['稠密', '1.00', '1.00', '1.00'], ['RRF', '1.00', '1.00', '1.00'], ['加权', '1.00', '0.96', '0.97'], ['重排序', '1.00', '0.90', '0.93']],
+  init(s) {
+    const CN = { 'technical-code': '技术代码', 'exact-name': '精确名称', semantic: '语义', multilingual: '多语言' };
+    s.querySelector('.w5i-rows').innerHTML = this.R.map(([q, c, rs]) => `<div class="w5i-r" data-c="${c}"><span>${C3.esc(q)}<small>${CN[c]}</small></span>${rs.map((r) => `<b class="${r ? 'r' + Math.min(r, 3) : 'miss'}">${r || '—'}</b>`).join('')}</div>`).join('');
+    s.querySelector('.w5i-sum').innerHTML = '<div class="w5i-sr h"><span></span><span>recall@3</span><span>MRR</span><span>nDCG@3</span></div>' + this.S.map(([n, a, b, c]) => `<div class="w5i-sr"><span>${n}</span><b>${a}</b><b>${b}</b><b>${c}</b></div>`).join('');
+    s.querySelectorAll('.w5i-f button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.filt(s, b.dataset.c); }));
+  },
+  filt(s, c) { this.c = c; s.querySelectorAll('.w5i-f button').forEach((b) => b.classList.toggle('on', b.dataset.c === c)); s.querySelectorAll('.w5i-r').forEach((r) => r.classList.toggle('hide', c !== 'all' && r.dataset.c !== c)); },
+  enter(s, ctx) {
+    this.auto = true; const C = ['all', 'technical-code', 'semantic', 'multilingual', 'exact-name']; let i = 0;
+    this.filt(s, 'all');
+    ctx.every(() => { if (this.auto) { i = (i + 1) % C.length; this.filt(s, C[i]); } }, 3600);
+  },
+};
+</script>

@@ -1,0 +1,613 @@
+<!-- ================= 第 9 部分分隔页 ================= -->
+<section class="slide chapter" id="c07-d9" data-part="9" data-title="PART 09 · 内部评估与仿真" data-notes="「从外部评估到内部评估：生产级 Agent 的评估基础设施」。前面几节讨论了如何从外部评估 Agent 系统——搭建评估环境、设计数据集、分析 Benchmark 报告。但最优秀的 Agent 产品不仅接受外部评估，还<b>内建了持续自我评估的基础设施</b>。这一部分以第五章介绍的开源通用 Agent OpenClaw 为例，并结合头部 Coding Agent 产品的公开技术分析与从业者分享，展示一套值得借鉴的内部评估体系——它将 ML 研究中的实验方法论系统性地嵌入到了产品工程中：消融基础设施、AB 测试方法论、双层特性开关、提示词敏感性评估、隐私感知分析。最后讨论仿真环境：从评估到后训练的桥梁（图7-9、图7-10、实验 7-14），以及保真度权衡与领域随机化。">
+  <div class="ch-k fx fx-up">PART 09</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">内部评估与仿真</h1>
+  <div class="ch-s fx fx-up" style="--d:3">外部评估告诉你“Agent 有多好”，内部评估告诉你“哪项改动让它变好了”</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">最优秀的 Agent 产品不仅接受外部评估，还内建了持续自我评估的基础设施。</blockquote>
+  <div class="ch-loop" data-node="8" data-num="09"></div>
+</section>
+
+<!-- ================= 消融基础设施 ================= -->
+<section class="slide" id="c07-ablate" data-part="9" data-trans="zoom" data-dur="22000" data-title="消融基础设施：理解每个特性的真实贡献" data-notes="ML 研究者长期使用消融实验（Ablation Study）来理解模型的哪些组件真正重要——所谓消融，就是逐一“摘除”某个组件，看整体性能掉多少。OpenClaw 将这一方法论引入了产品工程：系统内置了一个<b>总开关</b>，可以同时禁用多个主要特性（思考模式、上下文压缩、自动记忆、后台任务等），创造一个“裸模型”基线。这使得团队能回答一个关键问题：<b>某个特性是真的改善了用户体验，还是只是感觉有用？</b><br>将消融作为常规的工程实践而非一次性的研究，有几个实际意义。首先，<b>消融开关必须在启动路径的极早期注入</b>——在任何模块级常量捕获配置值之前——这意味着消融基础设施必须从一开始就设计进系统架构，而非事后加装。其次，定期运行消融实验（如每次大版本发布前）可以发现<b>“特性债务”</b>——那些曾经有效但随着模型进化已不再必要的特性。对于任何构建生产 Agent 的团队，建议的实践是：<b>每个主要特性都应是可独立关闭的，团队应定期验证每个特性的实际贡献</b>。<br>页面上的分数为示意：逐个关闭特性，看分数掉多少；“特性债务”是关掉之后分数几乎不变的那一项。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一个总开关，生成<em>“裸模型”基线</em></h2></header>
+  <div class="c7ab-body">
+    <div class="c7ab-l panel fx fx-left" style="--d:2">
+      <div class="c7ab-h"><b>OpenClaw 的消融开关</b><span class="c7-tag">示意分数</span><button class="btn c7ab-all">一键全关</button></div>
+      <div class="c7ab-fs"></div>
+      <div class="c7ab-sc"><span>评估集得分</span><div class="c7ab-bar"><i></i><b>—</b></div></div>
+      <p class="c7ab-nt">—</p>
+    </div>
+    <div class="c7ab-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7ab-k">注入点：启动路径的极早期</b><div class="c7ab-boot"><span class="on">读取消融开关</span><i></i><span>模块级常量捕获配置</span><i></i><span>加载各特性</span></div><p>必须在任何模块级常量捕获配置值之前——<b>从一开始就设计进架构</b>，而非事后加装</p></div>
+      <div class="c7-card"><b class="c7ab-k">特性债务</b><p>曾经有效、但随着模型进化已不再必要的特性。定期（如每次大版本发布前）跑消融就能发现</p></div>
+      <p class="c7ab-q">某个特性是<b>真的改善了用户体验</b>，还是只是<b>感觉有用</b>？</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「消融基础设施：理解每个特性的真实贡献」</div>
+</section>
+<style>
+.c7ab-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7ab-l{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.c7ab-h{display:flex;align-items:center;gap:12px}.c7ab-h b{font-size:18px}
+.c7ab-all{margin-left:auto;font-size:15px;padding:6px 14px}
+.c7ab-fs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7ab-f{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:12px;border:1px solid var(--line);font-size:17px}
+.c7ab-f small{display:block;font-size:15px;color:var(--text3)}
+.c7ab-f.debt{border-color:rgba(251,191,36,.6);background:rgba(251,191,36,.07)}
+.c7ab-sc{display:grid;grid-template-columns:110px 1fr;gap:14px;align-items:center;font-size:16px;color:var(--text2)}
+.c7ab-bar{position:relative;height:40px;border-radius:10px;background:rgba(255,255,255,.05)}
+.c7ab-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:10px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .6s var(--ease)}
+.c7ab-bar b{position:absolute;right:12px;top:50%;translate:0 -50%;font:800 20px var(--num)}
+.c7ab-nt{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2);min-height:50px}.c7ab-nt b{color:var(--text)}
+.c7ab-r{display:flex;flex-direction:column;gap:12px}
+.c7ab-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7ab-r .c7-card p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:8px}.c7ab-r .c7-card p b{color:var(--text)}
+.c7ab-boot{display:flex;align-items:center;gap:6px}
+.c7ab-boot span{font-size:15px;padding:6px 10px;border-radius:8px;border:1px solid var(--line2);white-space:nowrap}
+.c7ab-boot span.on{border-color:var(--acc);color:var(--acc)}
+.c7ab-boot i{flex:1;height:2px;background:var(--line2)}
+.c7ab-q{margin-top:auto;font-size:18px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c7ab-q b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-ablate'] = {
+  // [特性, 说明, 示意贡献分]
+  F: [['思考模式', 'thinking', 9], ['上下文压缩', 'compaction', 6], ['自动记忆', 'auto memory', 4], ['后台任务', 'background tasks', 0.5]],
+  BASE: 62,
+  init(s) {
+    s.querySelector('.c7ab-fs').innerHTML = this.F.map(([n, e], i) => `<div class="c7ab-f" data-i="${i}"><span>${n}<small>${e}</small></span><button class="tgl on" data-i="${i}"><i></i></button></div>`).join('');
+    s.querySelectorAll('.c7ab-f .tgl').forEach((b) => b.addEventListener('click', () => { this.manual = true; b.classList.toggle('on'); this.calc(s); }));
+    s.querySelector('.c7ab-all').addEventListener('click', () => { this.manual = true; this.set(s, [0, 0, 0, 0]); });
+  },
+  set(s, v) { s.querySelectorAll('.c7ab-f .tgl').forEach((b, i) => b.classList.toggle('on', !!v[i])); this.calc(s); },
+  calc(s) {
+    const on = [...s.querySelectorAll('.c7ab-f .tgl')].map((b) => b.classList.contains('on'));
+    const sc = this.BASE + this.F.reduce((a, f, i) => a + (on[i] ? f[2] : 0), 0);
+    s.querySelector('.c7ab-bar i').style.width = sc + '%';
+    s.querySelector('.c7ab-bar b').textContent = sc.toFixed(1);
+    s.querySelectorAll('.c7ab-f').forEach((f, i) => f.classList.toggle('debt', !on[i] && this.F[i][2] < 1));
+    const off = this.F.filter((_, i) => !on[i]);
+    s.querySelector('.c7ab-nt').innerHTML = !off.length ? '全部开启：完整产品' : off.length === 4 ? '<b>“裸模型”基线</b>：所有主要特性同时禁用' : off.length === 1 ? (off[0][2] < 1 ? `关掉<b>${off[0][0]}</b>，分数几乎不变——<b>特性债务</b>的候选` : `关掉<b>${off[0][0]}</b>，分数掉 ${off[0][2]} 分：这是它的真实贡献`) : `关掉 ${off.map((f) => f[0]).join('、')}`;
+  },
+  enter(s, ctx) {
+    this.manual = false; this.set(s, [1, 1, 1, 1]);
+    const seq = [[0, 1, 1, 1], [1, 0, 1, 1], [1, 1, 0, 1], [1, 1, 1, 0], [0, 0, 0, 0], [1, 1, 1, 1]]; let n = 0;
+    ctx.every(() => { if (!this.manual) this.set(s, seq[n++ % seq.length]); }, 2600);
+  },
+  reset(s) { this.set(s, [1, 1, 1, 1]); },
+};
+</script>
+
+<!-- ================= AB 测试 ================= -->
+<section class="slide" id="c07-ab" data-part="9" data-trans="flip" data-dur="26000" data-title="AB 测试方法论：区分机制与目标" data-notes="成熟的 Agent 产品会对自身行为进行严格的 AB 测试（即把用户随机分成两组，一组使用旧版本、一组使用新版本，通过对比两组的实际数据来判断改动是否有效）。一个设计精良的 Agent AB 测试案例展示了几个关键的方法论原则：<br><b>多臂而非二元</b>。不仅对比“有”和“没有”，而是设计多个渐进式变体（例如测试不同强度的提示词约束时，设置控制组和三个渐进更严格的实验组）。这种设计能揭示剂量-效应关系，帮助找到最优点。<br><b>区分机制指标和目标指标</b>。这是最容易犯的错误——把你正在改变的东西当作优化目标。例如，如果你在测试“缩短 Agent 的计划文件长度”，计划长度是机制指标（你直接改变的东西），但它不是目标。真正的目标可能是“降低会话级成本”。缩短计划文件可能降低成本，但也可能因为计划不够详细而导致更多的编辑-检查-编辑循环，反而增加了总输出量。始终问自己：<b>我改变的东西（机制）和我真正关心的东西（目标）是同一个吗？</b>如果不是，以目标为准。<br><b>设置护栏指标</b>。即使目标指标改善了，如果用户满意度下降、操作次数增加或错误率上升，实验也应该停止。护栏指标是“不能变差的底线”。<br><b>记录基线统计</b>。包含样本量、分布百分位数、相关性分析（如“拒绝率随计划大小单调递增”），为实验结果的解读提供必要的上下文。没有基线，你无法判断实验结果是否具有统计显著性。<br>图中四个臂的数值为示意：计划越短（机制指标单调下降），会话成本（目标指标）先降后升，最严格的一臂还触发了护栏。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">改变的是<em>机制</em>，关心的是<em>目标</em></h2></header>
+  <div class="c7abt-body">
+    <div class="c7abt-ch panel fx fx-left" style="--d:2">
+      <div class="c7abt-h"><b>测试“缩短计划文件长度”：控制组 + 三个渐进更严格的实验组</b><span class="c7-tag">示意数据</span></div>
+      <div class="c7abt-arms"></div>
+      <div class="c7abt-lg"><span class="m"><i></i>机制指标：计划长度</span><span class="g"><i></i>目标指标：会话级成本</span><span class="r"><i></i>护栏：用户满意度</span></div>
+      <p class="c7abt-nt">—</p>
+    </div>
+    <div class="c7abt-r fx fx-right" style="--d:3">
+      <div class="c7abt-p" data-i="0"><em>01</em><div><b>多臂而非二元</b><span>渐进式变体揭示<b>剂量—效应关系</b>，帮助找到最优点</span></div></div>
+      <div class="c7abt-p" data-i="1"><em>02</em><div><b>区分机制指标和目标指标</b><span>我改变的东西和我真正关心的东西<b>是同一个吗？</b>不是就以目标为准</span></div></div>
+      <div class="c7abt-p" data-i="2"><em>03</em><div><b>设置护栏指标</b><span>满意度下降、操作次数增加、错误率上升 → <b>停止实验</b></span></div></div>
+      <div class="c7abt-p" data-i="3"><em>04</em><div><b>记录基线统计</b><span>样本量、分布百分位数、相关性（如“拒绝率随计划大小单调递增”）</span></div></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「AB 测试方法论：区分机制与目标」</div>
+</section>
+<style>
+.c7abt-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c7abt-ch{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7abt-h{display:flex;align-items:center;gap:12px}.c7abt-h b{font-size:17px}
+.c7abt-arms{flex:1;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:end;min-height:0;border-bottom:1px solid var(--line2);padding:0 8px}
+.c7abt-a{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.c7abt-a .bs{display:flex;gap:6px;align-items:flex-end;height:300px}
+.c7abt-a .bs i{width:34px;border-radius:6px 6px 0 0;transition:height .7s var(--ease)}
+.c7abt-a .bs .m,.c7abt-lg .m i{background:#60a5fa}
+.c7abt-a .bs .g,.c7abt-lg .g i{background:#fbbf24}
+.c7abt-a .bs .r,.c7abt-lg .r i{background:#34d399}
+.c7abt-a .bs .r.bad{background:#fb7185}
+.c7abt-a b{font-size:16px}
+.c7abt-a small{font-size:15px;color:var(--text3)}
+.c7abt-a.best b{color:var(--warn)}
+.c7abt-lg{display:flex;gap:14px;flex-wrap:wrap}
+.c7abt-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7abt-lg i{width:14px;height:14px;border-radius:3px}
+.c7abt-nt{font-size:16px;line-height:1.55;color:var(--text2);min-height:50px}.c7abt-nt b{color:var(--text)}
+.c7abt-r{display:flex;flex-direction:column;gap:10px}
+.c7abt-p{display:grid;grid-template-columns:50px 1fr;gap:12px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s}
+.c7abt-p em{font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.c7abt-p b{font-size:18px}
+.c7abt-p span{display:block;font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}.c7abt-p span b{font-size:15px;color:var(--text)}
+.c7abt-p.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85))}
+</style>
+<script>
+HOOKS['c07-ab'] = {
+  // [臂, 计划长度, 会话成本, 满意度]（相对值 0–1，示意）
+  A: [['控制组', '原约束', 1, 0.8, 0.85], ['实验组 1', '略严', 0.75, 0.66, 0.84], ['实验组 2', '更严', 0.5, 0.7, 0.8], ['实验组 3', '最严', 0.3, 0.86, 0.55]],
+  init(s) {
+    s.querySelector('.c7abt-arms').innerHTML = this.A.map(([n, d]) => `<div class="c7abt-a"><div class="bs"><i class="m"></i><i class="g"></i><i class="r"></i></div><b>${n}</b><small>${d}</small></div>`).join('');
+  },
+  show(s, k) {
+    const as = s.querySelectorAll('.c7abt-a');
+    as.forEach((a, i) => {
+      const [, , m, g, r] = this.A[i], vis = i <= k;
+      const [bm, bg, br] = a.querySelectorAll('.bs i');
+      bm.style.height = vis ? m * 280 + 'px' : '0'; bg.style.height = vis ? g * 280 + 'px' : '0'; br.style.height = vis ? r * 280 + 'px' : '0';
+      br.classList.toggle('bad', vis && r < 0.7);
+      a.classList.toggle('best', k >= 3 && i === 1);
+    });
+    const nt = ['控制组：记录基线——样本量、百分位数、相关性', '计划变短了，会话成本也降了——<b>此时机制与目标同向</b>', '计划继续变短，<b>成本却回升</b>：计划不够详细，编辑—检查—编辑循环变多，总输出量增加', '最严的一臂：成本更高，<b>满意度跌破护栏</b> → 停止。以目标为准，最优点是<b>实验组 1</b>'];
+    s.querySelector('.c7abt-nt').innerHTML = nt[k];
+    s.querySelectorAll('.c7abt-p').forEach((p, j) => p.classList.toggle('on', j === [3, 0, 1, 2][k]));
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 4, 3400, (i) => { this.i = i; this.show(s, i); }, 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7abt-a .bs i').forEach((b) => (b.style.height = '0')); s.querySelectorAll('.c7abt-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 特性开关与提示词敏感性 ================= -->
+<section class="slide" id="c07-flags" data-part="9" data-trans="rise" data-dur="24000" data-title="双层特性开关与提示词敏感性评估" data-notes="<b>双层特性开关系统。</b>Agent 产品需要从第一天就设计特性开关（Feature Flag）基础设施——所谓特性开关，就是一个可以远程控制的开关，决定某项功能对用户是开启还是关闭，无需重新部署代码。它同时服务于三个目的：<b>实验、渐进发布和紧急熔断</b>。<br><b>编译时开关</b>在构建阶段就将相关代码从产物中物理移除。内部专用的特性在外部构建中根本不存在——即使逆向工程也无法发现被移除的功能。这也是一种干净的消融机制：关闭某个特性不是在运行时跳过逻辑，而是对应的代码在物理上就不存在。<br><b>运行时开关</b>的配置由服务端下发，并在本地磁盘缓存一份。设计上宁可读取到稍旧的缓存配置，也不能让 Agent 因等待网络请求而阻塞启动。具体的分组决策通过实验平台（如 GrowthBook）完成，用于分配 AB 测试组。一个关键的设计细节是：<b>每个特性的曝光事件在每个会话中最多记录一次</b>，避免重复记录污染实验数据。对 Agent 开发者来说，特性开关不是简单的调试工具，而是<b>一等架构组件</b>。<br><b>提示词敏感性评估。</b>系统提示是 Agent 行为的核心“代码”，但它往往缺少与普通代码同等的版本控制和回归测试。OpenClaw 的做法是提供一个专用工具，能在指定的 git 版本上提取完整渲染后的系统提示——包含所有动态条件展开后的最终文本。这使得团队能精确回答：<b>哪次提交改变了提示词？对评估集的影响是什么？</b>建议的实践是：(1) 系统提示应该能够确定性地渲染（给定相同的配置输入，永远产生相同的输出）；(2) 建立提示词的版本化快照机制；(3) 每次提示词变更都应在评估集上运行回归测试——就像代码变更需要跑 CI 一样。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">特性开关是<em>一等架构组件</em>，系统提示要<em>进 CI</em></h2></header>
+  <div class="c7fl-body">
+    <div class="c7fl-l fx fx-left" style="--d:2">
+      <div class="c7fl-two">
+        <div class="c7-card c7fl-c"><b>编译时开关</b><div class="c7fl-bd"><span>源码</span><i></i><span class="x">内部特性<br>物理移除</span><i></i><span>外部构建产物</span></div><p>逆向工程也找不到；关闭特性 = 代码<b>物理上不存在</b>，一种干净的消融</p></div>
+        <div class="c7-card c7fl-c"><b>运行时开关</b><div class="c7fl-bd"><span>服务端下发</span><i></i><span>本地磁盘缓存</span><i></i><span>GrowthBook 分组</span></div><p>宁可读到稍旧的缓存，<b>也不阻塞启动</b>；曝光事件<b>每会话最多记录一次</b></p></div>
+      </div>
+      <div class="c7fl-use"><span>三个目的</span><b>实验</b><b>渐进发布</b><b>紧急熔断</b></div>
+    </div>
+    <div class="c7fl-r panel fx fx-right" style="--d:3">
+      <div class="c7fl-h"><b>提示词的版本化快照与回归</b><span class="c7-tag">示意</span></div>
+      <div class="c7fl-cm"></div>
+      <div class="c7fl-res"><span>哪次提交改变了提示词？</span><b class="c7fl-who">—</b><span>对评估集的影响是什么？</span><b class="c7fl-eff">—</b></div>
+      <div class="c7fl-rl"><span>① 确定性渲染</span><span>② 版本化快照</span><span>③ 每次变更跑评估集回归</span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「双层特性开关系统」「提示词敏感性评估」</div>
+</section>
+<style>
+.c7fl-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7fl-l{display:flex;flex-direction:column;gap:14px}
+.c7fl-two{display:flex;flex-direction:column;gap:12px}
+.c7fl-c>b{font-size:19px;color:var(--acc)}
+.c7fl-bd{display:flex;align-items:center;gap:6px;margin:10px 0}
+.c7fl-bd span{font-size:15px;padding:8px 10px;border-radius:10px;border:1px solid var(--line2);text-align:center;line-height:1.35}
+.c7fl-bd span.x{border-color:rgba(251,113,133,.55);color:#fda4af;text-decoration:line-through}
+.c7fl-bd i{flex:1;height:2px;background:var(--line2)}
+.c7fl-c p{font-size:15px;line-height:1.55;color:var(--text2)}.c7fl-c p b{color:var(--text)}
+.c7fl-use{display:flex;align-items:center;gap:10px}
+.c7fl-use span{font-size:15px;color:var(--text3)}
+.c7fl-use b{font-size:17px;padding:6px 16px;border-radius:10px;background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.c7fl-r{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7fl-h{display:flex;align-items:center;gap:12px}.c7fl-h b{font-size:18px}
+.c7fl-cm{display:flex;flex-direction:column;gap:6px}
+.c7fl-cm div{display:grid;grid-template-columns:90px 1fr 110px;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid var(--line);font-size:15px;transition:border-color .3s,background .3s}
+.c7fl-cm code{font:600 15px var(--num);color:var(--acc2)}
+.c7fl-cm span{color:var(--text2)}
+.c7fl-cm b{font:700 15px var(--num);text-align:right}
+.c7fl-cm div.cur{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.c7fl-cm div.bad{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.08)}
+.c7fl-cm div.bad b{color:#fda4af}
+.c7fl-res{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:15px;color:var(--text3);padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03)}
+.c7fl-res b{font-size:16px;color:var(--text)}
+.c7fl-rl{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap}
+.c7fl-rl span{font-size:15px;padding:5px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+</style>
+<script>
+HOOKS['c07-flags'] = {
+  // [提交, 改动, 评估集得分]（示意）
+  C: [['a1f3c9e', '调整工具描述措辞', '82.0%'], ['b72d014', '新增条件分支：无网络时的提示', '81.8%'], ['c90e5aa', '合并两段安全规则', '76.4%'], ['d4410b7', '修正示例格式', '82.2%']],
+  init(s) { s.querySelector('.c7fl-cm').innerHTML = this.C.map(([c, d]) => `<div><code>${c}</code><span>${d}</span><b>—</b></div>`).join(''); },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, rs = [...s.querySelectorAll('.c7fl-cm div')];
+    while (ok()) {
+      rs.forEach((r) => { r.classList.remove('cur', 'bad'); r.querySelector('b').textContent = '—'; });
+      s.querySelector('.c7fl-who').textContent = '—'; s.querySelector('.c7fl-eff').textContent = '—';
+      for (let i = 0; i < rs.length; i++) {
+        await U.wait(ctx, 1100); if (!ok()) return;
+        rs.forEach((r) => r.classList.remove('cur')); rs[i].classList.add('cur');
+        rs[i].querySelector('b').textContent = this.C[i][2];
+        if (i === 2) { rs[i].classList.add('bad'); s.querySelector('.c7fl-who').textContent = 'c90e5aa · 合并两段安全规则'; s.querySelector('.c7fl-eff').textContent = '评估集回归 5.4 个百分点 → 回滚或修正'; }
+      }
+      await U.wait(ctx, 4000);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 隐私与评估思维转变 ================= -->
+<section class="slide" id="c07-privacy" data-part="9" data-trans="iris" data-dur="22000" data-title="隐私感知分析与评估思维的转变" data-notes="<b>以隐私感知分析为评估基础。</b>评估依赖好的数据，但 Agent 产品处理的往往是用户的敏感内容。OpenClaw 通过类型系统来解决这个矛盾：分析接口只接受经过特殊类型包装的值，<b>类型名本身就是审计线索</b>——它明确表明“我已验证这不是代码或文件路径”。这种设计将隐私约束从文档化的规范变成了编译时强制执行的类型检查。核心原则是：<b>从一开始就把隐私约束设计进去，而非事后加装</b>。如果你的分析系统无法安全地收集数据，你就无法有效地评估。隐私和评估并不对立——隐私感知的设计迫使你认真思考<b>真正需要度量什么</b>，这反而会催生更精准的评估指标。<br><b>从外部到内部：评估思维的转变。</b>本节的核心信息是：<b>前面几节教你如何从外部评估 Agent，本节揭示的是最好的 Agent 产品如何从内部评估自己</b>。外部评估告诉你“Agent 有多好”，内部评估基础设施告诉你“哪项改动让它变好了”。消融实验发现哪些特性真正重要，AB 测试量化每项改动的影响，特性开关提供实验和回滚的基础设施，提示词敏感性评估将系统提示纳入 CI 体系，隐私感知分析确保数据收集的合规性。这五个组件共同构成了评估驱动的产品工程——不是偶尔做一次评估，而是将评估嵌入到每一次产品决策中。<br>左侧闸门演示中的类型名为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">隐私约束交给<em>类型检查</em>；评估嵌入<em>每一次产品决策</em></h2></header>
+  <div class="c7pv-body">
+    <div class="c7pv-l panel fx fx-left" style="--d:2">
+      <div class="c7pv-h"><b>分析接口只接受特殊类型包装的值</b><span class="c7-tag">示意类型名</span></div>
+      <div class="c7pv-gate">
+        <div class="c7pv-in"></div>
+        <div class="c7pv-wall"><svg class="ic"><use href="#i-shield"/></svg><span>编译时类型检查</span></div>
+        <div class="c7pv-out"><span class="lbl">分析系统</span><div class="c7pv-ok"></div></div>
+      </div>
+      <div class="win c7pv-code"><div class="win-bar"><i></i><i></i><i></i><span>analytics.ts</span></div><pre class="code"><span class="ln">logEvent(<span class="t-s">'tool_used'</span>, {</span><span class="ln hl">  name: value <span class="t-k">as</span> <span class="t-p">VerifiedNotCodeOrFilePath</span>,</span><span class="ln">})  <span class="t-c">// 类型名本身就是审计线索</span></span></pre></div>
+    </div>
+    <div class="c7pv-r fx fx-right" style="--d:3">
+      <div class="c7pv-cmp"><div><span class="lbl">外部评估</span><b>Agent 有多好？</b></div><div class="in"><span class="lbl">内部评估基础设施</span><b>哪项改动让它变好了？</b></div></div>
+      <div class="c7pv-five"></div>
+      <p class="c7pv-nt">隐私与评估并不对立：隐私感知的设计迫使你认真思考<b>真正需要度量什么</b>，反而催生更精准的评估指标</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「以隐私感知分析为评估基础」「从外部到内部：评估思维的转变」</div>
+</section>
+<style>
+.c7pv-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7pv-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7pv-h{display:flex;align-items:center;gap:12px}.c7pv-h b{font-size:18px}
+.c7pv-gate{display:grid;grid-template-columns:1fr 120px 1fr;gap:14px;align-items:center;min-height:250px}
+.c7pv-in,.c7pv-ok{display:flex;flex-direction:column;gap:8px}
+.c7pv-it{font:600 15px var(--num);padding:8px 12px;border-radius:10px;border:1px solid var(--line2);transition:translate .8s var(--ease),opacity .6s,border-color .3s;white-space:nowrap}
+.c7pv-it.go{translate:300px 0;opacity:0}
+.c7pv-it.bk{border-color:rgba(251,113,133,.6);color:#fda4af;animation:c7pvShake .4s}
+@keyframes c7pvShake{25%{translate:6px 0}75%{translate:-6px 0}}
+.c7pv-wall{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;border-radius:14px;border:2px dashed color-mix(in srgb,var(--acc) 55%,transparent);font-size:15px;text-align:center;color:var(--text2)}
+.c7pv-wall .ic{width:34px;height:34px;color:var(--acc)}
+.c7pv-out{display:flex;flex-direction:column;gap:8px;height:100%;padding:10px;border-radius:14px;background:rgba(255,255,255,.03)}
+.c7pv-ok .c7pv-it{border-color:rgba(52,211,153,.55);color:#6ee7b7;animation:c7pvIn .4s}
+@keyframes c7pvIn{from{opacity:0;translate:-20px 0}}
+.c7pv-code pre{font-size:15px}
+.c7pv-r{display:flex;flex-direction:column;gap:12px}
+.c7pv-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7pv-cmp div{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7pv-cmp b{font-size:20px}
+.c7pv-cmp .in{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.c7pv-five{display:flex;flex-direction:column;gap:6px}
+.c7pv-five div{display:grid;grid-template-columns:170px 1fr;gap:12px;padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.03);font-size:15px;color:var(--text2);transition:background .35s}
+.c7pv-five b{font-size:16px;color:var(--text)}
+.c7pv-five div.on{background:color-mix(in srgb,var(--acc) 13%,transparent)}
+.c7pv-nt{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c7pv-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-privacy'] = {
+  IN: [['"edit_file"', 1], ['"/home/alice/secret.env"', 0], ['"bash"', 1], ['"def login(pw): …"', 0], ['"web_search"', 1]],
+  FIVE: [['消融实验', '发现哪些特性真正重要'], ['AB 测试', '量化每项改动的影响'], ['特性开关', '提供实验和回滚的基础设施'], ['提示词敏感性评估', '把系统提示纳入 CI 体系'], ['隐私感知分析', '确保数据收集的合规性']],
+  init(s) { s.querySelector('.c7pv-five').innerHTML = this.FIVE.map(([a, b]) => `<div><b>${a}</b><span>${b}</span></div>`).join(''); },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, inn = s.querySelector('.c7pv-in'), out = s.querySelector('.c7pv-ok');
+    while (ok()) {
+      inn.innerHTML = this.IN.map(([v]) => `<span class="c7pv-it">${v}</span>`).join(''); out.innerHTML = '';
+      const its = [...inn.children];
+      for (let i = 0; i < its.length; i++) {
+        await U.wait(ctx, 900); if (!ok()) return;
+        if (this.IN[i][1]) { its[i].classList.add('go'); ctx.later(() => out.insertAdjacentHTML('beforeend', `<span class="c7pv-it">${this.IN[i][0]}</span>`), 500); }
+        else its[i].classList.add('bk');
+        s.querySelectorAll('.c7pv-five div').forEach((d, j) => d.classList.toggle('on', j === i));
+      }
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.c7pv-in').innerHTML = ''; s.querySelector('.c7pv-ok').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 仿真环境：桥梁 ================= -->
+<section class="slide" id="c07-simbridge" data-part="9" data-trans="zoom" data-dur="22000" data-title="仿真环境：从评估到后训练的桥梁" data-notes="评估的终点不是打分，而是改进。本章已经展示了改进的两条路径：调整 Harness（从 Benchmark 报告到系统改进）和把评估嵌入产品工程（内部评估基础设施）。而最深入的改进方式是训练——当目标从“评估现有能力”扩展到“培养新能力”时，特别是通过第八章讨论的后训练技术，评估环境就需要演化为<b>仿真环境</b>：一个能让 Agent 反复练习、自动打分的虚拟操场。仿真环境与评估环境的核心区别在于：交互频率高得多（数百万次 vs 数千次）、需要随机化（防止死记硬背特定配置），而且必须提供即时反馈。从应用领域看，仿真环境分为数字环境（信息处理任务）与具身环境（物理世界感知与操作）两大类。<br>这座桥梁的两端是这样接起来的。评估侧已经积累的资产可以近乎无缝地转成训练信号：一套定义清晰的 Rubric 或验证器，本质上就是一个<b>可验证奖励（RLVR，Reinforcement Learning with Verifiable Rewards）</b>的奖励函数——<b>验证脚本直接就是奖励脚本</b>，测试是否通过、状态是否达标，既是评估的判据，也是强化学习的回报。但训练会提出评估阶段不必操心的新要求。其一是<b>可靠的 reset 语义</b>：训练要跑数百万个 episode，每个 episode 都必须能把环境重置到一个确定、干净的初始状态，否则梯度信号会被上一轮的残留状态污染。其二是<b>远高于评估的吞吐</b>：评估几千次就够出结论，训练则要在可接受的墙钟时间内喂给模型上百万次交互，环境的并行度和单实例开销直接决定训练是否可行。这两点都将在第八章展开。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">验证脚本，<em>直接就是奖励脚本</em></h2></div>
+    <div class="c7sb-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="e">评估环境</button><button data-v="t">仿真（训练）环境</button></div></header>
+  <div class="c7sb-body">
+    <div class="c7sb-l panel fx fx-left" style="--d:3">
+      <div class="c7sb-rows">
+        <div><span>交互次数</span><b class="c7sb-v" data-k="n"></b></div>
+        <div><span>随机化</span><b class="c7sb-v" data-k="r"></b></div>
+        <div><span>反馈</span><b class="c7sb-v" data-k="f"></b></div>
+        <div><span>reset 语义</span><b class="c7sb-v" data-k="s"></b></div>
+        <div><span>吞吐</span><b class="c7sb-v" data-k="t"></b></div>
+      </div>
+      <div class="c7sb-ep"><span class="lbl">episode</span><div class="c7sb-eps"></div></div>
+    </div>
+    <div class="c7sb-r fx fx-right" style="--d:4">
+      <div class="c7sb-br"><div><span class="lbl">评估侧</span><b>Rubric / 验证器</b><small>测试是否通过、状态是否达标</small></div><svg class="ic"><use href="#i-arrow"/></svg><div><span class="lbl">训练侧</span><b>RLVR 奖励函数</b><small>Reinforcement Learning with Verifiable Rewards</small></div></div>
+      <div class="c7-card c7sb-two"><b>两大类</b><p><b>数字环境</b>：信息处理任务 · <b>具身环境</b>：物理世界感知与操作</p></div>
+      <p class="c7sb-nt">奖励函数化的验证器、面向训练的 reset 与吞吐——都将在<b>第八章</b>展开</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「仿真环境：从评估到后训练的桥梁」</div>
+</section>
+<style>
+.c7sb-seg button{font-size:16px}
+.c7sb-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7sb-l{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.c7sb-rows{display:flex;flex-direction:column;gap:8px}
+.c7sb-rows div{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.c7sb-rows span{font-size:16px;color:var(--text3)}
+.c7sb-v{font-size:17px;transition:color .3s}
+#c07-simbridge.t .c7sb-v{color:var(--acc)}
+.c7sb-ep{display:flex;flex-direction:column;gap:8px}
+.c7sb-eps{display:grid;grid-template-columns:repeat(40,1fr);gap:3px}
+.c7sb-eps i{aspect-ratio:1;border-radius:2px;background:rgba(255,255,255,.06)}
+.c7sb-eps i.on{background:color-mix(in srgb,var(--acc) 70%,transparent)}
+.c7sb-eps i.dirty{background:#fb7185}
+.c7sb-r{display:flex;flex-direction:column;gap:14px}
+.c7sb-br{display:grid;grid-template-columns:1fr 40px 1fr;gap:10px;align-items:center}
+.c7sb-br div{display:flex;flex-direction:column;gap:4px;padding:16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c7sb-br div:last-child{border-color:color-mix(in srgb,var(--acc) 60%,transparent)}
+.c7sb-br b{font-size:20px}
+.c7sb-br small{font-size:15px;color:var(--text3);line-height:1.4}
+.c7sb-br .ic{width:34px;height:34px;color:var(--acc)}
+.c7sb-two p{font-size:16px;line-height:1.55;color:var(--text2)}.c7sb-two p b{color:var(--text)}
+.c7sb-two>b{font-size:17px;color:var(--acc)}
+.c7sb-nt{margin-top:auto;font-size:17px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c7sb-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-simbridge'] = {
+  D: {
+    e: { n: '数千次就够出结论', r: '固定配置即可', f: '跑完再统计', s: '偶尔重置', t: '几千次 / 评估轮' },
+    t: { n: '数百万次', r: '必须随机化，防止死记硬背特定配置', f: '即时反馈', s: '每个 episode 重置到确定、干净的初始状态', t: '上百万次交互，并行度与单实例开销决定可行性' },
+  },
+  init(s) {
+    s.querySelector('.c7sb-eps').innerHTML = '<i></i>'.repeat(200);
+    this.seg = U.seg(s.querySelector('.c7sb-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) {
+    this.v = v; s.classList.toggle('t', v === 't');
+    s.querySelectorAll('.c7sb-v').forEach((b) => (b.textContent = this.D[v][b.dataset.k]));
+    const eps = s.querySelectorAll('.c7sb-eps i'), n = v === 't' ? 200 : 12;
+    eps.forEach((e, i) => { e.className = i < n ? 'on' : ''; });
+    if (v === 't') [57, 58, 59].forEach((i) => (eps[i].className = 'dirty'));
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 2, 4200, (i) => { this.i = i; const v = i ? 't' : 'e'; this.seg(v); this.show(s, v); }, 300); },
+  reset(s) { this.i = null; s.classList.remove('t'); },
+};
+</script>
+
+<!-- ================= 图7-9 保真度谱 ================= -->
+<section class="slide" id="c07-fidelity" data-part="9" data-trans="flip" data-dur="26000" data-title="图7-9 仿真保真度谱" data-notes="图7-9 把常见仿真环境排在“仿真保真度 → 可扩展性”两个维度上：Mock API（单元测试级，百万次/小时）、AWorld（MCP 沙盒，126 个工具函数，分布式 525 秒/轮）、AndroidWorld（模拟器，116 个真实应用任务，UI Automator）、Isaac Gym（GPU 并行，千级并行实例，精度略妥协）、RoboTwin2（物理引擎，高精度碰撞，单实例 CPU）、真实世界（完美保真度，但不可重置）。保真度越高，可扩展性越低。<br><b>数字环境</b>方面，AWorld 框架为 GAIA 任务构建了可控的 MCP 服务器沙盒，提供 <b>26 个 MCP 服务器、涵盖 126 个工具函数</b>，避免直接访问真实 API 带来的封禁和不可控副作用。所有工具调用可重放、可审计。AWorld 的分布式架构将传统串行执行的 <b>7695 秒缩短到 525 秒（14.6 倍加速）</b>，环境的无状态设计使每个实例完全独立，支持高效并行。<br><b>具身环境</b>方面，RoboTwin2 基于物理引擎构建双臂操作任务，环境随机化物体位置、朝向和外观以提升泛化能力。观测空间包括多相机视觉和关节状态，通过<b>动作分块（Action Chunking）</b>——模型一次规划多个连续动作——实现实时控制（详见第六章）。OSWorld 通过虚拟机快照实现可重置性，AndroidWorld 聚焦移动应用自动化。无论数字环境还是具身环境，仿真环境同样需要第四章讨论的隔离执行环境与虚拟身份机制（VM/容器隔离、住宅代理、Human-in-the-Loop 认证、共享文件系统）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图7-9 保真度越高，<em>可扩展性越低</em></h2></header>
+  <div class="c7fd-body">
+    <div class="c7fd-ch panel fx fx-left" style="--d:2">
+      <div class="c7fd-st">
+        <span class="c7fd-ya">可扩展性 ↑</span><span class="c7fd-xa">仿真保真度 →</span>
+        <svg class="c7fd-svg" viewBox="0 0 900 520"><path class="c7fd-tr" d="M60 40 C320 80 600 300 860 480"/></svg>
+      </div>
+    </div>
+    <div class="c7fd-r fx fx-right" style="--d:3">
+      <div class="c7fd-card"><b class="c7fd-n">—</b><div class="c7fd-tags"></div><p class="c7fd-d"></p></div>
+      <div class="c7-card c7fd-aw"><b>AWorld 分布式加速</b><div class="c7fd-sp"><div><span>串行</span><i class="a"></i><b>7695 s</b></div><div><span>分布式</span><i class="b"></i><b>525 s</b></div></div><p><b>14.6 倍</b>加速；无状态设计，每个实例完全独立</p></div>
+      <p class="c7fd-iso">两类环境都需要第四章的隔离执行与虚拟身份：VM / 容器隔离、住宅代理、Human-in-the-Loop 认证、共享文件系统</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「仿真环境：从评估到后训练的桥梁」· 图7-9 仿真保真度谱</div>
+</section>
+<style>
+.c7fd-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c7fd-ch{padding:16px 20px}
+.c7fd-st{position:relative;width:100%;height:100%;min-height:560px}
+.c7fd-ya{position:absolute;left:0;top:0;font-size:15px;color:var(--text3)}
+.c7fd-xa{position:absolute;right:0;bottom:0;font-size:15px;color:var(--text3)}
+.c7fd-svg{position:absolute;left:20px;right:20px;top:20px;bottom:30px;width:calc(100% - 40px);height:calc(100% - 50px)}
+.c7fd-tr{fill:none;stroke:var(--line2);stroke-width:2;stroke-dasharray:8 8}
+.c7fd-p{position:absolute;translate:-50% -50%;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.c7fd-p i{width:22px;height:22px;border-radius:50%;background:var(--c);box-shadow:0 0 0 0 var(--c);transition:box-shadow .4s,scale .4s}
+.c7fd-p b{font-size:16px;white-space:nowrap}
+.c7fd-p small{font-size:15px;color:var(--text3);white-space:nowrap}
+.c7fd-p.on i{scale:1.4;box-shadow:0 0 0 10px color-mix(in srgb,var(--c) 25%,transparent)}
+.c7fd-r{display:flex;flex-direction:column;gap:12px}
+.c7fd-card{padding:16px 20px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 7%,rgba(12,18,40,.8));min-height:180px}
+.c7fd-n{font-size:24px}
+.c7fd-tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+.c7fd-tags span{font-size:15px;padding:3px 10px;border-radius:8px;border:1px solid var(--line2)}
+.c7fd-d{font-size:15px;line-height:1.55;color:var(--text2)}
+.c7fd-aw>b{font-size:17px;color:var(--acc)}
+.c7fd-sp{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.c7fd-sp div{display:grid;grid-template-columns:70px 1fr 80px;gap:10px;align-items:center;font-size:15px}
+.c7fd-sp i{height:18px;border-radius:5px}
+.c7fd-sp i.a{background:rgba(148,163,184,.5)}
+.c7fd-sp i.b{width:6.8%;background:var(--acc)}
+.c7fd-sp b{font-family:var(--num);text-align:right}
+.c7fd-aw p{font-size:15px;color:var(--text2)}.c7fd-aw p b{color:var(--text)}
+.c7fd-iso{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text3)}
+</style>
+<script>
+HOOKS['c07-fidelity'] = {
+  // [名称, 类型, 标签, 说明, x%, y%, 色]
+  P: [
+    ['Mock API', '单元测试级', ['百万次 / 小时'], '可扩展性最高，但离真实最远', 8, 10, '#94a3b8'],
+    ['AWorld', 'MCP 沙盒', ['26 个 MCP 服务器', '126 个工具函数', '525 s / 轮 分布式'], '为 GAIA 任务构建的可控沙盒，避免直接访问真实 API 带来的封禁和不可控副作用；所有工具调用可重放、可审计', 27, 24, '#22d3ee'],
+    ['AndroidWorld', '模拟器', ['116 个真实应用任务', 'UI Automator'], '聚焦移动应用自动化；OSWorld 则通过虚拟机快照实现可重置性', 46, 42, '#34d399'],
+    ['Isaac Gym', 'GPU 并行', ['千级并行实例', '精度略妥协'], '用 GPU 并行换取规模，物理精度有所让步', 62, 58, '#fbbf24'],
+    ['RoboTwin2', '物理引擎', ['高精度碰撞', '单实例 CPU', '动作分块'], '双臂操作任务；随机化物体位置、朝向和外观以提升泛化；多相机视觉 + 关节状态', 78, 74, '#fb923c'],
+    ['真实世界', '完美保真度', ['不可重置'], '保真度最高，却无法 reset——这正是需要仿真的原因', 94, 90, '#fb7185'],
+  ],
+  init(s) {
+    const st = s.querySelector('.c7fd-st');
+    this.P.forEach(([n, t], i) => st.insertAdjacentHTML('beforeend', `<div class="c7fd-p" data-i="${i}" style="--c:${this.P[i][6]};left:${this.P[i][4]}%;top:${this.P[i][5]}%"><i></i><b>${n}</b><small>${t}</small></div>`));
+    st.querySelectorAll('.c7fd-p').forEach((p) => p.addEventListener('click', () => { this.auto = false; this.pick(s, +p.dataset.i); }));
+  },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c7fd-p').forEach((p, j) => p.classList.toggle('on', j === i));
+    const [n, t, tags, d] = this.P[i];
+    s.querySelector('.c7fd-n').textContent = `${n} · ${t}`;
+    s.querySelector('.c7fd-tags').innerHTML = tags.map((x) => `<span>${x}</span>`).join('');
+    s.querySelector('.c7fd-d').textContent = d;
+  },
+  enter(s, ctx) { C7.auto(this, ctx, this.P.length, 3000, (i) => this.pick(s, i), 600); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7fd-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 实验 7-14 ================= -->
+<section class="slide" id="c07-exp714" data-part="9" data-trans="rise" data-dur="26000" data-title="实验 7-14 ★★：配置 OpenVLA 与 RoboTwin2 的具身智能环境" data-notes="<b>实验 7-14 ★★：配置 OpenVLA 与 RoboTwin2 的具身智能环境。</b>搭建机器人操作的仿真环境。阅读 ch7/SimpleVLA-RL 和 OpenVLA 文档，理解视觉-语言-动作模型的架构（视觉编码器 + 语言模型 + 动作解码器端到端整合，图像和文本投影到共享语义空间）。配置 RoboTwin2 环境，理解观测空间（三视角 RGB + 14 维关节状态）和动作空间（14 维控制向量）。研究 move_can_pot 中的环境随机化机制和空间约束逻辑。运行预训练模型评估，记录成功率、完成时间和失败模式，<b>重点关注动作分块机制的影响</b>。<br>图7-10：多模态观测（头部相机、左腕相机、右腕相机各 224×224 RGB，加 14 维关节状态向量）进入 VLA 模型——视觉编码器 SigLIP 生成视觉 tokens，语言模型以 Llama 2 7B 为 backbone，动作解码器输出 14 维连续控制向量；动作分块一次生成 25 个连续动作。指令：“将罐子放入锅中”。SAPIEN 物理引擎模拟双臂机器人（各 7 自由度 = 14 维动作），环境随机化位置 60cm、朝向 ±22.5°，含碰撞检测与刚体、软体、摩擦力仿真。评估指标：成功率（罐子在锅内且未掉落）、完成时间（25 步 × 25 动作 = 625 控制步）、泛化能力（跨位置、朝向、外观变体），以及 Sim-to-Real（域随机化 → 真实迁移）。<br>配套仓库的正式单卡运行：两个 arm 各 128 IID + 128 OOD episodes，chunk 1 为 0/256，chunk 25 为 26/256（IID 13/128、OOD 13/128），配对成功率提高约 10.2 个百分点。这是一项完整的负面/低成功率结果，不把实验完成误写成模型表现良好；其余 486 个失败都在 200 个 action step 上限处超时结束。动作块较长后成功率提高，也不等于所有任务都应使用长动作块。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-14 <span class="c7-star">★★</span>：图7-10 VLA 与<em>动作分块</em></h2></header>
+  <div class="c7vl-body">
+    <div class="c7vl-arch panel fx fx-left" style="--d:2">
+      <div class="c7vl-row">
+        <div class="c7vl-obs"><span class="lbl">多模态观测</span><div><i>头部相机</i><i>左腕相机</i><i>右腕相机</i></div><small>各 224×224 RGB + 14 维关节状态</small></div>
+        <div class="c7vl-vla"><span class="lbl">VLA 模型</span><div class="c7vl-m"><b>视觉编码器</b><small>SigLIP → 视觉 tokens</small></div><div class="c7vl-m"><b>语言模型</b><small>Llama 2 7B backbone</small></div><div class="c7vl-m"><b>动作解码器</b><small>→ 14 维连续控制向量</small></div><em>指令：“将罐子放入锅中”</em></div>
+        <div class="c7vl-env"><span class="lbl">SAPIEN 物理引擎</span><b>双臂机器人</b><small>各 7 自由度 = 14 维动作</small><small>随机化：位置 60 cm · 朝向 ±22.5°</small><small>碰撞检测 · 刚体 / 软体 / 摩擦力</small></div>
+      </div>
+      <div class="c7vl-ck"><span class="lbl">动作分块：一次生成 <b class="c7vl-k">25</b> 个连续动作</span><div class="c7vl-seg seg"><i class="knob"></i><button data-v="1">chunk 1</button><button data-v="25">chunk 25</button></div></div>
+      <div class="c7vl-tl"></div>
+      <div class="c7vl-met"><span><b>成功率</b>罐子在锅内且未掉落</span><span><b>完成时间</b>25 步 × 25 动作 = 625 控制步</span><span><b>泛化</b>跨位置 / 朝向 / 外观变体</span><span><b>Sim-to-Real</b>域随机化 → 真实迁移</span></div>
+    </div>
+    <div class="c7vl-r fx fx-right" style="--d:3">
+      <div class="c7-card c7vl-res"><b class="c7vl-kk">配套仓库正式运行 · move_can_pot</b>
+        <div class="c7vl-bars"><div><span>chunk 1</span><i style="--v:0"></i><b>0 / 256</b></div><div><span>chunk 25</span><i style="--v:.1016"></i><b>26 / 256</b></div></div>
+        <p>chunk 25：IID 13/128、OOD 13/128；配对成功率 <b>+10.2 个百分点</b></p>
+        <p>一项完整的<b>负面 / 低成功率</b>结果：其余 486 个失败都在 200 步上限处超时</p></div>
+      <p class="c7vl-nt">动作块较长后成功率提高，<b>不等于所有任务都应使用长动作块</b>——要结合任务速度、误差累积和纠正行为分析</p>
+      <p class="c7-data">数据：配套仓库 chapter7/openvla-robotwin2-eval，运行 exp7-13-localgpu-20260803-v1（仓库沿用旧编号 7-13），每个 arm 128 IID + 128 OOD episodes</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「仿真环境：从评估到后训练的桥梁」· 实验 7-14 · 图7-10 OpenVLA 与 RoboTwin2 具身智能环境</div>
+</section>
+<style>
+.c7vl-body{display:grid;grid-template-columns:1.45fr 1fr;gap:22px;flex:1;min-height:0}
+.c7vl-arch{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.c7vl-row{display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:12px}
+.c7vl-row>div{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:14px;border:1px solid var(--line)}
+.c7vl-obs div{display:flex;flex-direction:column;gap:5px}
+.c7vl-obs i{font-style:normal;font-size:15px;padding:5px 10px;border-radius:8px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.35)}
+.c7vl-row small{font-size:15px;color:var(--text3);line-height:1.4}
+.c7vl-vla{border-color:color-mix(in srgb,var(--acc) 55%,transparent)!important}
+.c7vl-m{display:flex;flex-direction:column;padding:5px 10px;border-radius:8px;background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c7vl-m b{font-size:15px}
+.c7vl-vla em{font-style:normal;font-size:15px;color:var(--warn)}
+.c7vl-env b{font-size:16px}
+.c7vl-ck{display:flex;align-items:center;justify-content:space-between}
+.c7vl-ck b{font-family:var(--num);color:var(--acc)}
+.c7vl-seg button{font-size:15px}
+.c7vl-tl{display:flex;gap:2px;height:46px;align-items:stretch}
+.c7vl-tl i{flex:1;border-radius:2px;background:rgba(255,255,255,.06);transition:background .15s}
+.c7vl-tl i.inf{background:var(--acc)}
+.c7vl-tl i.ex{background:rgba(52,211,153,.5)}
+.c7vl-met{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.c7vl-met span{display:flex;flex-direction:column;gap:2px;font-size:15px;line-height:1.4;color:var(--text3);padding:8px 10px;border-radius:10px;background:rgba(255,255,255,.03)}
+.c7vl-met b{font-size:16px;color:var(--text)}
+.c7vl-r{display:flex;flex-direction:column;gap:12px}
+.c7vl-kk{display:block;font-size:17px;color:var(--acc);margin-bottom:10px}
+.c7vl-bars{display:flex;flex-direction:column;gap:8px}
+.c7vl-bars div{display:grid;grid-template-columns:80px 1fr 90px;gap:10px;align-items:center;font-size:15px}
+.c7vl-bars i{height:24px;border-radius:6px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c7vl-bars i::after{content:"";position:absolute;inset:0;width:calc(var(--v)*100%);background:var(--acc)}
+.c7vl-bars b{font-family:var(--num);text-align:right}
+.c7vl-res p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:8px}.c7vl-res p b{color:var(--text)}
+.c7vl-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c7vl-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp714'] = {
+  init(s) {
+    s.querySelector('.c7vl-tl').innerHTML = '<i></i>'.repeat(75);
+    this.seg = U.seg(s.querySelector('.c7vl-seg'), (v) => { this.manual = true; this.k = +v; this.play(s, this.ctx); });
+  },
+  // 时间线：模型推理一次（紫）→ 执行 k 个动作（绿），示意 75 个控制步
+  async play(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx && ctx.alive, k = this.k;
+    s.querySelector('.c7vl-k').textContent = k;
+    const cs = [...s.querySelectorAll('.c7vl-tl i')];
+    cs.forEach((c) => (c.className = ''));
+    for (let i = 0; i < cs.length; i++) {
+      await U.wait(ctx, 40); if (!ok()) return;
+      cs[i].className = i % (k + 1) === 0 ? 'inf' : 'ex';
+    }
+    return true;
+  },
+  async loop(s, ctx) {
+    while (ctx.alive && !this.manual) {
+      for (const k of [1, 25]) {
+        if (this.manual || !ctx.alive) return;
+        this.k = k; this.seg(String(k));
+        await this.play(s, ctx);
+        await U.wait(ctx, 2200);
+      }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.manual = false; this.loop(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7vl-tl i').forEach((c) => (c.className = '')); },
+};
+</script>
+
+<!-- ================= 领域随机化 ================= -->
+<section class="slide" id="c07-domain" data-part="9" data-trans="iris" data-dur="20000" data-title="保真度权衡与领域随机化" data-notes="<b>保真度权衡与领域随机化。</b>高保真环境能更好地迁移到真实世界，但计算开销大。保真度的另一维度是随机化程度：<b>适度随机化能提升泛化能力，过度随机化则会让任务变得过于困难</b>。<b>领域随机化（Domain Randomization）</b>是缩小仿真与现实差距（sim-to-real gap）的关键技术：在物理参数、视觉外观、传感器噪声等方面引入大范围随机变化——好比在各种光照和角度下都练习过抓取，到了真实环境也不会因为光线变化就失手。在数字环境中，sim-to-real 表现为界面渲染、响应时间等方面的差异，可通过引入延迟和失败的随机化来缓解。<br>页面上的滑块调节随机化强度：左边画布里的训练样本随之变化（光照、朝向、位置），右侧两条曲线是示意的“泛化能力”和“任务难度”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">领域随机化：<em>适度</em>提升泛化，<em>过度</em>让任务太难</h2></header>
+  <div class="c7dr-body">
+    <div class="c7dr-l panel fx fx-left" style="--d:2">
+      <div class="c7dr-h"><b>训练时见过的场景</b><label>随机化强度 <input type="range" class="rng c7dr-r" min="0" max="100" step="1" value="40"><b class="c7dr-v">40</b></label></div>
+      <canvas class="c7dr-cv" width="880" height="420"></canvas>
+      <div class="c7dr-dims"><span>物理参数</span><span>视觉外观 · 光照</span><span>传感器噪声</span><span>数字环境：延迟与失败</span></div>
+    </div>
+    <div class="c7dr-r fx fx-right" style="--d:3">
+      <div class="c7-card"><div class="c7dr-ch"><b>示意曲线</b><span class="c7-tag">示意</span></div><svg class="c7dr-svg" viewBox="0 0 560 300"></svg><div class="c7dr-lg"><span class="g"><i></i>泛化能力（sim-to-real）</span><span class="d"><i></i>任务难度</span></div></div>
+      <p class="c7dr-nt">好比在各种光照和角度下都练习过抓取，到了真实环境<b>也不会因为光线变化就失手</b></p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「保真度权衡与领域随机化」</div>
+</section>
+<style>
+.c7dr-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c7dr-l{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.c7dr-h{display:flex;justify-content:space-between;align-items:center}
+.c7dr-h>b{font-size:18px}
+.c7dr-h label{display:flex;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.c7dr-h label input{width:260px}
+.c7dr-h label b{font:800 22px var(--num);color:var(--text);min-width:40px}
+.c7dr-cv{width:100%;height:420px;border-radius:12px;background:rgba(0,0,0,.25)}
+.c7dr-dims{display:flex;gap:8px;flex-wrap:wrap}
+.c7dr-dims span{font-size:15px;padding:4px 10px;border-radius:8px;border:1px solid var(--line2)}
+.c7dr-r{display:flex;flex-direction:column;gap:14px}
+.c7dr-ch{display:flex;align-items:center;gap:12px;margin-bottom:6px}.c7dr-ch b{font-size:17px;color:var(--acc)}
+.c7dr-svg{width:100%;height:300px}
+.c7dr-svg path{fill:none;stroke-width:4}
+.c7dr-svg .g{stroke:#34d399}.c7dr-svg .d{stroke:#fb7185}
+.c7dr-svg .cur{stroke:var(--warn);stroke-width:2;stroke-dasharray:6 5}
+.c7dr-svg text{fill:var(--text3);font-size:15px}
+.c7dr-lg{display:flex;gap:16px}
+.c7dr-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7dr-lg i{width:14px;height:4px;border-radius:2px}
+.c7dr-lg .g i{background:#34d399}.c7dr-lg .d i{background:#fb7185}
+.c7dr-nt{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c7dr-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-domain'] = {
+  init(s) {
+    const svg = s.querySelector('.c7dr-svg'), S = C7.S, X = (r) => 40 + r * 5, Y = (v) => 270 - v * 240;
+    S('line', { x1: 40, y1: 270, x2: 540, y2: 270, stroke: 'rgba(255,255,255,.2)' }, svg);
+    const g = (r) => 0.3 + 0.6 * Math.sin(Math.min(1, r / 100) * Math.PI * 0.85) * (r < 70 ? 1 : 1 - (r - 70) / 120), d = (r) => 0.15 + 0.8 * Math.pow(r / 100, 2);
+    const path = (f) => 'M' + Array.from({ length: 101 }, (_, r) => `${X(r)},${Y(f(r)).toFixed(1)}`).join(' L');
+    S('path', { d: path(g), class: 'g' }, svg); S('path', { d: path(d), class: 'd' }, svg);
+    this.cur = S('line', { x1: X(40), y1: 20, x2: X(40), y2: 270, class: 'cur' }, svg);
+    const t1 = S('text', { x: 40, y: 292 }, svg); t1.textContent = '无随机化'; const t2 = S('text', { x: 470, y: 292 }, svg); t2.textContent = '过度';
+    this.X = X;
+    this.q = (x) => s.querySelector(x);
+    this.q('.c7dr-r').addEventListener('input', () => { this.manual = true; this.r = +this.q('.c7dr-r').value; this.upd(); });
+    const rnd = U.rand(3); this.seeds = Array.from({ length: 12 }, () => [rnd(), rnd(), rnd(), rnd(), rnd()]);
+  },
+  upd() { this.q('.c7dr-v').textContent = Math.round(this.r); this.cur.setAttribute('x1', this.X(this.r)); this.cur.setAttribute('x2', this.X(this.r)); },
+  draw(t) {
+    const cv = this.q('.c7dr-cv'), g = cv.getContext('2d'), W = cv.width, H = cv.height, k = this.r / 100;
+    g.clearRect(0, 0, W, H);
+    this.seeds.forEach(([a, b, c, d, e], i) => {
+      const cx = 80 + (i % 6) * 145, cy = 110 + Math.floor(i / 6) * 200;
+      const light = 0.55 + (a - 0.5) * k * 0.9, ang = (b - 0.5) * k * Math.PI * 0.9, dx = (c - 0.5) * k * 70, dy = (d - 0.5) * k * 50;
+      g.fillStyle = `rgba(${Math.round(120 * light)},${Math.round(140 * light)},${Math.round(190 * light)},.35)`;
+      g.fillRect(cx - 60, cy - 80, 120, 160);
+      g.save(); g.translate(cx + dx, cy + dy + 30); g.rotate(ang);
+      g.fillStyle = `hsl(${30 + e * 300 * k},70%,${40 + light * 25}%)`; g.fillRect(-26, -16, 52, 32);
+      g.restore();
+      g.strokeStyle = `rgba(255,255,255,${0.5 + 0.3 * Math.sin(t / 400 + i)})`; g.lineWidth = 3;
+      g.beginPath(); g.arc(cx + dx * 0.4, cy - 40, 12, 0, Math.PI * 2); g.stroke();
+      if (k > 0.75) { g.fillStyle = 'rgba(251,113,133,.15)'; g.fillRect(cx - 60, cy - 80, 120, 160); }
+    });
+  },
+  enter(s, ctx) {
+    this.manual = false; this.r = 40; this.q('.c7dr-r').value = 40; this.upd();
+    const t0 = performance.now();
+    ctx.raf((now) => {
+      if (!this.manual) { this.r = 50 + 48 * Math.sin((now - t0) / 2600 - 0.2); this.q('.c7dr-r').value = this.r; this.upd(); }
+      this.draw(now); return true;
+    });
+  },
+  reset() {},
+};
+</script>

@@ -1,0 +1,209 @@
+<!-- ================= PART 09 睡眠学习 ================= -->
+<section class="slide chapter" id="c09-d9" data-part="9" data-title="PART 09 · 睡眠学习" data-notes="“睡眠学习”是对离线整合的认知类比，并不要求任务真的在夜间运行。在线 Agent 的首要职责是完成当前任务并追加不可变证据；后台学习进程则在空闲期或满足门控条件时读取一批新经历，比较新旧结论、合并重复项、解决冲突、提出更新提案并运行回归。这一部分依次讲睡眠学习的五步周期、Claude Code 与 Hermes 的记忆整理，以及长时间尺度上的上下文腐化与周期性整理。">
+  <div class="ch-k fx fx-up">PART 09</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">睡眠学习</h1>
+  <div class="ch-s fx fx-up" style="--d:3">整合、遗忘与能力保鲜</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">把采集与整理分开，防止一次偶发成功、网络故障或恶意输入立刻改写长期能力。</blockquote>
+  <div class="ch-loop" data-node="8" data-num="09"></div>
+</section>
+
+<section class="slide" id="c09-sleep5" data-part="9" data-dur="22000" data-title="睡眠学习的五步周期" data-notes="“睡眠学习”是对离线整合的认知类比，并不要求任务真的在夜间运行。在线 Agent 的首要职责是完成当前任务并追加不可变证据；后台学习进程则在空闲期或满足门控条件时读取一批新经历，比较新旧结论、合并重复项、解决冲突、提出更新提案并运行回归。把采集与整理分开，可以防止一次偶发成功、网络故障或恶意输入立刻改写长期能力，也允许系统使用更大的批量和更便宜的模型完成整理。<br>一个典型的睡眠学习周期包含五步：1. <b>触发</b>：达到时间间隔、新增轨迹数量、存储容量或错误频率门槛，并确认当前没有高优先级在线任务；2. <b>定向</b>：读取正式知识、Prompt、Skill 目录及其版本，了解已有能力和不可修改边界；3. <b>采集与整合</b>：从近期已评价轨迹中寻找新信号，合并重复内容，标记冲突与适用条件，优先生成局部补丁；4. <b>验证与审批</b>：在迁移集、保留集和安全集上评估待验证版本，高风险写入等待人工批准；5. <b>修剪与索引</b>：更新检索索引，把长期不用或被新证据推翻的能力标记为过期，或将其归档、删除，同时保留来源和回滚版本。<br>左侧“白天”不断追加证据，门控计量条满了、且没有高优先级任务时，进入“夜间”五步（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">白天只追加证据，<em>空闲时再整理</em></h2></header>
+  <div class="g9b-body">
+    <div class="g9b-day panel fx fx-left" style="--d:2">
+      <div class="g9b-sky"><svg class="ic g9b-sun"><use href="#i-sun"/></svg><svg class="ic g9b-moon"><use href="#i-moon"/></svg><b class="g9b-mode">白天：完成任务，追加不可变证据</b><span class="c9-sy">示意</span></div>
+      <div class="g9b-log"></div>
+      <div class="g9b-gate"><span>门控：时间间隔 · 新增轨迹数 · 存储容量 · 错误频率</span><div class="meter"><i></i></div></div>
+      <div class="g9b-why"><span>防止一次偶发成功、网络故障或恶意输入<b>立刻改写长期能力</b></span><span>允许用<b>更大的批量和更便宜的模型</b>完成整理</span></div>
+    </div>
+    <div class="g9b-steps fx fx-right" style="--d:3"></div>
+  </div>
+  <div class="src">第九章 ·「睡眠学习：整合、遗忘与能力保鲜」· 五步周期</div>
+</section>
+<style>
+.g9b-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.g9b-day{padding:16px 20px;display:flex;flex-direction:column;gap:12px;transition:background .8s}
+.g9b-day.night{background:linear-gradient(160deg,rgba(30,27,75,.9),rgba(12,18,40,.92))}
+.g9b-sky{display:flex;align-items:center;gap:12px}
+.g9b-sky .ic{font-size:30px;transition:opacity .5s}
+.g9b-sun{color:#fbbf24}.g9b-moon{color:#c4b5fd;opacity:.2}
+.g9b-day.night .g9b-sun{opacity:.2}.g9b-day.night .g9b-moon{opacity:1}
+.g9b-mode{font-size:19px}
+.g9b-sky .c9-sy{margin-left:auto}
+.g9b-log{flex:1;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden}
+.g9b-e{display:flex;align-items:center;gap:10px;padding:6px 12px;border-radius:10px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line);animation:upIn .35s var(--spring) both}
+.g9b-e i{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.g9b-e.f i{background:var(--bad)}
+.g9b-gate{display:flex;flex-direction:column;gap:6px;font-size:15px;color:var(--text2)}
+.g9b-gate .meter{height:16px}
+.g9b-why{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g9b-why span{padding:10px 12px;border-radius:12px;font-size:15px;line-height:1.5;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g9b-why b{color:var(--text)}
+.g9b-steps{display:flex;flex-direction:column;gap:9px}
+.g9b-s{display:grid;grid-template-columns:44px 1fr;gap:4px 14px;align-items:start;padding:11px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.4;transition:all .4s}
+.g9b-s em{grid-row:span 2;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 20px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.g9b-s b{font-size:19px}
+.g9b-s span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g9b-s.on{opacity:1;border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 22%,transparent)}
+.g9b-s.on em{color:#06101f;background:var(--acc)}
+.g9b-s.dn{opacity:1}
+</style>
+<script>
+HOOKS['c09-sleep5'] = {
+  S: [['触发', '达到时间间隔、新增轨迹数量、存储容量或错误频率门槛，并确认当前没有高优先级在线任务'], ['定向', '读取正式知识、Prompt、Skill 目录及其版本，了解已有能力和不可修改边界'], ['采集与整合', '从近期已评价轨迹中寻找新信号，合并重复内容，标记冲突与适用条件，优先生成局部补丁'], ['验证与审批', '在迁移集、保留集和安全集上评估待验证版本，高风险写入等待人工批准'], ['修剪与索引', '更新检索索引；长期不用或被新证据推翻的能力标记过期、归档或删除，保留来源和回滚版本']],
+  init(s) { s.querySelector('.g9b-steps').innerHTML = this.S.map(([b, t], i) => `<div class="g9b-s"><em>${i + 1}</em><b>${b}</b><span>${t}</span></div>`).join(''); },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const day = s.querySelector('.g9b-day'), mode = s.querySelector('.g9b-mode'), log = s.querySelector('.g9b-log'), mt = s.querySelector('.g9b-gate .meter i'), st = [...s.querySelectorAll('.g9b-s')];
+    let n = 0;
+    while (ok()) {
+      day.classList.remove('night'); mode.textContent = '白天：完成任务，追加不可变证据';
+      st.forEach((x) => (x.className = 'g9b-s')); log.innerHTML = ''; mt.style.setProperty('--v', '0%');
+      for (let i = 0; i < 10; i++) {
+        n++;
+        log.insertAdjacentHTML('beforeend', `<div class="g9b-e${i % 4 === 3 ? ' f' : ''}"><i></i>traj-${String(1000 + n)} · ${i % 4 === 3 ? '失败' : '成功'} · 追加到证据日志</div>`);
+        while (log.children.length > 9) log.firstElementChild.remove();
+        mt.style.setProperty('--v', (i + 1) * 10 + '%');
+        await U.wait(ctx, 420); if (!ok()) return;
+      }
+      day.classList.add('night'); mode.textContent = '空闲期：门控已满，后台学习进程开始整理';
+      for (let i = 0; i < 5; i++) {
+        st.forEach((x, j) => (x.className = 'g9b-s' + (j === i ? ' on' : j < i ? ' dn' : '')));
+        await U.wait(ctx, 1300); if (!ok()) return;
+      }
+      st.forEach((x) => (x.className = 'g9b-s dn'));
+      await U.wait(ctx, 1600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.g9b-log').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c09-memory" data-part="9" data-trans="zoom" data-dur="20000" data-title="Claude Code 与 Hermes 的记忆整理" data-notes="用户记忆是最直观的例子，但要与行动经验区分。Claude Code 的自动记忆为每个项目维护 MEMORY.md 索引和按主题拆分的详细文件，会话启动只加载索引的有界前缀，其余内容按需读取；当索引接近上限时，系统要求 Agent 合并或移走细节。它说明纯文本记忆也需要容量约束、分层加载和主动整理，但当前公开机制主要是在会话中持续写入，并不能简单等同于一个固定的夜间后台任务。<br>Hermes 则是一个更完整的后台记忆进化案例。它把长期信息分成有界的 MEMORY.md 与 USER.md、基于 SQLite/FTS5 的历史会话检索、按需加载的 Skill，以及 Honcho 等可选外部记忆提供者。历史检索返回原始消息而非先由 LLM 摘要，避免把检索和生成混成一个不可审计步骤。当一次任务包含较多工具调用、从错误或死路中恢复、收到用户纠正，或发现非显而易见的工作流时，后台复盘可以创建或局部修订 Skill；记忆和 Skill 写入还可以经过审批门控。独立的 Curator 进一步跟踪 Skill 的使用、陈旧和归档状态，在空闲期执行确定性修剪，并可选择运行 LLM 合并；变更前保存快照，错误整理可以回滚。<br>右上角切换两个案例。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">记忆也需要<em>容量约束、分层加载和主动整理</em></h2></div>
+    <div class="g9c-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="cc">Claude Code</button><button data-v="hm">Hermes</button></div></header>
+  <div class="g9c-stage">
+    <div class="g9c-v" data-k="cc">
+      <div class="g9c-l panel"><div class="g9c-h"><b>自动记忆的结构</b></div>
+        <div class="g9c-idx"><div class="g9c-file"><svg class="ic"><use href="#i-file"/></svg><b>MEMORY.md</b><span>索引</span></div><div class="g9c-lines"></div><div class="g9c-cap"><span>会话启动只加载</span><b>索引的有界前缀</b></div></div>
+        <div class="g9c-topics"><span class="lbl">按主题拆分的详细文件 · 按需读取</span><div><span>build-and-test.md</span><span>architecture.md</span><span>user-preferences.md</span></div></div>
+      </div>
+      <div class="g9c-r"><div class="c9-card g9c-k"><b>接近上限时</b><p>系统要求 Agent <em>合并或移走细节</em></p></div><div class="g9c-k2"><b>但要注意</b><p>当前公开机制主要是<em>在会话中持续写入</em>，不能简单等同于一个固定的夜间后台任务</p></div><p class="g9c-nt">用户记忆是最直观的例子，但要与行动经验区分</p></div>
+    </div>
+    <div class="g9c-v" data-k="hm">
+      <div class="g9c-l panel"><div class="g9c-h"><b>Hermes 的长期信息</b></div>
+        <div class="g9c-hg">
+          <div><b>MEMORY.md · USER.md</b><span>有界</span></div>
+          <div><b>SQLite / FTS5 历史检索</b><span>返回原始消息，不先由 LLM 摘要</span></div>
+          <div><b>按需加载的 Skill</b><span>后台复盘可创建或局部修订</span></div>
+          <div><b>Honcho 等外部记忆</b><span>可选提供者</span></div>
+        </div>
+        <div class="g9c-trig"><span class="lbl">后台复盘的触发</span><div><span>工具调用较多</span><span>从错误或死路中恢复</span><span>收到用户纠正</span><span>发现非显而易见的工作流</span></div></div>
+      </div>
+      <div class="g9c-r"><div class="c9-card g9c-k"><b>Curator</b><p>跟踪 Skill 的<em>使用、陈旧和归档</em>状态；空闲期执行确定性修剪，可选 LLM 合并</p></div><div class="g9c-k2"><b>可回滚</b><p>变更前保存<em>快照</em>，错误整理可以回滚；记忆与 Skill 写入还可以经过<em>审批门控</em></p></div></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「睡眠学习：整合、遗忘与能力保鲜」· Claude Code 与 Hermes</div>
+</section>
+<style>
+.g9c-stage{position:relative;flex:1;min-height:0}
+.g9c-v{position:absolute;inset:0;display:grid;grid-template-columns:1.2fr 1fr;gap:24px;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .45s,transform .45s}
+.g9c-v.on{opacity:1;transform:none;pointer-events:auto}
+.g9c-l{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.g9c-h b{font-size:20px}
+.g9c-idx{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:start}
+.g9c-file{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 10px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.g9c-file .ic{font-size:34px;color:var(--acc)}
+.g9c-file b{font:600 16px var(--mono)}
+.g9c-file span{font-size:15px;color:var(--text3)}
+.g9c-lines{display:flex;flex-direction:column;gap:4px}
+.g9c-ln{height:22px;border-radius:6px;background:rgba(255,255,255,.06);transition:all .35s}
+.g9c-ln.ld{background:color-mix(in srgb,var(--acc) 30%,transparent)}
+.g9c-ln.full{background:rgba(251,113,133,.25)}
+.g9c-cap{grid-column:1/3;display:flex;align-items:baseline;gap:8px;font-size:16px;color:var(--text2)}
+.g9c-cap b{color:var(--acc)}
+.g9c-topics div{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.g9c-topics div span{padding:5px 12px;border-radius:9px;font:15px var(--mono);color:var(--text2);border:1px dashed var(--line2)}
+.g9c-r{display:flex;flex-direction:column;gap:14px}
+.g9c-k b,.g9c-k2 b{font-size:20px}
+.g9c-k p,.g9c-k2 p{margin-top:6px;font-size:17px;line-height:1.6;color:var(--text2)}
+.g9c-k em,.g9c-k2 em{font-style:normal;font-weight:700;color:var(--text)}
+.g9c-k2{padding:14px 18px;border-radius:16px;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.06)}
+.g9c-nt{margin-top:auto;font-size:16px;color:var(--text3)}
+.g9c-hg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g9c-hg>div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g9c-hg b{font-size:16px}
+.g9c-hg span{font-size:15px;color:var(--text3)}
+.g9c-trig div{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.g9c-trig div span{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--c9-inst);border:1px solid color-mix(in srgb,var(--c9-inst) 50%,transparent)}
+</style>
+<script>
+HOOKS['c09-memory'] = {
+  init(s) {
+    s.querySelector('.g9c-lines').innerHTML = Array.from({ length: 9 }, () => '<i class="g9c-ln"></i>').join('');
+    this.set = U.seg(s.querySelector('.g9c-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) { this.v = v; this.set(v); s.querySelectorAll('.g9c-v').forEach((x) => x.classList.toggle('on', x.dataset.k === v)); },
+  enter(s, ctx) {
+    this.auto = true; this.show(s, 'cc');
+    ctx.every(() => { if (this.auto) this.show(s, this.v === 'cc' ? 'hm' : 'cc'); }, 8000);
+    const ls = [...s.querySelectorAll('.g9c-ln')]; let k = 0;
+    const tick = () => { const n = k % 12; ls.forEach((l, j) => { l.className = 'g9c-ln' + (j < Math.min(n, 9) ? (n >= 9 ? ' full' : ' ld') : ''); }); k++; };
+    tick(); ctx.every(tick, 600);
+  },
+  reset(s) { s.querySelectorAll('.g9c-v').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-prune" data-part="9" data-trans="rise" data-dur="18000" data-title="长时间尺度上的上下文腐化" data-notes="持续进化也不是让知识、Prompt 和工具无限增长。第二章所说的上下文腐化会在更长时间尺度上重现：经验文档相互冲突，Prompt 被边界规则淹没，Skill 库出现重复能力，多次微调造成灾难性遗忘。系统需要周期性离线整理：合并重复经验，保留来源和版本；把局部规则从全局 Prompt 移动到领域 Skill，保持全局 Prompt 整洁；Prompt 和 Skill 保持结构清晰；重新验证长期未使用的工具；删除被新证据推翻的知识；从原始基座模型重新训练 LoRA。<br>左侧曲线示意“库存杂乱度”随时间上升，每次周期性整理把它拉回来；右侧清单逐项勾选。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">上下文腐化在<em>更长时间尺度上</em>重现</h2></header>
+  <div class="g9d-body">
+    <div class="g9d-l panel fx fx-left" style="--d:2">
+      <div class="g9d-h"><b>知识、Prompt 和工具不会无限增长</b><span class="c9-sy">示意</span></div>
+      <div class="g9d-rot"><span>经验文档相互冲突</span><span>Prompt 被边界规则淹没</span><span>Skill 库出现重复能力</span><span>多次微调造成灾难性遗忘</span></div>
+      <svg class="g9d-svg" viewBox="0 0 640 230"><line class="g9d-ax" x1="40" y1="200" x2="630" y2="200"/><text class="g9d-at" x="44" y="22">杂乱度</text><text class="g9d-at" x="626" y="222" text-anchor="end">时间 →</text><path class="g9d-c"/><g class="g9d-mk"></g></svg>
+    </div>
+    <div class="g9d-r fx fx-right" style="--d:3"><span class="lbl">周期性离线整理</span><div class="g9d-list"></div></div>
+  </div>
+  <div class="src">第九章 ·「睡眠学习：整合、遗忘与能力保鲜」· 周期性离线整理</div>
+</section>
+<style>
+.g9d-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.g9d-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.g9d-h{display:flex;align-items:center;justify-content:space-between}
+.g9d-h b{font-size:20px}
+.g9d-rot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.g9d-rot span{padding:8px 12px;border-radius:10px;font-size:16px;color:#fda4af;border:1px solid rgba(251,113,133,.4);background:rgba(251,113,133,.05)}
+.g9d-svg{width:100%;flex:1;min-height:0}
+.g9d-ax{stroke:var(--line2);stroke-width:1.5}
+.g9d-at{font-size:15px;fill:var(--text3)}
+.g9d-c{fill:none;stroke:var(--warn);stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.g9d-mk line{stroke:var(--ok);stroke-width:1.5;stroke-dasharray:4 4}
+.g9d-mk text{font-size:15px;fill:#6ee7b7;text-anchor:middle}
+.g9d-r{display:flex;flex-direction:column;gap:10px}
+.g9d-list{display:flex;flex-direction:column;gap:9px}
+.g9d-it{display:grid;grid-template-columns:30px 1fr;gap:12px;align-items:center;padding:11px 16px;border-radius:14px;font-size:17px;line-height:1.5;color:var(--text2);border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.g9d-it i{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-style:normal;font-weight:800;color:transparent;border:1.5px solid var(--line2);transition:all .3s}
+.g9d-it.on{color:var(--text);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.g9d-it.on i{color:#06101f;background:var(--ok);border-color:var(--ok)}
+</style>
+<script>
+HOOKS['c09-prune'] = {
+  L: ['合并重复经验，保留来源和版本', '把局部规则从全局 Prompt 移到领域 Skill，保持全局 Prompt 整洁', 'Prompt 和 Skill 保持结构清晰', '重新验证长期未使用的工具', '删除被新证据推翻的知识', '从原始基座模型重新训练 LoRA'],
+  init(s) {
+    s.querySelector('.g9d-list').innerHTML = this.L.map((t) => `<div class="g9d-it"><i>✓</i><span>${t}</span></div>`).join('');
+    const P = []; let y = 180;
+    for (let x = 40; x <= 630; x += 10) { const cyc = (x - 40) % 150; if (cyc === 0 && x > 40) y = 175; y -= 2.6 + Math.sin(x / 17) * 0.8; P.push([x, Math.max(30, y)]); }
+    s.querySelector('.g9d-c').setAttribute('d', 'M' + P.map(([a, b]) => `${a} ${b.toFixed(1)}`).join(' L'));
+    s.querySelector('.g9d-mk').innerHTML = [190, 340, 490].map((x) => `<line x1="${x}" y1="20" x2="${x}" y2="200"/><text x="${x}" y="16">整理</text>`).join('');
+  },
+  enter(s, ctx) {
+    const its = [...s.querySelectorAll('.g9d-it')]; let k = 0;
+    const tick = () => { const n = k % (its.length + 3); its.forEach((x, j) => x.classList.toggle('on', j < n)); k++; };
+    tick(); ctx.every(tick, 900);
+  },
+  reset(s) { s.querySelectorAll('.g9d-it').forEach((x) => x.classList.remove('on')); },
+};
+</script>

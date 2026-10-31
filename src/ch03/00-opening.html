@@ -1,0 +1,316 @@
+<!-- ================= 第三章共用：样式（类名前缀 c3-）与脚本工具（window.C3） ================= -->
+<style>
+/* 示意标记：演示用的虚构数据 */
+.c3-shi{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:8px;font-size:15px;line-height:1.4;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent);letter-spacing:.06em;white-space:nowrap}
+/* 验收记录面板：配套仓库的真实运行数据 */
+.c3-data{position:relative;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--env) 38%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--env) 9%,rgba(10,16,36,.86)),rgba(10,16,36,.86) 70%)}
+.c3-data-h{display:flex;align-items:center;gap:10px;font-size:17px;font-weight:700;color:var(--env);letter-spacing:.06em}
+.c3-data-h .ic{font-size:20px}
+.c3-data-s{font-size:15px;color:var(--text3);line-height:1.55;margin-top:6px}
+/* 通用表格 */
+.c3-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:18px}
+.c3-tbl th{font-size:15px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line2)}
+.c3-tbl td{padding:11px 14px;border-bottom:1px solid var(--line);color:var(--text2);line-height:1.45;transition:background .4s,color .4s}
+.c3-tbl tr.on td{background:color-mix(in srgb,var(--acc) 11%,transparent);color:var(--text)}
+/* 条形图行：<div class="c3-bar" style="--v:60%;--c:#..."><span>标签</span><i><b></b></i><em>值</em></div> */
+.c3-bar{display:grid;grid-template-columns:var(--lw,150px) 1fr var(--vw,90px);align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.c3-bar i{position:relative;height:14px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.c3-bar i b{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background:linear-gradient(90deg,var(--c,var(--acc)),color-mix(in srgb,var(--c,var(--acc)) 55%,#fff));transition:width 1s var(--ease)}
+.c3-bar.on i b{width:var(--v)}
+.c3-bar em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+/* 小号代码块 */
+.c3-code{font:17px/1.65 var(--mono);color:#cbd5f5;white-space:pre;padding:14px 18px}
+.c3-k{color:#c084fc}.c3-s{color:#86efac}.c3-c{color:#5f6b8a}.c3-n{color:#fbbf24}.c3-p{color:#7dd3fc}
+/* 小标签 */
+.c3-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:15px;line-height:1.4;color:var(--c,var(--acc));border:1px solid color-mix(in srgb,var(--c,var(--acc)) 42%,transparent);background:color-mix(in srgb,var(--c,var(--acc)) 10%,transparent);white-space:nowrap}
+</style>
+<script>
+window.C3 = {
+  esc: (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])),
+  slides: () => [...document.querySelectorAll('#deck .slide')],
+  // 跳到某个部分的第一页 / 某个页面
+  jump(p) { const i = C3.slides().findIndex((x) => +x.dataset.part === +p); if (i >= 0) DECK.go(i, 0); },
+  jumpId(id) { const i = C3.slides().findIndex((x) => x.id === id); if (i >= 0) DECK.go(i, 0); },
+  // 依次给一组元素加 .on（条形图、列表逐条出现）
+  stagger(ctx, els, gap = 140, delay = 0, cls = 'on') { els.forEach((e, i) => ctx.later(() => e.classList.add(cls), delay + i * gap)); },
+  /* ---------- BM25：移植自配套仓库 chapter3/sparse-embedding/bm25_engine.py ----------
+     分词规则、停用词、IDF 下限、小写回退都与原实现一致；
+     在实验 3-5 的验收语料上复算结果与验收记录逐位相同。 */
+  STOP: new Set('the is at which on a an as are was been be have has had do does did will would could should may might must can this that these those i you he she it we they what who when where why how all each every both few more most other some such only own same so than too very just'.split(' ')),
+  TOKRE: /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b)|(https?:\/\/[^\s]+)|(\b[A-Z0-9]+(?:[_-][A-Z0-9]+)+\b)|(\b[A-Z]\+\+|\b[A-Z]#|\.[A-Z]+[a-zA-Z]*)|(\b\d+(?:\.\d+)+\b)|(#[0-9A-Fa-f]{3,8}\b|0x[0-9A-Fa-f]+\b)|(\b\d+(?:\.\d+)?\b)|(\b[a-zA-Z]+'[a-zA-Z]+\b)|(\b[A-Z]{2,}\b)|(\b[A-Z][a-z]+[A-Z][a-zA-Z]*\b)|(\b[A-Za-z]+\d+\b|\b\d+[A-Za-z]+\b)|(\b[a-zA-Z]+\b)/gi,
+  tok(text) {
+    const up = (t) => /[A-Za-z]/.test(t) && t === t.toUpperCase(), low = (t) => /[A-Za-z]/.test(t) && t === t.toLowerCase();
+    const out = [];
+    for (const m of String(text).matchAll(C3.TOKRE)) {
+      const t = m[0];
+      out.push((up(t) && t.length > 1) || /[A-Z]/.test(t.slice(1)) || /[-_@.#+]/.test(t) || /\d/.test(t) || t.startsWith('.') ? t : t.toLowerCase());
+    }
+    return out.filter((t) => !low(t) || !C3.STOP.has(t));
+  },
+  bm25(docs, o = {}) {
+    const k1 = o.k1 ?? 1.5, b = o.b ?? 0.75, index = new Map(), tf = {}, dl = {};
+    docs.forEach((d) => {
+      const ts = C3.tok(d.text), c = {};
+      dl[d.id] = ts.length;
+      ts.forEach((x) => (c[x] = (c[x] || 0) + 1));
+      tf[d.id] = c;
+      Object.keys(c).forEach((k) => { if (!index.has(k)) index.set(k, new Set()); index.get(k).add(d.id); });
+    });
+    const N = docs.length, avgdl = Object.values(dl).reduce((a, x) => a + x, 0) / Math.max(1, N);
+    const df = (t) => (index.get(t) || new Set()).size;
+    const idf = (t) => { const n = df(t); if (!n) return 0; const v = (Math.max(N, n) - n + 0.5) / (n + 0.5); return Math.max(v <= 0 ? 0 : Math.log(v), 1e-6); };
+    const search = (q) => {
+      const terms = C3.tok(q).map((t) => {
+        if (!index.get(t) && t && !/^\d/.test(t) && !t.includes('-')) { const l = t.toLowerCase(); if (index.get(l)) return l; }
+        return t;
+      });
+      const cand = new Set();
+      terms.forEach((t) => (index.get(t) || []).forEach((d) => cand.add(d)));
+      const res = [...cand].map((id) => {
+        const parts = terms.map((t) => { const f = tf[id][t] || 0; return { t, tf: f, c: f ? idf(t) * (f * (k1 + 1)) / (f + k1 * (1 - b + (b * dl[id]) / avgdl)) : 0 }; });
+        return { id, score: parts.reduce((a, p) => a + p.c, 0), parts };
+      }).sort((x, y) => y.score - x.score);
+      return { terms, res };
+    };
+    return { N, avgdl, df, idf, tf, dl, index, search };
+  },
+};
+</script>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c03-cover" data-part="0" data-title="封面" data-notes="上一章解决的是单次交互的上下文管理。这一章要处理一个更难的问题：<b>如何让 Agent 在对话结束后仍然记住用户、记住知识</b>。<br>这种持久化的记忆体系可以从两个尺度来理解：<b>用户记忆</b>是针对单个用户的个性化记忆，<b>知识库</b>则是面向所有用户共享的集体知识。延续第二章的上下文工程思路，本章把视野从单次会话的上下文管理扩展到跨会话的持久化知识体系：先探讨如何构建用户记忆系统，再深入知识库的检索增强生成（RAG）技术，最后把这些检索技术反过来用于增强用户记忆。<br>右侧的轨道图：Agent 居中，用户记忆、知识库、检索三条轨道环绕；周围浮现的是 Agent 需要长期记住的两类东西——某位用户的偏好，以及所有用户共享的领域知识。">
+  <div class="cv3-orbit fx fx-scale" style="--d:4"></div>
+  <div class="cv3-float" aria-hidden="true">
+    <span style="left:4%;top:6%;--dl:0s;--c:#2dd4bf">偏好靠窗座位</span>
+    <span style="left:62%;top:3%;--dl:2.2s;--c:#60a5fa">《刑法》第二百三十二条</span>
+    <span style="left:74%;top:44%;--dl:4.1s;--c:#2dd4bf">素食者 · 需特殊餐食</span>
+    <span style="left:58%;top:88%;--dl:1.3s;--c:#a78bfa">退款政策 · 7 天内全额退款</span>
+    <span style="left:2%;top:84%;--dl:3.2s;--c:#2dd4bf">护照 2025-02-18 到期</span>
+    <span style="left:0%;top:46%;--dl:5.4s;--c:#60a5fa">x86 SIMD 指令集</span>
+  </div>
+  <div class="cv3-text">
+    <div class="cv3-tag fx fx-up"><i></i>深入理解 AI Agent · 第三章</div>
+    <h1 class="cv3-title"><span class="split">用户记忆</span><span class="split" data-off="5" data-grad="#2dd4bf,#38bdf8,#a78bfa">和知识库</span></h1>
+    <p class="cv3-sub fx fx-up" style="--d:12">让 Agent 在对话结束之后，<br>仍然记住用户、记住知识</p>
+    <div class="cv3-meta fx fx-up" style="--d:14"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="cv3-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c03-cover{justify-content:center;padding-left:150px}
+.cv3-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.cv3-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.cv3-title{margin-top:30px;font-size:128px;line-height:1.12;font-weight:800;letter-spacing:.02em}
+.cv3-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.cv3-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.cv3-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.cv3-orbit{position:absolute;right:120px;top:50%;width:700px;height:700px;margin-top:-362px}
+.cv3-float{position:absolute;right:70px;top:150px;width:800px;height:760px;pointer-events:none}
+.cv3-float span{position:absolute;padding:7px 16px;border-radius:999px;font-size:17px;white-space:nowrap;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(5,8,22,.7));opacity:0;animation:cv3Float 11s ease-in-out infinite;animation-delay:var(--dl)}
+@keyframes cv3Float{0%,100%{opacity:0;translate:0 14px}18%,62%{opacity:.92;translate:0 0}80%{opacity:0;translate:0 -10px}}
+.cv3-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.cv3-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c03-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.cv3-orbit'), {
+      size: 700, core: 'Agent', coreColor: '#2dd4bf', outer: 'PERSISTENT · 跨会话 · 持久化的知识 · PERSISTENT',
+      sats: [
+        { label: '用户记忆 · 个体', color: '#2dd4bf', rx: 0.36, ry: 0.15, tilt: -22, dur: 13, phase: 0 },
+        { label: '知识库 · 群体', color: '#a78bfa', rx: 0.33, ry: 0.13, tilt: 32, dur: 16, phase: 0.4 },
+        { label: '检索 · RAG', color: '#60a5fa', rx: 0.29, ry: 0.2, tilt: 88, dur: 11, phase: 0.72 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c03-scales" data-part="0" data-steps="2" data-trans="rise" data-title="两个尺度：懂你的助手与领域专家" data-notes="持久化的记忆体系可以从两个尺度来理解。<b>用户记忆</b>是针对单个用户的个性化记忆——Agent 在与每位用户的交互中逐渐了解其偏好、习惯和需求，构建专属于该用户的知识模型。<b>知识库</b>则是面向所有用户共享的集体知识——比如一个行业的法规体系、一家公司内部的操作流程、一个技术领域的专业文档。前者让 Agent 成为“懂你的助手”，后者让 Agent 成为“领域专家”。<br>按 → 逐步看：两者解决的其实是同一个问题，只是尺度不同——一个关注个体，一个关注群体。也正因如此，两者<b>共用许多底层技术</b>（向量检索、知识压缩），也<b>面临同样的麻烦</b>：信息冲突、知识过期、检索不准。<br>本章延续第二章的上下文工程思路：从单次会话的上下文管理，扩展到跨会话的持久化知识体系。点击任一侧卡片可以单独查看。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一个问题，<em>两个尺度</em></h2>
+  <p class="lead fx fx-up" style="--d:2">一个关注个体，一个关注群体——底层技术相通，麻烦也相同</p></header>
+  <div class="sc3-stage">
+    <div class="sc3-w fx fx-left" style="--d:3;left:0"><div class="sc3-card" data-i="0" style="--c:#2dd4bf">
+      <div class="sc3-h"><span class="sc3-orb"><svg class="ic"><use href="#i-user"/></svg></span><div><b>用户记忆</b><small>个体尺度 · 针对单个用户</small></div></div>
+      <p>在与每位用户的交互中，逐渐了解其<b>偏好、习惯和需求</b>，构建专属于该用户的知识模型</p>
+      <div class="sc3-ex"><span>偏好靠窗座位</span><span>素食者，需要特殊餐食</span><span>常旅客号码 12345678</span></div>
+      <div class="sc3-role"><svg class="ic"><use href="#i-heart-c03"/></svg>懂你的助手</div>
+    </div></div>
+    <div class="sc3-mid fx fx-scale" style="--d:5">
+      <div class="sc3-axis"><span class="sc3-one"><svg class="ic"><use href="#i-user"/></svg></span><i></i><span class="sc3-many"><svg class="ic"><use href="#i-users"/></svg><svg class="ic"><use href="#i-users"/></svg></span></div>
+      <div class="sc3-axl"><span>个体</span><span>尺度</span><span>群体</span></div>
+      <p class="sc3-same">解决的其实是<b>同一个问题</b>：<br>如何让 Agent 跨越会话，持久地“知道”</p>
+    </div>
+    <div class="sc3-w fx fx-right" style="--d:4;left:1140px"><div class="sc3-card" data-i="1" style="--c:#a78bfa">
+      <div class="sc3-h"><span class="sc3-orb"><svg class="ic"><use href="#i-db"/></svg></span><div><b>知识库</b><small>群体尺度 · 面向所有用户共享</small></div></div>
+      <p>沉淀一个领域的<b>集体知识</b>，所有用户都能从中获益</p>
+      <div class="sc3-ex"><span>一个行业的法规体系</span><span>一家公司内部的操作流程</span><span>一个技术领域的专业文档</span></div>
+      <div class="sc3-role"><svg class="ic"><use href="#i-grad"/></svg>领域专家</div>
+    </div></div>
+    <svg class="sc3-svg" viewBox="0 0 1660 600" width="1660" height="600">
+      <path class="fl sc3-p0" d="M260 352 C 260 400, 420 380, 520 432" style="--c:#2dd4bf"/>
+      <path class="fl sc3-p1" d="M1400 352 C 1400 400, 1240 380, 1140 432" style="--c:#a78bfa"/>
+      <circle class="pk sc3-k0" r="9" style="fill:#2dd4bf;--c:#2dd4bf"/>
+      <circle class="pk sc3-k1" r="9" style="fill:#a78bfa;--c:#a78bfa"/>
+    </svg>
+    <div class="sc3-base fx fx-up" data-step="1"><span class="sc3-bl"><svg class="ic"><use href="#i-layers"/></svg>共用的底层技术</span><span class="chip ctx">向量检索</span><span class="chip ctx">知识压缩</span><span class="sc3-more">→ 本章后半程的检索技术，反过来也用于增强用户记忆</span></div>
+    <div class="sc3-trb fx fx-up" data-step="2"><span class="sc3-bl"><svg class="ic"><use href="#i-alert"/></svg>同样的麻烦</span><span class="sc3-t" style="--i:0">信息冲突</span><span class="sc3-t" style="--i:1">知识过期</span><span class="sc3-t" style="--i:2">检索不准</span></div>
+  </div>
+  <p class="tagline sc3-tag fx fx-up" data-step="2">延续第二章的上下文工程：从<b>单次会话的上下文管理</b>，扩展到<b>跨会话的持久化知识体系</b></p>
+  <div class="src">第三章 开篇</div>
+</section>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="i-heart-c03" viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></symbol></svg>
+<style>
+.sc3-stage{position:relative;height:600px}
+.sc3-w{position:absolute;top:0;width:520px;height:352px}
+.sc3-card{--c:var(--acc);position:relative;width:100%;height:100%;padding:26px 28px;border-radius:22px;cursor:pointer;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.88)),rgba(12,18,40,.88) 70%);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);transition:border-color .5s,box-shadow .5s,opacity .5s,translate .5s var(--ease)}
+.sc3-card.on{border-color:var(--c);box-shadow:0 0 50px -10px color-mix(in srgb,var(--c) 55%,transparent);translate:0 -6px}
+.sc3-card.dim{opacity:.5}
+.sc3-h{display:flex;align-items:center;gap:16px}
+.sc3-orb{width:64px;height:64px;border-radius:20px;display:grid;place-items:center;font-size:32px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.sc3-h b{display:block;font-size:32px;color:var(--c)}
+.sc3-h small{display:block;font-size:16px;color:var(--text3);margin-top:2px}
+.sc3-card p{font-size:20px;line-height:1.6;color:var(--text2);margin-top:16px}
+.sc3-card p b{color:var(--text)}
+.sc3-ex{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.sc3-ex span{padding:6px 12px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.sc3-ex span.on{color:var(--text);border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.sc3-role{position:absolute;left:28px;bottom:22px;display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;color:var(--c)}
+.sc3-mid{position:absolute;left:560px;top:30px;width:540px;text-align:center}
+.sc3-axis{display:flex;align-items:center;justify-content:center;gap:18px;font-size:40px}
+.sc3-one{color:#2dd4bf}.sc3-many{color:#a78bfa;display:flex}
+.sc3-axis i{width:250px;height:3px;border-radius:3px;background:linear-gradient(90deg,#2dd4bf,#a78bfa);position:relative}
+.sc3-axis i::after{content:"";position:absolute;right:-2px;top:-6px;border:7px solid transparent;border-left:11px solid #a78bfa}
+.sc3-axl{display:flex;justify-content:space-between;width:430px;margin:12px auto 0;font-size:17px;color:var(--text3)}
+.sc3-same{margin-top:44px;font-size:24px;line-height:1.65;color:var(--text2)}
+.sc3-same b{color:var(--acc)}
+.sc3-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.sc3-base,.sc3-trb{position:absolute;left:0;right:0;display:flex;align-items:center;gap:14px;padding:0 26px;height:70px;border-radius:18px}
+.sc3-base{top:432px;border:1px solid color-mix(in srgb,var(--ctx) 40%,transparent);background:color-mix(in srgb,var(--ctx) 7%,rgba(10,16,36,.8))}
+.sc3-trb{top:520px;border:1px solid color-mix(in srgb,var(--bad) 35%,transparent);background:color-mix(in srgb,var(--bad) 6%,rgba(10,16,36,.8))}
+.sc3-bl{display:flex;align-items:center;gap:10px;font-size:21px;font-weight:700;min-width:210px}
+.sc3-base .sc3-bl{color:var(--ctx)}.sc3-trb .sc3-bl{color:var(--bad)}
+.sc3-more{margin-left:auto;font-size:17px;color:var(--text3)}
+.sc3-t{padding:7px 18px;border-radius:999px;font-size:19px;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.sc3-t.pulse{animation:glowPulse 1.4s ease 1;--c:var(--bad)}
+.sc3-tag{margin-top:10px;font-size:23px}
+</style>
+<script>
+HOOKS['c03-scales'] = {
+  init(s) {
+    this.cards = [...s.querySelectorAll('.sc3-card')];
+    this.cards.forEach((c, i) => c.addEventListener('click', () => { this.auto = false; this.focus(s, i); }));
+  },
+  focus(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.i = i;
+    this.cards.forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+    const ex = [...this.cards[i].querySelectorAll('.sc3-ex span')];
+    s.querySelectorAll('.sc3-ex span').forEach((e) => e.classList.remove('on'));
+    if (!ctx) return;
+    ex.forEach((e, j) => ctx.later(() => tk === this.tk && e.classList.add('on'), 250 + j * 420));
+    // 有底层技术时，数据包从这一侧流向共用底层
+    if (this.k >= 1) U.fly(s.querySelector('.sc3-k' + i), s.querySelector('.sc3-p' + i), 1300, { ctx, delay: 300 });
+    if (this.k >= 2) s.querySelectorAll('.sc3-t').forEach((t, j) => ctx.later(() => { if (tk === this.tk) U.restart(t, 'pulse'); }, 1500 + j * 260));
+  },
+  lines(s) { s.querySelectorAll('.sc3-svg .fl').forEach((p) => p.classList.toggle('on', this.k >= 1)); },
+  enter(s, ctx, k) {
+    this.ctx = ctx; this.k = k; this.auto = true; this.lines(s);
+    ctx.later(() => this.focus(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.focus(s, 1 - this.i); }, 4200);
+  },
+  step(s, ctx, k) { this.k = k; this.lines(s); this.focus(s, this.i || 0); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.k = 0;
+    s.querySelectorAll('.on,.dim,.pulse').forEach((e) => { if (!e.hasAttribute('data-step')) e.classList.remove('on', 'dim', 'pulse'); });
+  },
+};
+</script>
+
+<section class="slide" id="c03-map" data-part="0" data-trans="zoom" data-title="本章知识脉络" data-notes="这一页对应<b>图3-1 本章知识脉络</b>。左边是<b>用户记忆（个体尺度）</b>：记忆层次与三层次评估、四种存储格式、认知类型（情景 · 语义 · 程序）、记忆框架（Mem0 · Memobase）、压缩整理与隐私保护。右边是<b>知识库（群体尺度）</b>：文档分块与多模态、稠密与稀疏嵌入、混合检索、结构化索引（RAPTOR · GraphRAG）、文件系统范式与知识更新、智能体化 RAG、上下文感知检索、深度知识提取。<br>两者共享同一套检索底层——文档分块、向量与关键词嵌入、混合检索、重排序。两条线索最终汇合于<b>双层记忆架构</b>：用 Advanced JSON Cards 常驻概览，用上下文感知检索按需取细节。<br>每个标签都可以点击，直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章知识脉络：<em>两条线索，一个汇合点</em></h2></header>
+  <div class="mp3-stage">
+    <div class="mp3-col fx fx-left" data-c="0" style="--d:2;--c:#2dd4bf">
+      <div class="mp3-ch"><svg class="ic"><use href="#i-user"/></svg>用户记忆<small>个体尺度</small></div>
+      <div class="mp3-rows"></div>
+    </div>
+    <div class="mp3-col fx fx-right" data-c="1" style="--d:3;--c:#a78bfa">
+      <div class="mp3-ch"><svg class="ic"><use href="#i-db"/></svg>知识库<small>群体尺度</small></div>
+      <div class="mp3-rows"></div>
+    </div>
+    <svg class="mp3-svg" viewBox="0 0 1660 640" width="1660" height="640">
+      <path class="mp3-path" id="mp3pa" d="M390 372 C 390 470, 640 470, 790 548"/>
+      <path class="mp3-path" id="mp3pb" d="M1270 372 C 1270 470, 1020 470, 870 548"/>
+      <circle class="pk mp3-ka" r="9" style="fill:#2dd4bf;--c:#2dd4bf"/>
+      <circle class="pk mp3-kb" r="9" style="fill:#a78bfa;--c:#a78bfa"/>
+    </svg>
+    <div class="mp3-bw fx fx-up" style="--d:9"><button class="mp3-base" data-p="4"><span><svg class="ic"><use href="#i-layers"/></svg>共享底层：检索技术</span><em>文档分块</em><em>向量 / 关键词嵌入</em><em>混合检索</em><em>重排序</em></button></div>
+    <div class="mp3-mw fx fx-pop" style="--d:12"><button class="mp3-meet" data-go="c03-twolayer"><b><svg class="ic"><use href="#i-merge"/></svg>双层记忆架构</b><span>Advanced JSON Cards 常驻概览 + 上下文感知检索按需取细节</span></button></div>
+  </div>
+  <div class="src">第三章 · 图3-1 本章知识脉络</div>
+</section>
+<style>
+.mp3-stage{position:relative;height:640px}
+.mp3-col{--c:var(--acc);position:absolute;top:0;width:780px;height:372px;padding:20px 24px;border-radius:22px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 8%,rgba(12,18,40,.88)),rgba(12,18,40,.88) 70%)}
+.mp3-col[data-c="0"]{left:0}.mp3-col[data-c="1"]{left:880px}
+.mp3-ch{display:flex;align-items:center;gap:12px;font-size:28px;font-weight:800;color:var(--c)}
+.mp3-ch small{font-size:17px;font-weight:400;color:var(--text3);margin-left:6px}
+.mp3-rows{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+.mp3-r{display:flex;align-items:center;gap:12px;width:100%;padding:9px 14px;border-radius:12px;text-align:left;font-size:20px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.025);transition:all .4s var(--ease)}
+.mp3-r i{flex:none;width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.mp3-r em{margin-left:auto;font:600 15px var(--num);font-style:normal;color:var(--text3);letter-spacing:.08em}
+.mp3-r:hover,.mp3-r.on{color:var(--text);border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.mp3-r.on em{color:var(--c)}
+.mp3-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.mp3-path{fill:none;stroke:rgba(255,255,255,.18);stroke-width:3;stroke-dasharray:6 9;animation:flow 1.1s linear infinite}
+.mp3-bw{position:absolute;left:150px;right:150px;top:410px;height:64px}
+.mp3-base{width:100%;height:100%;display:flex;align-items:center;justify-content:center;gap:14px;border-radius:16px;font-size:19px;color:var(--ctx);border:1px solid color-mix(in srgb,var(--ctx) 40%,transparent);background:color-mix(in srgb,var(--ctx) 8%,rgba(10,16,36,.9));transition:box-shadow .4s}
+.mp3-base span{display:flex;align-items:center;gap:10px;font-weight:700;margin-right:10px}
+.mp3-base em{font-style:normal;padding:5px 14px;border-radius:999px;font-size:17px;color:var(--text2);border:1px solid var(--line2)}
+.mp3-base:hover{box-shadow:0 0 30px color-mix(in srgb,var(--ctx) 35%,transparent)}
+.mp3-mw{position:absolute;left:380px;right:380px;top:548px;height:84px}
+.mp3-meet{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border-radius:18px;border:2px solid color-mix(in srgb,var(--acc) 70%,transparent);background:color-mix(in srgb,var(--acc) 12%,rgba(10,16,36,.92));box-shadow:0 0 40px -10px color-mix(in srgb,var(--acc) 60%,transparent)}
+.mp3-meet b{display:flex;align-items:center;gap:10px;font-size:25px;color:var(--acc)}
+.mp3-meet span{font-size:17px;color:var(--text2)}
+.mp3-meet.hit{animation:glowPulse 1.2s ease 1}
+</style>
+<script>
+HOOKS['c03-map'] = {
+  R: [
+    [['记忆层次 · 三层次评估', 1], ['四种存储格式 · 可执行代码', 2], ['认知类型：情景 · 语义 · 程序', 2], ['记忆框架：Mem0 · Memobase', 3], ['压缩整理 · 隐私保护（日志脱敏）', 3]],
+    [['文档分块 · 稠密嵌入 · ANN 索引', 4], ['稀疏嵌入 · 混合检索 · 重排序', 5], ['结构化索引：RAPTOR · GraphRAG', 6], ['文件系统范式 · 知识更新', 7], ['智能体化 RAG · 上下文感知 · 深度知识与多模态', 8]],
+  ],
+  init(s) {
+    s.querySelectorAll('.mp3-col').forEach((col, c) => {
+      col.querySelector('.mp3-rows').innerHTML = this.R[c].map(([t, p]) => `<button class="mp3-r" data-p="${p}"><i></i>${t}<em>PART ${String(p).padStart(2, '0')}</em></button>`).join('');
+    });
+    s.querySelector('.mp3-stage').addEventListener('click', (e) => {
+      const g = e.target.closest('[data-go]');
+      if (g) { C3.jumpId(g.dataset.go); return; }
+      const b = e.target.closest('[data-p]');
+      if (b) C3.jump(+b.dataset.p);
+    });
+  },
+  // 两侧逐行点亮，数据包沿两条线流向汇合点
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const rows = [0, 1].map((c) => [...s.querySelectorAll(`.mp3-col[data-c="${c}"] .mp3-r`)]);
+    for (let j = 0; j < 5; j++) {
+      rows.forEach((r) => r.forEach((e, q) => e.classList.toggle('on', q === j)));
+      await U.wait(ctx, 900);
+      if (!ok()) return;
+    }
+    rows.forEach((r) => r.forEach((e) => e.classList.remove('on')));
+    await Promise.all([U.fly(s.querySelector('.mp3-ka'), s.querySelector('#mp3pa'), 1500, { ctx }), U.fly(s.querySelector('.mp3-kb'), s.querySelector('#mp3pb'), 1500, { ctx })]);
+    if (!ok()) return;
+    U.restart(s.querySelector('.mp3-meet'), 'hit');
+    await U.wait(ctx, 1600);
+    if (ok()) this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; ctx.later(() => this.run(s), 1600); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.mp3-r.on,.mp3-meet.hit').forEach((e) => e.classList.remove('on', 'hit')); },
+};
+</script>

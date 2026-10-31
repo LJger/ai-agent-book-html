@@ -1,0 +1,173 @@
+<!-- ================= PART 01（续）：独立身份的两个现实挑战与共享文件系统 ================= -->
+<section class="slide" id="c06-share" data-part="1" data-trans="rise" data-dur="17000" data-title="两个现实挑战与共享文件系统" data-notes="独立身份也带来两个现实挑战。一是<b>反机器人机制</b>：许多网站用 CAPTCHA 和 IP 信誉检测拦截自动化访问，使用数据中心 IP 的虚拟环境很容易被识别，实践中往往需要配置住宅代理网络（使用真实家庭 IP）才能正常访问。二是<b>访问用户真实账号的场景</b>：当任务必须以用户本人的身份登录时，应采用 Human-in-the-Loop 认证——通过 VNC/RDP 远程桌面让用户在可视化环境中亲自完成登录。用户能看到 Agent 正在操作的完整界面，理解为什么需要认证；认证后的会话令牌可以在有效期内复用，避免频繁打断用户，在自主性与安全性之间取得平衡。<br>Agent 与虚拟环境之间的数据交换通过<b>共享文件系统</b>完成：以卷挂载的方式（如 /workspace/shared）连接 Agent、虚拟电脑和虚拟手机，<b>数据以文件路径引用传递而非内容拷贝，避免占用上下文窗口</b>。以一个数据分析任务为例：用户上传 CSV 文件到共享目录，虚拟电脑中的 Agent 读取文件、执行分析、生成图表并保存回共享目录，Agent 只需将图表的文件路径返回给用户——各方之间传递的始终只是轻量级的路径字符串。<br>事件触发工具让世界能够唤醒 Agent，用户沟通工具让 Agent 能够触达用户，虚拟身份与隔离执行环境让 Agent 能以独立、可审计的身份行动。剩下的问题是：当多个事件同时涌向同一个 Agent 实例时，应该如何处理？<br>左侧两个小动画与右侧数据流转都是示意：文件始终留在共享目录里，在各方之间传递的只是写着路径的小纸条。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">独立身份的<em>两个现实挑战</em>，与共享文件系统</h2></header>
+  <div class="sh6-body">
+    <div class="sh6-l">
+      <div class="sh6-c panel fx fx-left" style="--d:2">
+        <div class="sh6-h"><em>一</em><b>反机器人机制</b><span class="chip warn">示意</span></div>
+        <p>CAPTCHA 与 IP 信誉检测拦截自动化访问；数据中心 IP 的虚拟环境很容易被识别</p>
+        <div class="sh6-ip">
+          <div class="sh6-src"><svg class="ic"><use href="#i-cpu"/></svg><span class="sh6-ipl">数据中心 IP</span></div>
+          <div class="sh6-road"><i class="sh6-pk"></i></div>
+          <div class="sh6-site"><svg class="ic"><use href="#i-shield"/></svg><span>网站：CAPTCHA · IP 信誉</span><b class="sh6-res">拦截</b></div>
+        </div>
+        <p class="sh6-fix"><svg class="ic"><use href="#i-home"/></svg>实践中往往需要配置<b>住宅代理网络</b>（使用真实家庭 IP）才能正常访问</p>
+      </div>
+      <div class="sh6-c panel fx fx-left" style="--d:3">
+        <div class="sh6-h"><em>二</em><b>访问用户真实账号的场景</b><span class="chip warn">示意</span></div>
+        <p>必须以用户本人身份登录时，采用 <b>Human-in-the-Loop 认证</b>：通过 VNC/RDP 远程桌面，让用户在可视化环境中亲自完成登录</p>
+        <div class="sh6-tok"><div class="sh6-vnc"><svg class="ic"><use href="#i-browser"/></svg><span class="sh6-vs">用户亲自登录</span></div><div class="sh6-tb"><span>会话令牌有效期</span><div class="meter"><i class="sh6-tv"></i></div><small class="sh6-tn">复用 0 次，没有打断用户</small></div></div>
+        <p class="sh6-sm">用户能看到 Agent 正在操作的完整界面，理解为什么需要认证；令牌在有效期内复用——<b>在自主性与安全性之间取得平衡</b></p>
+      </div>
+    </div>
+    <div class="sh6-r panel fx fx-right" style="--d:4">
+      <div class="sh6-rh"><b>共享文件系统</b><span>以卷挂载连接 Agent、虚拟电脑和虚拟手机；数据以<b>文件路径引用</b>传递，而非内容拷贝</span></div>
+      <div class="sh6-st">
+        <div class="sh6-n" data-n="user" style="left:30px;top:30px"><svg class="ic"><use href="#i-user"/></svg><b>用户</b></div>
+        <div class="sh6-n" data-n="agent" style="left:30px;top:300px"><svg class="ic"><use href="#i-robot"/></svg><b>Agent</b><small>上下文里只有路径</small></div>
+        <div class="sh6-n" data-n="vm" style="left:690px;top:30px"><svg class="ic"><use href="#i-cpu"/></svg><b>虚拟电脑</b></div>
+        <div class="sh6-n" data-n="phone" style="left:690px;top:300px"><svg class="ic"><use href="#i-mobile"/></svg><b>虚拟手机</b></div>
+        <div class="sh6-vol"><code>/workspace/shared</code><div class="sh6-files"><span class="sh6-f csv"><svg class="ic"><use href="#i-file"/></svg>data.csv</span><span class="sh6-f png"><svg class="ic"><use href="#i-image"/></svg>chart.png</span></div><small>文件留在原地</small></div>
+        <div class="sh6-note"></div>
+      </div>
+      <div class="sh6-log"></div>
+    </div>
+  </div>
+  <p class="tagline sh6-tag fx fx-up" style="--d:6">事件触发工具让世界唤醒 Agent，用户沟通工具让 Agent 触达用户，虚拟身份与隔离环境让 Agent 以独立、可审计的身份行动——剩下的问题：<b>多个事件同时涌来怎么办？</b></p>
+  <div class="src">第六章 ·「虚拟身份与隔离执行环境」</div>
+</section>
+<style>
+#c06-share .sh6-body{display:grid;grid-template-columns:640px 1fr;gap:26px;height:640px}
+#c06-share .sh6-l{display:flex;flex-direction:column;gap:18px}
+#c06-share .sh6-c{flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+#c06-share .sh6-h{display:flex;align-items:center;gap:12px}
+#c06-share .sh6-h em{font-style:normal;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;font-size:17px;font-weight:800;color:#06101f;background:var(--acc)}
+#c06-share .sh6-h b{font-size:22px}
+#c06-share .sh6-h .chip{margin-left:auto;font-size:15px;padding:1px 8px}
+#c06-share .sh6-c>p{font-size:17px;line-height:1.55;color:var(--text2)}
+#c06-share .sh6-c>p b{color:var(--text)}
+#c06-share .sh6-ip{display:grid;grid-template-columns:170px 1fr 200px;align-items:center;gap:10px}
+#c06-share .sh6-src,#c06-share .sh6-site{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;border-radius:12px;text-align:center;border:1px solid var(--line2);background:rgba(10,16,36,.9)}
+#c06-share .sh6-src .ic,#c06-share .sh6-site .ic{font-size:26px;color:var(--acc)}
+#c06-share .sh6-ipl{font-size:16px;font-weight:700;color:var(--bad)}
+#c06-share[data-p="1"] .sh6-ipl{color:var(--ok)}
+#c06-share .sh6-site span{font-size:15px;color:var(--text2)}
+#c06-share .sh6-res{font-size:17px;color:var(--bad)}
+#c06-share[data-p="1"] .sh6-res{color:var(--ok)}
+#c06-share .sh6-road{position:relative;height:4px;border-radius:4px;background:rgba(255,255,255,.1)}
+#c06-share .sh6-pk{position:absolute;left:0;top:-6px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 0 12px #fff}
+#c06-share .sh6-fix{display:flex;gap:10px;align-items:flex-start}
+#c06-share .sh6-fix .ic{flex:none;font-size:22px;color:var(--ok);margin-top:2px}
+#c06-share .sh6-fix b{color:var(--ok)!important}
+#c06-share .sh6-tok{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center}
+#c06-share .sh6-vnc{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px;border-radius:12px;border:1px solid var(--line2);background:rgba(10,16,36,.9);transition:border-color .3s,box-shadow .3s}
+#c06-share .sh6-vnc .ic{font-size:28px;color:var(--acc)}
+#c06-share .sh6-vnc span{font-size:16px}
+#c06-share .sh6-vnc.ask{border-color:var(--warn);box-shadow:0 0 20px color-mix(in srgb,var(--warn) 40%,transparent)}
+#c06-share .sh6-tb{display:flex;flex-direction:column;gap:6px}
+#c06-share .sh6-tb>span{font-size:16px;color:var(--text3)}
+#c06-share .sh6-tv{--c:var(--ok);transition:width .2s linear!important}
+#c06-share .sh6-tn{font-size:16px;color:var(--text2)}
+#c06-share .sh6-sm b{color:var(--acc)!important}
+#c06-share .sh6-r{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-share .sh6-rh b{display:block;font-size:23px;color:var(--acc)}
+#c06-share .sh6-rh span{font-size:17px;color:var(--text2)}
+#c06-share .sh6-rh span b{display:inline;font-size:inherit}
+#c06-share .sh6-st{position:relative;height:400px}
+#c06-share .sh6-n{position:absolute;width:250px;height:84px;padding:10px 14px;border-radius:16px;display:grid;grid-template-columns:36px 1fr;grid-template-rows:auto auto;align-content:center;gap:0 10px;border:1.5px solid var(--line2);background:rgba(10,16,36,.95);transition:border-color .3s,box-shadow .3s}
+#c06-share .sh6-n .ic{grid-row:1/3;font-size:30px;color:var(--acc);align-self:center}
+#c06-share .sh6-n b{font-size:20px}
+#c06-share .sh6-n small{font-size:15px;color:var(--text3)}
+#c06-share .sh6-n.on{border-color:var(--acc);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 40%,transparent)}
+#c06-share .sh6-vol{position:absolute;left:330px;top:120px;width:330px;height:170px;padding:14px;border-radius:20px;display:flex;flex-direction:column;align-items:center;gap:10px;border:2px dashed color-mix(in srgb,var(--ctx) 60%,transparent);background:color-mix(in srgb,var(--ctx) 7%,rgba(10,16,36,.9))}
+#c06-share .sh6-vol code{font:700 18px var(--mono);color:var(--ctx)}
+#c06-share .sh6-vol small{font-size:15px;color:var(--text3)}
+#c06-share .sh6-files{display:flex;gap:10px}
+#c06-share .sh6-f{display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;font:15px var(--mono);border:1px solid var(--line2);opacity:.2;transition:opacity .4s,border-color .4s,box-shadow .4s}
+#c06-share .sh6-f .ic{font-size:20px;color:var(--warn)}
+#c06-share .sh6-f.in{opacity:1}
+#c06-share .sh6-f.hl{border-color:var(--warn);box-shadow:0 0 18px color-mix(in srgb,var(--warn) 45%,transparent)}
+#c06-share .sh6-note{position:absolute;left:0;top:0;padding:5px 10px;border-radius:6px;font:15px var(--mono);color:#1f2937;background:#fef3c7;box-shadow:0 4px 14px rgba(0,0,0,.4);rotate:-3deg;opacity:0;pointer-events:none;transition:left .9s var(--ease),top .9s var(--ease),opacity .3s}
+#c06-share .sh6-log{min-height:52px;padding:10px 14px;border-radius:12px;font-size:17px;line-height:1.5;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+#c06-share .sh6-log b{color:var(--acc)}
+#c06-share .sh6-tag{margin-top:14px;font-size:20px;line-height:1.55}
+</style>
+<script>
+HOOKS['c06-share'] = {
+  // 数据分析任务：用户上传 CSV → Agent 把路径交给虚拟电脑 → 分析、保存图表 → 只把图表路径返回给用户
+  STEPS: [
+    { from: 'user', to: null, file: 'csv', txt: '用户上传 <b>data.csv</b> 到共享目录' },
+    { from: 'user', to: 'agent', note: '/workspace/shared/data.csv', txt: '告诉 Agent：只传路径，不传内容' },
+    { from: 'agent', to: 'vm', note: '/workspace/shared/data.csv', txt: 'Agent 把<b>路径</b>交给虚拟电脑' },
+    { from: 'vm', to: null, file: 'png', read: 'csv', txt: '虚拟电脑读取文件、执行分析，生成图表并<b>保存回共享目录</b>' },
+    { from: 'vm', to: 'agent', note: '/workspace/shared/chart.png', txt: '返回给 Agent 的也只是图表的<b>路径</b>' },
+    { from: 'agent', to: 'user', note: '/workspace/shared/chart.png', txt: 'Agent 只需把文件路径返回给用户——<b>各方之间传递的始终只是轻量级的路径字符串</b>' },
+  ],
+  init(s) {
+    this.st = s.querySelector('.sh6-st');
+    this.note = s.querySelector('.sh6-note');
+    this.log = s.querySelector('.sh6-log');
+    this.N = {};
+    s.querySelectorAll('.sh6-n').forEach((n) => (this.N[n.dataset.n] = n));
+    this.F = { csv: s.querySelector('.sh6-f.csv'), png: s.querySelector('.sh6-f.png') };
+  },
+  pos(n) { return [n.offsetLeft + 60, n.offsetTop + 28]; },
+  async flow(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), nt = this.note;
+    while (ok()) {
+      Object.values(this.F).forEach((f) => f.classList.remove('in', 'hl'));
+      for (const st of this.STEPS) {
+        Object.values(this.N).forEach((n) => n.classList.remove('on'));
+        this.N[st.from].classList.add('on');
+        this.log.innerHTML = st.txt;
+        if (st.note) {
+          const [x0, y0] = this.pos(this.N[st.from]), [x1, y1] = this.pos(this.N[st.to]);
+          nt.textContent = st.note;
+          nt.style.transition = 'none'; nt.style.left = x0 + 'px'; nt.style.top = y0 + 'px'; nt.style.opacity = 1;
+          void nt.offsetWidth; nt.style.transition = '';
+          await w(150); if (!ok()) return;
+          nt.style.left = x1 + 'px'; nt.style.top = y1 + 'px';
+          await w(1000); if (!ok()) return;
+          this.N[st.to].classList.add('on');
+          nt.style.opacity = 0;
+        }
+        if (st.read) { this.F[st.read].classList.add('hl'); await w(800); if (!ok()) return; this.F[st.read].classList.remove('hl'); }
+        if (st.file) { this.F[st.file].classList.add('in', 'hl'); await w(700); if (!ok()) return; this.F[st.file].classList.remove('hl'); }
+        await w(1100); if (!ok()) return;
+      }
+      await w(1800);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.flow(s);
+    // 挑战一：数据中心 IP 被拦截 ↔ 住宅代理通过；挑战二：令牌在有效期内复用，过期才请用户登录
+    const pk = s.querySelector('.sh6-pk'), tv = s.querySelector('.sh6-tv'), tn = s.querySelector('.sh6-tn'), vnc = s.querySelector('.sh6-vnc'), vs = s.querySelector('.sh6-vs');
+    let u = 0, mode = 0, life = 100, reuse = 0, ask = 0, last = 0;
+    s.dataset.p = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      u += dt / 1600;
+      if (u >= 1) { u = 0; mode = 1 - mode; s.dataset.p = mode; s.querySelector('.sh6-ipl').textContent = mode ? '住宅代理（真实家庭 IP）' : '数据中心 IP'; s.querySelector('.sh6-res').textContent = mode ? '正常访问' : '拦截'; }
+      const blocked = mode === 0 && u > 0.55;
+      pk.style.left = `calc(${Math.min(u, blocked ? 0.55 : 1) * 100}% - 8px)`;
+      pk.style.background = blocked ? '#fb7185' : mode ? '#34d399' : '#fff';
+      if (ask > 0) {
+        ask -= dt;
+        if (ask <= 0) { life = 100; reuse = 0; vnc.classList.remove('ask'); vs.textContent = '已登录 · 令牌有效'; }
+      } else {
+        life -= dt / 90;
+        if (Math.random() < dt / 1400) { reuse++; }
+        if (life <= 0) { life = 0; ask = 2200; vnc.classList.add('ask'); vs.textContent = '令牌过期：请用户亲自登录'; }
+      }
+      tv.style.setProperty('--v', life.toFixed(1) + '%');
+      tn.textContent = ask > 0 ? '有效期已过，才需要打断用户一次' : `有效期内已复用 ${reuse} 次，没有打断用户`;
+    });
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.note.style.opacity = 0; Object.values(this.N).forEach((n) => n.classList.remove('on')); Object.values(this.F).forEach((f) => f.classList.remove('in', 'hl')); },
+};
+</script>

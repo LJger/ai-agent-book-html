@@ -1,0 +1,439 @@
+<!-- ================= 成本的三个层次 ================= -->
+<section class="slide" id="c07-coststack" data-part="7" data-trans="rise" data-dur="22000" data-title="Agent 系统的成本分析：成本的构成要素" data-notes="上一节把成本列为模型选型的关键维度之一，但 Agent 场景下的成本远比 token 定价复杂：多轮推理、工具调用和上下文累积会让它呈非线性增长。系统的成本分析既是评估体系不可或缺的一环，也是生产部署的必要前提。<br><b>成本的构成要素。</b>Agent 系统的成本可分解为三个层次。<br><b>模型推理成本</b>是最直接的部分，由输入 token 和输出 token 的消耗决定。但 Agent 场景下有两个常被忽视的放大因素。一是<b>上下文累积效应</b>：Agent 每轮调用 LLM 时，都会把之前所有的对话历史和工具返回结果一起发送。如果没有利用好 KV Cache（即缓存已处理过的上下文，避免重复计算），成本增长会非常快——第 1 轮发送 1000 token，第 2 轮发送 2000 token，第 3 轮发送 3000 token，总量是 1000+2000+3000=6000 而非 3×1000=3000，轮次越多差距越大。二是<b>思考 token 成本</b>：支持思考的模型会生成大量思考 token，这些 token 虽然不展示给用户，但同样计入费用。<br><b>工具调用成本</b>包括外部 API 费用（搜索引擎按次计费、数据库查询消耗计算资源）、代码执行的沙盒资源，以及一个容易被忽视的间接成本：工具返回结果注入上下文后产生的 token 费用。一次网页搜索返回的内容可能就占用 2000-5000 个 token，而且在后续每轮推理中都会作为输入被反复计费。<br><b>基础设施成本</b>涵盖向量数据库（用于 RAG 检索）、消息队列、关系型数据库、日志与追踪存储（用于可观测性）等运维开销。<br>左侧滑块按原书的例子计算：每轮新增 1000 token，累计发送量随轮数平方增长。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">成本随轮数<em>非线性增长</em></h2></header>
+  <div class="c7cs-body">
+    <div class="c7cs-l panel fx fx-left" style="--d:2">
+      <div class="c7cs-h"><b>上下文累积效应</b><label>轮数 <input type="range" class="rng c7cs-n" min="1" max="12" step="1" value="3"><b class="c7cs-vn">3</b></label></div>
+      <div class="c7cs-bars"></div>
+      <div class="c7cs-sum"><div><span>每轮重发全部历史</span><b class="c7cs-a">6,000</b></div><div><span>若每轮只算新增的 1000</span><b class="c7cs-b">3,000</b></div><div><span>放大倍数</span><b class="c7cs-x">2.0×</b></div></div>
+      <p class="c7cs-nt">原书例子：1000 + 2000 + 3000 = 6000，而非 3 × 1000 = 3000——<b>轮次越多差距越大</b></p>
+    </div>
+    <div class="c7cs-r fx fx-right" style="--d:3">
+      <div class="c7cs-ly" data-i="0"><em>01</em><div><b>模型推理成本</b><p>输入 + 输出 token。两个放大因素：<b>上下文累积</b>（没用好 KV Cache 时增长很快）、<b>思考 token</b>（不展示也计费）</p></div></div>
+      <div class="c7cs-ly" data-i="1"><em>02</em><div><b>工具调用成本</b><p>外部 API 按次计费、沙盒资源；间接成本：一次网页搜索返回 <b>2000–5000 token</b>，此后每轮都作为输入被<b>反复计费</b></p></div></div>
+      <div class="c7cs-ly" data-i="2"><em>03</em><div><b>基础设施成本</b><p>向量数据库、消息队列、关系型数据库、日志与追踪存储等运维开销</p></div></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「Agent 系统的成本分析」</div>
+</section>
+<style>
+.c7cs-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c7cs-l{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.c7cs-h{display:flex;justify-content:space-between;align-items:center}
+.c7cs-h>b{font-size:18px}
+.c7cs-h label{display:flex;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.c7cs-h label input{width:240px}
+.c7cs-h label b{font:800 22px var(--num);color:var(--text);min-width:30px}
+.c7cs-bars{display:flex;align-items:flex-end;gap:6px;height:330px;padding-bottom:4px;border-bottom:1px solid var(--line2)}
+.c7cs-bars div{flex:1;display:flex;flex-direction:column-reverse;gap:2px;transition:opacity .3s}
+.c7cs-bars i{height:22px;border-radius:3px;background:rgba(34,211,238,.25);animation:c7csIn .3s var(--ease)}
+.c7cs-bars i:first-child{background:#22d3ee}
+@keyframes c7csIn{from{opacity:0;scale:1 .3}}
+.c7cs-sum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c7cs-sum div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.c7cs-sum span{font-size:15px;color:var(--text3)}
+.c7cs-sum b{font:800 26px var(--num)}
+.c7cs-sum div:first-child b{color:#fb7185}
+.c7cs-nt{font-size:15px;line-height:1.55;color:var(--text2)}.c7cs-nt b{color:var(--text)}
+.c7cs-r{display:flex;flex-direction:column;gap:14px}
+.c7cs-ly{display:grid;grid-template-columns:56px 1fr;gap:14px;padding:18px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s}
+.c7cs-ly em{font:800 30px var(--num);font-style:normal;color:var(--acc)}
+.c7cs-ly b{font-size:19px}
+.c7cs-ly p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:4px}
+.c7cs-ly p b{font-size:16px;color:var(--text)}
+.c7cs-ly.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85))}
+</style>
+<script>
+HOOKS['c07-coststack'] = {
+  init(s) {
+    this.q = (x) => s.querySelector(x);
+    this.q('.c7cs-n').addEventListener('input', () => { this.manual = true; this.draw(+this.q('.c7cs-n').value); });
+  },
+  draw(n) {
+    const q = this.q;
+    q('.c7cs-vn').textContent = n; q('.c7cs-n').value = n;
+    // 每格 = 1000 token；第 i 轮发送 i 格，最上面一格是本轮新增
+    q('.c7cs-bars').innerHTML = Array.from({ length: 12 }, (_, i) => `<div style="opacity:${i < n ? 1 : 0.12}">${i < n ? Array.from({ length: i + 1 }, () => '<i></i>').join('') : ''}</div>`).join('');
+    const a = (1000 * n * (n + 1)) / 2, b = 1000 * n;
+    q('.c7cs-a').textContent = a.toLocaleString('en-US'); q('.c7cs-b').textContent = b.toLocaleString('en-US'); q('.c7cs-x').textContent = (a / b).toFixed(1) + '×';
+  },
+  enter(s, ctx) {
+    this.manual = false; this.draw(3);
+    let n = 3;
+    ctx.every(() => { if (this.manual) return; n = n >= 12 ? 1 : n + 1; this.draw(n); }, 1100);
+    C7.auto(this, ctx, 3, 3600, (i) => { this.i = i; s.querySelectorAll('.c7cs-ly').forEach((l, j) => l.classList.toggle('on', j === i)); }, 600);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c7cs-ly').forEach((l) => l.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 表7-4 ================= -->
+<section class="slide" id="c07-cost74" data-part="7" data-trans="zoom" data-dur="26000" data-title="表7-4 八轮 Agent 任务的真实成本对照" data-notes="为了看清这些费用究竟从哪里来，配套实验选了一个固定的八轮客服退款任务：查询订单、物流、退款政策和知识库，随后完成风控、退款、通知与关单。实验调用 gpt-4o-mini，分别打开或关闭“稳定前缀”和“压缩历史”两个开关，得到四组对照。<br>表7-4：无缓存、无压缩——输入 20,700、缓存 0、总成本 $0.003776；仅稳定前缀——输入 20,386、缓存 13,568、$0.002707，节省 28.3%；仅压缩历史——输入 16,177、缓存 0、$0.003115，节省 17.5%；稳定前缀 + 压缩——输入 16,035、缓存 6,144、$0.002643，节省 30.0%。<br>在基线组中，每轮输入从 1,113 token 一路涨到 3,668 token。工具返回会跟着历史反复进入后续请求，八轮累计占了 9,544 个输入 token。两项优化同时开启后，这个数字降到 5,248，总费用下降 30%。<br>不过，“仅稳定前缀”已经节省 28.3%，“仅压缩历史”又节省 17.5%，两者一起却只节省 30%，并不是二者相加。原因是压缩历史的同时，也缩短了可以命中缓存的前缀。因此，<b>几项上下文优化同时使用时，必须在完整任务中一起实测，不能把各自的节省比例直接相加。</b><br>页面上的两个开关对应四组对照，柱状图是 sample_trace.json 里逐轮的真实 prompt token 与缓存命中 token。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表7-4：两项优化合用，<em>节省不能相加</em></h2></div>
+    <div class="c7c4-tg fx fx-up" style="--d:2"><button class="tgl c7c4-kv" data-k="kv"><i></i>稳定前缀</button><button class="tgl c7c4-cp" data-k="cp"><i></i>压缩历史</button></div></header>
+  <div class="c7c4-body">
+    <div class="c7c4-ch panel fx fx-left" style="--d:3">
+      <div class="c7c4-h"><b class="c7c4-nm">—</b><span>gpt-4o-mini · 八轮客服退款任务 · 每轮输入 token</span></div>
+      <div class="c7c4-bars"></div>
+      <div class="c7c4-lg"><span class="u"><i></i>未命中缓存的输入</span><span class="c"><i></i>命中缓存的输入（半价）</span></div>
+    </div>
+    <div class="c7c4-r fx fx-right" style="--d:4">
+      <div class="c7c4-tb">
+        <div class="c7c4-hd"><span>方案</span><span>输入 token</span><span>缓存 token</span><span>总成本</span><span>比基线节省</span></div>
+        <div class="c7c4-rows"></div>
+      </div>
+      <div class="c7c4-tool"><span>工具返回累计占用输入</span><b class="c7c4-tt">9,544</b><small>两项都开 → 5,248</small></div>
+      <div class="c7c4-add"><span>28.3% + 17.5% ≠ <b>30.0%</b></span><p>压缩历史的同时，也<b>缩短了可以命中缓存的前缀</b>——几项上下文优化必须在完整任务中一起实测</p></div>
+      <p class="c7-data">数据：配套仓库 chapter7/agent-cost-analysis/sample_trace.json（gpt-4o-mini，输入 $0.15 / 缓存 $0.075 / 输出 $0.6 每百万 token）</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「Agent 系统的成本分析」· 表7-4 八轮 Agent 任务的真实成本对照</div>
+</section>
+<style>
+.c7c4-tg{display:flex;gap:10px}
+.c7c4-tg .tgl{font-size:16px}
+.c7c4-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7c4-ch{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.c7c4-h{display:flex;align-items:baseline;gap:14px}
+.c7c4-h b{font-size:20px;color:var(--acc)}.c7c4-h span{font-size:15px;color:var(--text3)}
+.c7c4-bars{flex:1;display:grid;grid-template-columns:repeat(8,1fr);gap:14px;align-items:end;border-bottom:1px solid var(--line2);min-height:0}
+.c7c4-col{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.c7c4-col em{font:700 15px var(--num);font-style:normal;color:var(--text2)}
+.c7c4-st{width:100%;display:flex;flex-direction:column-reverse;border-radius:6px 6px 0 0;overflow:hidden}
+.c7c4-st i{display:block;transition:height .6s var(--ease)}
+.c7c4-st .c{background:rgba(52,211,153,.65)}.c7c4-st .u{background:rgba(96,165,250,.6)}
+.c7c4-col small{font-size:15px;color:var(--text3);white-space:nowrap}
+.c7c4-lg{display:flex;gap:16px}
+.c7c4-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7c4-lg i{width:14px;height:14px;border-radius:3px}
+.c7c4-lg .u i{background:#60a5fa}.c7c4-lg .c i{background:#34d399}
+.c7c4-r{display:flex;flex-direction:column;gap:12px}
+.c7c4-tb{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c7c4-hd,.c7c4-rw{display:grid;grid-template-columns:1.3fr 1fr .9fr 1fr .9fr;gap:8px;padding:5px 10px;align-items:center}
+.c7c4-hd span{font-size:15px;font-weight:700;color:var(--text3)}
+.c7c4-hd span:not(:first-child),.c7c4-rw span:not(:first-child){text-align:right}
+.c7c4-rw{border-radius:10px;font-size:16px;transition:background .3s}
+.c7c4-rw span:not(:first-child){font-family:var(--num)}
+.c7c4-rw.on{background:color-mix(in srgb,var(--acc) 15%,transparent);outline:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.c7c4-tool{display:grid;grid-template-columns:1fr auto;gap:2px 14px;align-items:center;padding:10px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7c4-tool span{font-size:16px;color:var(--text2)}
+.c7c4-tool b{grid-row:1/3;grid-column:2;font:800 32px var(--num);color:var(--tool)}
+.c7c4-tool small{font-size:15px;color:var(--text3)}
+.c7c4-add{padding:10px 16px;border-radius:14px;border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.06)}
+.c7c4-add span{font:700 20px var(--num)}.c7c4-add span b{color:var(--warn)}
+.c7c4-add p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c7c4-add p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-cost74'] = {
+  // sample_trace.json：每轮 [prompt_tokens, cached_tokens]
+  S: {
+    naive: ['无缓存、无压缩', [[1113, 0], [1807, 0], [2154, 0], [2564, 0], [2863, 0], [3123, 0], [3408, 0], [3668, 0]], '20,700', '0', '$0.003776', '—', 9544],
+    kv: ['仅稳定前缀', [[1056, 1024], [1763, 0], [2130, 1024], [2540, 1024], [2834, 2176], [3081, 2560], [3361, 2560], [3621, 3200]], '20,386', '13,568', '$0.002707', '28.3%', 9544],
+    compress: ['仅压缩历史', [[1112, 0], [1829, 0], [2164, 0], [2310, 0], [2066, 0], [2146, 0], [2192, 0], [2358, 0]], '16,177', '0', '$0.003115', '17.5%', 5248],
+    both: ['稳定前缀 + 压缩', [[1056, 1024], [1781, 0], [2143, 1024], [2310, 0], [2060, 1024], [2143, 1024], [2188, 1024], [2354, 1024]], '16,035', '6,144', '$0.002643', '30.0%', 5248],
+  },
+  TOOLS: ['查订单', '查物流', '退款政策', '知识库', '用户历史', '退款', '通知', '关单'],
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.q = q;
+    q('.c7c4-bars').innerHTML = this.TOOLS.map((t) => `<div class="c7c4-col"><em></em><div class="c7c4-st"><i class="c"></i><i class="u"></i></div><small>${t}</small></div>`).join('');
+    q('.c7c4-rows').innerHTML = Object.entries(this.S).map(([k, v]) => `<div class="c7c4-rw" data-k="${k}"><span>${v[0]}</span><span>${v[2]}</span><span>${v[3]}</span><span>${v[4]}</span><span>${v[5]}</span></div>`).join('');
+    s.querySelectorAll('.c7c4-tg .tgl').forEach((b) => b.addEventListener('click', () => { this.auto = false; b.classList.toggle('on'); this.show(this.key()); }));
+    s.querySelectorAll('.c7c4-rw').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.set(r.dataset.k); }));
+  },
+  key() { const kv = this.q('.c7c4-kv').classList.contains('on'), cp = this.q('.c7c4-cp').classList.contains('on'); return kv && cp ? 'both' : kv ? 'kv' : cp ? 'compress' : 'naive'; },
+  set(k) { this.q('.c7c4-kv').classList.toggle('on', k === 'kv' || k === 'both'); this.q('.c7c4-cp').classList.toggle('on', k === 'compress' || k === 'both'); this.show(k); },
+  show(k) {
+    const v = this.S[k], q = this.q, H = q('.c7c4-bars').clientHeight - 60;
+    q('.c7c4-nm').textContent = v[0];
+    q('.c7c4-bars').querySelectorAll('.c7c4-col').forEach((c, i) => {
+      const [p, ca] = v[1][i];
+      c.querySelector('em').textContent = p.toLocaleString('en-US');
+      c.querySelector('.c').style.height = (ca / 3800) * H + 'px';
+      c.querySelector('.u').style.height = ((p - ca) / 3800) * H + 'px';
+    });
+    q('.c7c4-rows').querySelectorAll('.c7c4-rw').forEach((r) => r.classList.toggle('on', r.dataset.k === k));
+    q('.c7c4-tt').textContent = v[6].toLocaleString('en-US');
+  },
+  enter(s, ctx) { const seq = ['naive', 'kv', 'compress', 'both']; C7.auto(this, ctx, 4, 3600, (i) => { this.i = i; this.set(seq[i]); }, 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7c4-tg .tgl').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 成本优化与实验 7-10 ================= -->
+<section class="slide" id="c07-exp710" data-part="7" data-steps="2" data-trans="flip" data-dur="12000" data-title="成本优化策略、预算控制与实验 7-10" data-notes="<b>成本优化策略。</b>从输入侧看，最值得优先测试的有三类办法：<b>复用 KV Cache</b>，也就是尽量保持前缀不变；<b>压缩上下文</b>，减少旧轨迹和冗长工具返回；以及<b>分层选择模型</b>，让轻量模型处理简单请求、强模型处理复杂推理。第二章已经介绍了具体做法。这里要强调的是：<b>这些能力最好都能独立开关</b>，这样既能看清每一项的作用，也能检查它们合用时会不会互相抵消。除此之外，还有两项与评估和运维直接相关的手段。<br><b>异步批处理</b>将非实时任务积攒起来批量处理，利用 API 提供商在波谷时段的批量定价折扣；在模型本地部署场景下，也能提高波谷时段的 GPU 利用率。<br><b>成本监控与预算控制。</b>生产环境中应当建立实时的成本监控体系：按任务类型、模型、用户等维度追踪 token 消耗和 API 费用。同时<b>设置每个任务的成本上限</b>——当 Agent 陷入循环或探索过深时自动终止，防止单次任务产生异常高额的费用。<br><b>实验 7-10 ★：Agent 任务的端到端成本分析。</b>实验目标：复现上述八轮任务的全链路成本拆解，并用自己的真实工作负载验证优化策略。技术方案：先复现配套仓库中的固定任务，再换成几个自己的典型任务。使用 LangSmith 或自建追踪系统记录每次 LLM 调用的输入/输出 token 数、思考 token 数、工具调用次数和返回大小、端到端延迟。计算每类任务的平均成本、成本分布（p50/p95/p99）和成本构成比例。验收标准：生成成本拆解报告，识别主要成本驱动因素。<b>四种开关组合都要运行</b>，既比较每项优化单独带来的变化，也检查两项优化合用后的结果。<br>左侧熔断演示为示意：一个陷入循环的任务，累计成本触到上限后被自动终止。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每项优化<em>独立开关</em>，每个任务<em>设成本上限</em></h2></header>
+  <div class="c7ea-body">
+    <div class="c7ea-l panel fx fx-left" style="--d:2">
+      <div class="c7ea-h"><b>成本上限熔断</b><span class="c7-tag">示意</span><span class="c7ea-st">运行中</span></div>
+      <div class="c7ea-cv"><div class="c7ea-cap"><span>任务成本上限 $0.05</span></div><div class="c7ea-ln"></div></div>
+      <div class="c7ea-log"></div>
+    </div>
+    <div class="c7ea-r">
+      <div class="c7ea-grid fx fx-up" data-step="0">
+        <div class="c7-card"><b>复用 KV Cache</b><p>尽量保持前缀不变</p></div>
+        <div class="c7-card"><b>压缩上下文</b><p>减少旧轨迹和冗长工具返回</p></div>
+        <div class="c7-card"><b>分层选择模型</b><p>轻量模型处理简单请求，强模型处理复杂推理</p></div>
+        <div class="c7-card"><b>异步批处理</b><p>非实时任务攒批，用波谷批量折扣；本地部署提高波谷 GPU 利用率</p></div>
+      </div>
+      <div class="c7-card c7ea-mon fx fx-up" data-step="1"><b>成本监控与预算控制</b><p>按<b>任务类型、模型、用户</b>等维度追踪 token 消耗和 API 费用；每个任务设成本上限，陷入循环或探索过深时自动终止</p></div>
+      <div class="c7-card c7ea-ex fx fx-up" data-step="2"><b>实验 7-10 <span class="c7-star">★</span>：Agent 任务的端到端成本分析</b>
+        <ul><li>先复现配套仓库的八轮任务，再换成自己的典型任务</li><li>LangSmith 或自建追踪：输入 / 输出 / 思考 token、工具调用次数与返回大小、端到端延迟</li><li>每类任务的平均成本、<b>p50 / p95 / p99</b> 分布、成本构成比例</li><li>验收：成本拆解报告，识别主要驱动因素；<b>四种开关组合都要运行</b></li></ul></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「Agent 系统的成本分析」· 实验 7-10</div>
+</section>
+<style>
+.c7ea-body{display:grid;grid-template-columns:1fr 1.1fr;gap:22px;flex:1;min-height:0}
+.c7ea-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7ea-h{display:flex;align-items:center;gap:12px}.c7ea-h b{font-size:18px}
+.c7ea-st{margin-left:auto;font-size:15px;font-weight:700;color:var(--env)}
+.c7ea-st.stop{color:#fb7185}
+.c7ea-cv{position:relative;height:300px;border-left:1px solid var(--line2);border-bottom:1px solid var(--line2)}
+.c7ea-cap{position:absolute;left:0;right:0;top:40px;border-top:2px dashed #fb7185}
+.c7ea-cap span{position:absolute;right:6px;top:-26px;font-size:15px;color:#fda4af}
+.c7ea-ln{position:absolute;inset:0;display:flex;align-items:flex-end;gap:4px;padding:0 6px}
+.c7ea-ln i{flex:1;border-radius:4px 4px 0 0;background:linear-gradient(0deg,rgba(34,211,238,.25),rgba(34,211,238,.7));animation:c7eaIn .3s var(--ease)}
+.c7ea-ln i.loop{background:linear-gradient(0deg,rgba(251,191,36,.3),rgba(251,191,36,.8))}
+.c7ea-ln i.kill{background:#fb7185}
+@keyframes c7eaIn{from{opacity:0}}
+.c7ea-log{font-size:15px;line-height:1.6;color:var(--text2);min-height:72px}
+.c7ea-log b{color:var(--text)}
+.c7ea-r{display:flex;flex-direction:column;gap:12px}
+.c7ea-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7ea-grid .c7-card{padding:12px 16px}
+.c7ea-grid b,.c7ea-mon>b,.c7ea-ex>b{font-size:17px}
+.c7ea-grid p,.c7ea-mon p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+.c7ea-mon p b{color:var(--text)}
+.c7ea-ex ul{margin:6px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:var(--text2)}
+.c7ea-ex li b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp710'] = {
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const ln = s.querySelector('.c7ea-ln'), log = s.querySelector('.c7ea-log'), st = s.querySelector('.c7ea-st'), H = 300, cap = 0.05, capY = H - 40;
+    while (ok()) {
+      ln.innerHTML = ''; st.textContent = '运行中'; st.classList.remove('stop');
+      log.innerHTML = '前几轮正常推进，累计成本平稳上升';
+      let c = 0;
+      for (let i = 0; i < 30; i++) {
+        await U.wait(ctx, 330); if (!ok()) return;
+        const loop = i >= 7;
+        c += loop ? 0.0024 + i * 0.00006 : 0.0014;
+        const e = document.createElement('i');
+        e.style.height = Math.min(H, (c / cap) * capY) + 'px';
+        if (loop) e.className = 'loop';
+        if (i === 8) log.innerHTML = '第 9 轮起 Agent <b>陷入循环</b>：反复调用同一个工具，上下文越滚越大';
+        if (c >= cap) { e.className = 'kill'; ln.appendChild(e); st.textContent = '已熔断'; st.classList.add('stop'); log.innerHTML = `第 ${i + 1} 轮累计 <b>$${c.toFixed(4)}</b> 触到上限 → <b>自动终止</b>，防止单次任务产生异常高额费用`; break; }
+        ln.appendChild(e);
+      }
+      await U.wait(ctx, 4200);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.c7ea-ln').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 模型切换案例 ================= -->
+<section class="slide" id="c07-switch" data-part="7" data-steps="3" data-trans="iris" data-title="评估驱动的持续迭代：要不要切到新模型？" data-notes="模型选择不是一次性的决策，而是随着模型演进需要动态调整的持续过程。本章开篇已经提出“拥有评估体系就能快速跟上模型演进”这一核心理念，下面用一个具体的模型切换案例说明这套体系在真实决策中如何运作。<br>假设你的 Agent 系统当前基于 Claude 构建，在工具调用和复杂编排上表现优异。某天 Gemini 发布了一个新模型，公开基准显示它在多项指标上超越 Claude，而且定价更低。此时你面临的问题不是“Gemini 是否比 Claude 强”，而是“<b>在我的特定任务上，Gemini 是否比 Claude 好？好多少？切换成本是什么？</b>”<br>拥有完善评估体系的团队可以在数小时内给出答案：在自己的评估数据集上运行新模型，对比任务成功率、工具调用正确率、延迟和成本。你可能会发现新模型在简单任务上确实更优且更便宜，但在涉及复杂多轮工具编排的核心场景中，成功率反而下降了 5%——在确认这一差异超出噪声带宽之后（见下文“评估结果的统计显著性”），你的决策就变成了“简单任务迁移到新模型以降低成本，复杂任务保留原模型以确保质量”的差异化策略，而非盲目的全量切换。<b>这种精细化的数据驱动决策，只有在预先构建好评估体系的前提下才可能实现。</b>">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">新模型发布了：<em>在我的任务上</em>它更好吗？</h2></header>
+  <div class="c7sw-flow">
+    <div class="c7sw-s fx fx-up" style="--d:2"><em>0</em><b>公开基准</b><p>Gemini 新模型多项指标超越 Claude，定价更低</p><span class="c7sw-q">“Gemini 是否比 Claude 强？”——问错了</span></div>
+    <div class="c7sw-s fx fx-up" data-step="1"><em>1</em><b>自有评估集 · 数小时</b><div class="c7sw-cmp"><div><span>简单任务</span><i class="up">新模型更优且更便宜</i></div><div><span>复杂多轮工具编排</span><i class="dn">成功率下降 5%</i></div></div><p>对比任务成功率、工具调用正确率、延迟、成本</p></div>
+    <div class="c7sw-s fx fx-up" data-step="2"><em>2</em><b>噪声检验</b><div class="c7sw-ci"><i></i><b></b></div><p>确认这 5% 的差异<b>超出噪声带宽</b>（见下一部分“统计显著性”）</p></div>
+    <div class="c7sw-s fx fx-up" data-step="3"><em>3</em><b>差异化路由</b><div class="c7sw-rt"><span class="n">简单任务 → 新模型（降成本）</span><span class="o">复杂任务 → 保留原模型（保质量）</span></div><p>而非盲目的全量切换</p></div>
+  </div>
+  <p class="c7sw-nt fx fx-up" style="--d:4">真正的问题：<b>在我的特定任务上，好不好？好多少？切换成本是什么？</b>只有预先构建好评估体系，才可能做出这种精细化决策</p>
+  <div class="src">第七章 ·「评估驱动的持续迭代」</div>
+</section>
+<style>
+.c7sw-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:8px}
+.c7sw-s{display:flex;flex-direction:column;gap:10px;padding:18px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75);min-height:420px}
+.c7sw-s em{font:800 34px var(--num);font-style:normal;color:var(--acc)}
+.c7sw-s>b{font-size:20px}
+.c7sw-s p{font-size:16px;line-height:1.55;color:var(--text2)}.c7sw-s p b{color:var(--text)}
+.c7sw-q{margin-top:auto;font-size:15px;color:#fda4af;padding:8px 12px;border-radius:10px;border:1px dashed rgba(251,113,133,.5)}
+.c7sw-cmp{display:flex;flex-direction:column;gap:8px}
+.c7sw-cmp div{display:flex;flex-direction:column;gap:3px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.03)}
+.c7sw-cmp span{font-size:15px;color:var(--text3)}
+.c7sw-cmp i{font-style:normal;font-size:16px;font-weight:700}
+.c7sw-cmp .up{color:#6ee7b7}.c7sw-cmp .dn{color:#fda4af}
+.c7sw-ci{position:relative;height:70px;border-radius:10px;background:rgba(255,255,255,.03)}
+.c7sw-ci i{position:absolute;left:30%;width:28%;top:28px;height:14px;border-radius:7px;background:rgba(148,163,184,.35)}
+.c7sw-ci i::after{content:"噪声带宽";position:absolute;left:0;right:0;top:-24px;text-align:center;font-size:15px;color:var(--text3);font-style:normal}
+.c7sw-ci b{position:absolute;left:30%;top:20px;width:4px;height:30px;border-radius:2px;background:#fb7185;transition:left 1.2s var(--ease)}
+#c07-switch.k2 .c7sw-ci b{left:78%}
+.c7sw-rt{display:flex;flex-direction:column;gap:8px}
+.c7sw-rt span{font-size:16px;font-weight:700;padding:10px 12px;border-radius:10px}
+.c7sw-rt .n{background:rgba(96,165,250,.12);border:1px solid rgba(96,165,250,.5);color:#bfdbfe}
+.c7sw-rt .o{background:rgba(251,146,60,.12);border:1px solid rgba(251,146,60,.5);color:#fed7aa}
+.c7sw-nt{margin-top:18px;font-size:18px;line-height:1.6;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.c7sw-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-switch'] = {
+  step(s, ctx, k) { s.classList.toggle('k2', k >= 2); },
+  enter(s, ctx, k) { s.classList.toggle('k2', k >= 2); },
+  reset(s) { s.classList.remove('k2'); },
+};
+</script>
+
+<!-- ================= 实验 7-11 ================= -->
+<section class="slide" id="c07-exp711" data-part="7" data-trans="slide" data-dur="20000" data-title="实验 7-11 ★★：多维度模型性能基准测试" data-notes="<b>实验 7-11 ★★：多维度模型性能基准测试。</b>对主流 LLM 及不同 API 提供商进行全面基准测试，建立多维度模型选型决策数据库。<br>选择测试范围：GPT 系列、Claude 系列、Gemini 系列、Doubao 系列等闭源 SOTA 模型，以及 Qwen、Kimi、DeepSeek 等开源模型。对同一模型测试不同 API 提供商（如 DeepSeek 官方 vs Siliconflow），验证第三方性能监测平台（如 Artificial Analysis）的结果。<br>设计标准化测试工作负载：输入吞吐量测试使用固定长度上下文（8K/32K/128K tokens），输出吞吐量测试请求生成固定长度响应（512/2048 tokens）。延迟测试包含 TTFT 和端到端延迟，对支持思考的模型单独测量思考长度与思考延迟。每个配置至少 100 次请求，计算标准差/p50/p95/p99——<b>高延迟方差意味着用户体验不稳定</b>。<br>评估 API 的可用性与稳定性：在一周内每小时探测一次，记录成功率、错误类型和故障时长。计算故障率、MTTR（平均恢复时间）和最长连续可用时间。测试速率限制的实际阈值——通过逐步提升并发量来找到限流点，记录 RPM/TPM 上限。计算综合成本：收集定价信息（输入/输出/缓存 token 的单价），考虑 KV Cache 的影响，计算典型多轮 Agent 任务的平均成本。<br>如实说明配套仓库的状态：chapter7/model-benchmark 已实现完整的实验编排与严格的结果审计，但实验台账把 7-11 标为“未完成——长时间、高成本的实验”：只有 29 次冒烟/就绪观测，没有标准的 N=100 单元，没有并发爬坡与 Agent 成本阶段，也没有 168 小时的可用性探测。因此本页只展示测试矩阵的设计，不给出任何模型的性能数字。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-11 <span class="c7-star">★★</span>：一张<em>多维度选型</em>测试矩阵</h2></header>
+  <div class="c7eb-body">
+    <div class="c7eb-mx panel fx fx-left" style="--d:2">
+      <div class="c7eb-h"><b>标准化工作负载</b><span>每格 ≥ 100 次请求 · 标准差 / p50 / p95 / p99</span></div>
+      <div class="c7eb-grid"><span></span><span>输出 512</span><span>输出 2048</span></div>
+      <div class="c7eb-ms"><span><b>TTFT</b>首个 token 生成时间</span><span><b>端到端延迟</b></span><span><b>思考长度与思考延迟</b>支持思考的模型单独测</span></div>
+      <div class="c7eb-scope"><b>测试范围</b><p>GPT、Claude、Gemini、Doubao 等闭源 SOTA；Qwen、Kimi、DeepSeek 等开源模型；同一模型不同提供商（如 DeepSeek 官方 vs Siliconflow），对照 Artificial Analysis 等第三方监测</p></div>
+    </div>
+    <div class="c7eb-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7eb-k">可用性与稳定性 · 一周逐小时探测</b><div class="c7eb-wk"></div><div class="c7eb-av"><span>故障率</span><span>MTTR 平均恢复时间</span><span>最长连续可用时间</span></div></div>
+      <div class="c7-card"><b class="c7eb-k">速率限制 · 逐步加压找限流点</b><div class="c7eb-rp"></div><p>记录 RPM / TPM 实际上限；综合成本考虑输入 / 输出 / 缓存单价与 KV Cache，算典型多轮 Agent 任务的平均成本</p></div>
+      <div class="c7eb-st"><span class="c7-tag">配套仓库状态：未完成</span><p>编排与审计已实现；只有 <b>29 次</b>冒烟 / 就绪观测，无标准 N = 100 单元、无并发爬坡与 Agent 成本阶段、无 168 小时探测——<b>本页不给出任何模型的性能数字</b>，图中格子与探测条为示意</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「评估驱动的持续迭代」· 实验 7-11</div>
+</section>
+<style>
+.c7eb-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;flex:1;min-height:0}
+.c7eb-mx{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.c7eb-h{display:flex;flex-direction:column;gap:2px}.c7eb-h b{font-size:18px}.c7eb-h span{font-size:15px;color:var(--text3)}
+.c7eb-grid{display:grid;grid-template-columns:120px 1fr 1fr;gap:8px}
+.c7eb-grid>span{font-size:15px;font-weight:700;color:var(--text3);text-align:center}
+.c7eb-grid>b{font:700 16px var(--num);display:flex;align-items:center}
+.c7eb-c{height:64px;border-radius:10px;border:1px solid var(--line);display:grid;grid-template-columns:repeat(10,1fr);gap:2px;padding:6px;align-content:center}
+.c7eb-c i{height:8px;border-radius:2px;background:rgba(255,255,255,.08);transition:background .2s}
+.c7eb-c i.on{background:color-mix(in srgb,var(--acc) 70%,transparent)}
+.c7eb-ms{display:flex;gap:8px;flex-wrap:wrap}
+.c7eb-ms span{display:flex;flex-direction:column;font-size:15px;color:var(--text3);padding:6px 12px;border-radius:10px;border:1px solid var(--line2)}
+.c7eb-ms b{font-size:16px;color:var(--text)}
+.c7eb-scope{margin-top:auto}
+.c7eb-scope b{font-size:16px;color:var(--acc)}
+.c7eb-scope p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}
+.c7eb-r{display:flex;flex-direction:column;gap:12px}
+.c7eb-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7eb-wk{display:grid;grid-template-columns:repeat(42,1fr);gap:2px}
+.c7eb-wk i{height:22px;border-radius:2px;background:rgba(52,211,153,.2);transition:background .2s}
+.c7eb-wk i.on{background:rgba(52,211,153,.7)}
+.c7eb-wk i.down{background:#fb7185}
+.c7eb-av{display:flex;gap:8px;margin-top:8px}
+.c7eb-av span{font-size:15px;padding:3px 10px;border-radius:8px;background:rgba(255,255,255,.04)}
+.c7eb-rp{display:flex;align-items:flex-end;gap:4px;height:70px}
+.c7eb-rp i{flex:1;border-radius:3px 3px 0 0;background:rgba(96,165,250,.6);transition:height .3s}
+.c7eb-rp i.lim{background:#fb7185}
+.c7eb-r .c7-card p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:8px}
+.c7eb-st{padding:12px 16px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent)}
+.c7eb-st p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c7eb-st b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp711'] = {
+  init(s) {
+    const g = s.querySelector('.c7eb-grid');
+    ['8K', '32K', '128K'].forEach((c) => { g.insertAdjacentHTML('beforeend', `<b>输入 ${c}</b>` + [0, 1].map(() => `<div class="c7eb-c">${'<i></i>'.repeat(100)}</div>`).join('')); });
+    s.querySelector('.c7eb-wk').innerHTML = '<i></i>'.repeat(168);
+    s.querySelector('.c7eb-rp').innerHTML = '<i></i>'.repeat(12);
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const cells = [...s.querySelectorAll('.c7eb-c')], wk = [...s.querySelectorAll('.c7eb-wk i')], rp = [...s.querySelectorAll('.c7eb-rp i')];
+    while (ok()) {
+      s.querySelectorAll('.c7eb-c i,.c7eb-wk i').forEach((x) => x.classList.remove('on', 'down'));
+      rp.forEach((x) => { x.style.height = '4px'; x.classList.remove('lim'); });
+      for (let t = 0; t < 20; t++) {
+        await U.wait(ctx, 160); if (!ok()) return;
+        cells.forEach((c) => { for (let j = t * 5; j < t * 5 + 5; j++) c.children[j].classList.add('on'); });
+        for (let j = t * 8.4; j < (t + 1) * 8.4 && j < 168; j++) wk[Math.floor(j)].classList.add([61, 62, 130].includes(Math.floor(j)) ? 'down' : 'on');
+        if (t < 12) { rp[t].style.height = Math.min(70, 8 + t * 7) + 'px'; if (t >= 8) { rp[t].style.height = '62px'; rp[t].classList.add('lim'); } }
+      }
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7eb-c i,.c7eb-wk i').forEach((x) => x.classList.remove('on', 'down')); },
+};
+</script>
+
+<!-- ================= 实验 7-12 ================= -->
+<section class="slide" id="c07-exp712" data-part="7" data-trans="zoom" data-dur="30000" data-title="实验 7-12 ★★：用户记忆系统的端到端选型评估" data-notes="<b>实验 7-12 ★★：用户记忆系统的端到端选型评估。</b>前置要求：需完成第三章上下文检索或智能体化 RAG 实验。目标：对用户记忆检索 Agent 做全链路选型评估，看嵌入模型、reranker、Agent 主模型三个选择点如何共同影响检索质量、延迟与成本。复用 chapter3/contextual-retrieval-for-user-memory 或 chapter3/agentic-rag-for-user-memory，在 60 个测试用例上对比。<br>验收：遍历三个选择点：嵌入模型（BGE-M3 / OpenAI / 豆包等，记 top-5 检索准确率、延迟、成本）、reranker（含“不用 reranker”基线，量化其边际价值）、主模型（相同检索配置下比成功率与工具使用效率）。原书给出的可能发现：<b>更强的嵌入可能让 reranker 变得多余，更强的主模型可能弥补检索的不足。</b><br>配套仓库的完整运行：4 种嵌入 × 3 种 reranker 设置 × 2 个主模型 × 60 个用例 = 1,440 条真实轨迹，零错误。需要注意后端替换：BGE-M3 与 OpenAI 嵌入经 OpenRouter 调用同一模型，Qwen3-Embedding-8B 替代了无法访问的豆包嵌入，豆包 LLM 语义重排替代了不可达的 BGE cross-encoder。<br>结果：主模型的差异最大——Kimi K2.5 总体成功率 54.0%，豆包 Seed 1.6 为 39.7%；在检索不完整（top-5 没召回全部相关记忆）的用例里，Kimi 仍有 43.1% 成功，豆包只有 26.4%，支持“更强的主模型可能弥补检索的不足”。reranker 在每种嵌入上都把 top-5 召回率提高 6.5–8.9 个百分点，代价是平均多 23–30 秒延迟；在 BGE-M3 上它对成功率的平均贡献只有 +0.4 个百分点，在 Mistral 嵌入上则是 +11.3 个百分点——reranker 的价值取决于嵌入和主模型，但按配套仓库的判定口径，它在任何一种嵌入上都不算多余。仓库的解读提醒：<b>要比较因子格和条件差值，不能只看边际排名就做系统选择。</b>">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-12 <span class="c7-star">★★</span>：三个选择点<em>共同</em>决定结果</h2></div>
+    <div class="c7ec-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="sr">任务成功率</button><button data-v="rc">top-5 召回率</button><button data-v="lt">平均延迟</button></div></header>
+  <div class="c7ec-body">
+    <div class="c7ec-hm panel fx fx-left" style="--d:3">
+      <div class="c7ec-top"><span></span><span class="c7ec-g">豆包语义重排</span><span class="c7ec-g">Kimi 语义重排</span><span class="c7ec-g">不用 reranker</span></div>
+      <div class="c7ec-top s"><span>嵌入 ＼ 主模型</span><span>豆包</span><span>Kimi</span><span>豆包</span><span>Kimi</span><span>豆包</span><span>Kimi</span></div>
+      <div class="c7ec-rows"></div>
+      <p class="c7ec-dt">点击格子查看详情</p>
+    </div>
+    <div class="c7ec-r fx fx-right" style="--d:4">
+      <div class="c7-card c7ec-a" data-a="0"><b>主模型能弥补检索不足</b><div class="c7ec-cp"><div><span>Kimi K2.5</span><i style="--v:.431"></i><b>43.1%</b></div><div><span>豆包 Seed 1.6</span><i style="--v:.264"></i><b>26.4%</b></div></div><p>检索不完整的用例（约 570 条）里仍然成功的比例；总体成功率 54.0% 对 39.7%</p></div>
+      <div class="c7-card c7ec-a" data-a="1"><b>reranker 的价值是条件性的</b><div class="c7ec-rr"></div><p>每种嵌入上召回率都提高 6.5–8.9 个百分点，平均多 23–30 秒延迟；按仓库口径<b>在任何嵌入上都不算多余</b></p></div>
+      <p class="c7-data">数据：配套仓库 chapter7/user-memory-system-evaluation/results/full_7_11_60_case_matrix.json 的 interaction_analysis，60 用例 × 24 格 = 1,440 条真实轨迹；Qwen3 嵌入替代豆包嵌入、豆包 LLM 语义重排替代 BGE cross-encoder</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「评估驱动的持续迭代」· 实验 7-12</div>
+</section>
+<style>
+.c7ec-seg button{font-size:15px}
+.c7ec-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c7ec-hm{padding:14px 18px;display:flex;flex-direction:column;gap:6px}
+.c7ec-top,.c7ec-rw{display:grid;grid-template-columns:150px repeat(6,1fr);gap:6px;align-items:center}
+.c7ec-top:not(.s){grid-template-columns:150px repeat(3,2fr)}
+.c7ec-top span{font-size:15px;font-weight:700;color:var(--text3);text-align:center}
+.c7ec-g{padding:4px;border-radius:8px;background:rgba(255,255,255,.04)}
+.c7ec-rw b{font-size:16px}
+.c7ec-c{height:68px;border-radius:10px;display:grid;place-items:center;font:800 18px var(--num);color:#0b1020;cursor:pointer;transition:background .5s,outline-color .3s;outline:2px solid transparent;outline-offset:2px}
+.c7ec-c.on{outline-color:#fff}
+.c7ec-dt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2);min-height:48px}
+.c7ec-dt b{color:var(--text)}
+.c7ec-r{display:flex;flex-direction:column;gap:12px}
+.c7ec-a>b{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7ec-a p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:8px}.c7ec-a p b{color:var(--text)}
+.c7ec-cp{display:flex;flex-direction:column;gap:6px}
+.c7ec-cp div,.c7ec-rr div{display:grid;grid-template-columns:130px 1fr 64px;gap:10px;align-items:center;font-size:15px}
+.c7ec-cp i,.c7ec-rr i{height:20px;border-radius:5px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c7ec-cp i::after,.c7ec-rr i::after{content:"";position:absolute;inset:0;width:calc(var(--v)*100%);background:linear-gradient(90deg,var(--acc),var(--acc2));opacity:.7}
+.c7ec-cp b,.c7ec-rr b{font-family:var(--num);text-align:right}
+.c7ec-rr{display:flex;flex-direction:column;gap:5px}
+</style>
+<script>
+HOOKS['c07-exp712'] = {
+  // [嵌入, reranker, 主模型, 成功率, top-5 召回, 平均延迟 s]
+  C: [['bge-m3','d','d',.417,.478,80.2],['bge-m3','d','k',.583,.473,69.0],['bge-m3','k','d',.417,.497,32.7],['bge-m3','k','k',.567,.478,14.6],['bge-m3','n','d',.4,.399,35.4],['bge-m3','n','k',.583,.404,9.8],['mistral','d','d',.45,.478,85.3],['mistral','d','k',.567,.463,79.3],['mistral','k','d',.45,.506,33.7],['mistral','k','k',.583,.484,15.3],['mistral','n','d',.333,.411,36.8],['mistral','n','k',.467,.414,9.9],['openai-small','d','d',.35,.482,67.2],['openai-small','d','k',.567,.482,68.2],['openai-small','k','d',.417,.498,31.7],['openai-small','k','k',.55,.484,14.5],['openai-small','n','d',.383,.383,35.3],['openai-small','n','k',.417,.373,9.2],['qwen3','d','d',.4,.49,94.5],['qwen3','d','k',.517,.469,87.1],['qwen3','k','d',.417,.5,47.3],['qwen3','k','k',.567,.484,27.9],['qwen3','n','d',.333,.364,49.5],['qwen3','n','k',.517,.375,24.9]],
+  E: { 'bge-m3': 'BGE-M3', mistral: 'Mistral Embed', 'openai-small': 'OpenAI small', qwen3: 'Qwen3-Emb-8B' },
+  RD: [['BGE-M3', 0.0042, 0.0651], ['Mistral Embed', 0.1125, 0.0887], ['OpenAI small', 0.0708, 0.0865], ['Qwen3-Emb-8B', 0.05, 0.0805]],
+  N: { d: '豆包', k: 'Kimi', n: '不用' },
+  init(s) {
+    const keys = Object.keys(this.E);
+    s.querySelector('.c7ec-rows').innerHTML = keys.map((e) => `<div class="c7ec-rw"><b>${this.E[e]}</b>${this.C.map((c, i) => [c, i]).filter(([c]) => c[0] === e).map(([, i]) => `<button class="c7ec-c" data-i="${i}"></button>`).join('')}</div>`).join('');
+    s.querySelector('.c7ec-rr').innerHTML = this.RD.map(([e, sd, rd]) => `<div><span>${e}</span><i style="--v:${sd / 0.12}"></i><b>+${(sd * 100).toFixed(1)}</b></div>`).join('') + '<div><span></span><span style="font-size:15px;color:var(--text3)">加 reranker 的平均成功率变化（百分点）</span><span></span></div>';
+    this.seg = U.seg(s.querySelector('.c7ec-seg'), (v) => { this.auto = false; this.paint(s, v); });
+    s.querySelectorAll('.c7ec-c').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  paint(s, v) {
+    this.m = v;
+    const j = { sr: 3, rc: 4, lt: 5 }[v], vals = this.C.map((c) => c[j]), lo = Math.min(...vals), hi = Math.max(...vals);
+    s.querySelectorAll('.c7ec-c').forEach((b) => {
+      const c = this.C[+b.dataset.i], x = (c[j] - lo) / (hi - lo), t = v === 'lt' ? 1 - x : x;
+      b.style.background = `color-mix(in srgb, #34d399 ${Math.round(t * 100)}%, #fb7185)`;
+      b.textContent = v === 'lt' ? c[j].toFixed(0) + 's' : (c[j] * 100).toFixed(0) + '%';
+    });
+  },
+  pick(s, i) {
+    s.querySelectorAll('.c7ec-c').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    const [e, r, m, sr, rc, lt] = this.C[i];
+    s.querySelector('.c7ec-dt').innerHTML = `<b>${this.E[e]} · ${this.N[r]} reranker · 主模型 ${this.N[m]}</b>：成功率 ${(sr * 100).toFixed(1)}% · top-5 召回 ${(rc * 100).toFixed(1)}% · 平均延迟 ${lt.toFixed(1)} 秒`;
+  },
+  enter(s, ctx) {
+    this.auto = true; this.seg('sr'); this.paint(s, 'sr');
+    const seq = ['sr', 'rc', 'lt']; let n = 0, k = 0;
+    ctx.every(() => { if (!this.auto) return; n = (n + 1) % seq.length; this.seg(seq[n]); this.paint(s, seq[n]); }, 5000);
+    const picks = [5, 4, 11, 10, 3, 1]; this.pick(s, picks[0]);
+    ctx.every(() => { if (this.auto) this.pick(s, picks[(k = (k + 1) % picks.length)]); }, 2500);
+  },
+  reset(s) { s.querySelectorAll('.c7ec-c').forEach((b) => b.classList.remove('on')); },
+};
+</script>

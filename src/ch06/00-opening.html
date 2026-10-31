@@ -1,0 +1,433 @@
+<!-- ================= 开篇 ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-c06-op-cup" viewBox="0 0 24 24"><path d="M5 7h11v6a5.5 5.5 0 0 1-11 0z"/><path d="M16 9h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M4 21h13"/></symbol>
+</svg>
+
+<section class="slide" id="c06-cover" data-part="0" data-title="封面" data-notes="第六章是全书第一部分「如何构建 Agent」的最后一章。第一章提出过一个论断：在底层模型固定时，提升 Agent 任务表现最主要的系统工程手段，往往是重新定义或扩展观察空间与动作空间。第二至五章扩展的是这两个空间的<b>内容</b>——上下文工程、记忆与知识库、工具、代码生成；本章《交互：观察与动作空间的扩展》扩展的是它们的<b>模态</b>和<b>时机</b>。<br>右侧轨道上的四颗卫星就是本章的四个场景：异步与事件驱动（秒—天）、Computer Use（亚秒—秒）、语音（10 毫秒—1 秒）、机器人（毫秒）。卫星绕行得越快，代表那个场景里环境变化得越快、留给 Agent 的反应时间越短（示意）。外圈是 Agent 与之交互的环境——它不会等模型想完再变化。">
+  <div class="c06cv-orbit fx fx-scale" style="--d:4"></div>
+  <div class="c06cv-text">
+    <div class="c06cv-tag fx fx-up"><i></i>深入理解 AI Agent · 第六章</div>
+    <h1 class="c06cv-title"><span class="split">交互：</span><span class="split c06cv-t2" data-off="3" data-grad="#f472b6,#c084fc,#38bdf8">观察与动作空间的扩展</span></h1>
+    <p class="c06cv-sub fx fx-up" style="--d:14">沿着模态与时机两根轴，把 Agent 的眼睛和手脚<br>伸进事件、声音、屏幕与物理世界</p>
+    <div class="c06cv-sc fx fx-up" style="--d:15"><span style="--c:#fb7185">秒 — 天 · 异步与事件驱动</span><span style="--c:#e879f9">10 毫秒 — 1 秒 · 语音</span><span style="--c:#38bdf8">亚秒 — 秒 · Computer Use</span><span style="--c:#fb923c">毫秒 · 机器人</span></div>
+    <div class="c06cv-meta fx fx-up" style="--d:16"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c06cv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c06-cover{justify-content:center;padding-left:150px}
+#c06-cover .c06cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c06-cover .c06cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c06-cover .c06cv-title{margin-top:30px;font-size:136px;line-height:1.1;font-weight:800;letter-spacing:.01em}
+#c06-cover .c06cv-t2{font-size:84px;margin-top:10px}
+#c06-cover .c06cv-sub{margin-top:30px;font-size:30px;color:var(--text2);line-height:1.6}
+#c06-cover .c06cv-sc{margin-top:26px;display:flex;flex-wrap:wrap;gap:10px;max-width:960px}
+#c06-cover .c06cv-sc span{padding:7px 16px;border-radius:999px;font-size:17px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+#c06-cover .c06cv-meta{margin-top:34px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+#c06-cover .c06cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+#c06-cover .c06cv-orbit{position:absolute;right:100px;top:50%;width:720px;height:720px;margin-top:-372px}
+#c06-cover .c06cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+#c06-cover .c06cv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c06-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.c06cv-orbit'), {
+      size: 720, core: 'Agent', coreColor: '#f472b6', outer: 'ENVIRONMENT · 世界不会等待 · ENVIRONMENT',
+      sats: [
+        { label: '异步事件', color: '#fb7185', rx: 0.40, ry: 0.14, tilt: -18, dur: 18, phase: 0 },
+        { label: 'Computer Use', color: '#38bdf8', rx: 0.31, ry: 0.19, tilt: 74, dur: 12, phase: 0.55 },
+        { label: '语音', color: '#e879f9', rx: 0.35, ry: 0.12, tilt: 30, dur: 8, phase: 0.3 },
+        { label: '机器人', color: '#fb923c', rx: 0.27, ry: 0.16, tilt: 128, dur: 5.5, phase: 0.8 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c06-premise" data-part="0" data-steps="1" data-title="前五章的隐含前提：交互是轮流的" data-dur="14000" data-notes="第一章提出过一个论断：在底层模型固定时，提升 Agent 任务表现最主要的系统工程手段，往往是重新定义或扩展<b>观察空间</b>与<b>动作空间</b>。在前五章的内容中，<b>Agent 与世界的交互是轮流的</b>：用户说完一句，Agent 想一段、调用几个工具，再回一句；在它思考的这段时间里，世界被默认为静止的。这个前提如此自然，以至于很少被当成一个假设写出来——这一章要挑战的正是这个前提。<br><b>回合制是模型与接口的一种交互约定，不是环境的性质。</b>早期工具调用接口通常按同步轮次组织消息：提问后面跟着回答，工具调用之后先补齐结果，再继续推理。真实环境却不会等模型作出反应：邮件在它思考时到达，用户在它说到一半时插话，页面在两次截图之间已经变了样，杯子在机械臂伸手的途中被碰倒。<br>这个约定也正在改变：截至 2026 年 9 月，GPT-6 Astra 已提供原生异步工具调用和回合中途追加用户指令的能力。本章因此同时讨论<b>原生支持</b>与<b>兼容既有同步接口</b>的两条路线。按 → 或点击右上角开关，在「回合制假设」与「真实环境」之间切换；时间线会自动循环播放。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">前五章的隐含前提：<em>交互是轮流的</em></h2>
+    <p class="lead fx fx-up" style="--d:2">用户说完一句，Agent 想一段、调几个工具，再回一句——在它思考时，世界被默认为静止</p></div>
+    <div class="c06pm-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="turn">回合制假设</button><button data-v="real">真实环境</button></div></header>
+  <div class="c06pm-stage panel fx fx-up" style="--d:3">
+    <div class="c06pm-lane" style="top:30px"><span class="c06pm-ll"><svg class="ic"><use href="#i-user"/></svg>用户</span><i></i></div>
+    <div class="c06pm-lane" style="top:168px"><span class="c06pm-ll"><svg class="ic"><use href="#i-robot"/></svg>Agent</span><i></i></div>
+    <div class="c06pm-lane" style="top:306px"><span class="c06pm-ll"><svg class="ic"><use href="#i-globe"/></svg>世界</span><i></i></div>
+    <div class="c06pm-items"></div>
+    <div class="c06pm-head"><span>此刻</span></div>
+  </div>
+  <div class="c06pm-cap">
+    <span class="c06pm-c0">前提：Agent 思考时世界静止——这个前提如此自然，以至于很少被当成一个假设写出来</span>
+    <span class="c06pm-c1">真实环境不会等模型作出反应：这些变化都发生在 Agent 的一个回合之内，它要等这一轮结束才可能看到</span>
+  </div>
+  <div class="c06pm-bot fx fx-up" style="--d:6">
+    <p class="tagline"><b>回合制是模型与接口的一种交互约定，不是环境的性质。</b></p>
+    <div class="c06pm-rt"><span class="chip llm"><svg class="ic"><use href="#i-zap"/></svg>原生支持：截至 2026 年 9 月，GPT-6 Astra 提供原生异步工具调用与回合中途追加用户指令</span><span class="chip har"><svg class="ic"><use href="#i-layers"/></svg>兼容既有同步接口：运行时安排事件的接入顺序</span></div>
+  </div>
+  <div class="src">第六章 · 章首 ·「模态与触发时机的扩展」</div>
+</section>
+<style>
+#c06-premise .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+#c06-premise .c06pm-stage{position:relative;height:430px;overflow:hidden}
+#c06-premise .c06pm-lane{position:absolute;left:0;right:0;height:104px}
+#c06-premise .c06pm-lane+.c06pm-lane{border-top:1px solid var(--line)}
+#c06-premise .c06pm-ll{position:absolute;left:28px;top:34px;display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700;color:var(--text2)}
+#c06-premise .c06pm-ll .ic{font-size:26px;color:var(--acc)}
+#c06-premise .c06pm-lane>i{position:absolute;left:210px;right:50px;top:51px;height:2px;background:rgba(255,255,255,.07)}
+#c06-premise .c06pm-items{position:absolute;inset:0}
+#c06-premise .c06pm-b{--c:var(--acc);position:absolute;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:19px;color:var(--text2);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(10,16,36,.9));transition:all .4s var(--ease);white-space:nowrap;overflow:hidden}
+#c06-premise .c06pm-b.on{color:var(--text);background:color-mix(in srgb,var(--c) 24%,rgba(10,16,36,.9));border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 35%,transparent)}
+#c06-premise .c06pm-b.u{--c:var(--tool)}#c06-premise .c06pm-b.think{--c:var(--llm)}#c06-premise .c06pm-b.act{--c:#fbbf24}#c06-premise .c06pm-b.say{--c:var(--ctx)}
+#c06-premise .c06pm-frz{position:absolute;height:64px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:19px;color:var(--text3);border:1px dashed var(--line2);background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 10px,transparent 10px 20px)}
+#c06-premise .c06pm-ev{position:absolute;display:flex;align-items:center;gap:8px;height:64px;padding:0 14px 0 10px;border-radius:14px;font-size:18px;color:#fecdd3;white-space:nowrap;border:1px solid color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 14%,rgba(10,16,36,.92));opacity:0;scale:.6;transition:opacity .4s,scale .5s var(--spring)}
+#c06-premise .c06pm-ev .ic{font-size:24px;color:var(--bad)}
+#c06-premise .c06pm-ev.on{opacity:1;scale:1}
+#c06-premise .c06pm-cn{position:absolute;width:0;border-left:2px dashed var(--bad);opacity:0;transition:opacity .4s}
+#c06-premise .c06pm-cn.on{opacity:.85}
+#c06-premise .c06pm-x{position:absolute;padding:3px 10px;border-radius:999px;font-size:15px;color:#fff;background:var(--bad);white-space:nowrap;opacity:0;translate:-50% 0;transition:opacity .4s .25s}
+#c06-premise .c06pm-x.on{opacity:1}
+#c06-premise[data-m=turn] .c06pm-real,#c06-premise[data-m=real] .c06pm-turn{display:none}
+#c06-premise .c06pm-head{position:absolute;top:14px;height:404px;width:2px;left:210px;background:linear-gradient(var(--acc),var(--acc2));box-shadow:0 0 14px var(--acc);opacity:0}
+#c06-premise .c06pm-head span{position:absolute;top:-2px;left:8px;font-size:15px;color:var(--acc);white-space:nowrap}
+#c06-premise[data-m] .c06pm-head{opacity:1}
+#c06-premise .c06pm-cap{position:relative;height:40px;margin-top:16px;font-size:21px;text-align:center}
+#c06-premise .c06pm-cap span{position:absolute;inset:0;opacity:0;transform:translateY(8px);transition:all .6s var(--ease);color:var(--text2)}
+#c06-premise[data-m=turn] .c06pm-c0,#c06-premise[data-m=real] .c06pm-c1{opacity:1;transform:none}
+#c06-premise .c06pm-bot{display:flex;align-items:center;gap:22px;margin-top:14px}
+#c06-premise .c06pm-bot .tagline{flex:none;font-size:25px;padding:14px 24px}
+#c06-premise .c06pm-rt{display:flex;flex-direction:column;gap:8px}
+#c06-premise .c06pm-rt .chip{font-size:16px;white-space:normal}
+</style>
+<script>
+HOOKS['c06-premise'] = {
+  L: 210, W: 1400,
+  BL: [
+    { lane: 0, a: 0.01, b: 0.11, t: '说完一句', c: 'u' },
+    { lane: 1, a: 0.12, b: 0.30, t: '想一段', c: 'think' },
+    { lane: 1, a: 0.31, b: 0.55, t: '调用工具 · 执行动作', c: 'act' },
+    { lane: 1, a: 0.56, b: 0.70, t: '再想', c: 'think' },
+    { lane: 1, a: 0.71, b: 0.97, t: '回一句', c: 'say' },
+  ],
+  EV: [
+    { lane: 2, p: 0.17, ic: 'mail', t: '邮件到达' },
+    { lane: 2, p: 0.36, ic: 'browser', t: '页面变了样' },
+    { lane: 2, p: 0.51, ic: 'c06-op-cup', t: '杯子被碰倒' },
+    { lane: 0, p: 0.80, ic: 'chat', t: '说到一半时插话' },
+  ],
+  TOP: [46, 184, 322],
+  x(p) { return this.L + p * this.W; },
+  init(s) {
+    const box = s.querySelector('.c06pm-items');
+    let h = '';
+    this.BL.forEach((b, i) => { h += `<div class="c06pm-b ${b.c}" data-b="${i}" style="left:${this.x(b.a)}px;width:${(b.b - b.a) * this.W}px;top:${this.TOP[b.lane]}px">${b.t}</div>`; });
+    h += `<div class="c06pm-frz c06pm-turn" style="left:${this.x(0.12)}px;width:${0.85 * this.W}px;top:${this.TOP[2]}px"><svg class="ic"><use href="#i-pause"/></svg>世界被默认为静止</div>`;
+    this.EV.forEach((e, i) => {
+      const x = this.x(e.p);
+      h += `<div class="c06pm-ev c06pm-real" data-e="${i}" style="left:${x - 18}px;top:${this.TOP[e.lane]}px"><svg class="ic"><use href="#i-${e.ic}"/></svg>${e.t}</div>`;
+      const top = e.lane === 2 ? this.TOP[1] + 64 : this.TOP[0] + 64, ht = e.lane === 2 ? this.TOP[2] - top : this.TOP[1] - top;
+      h += `<div class="c06pm-cn c06pm-real" data-e="${i}" style="left:${x}px;top:${top}px;height:${ht}px"></div>`;
+      h += `<div class="c06pm-x c06pm-real" data-e="${i}" style="left:${x}px;top:${top + ht / 2 - 14}px">本轮看不到</div>`;
+    });
+    box.innerHTML = h;
+    this.set = U.seg(s.querySelector('.c06pm-seg'), (v) => { this.mode(s, v); });
+  },
+  clear(s) { s.querySelectorAll('.c06pm-b,.c06pm-ev,.c06pm-cn,.c06pm-x').forEach((e) => e.classList.remove('on')); },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    s.dataset.m = m;
+    this.set(m);
+    this.clear(s);
+    if (!ctx) return;
+    const head = s.querySelector('.c06pm-head'), D = 9000, HOLD = 1800;
+    const bl = [...s.querySelectorAll('.c06pm-b')], ev = this.EV.map((e, i) => [...s.querySelectorAll(`[data-e="${i}"]`)]);
+    let t0 = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      let e = now - t0;
+      if (e > D + HOLD) { t0 = now; e = 0; this.clear(s); }
+      const p = Math.min(1, e / D);
+      head.style.left = this.x(p) + 'px';
+      bl.forEach((b, i) => b.classList.toggle('on', p >= this.BL[i].a && p < this.BL[i].b));
+      if (m === 'real') this.EV.forEach((x, i) => { if (p >= x.p) ev[i].forEach((el) => el.classList.add('on')); });
+    });
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 'real' : 'turn'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'real' : 'turn'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; delete s.dataset.m; this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c06-axes" data-part="0" data-trans="zoom" data-title="两个扩展方向：模态与触发时机" data-notes="把观察空间和动作空间摊开，会发现它们各有两个可以扩展的方向。<b>模态</b>决定观察和动作的<b>形式</b>：Agent 是只读文本，还是也能听见声音、看见屏幕、感知力矩；是只能输出 token，还是也能发声、点击、驱动关节。<b>触发时机</b>决定观察和动作的<b>节奏</b>：观察是 Agent 主动去取，还是世界主动推来；动作是必须在一个回合内做完，还是可以跨越回合、中途被打断、被更紧急的事抢占。<br>前面几章扩展的是这两个空间的<b>内容</b>（第二至五章：观察侧是上下文工程、记忆与知识库，动作侧是工具、代码生成），这一章扩展的是它们的<b>模态</b>和<b>时机</b>：模态上，观察扩展到语音、屏幕、物理传感器，动作扩展到说话、点击、关节运动；时机上，观察变成世界主动推送、连续流，动作变成跨回合、可打断、可抢占。<br>表格会逐行自动高亮，右侧示意图同步点亮对应的扩展方向；也可以把鼠标移到某一行上。图中四个场景的位置只是示意：异步与事件驱动一节模态没有变化，仍然是文本，变的只有时机；语音、屏幕与机器人则同时在两根轴上展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">两个扩展方向：<em>模态</em>与<em>触发时机</em></h2>
+  <p class="lead fx fx-up" style="--d:2">前几章扩展的是两个空间的内容，这一章扩展它们的模态和时机</p></header>
+  <div class="c06ax-body">
+    <div class="c06ax-left">
+      <div class="c06ax-tb panel fx fx-left" style="--d:3">
+        <div class="c06ax-r c06ax-h"><span></span><span><svg class="ic"><use href="#i-eye"/></svg>观察空间的扩展</span><span><svg class="ic"><use href="#i-hand"/></svg>动作空间的扩展</span></div>
+        <div class="c06ax-r" data-i="0" style="--c:#94a3b8"><b>内容<small>第二至五章</small></b><span>上下文工程、记忆与知识库</span><span>工具、代码生成</span></div>
+        <div class="c06ax-r" data-i="1" style="--c:#e879f9"><b>模态<small>本章</small></b><span>语音、屏幕、物理传感器</span><span>说话、点击、关节运动</span></div>
+        <div class="c06ax-r" data-i="2" style="--c:#fb7185"><b>时机<small>本章</small></b><span>世界主动推送、连续流</span><span>跨回合、可打断、可抢占</span></div>
+      </div>
+      <div class="c06ax-defs">
+        <div class="c06ax-def fx fx-up" style="--d:5;--c:#e879f9"><b><em>模态</em>决定观察和动作的<span>形式</span></b>
+          <p><i>观察</i>只读文本 → 也能听见声音、看见屏幕、感知力矩</p><p><i>动作</i>只能输出 token → 也能发声、点击、驱动关节</p></div>
+        <div class="c06ax-def fx fx-up" style="--d:6;--c:#fb7185"><b><em>触发时机</em>决定观察和动作的<span>节奏</span></b>
+          <p><i>观察</i>Agent 主动去取 → 世界主动推来</p><p><i>动作</i>回合内做完 → 跨越回合、中途被打断、被更紧急的事抢占</p></div>
+      </div>
+    </div>
+    <div class="c06ax-dia fx fx-right" style="--d:4">
+      <svg viewBox="0 0 600 560" width="600" height="560">
+        <defs>
+          <marker id="c06ax-m1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fb7185"/></marker>
+          <marker id="c06ax-m2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#e879f9"/></marker>
+        </defs>
+        <g class="c06ax-grid"><path d="M80 380 H570M80 260 H570M80 140 H570M220 480 V40M360 480 V40M500 480 V40"/></g>
+        <path class="c06ax-pv" d="M470 466 V480M400 330 V480M290 210 V480M530 110 V480"/>
+        <path class="c06ax-ph" d="M470 466 H80M400 330 H80M290 210 H80M530 110 H80"/>
+        <path class="c06ax-x" d="M80 480 H574" marker-end="url(#c06ax-m1)"/>
+        <path class="c06ax-y" d="M80 480 V36" marker-end="url(#c06ax-m2)"/>
+        <text class="c06ax-al c06ax-alx" x="574" y="524" text-anchor="end">触发时机 · 节奏 →</text>
+        <text class="c06ax-al c06ax-aly" x="96" y="30">↑ 模态 · 形式</text>
+        <text class="c06ax-tk" x="88" y="504">回合制 · 主动去取</text>
+        <text class="c06ax-tk" x="574" y="504" text-anchor="end">推送 · 连续 · 可抢占</text>
+        <text class="c06ax-tk" x="70" y="472" text-anchor="end">文本</text>
+        <text class="c06ax-tk" x="70" y="336" text-anchor="end">声音</text>
+        <text class="c06ax-tk" x="70" y="216" text-anchor="end">像素</text>
+        <text class="c06ax-tk" x="70" y="116" text-anchor="end">力矩</text>
+        <g class="c06ax-o"><rect x="92" y="414" width="196" height="56" rx="12"/><text x="190" y="438">前五章：扩展内容</text><text class="c06ax-o2" x="190" y="459">文本 · 回合制</text></g>
+        <g class="c06ax-pt" style="--c:#fb7185;--i:0"><circle cx="470" cy="466" r="12"/><text x="470" y="446">异步与事件驱动</text></g>
+        <g class="c06ax-pt" style="--c:#e879f9;--i:1"><circle cx="400" cy="330" r="12"/><text x="400" y="310">语音</text></g>
+        <g class="c06ax-pt" style="--c:#38bdf8;--i:2"><circle cx="290" cy="210" r="12"/><text x="290" y="190">Computer Use</text></g>
+        <g class="c06ax-pt" style="--c:#fb923c;--i:3"><circle cx="530" cy="110" r="12"/><text x="530" y="90">机器人</text></g>
+      </svg>
+      <span class="chip warn c06ax-sim">位置示意</span>
+    </div>
+  </div>
+  <div class="src">第六章 ·「模态与触发时机的扩展」· 内容 / 模态 / 时机 × 观察空间的扩展 / 动作空间的扩展 对照表</div>
+</section>
+<style>
+#c06-axes .c06ax-body{display:grid;grid-template-columns:1fr 600px;gap:40px;align-items:start}
+#c06-axes .c06ax-left{display:flex;flex-direction:column;gap:22px}
+#c06-axes .c06ax-tb{padding:8px 0;overflow:hidden}
+#c06-axes .c06ax-r{--c:var(--line2);display:grid;grid-template-columns:200px 1fr 1fr;gap:20px;align-items:center;padding:20px 28px;border-left:4px solid transparent;transition:all .45s var(--ease);cursor:default}
+#c06-axes .c06ax-r+.c06ax-r{border-top:1px solid var(--line)}
+#c06-axes .c06ax-h{padding-top:12px;padding-bottom:12px}
+#c06-axes .c06ax-h span{display:flex;align-items:center;gap:10px;font-size:19px;color:var(--text2);font-weight:600}
+#c06-axes .c06ax-h .ic{color:var(--acc);font-size:22px}
+#c06-axes .c06ax-r b{font-size:30px;color:var(--c)}
+#c06-axes .c06ax-r b small{display:block;font-size:15px;color:var(--text3);font-weight:500;margin-top:2px}
+#c06-axes .c06ax-r[data-i] span{font-size:23px;font-weight:600;color:var(--text2);transition:color .4s}
+#c06-axes .c06ax-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent)}
+#c06-axes .c06ax-r.on span{color:var(--text)}
+#c06-axes .c06ax-defs{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+#c06-axes .c06ax-def{padding:20px 24px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.8))}
+#c06-axes .c06ax-def>b{display:block;font-size:23px;margin-bottom:12px}
+#c06-axes .c06ax-def em{font-style:normal;color:var(--c)}
+#c06-axes .c06ax-def b span{color:var(--c);padding:0 4px;border-bottom:2px solid var(--c)}
+#c06-axes .c06ax-def p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:6px}
+#c06-axes .c06ax-def p i{font-style:normal;display:inline-block;margin-right:10px;padding:1px 8px;border-radius:7px;font-size:15px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-axes .c06ax-dia{position:relative}
+#c06-axes .c06ax-dia svg{overflow:visible}
+#c06-axes .c06ax-sim{position:absolute;right:0;top:-6px;font-size:15px}
+#c06-axes .c06ax-grid path{stroke:rgba(255,255,255,.05);stroke-width:1}
+#c06-axes .c06ax-x,#c06-axes .c06ax-y{fill:none;stroke-width:3;stroke-linecap:round;opacity:.55;transition:opacity .4s,stroke-width .4s}
+#c06-axes .c06ax-x{stroke:#fb7185}#c06-axes .c06ax-y{stroke:#e879f9}
+#c06-axes[data-k="2"] .c06ax-x,#c06-axes[data-k="1"] .c06ax-y{opacity:1;stroke-width:5}
+#c06-axes .c06ax-al{font-size:19px;font-weight:700}
+#c06-axes .c06ax-alx{fill:#fb7185}#c06-axes .c06ax-aly{fill:#e879f9}
+#c06-axes .c06ax-tk{fill:var(--text3);font-size:15px}
+#c06-axes .c06ax-pv,#c06-axes .c06ax-ph{fill:none;stroke-width:2;stroke-dasharray:4 6;opacity:0;transition:opacity .5s}
+#c06-axes .c06ax-pv{stroke:#fb7185}#c06-axes .c06ax-ph{stroke:#e879f9}
+#c06-axes[data-k="2"] .c06ax-pv,#c06-axes[data-k="1"] .c06ax-ph{opacity:.8;animation:flow 1.2s linear infinite}
+#c06-axes .c06ax-o rect{fill:rgba(148,163,184,.1);stroke:#94a3b8;stroke-width:1.5;transition:all .45s}
+#c06-axes .c06ax-o text{fill:var(--text);font-size:17px;font-weight:700;text-anchor:middle}
+#c06-axes .c06ax-o .c06ax-o2{fill:var(--text3);font-size:15px;font-weight:400}
+#c06-axes[data-k="0"] .c06ax-o rect{fill:rgba(148,163,184,.28);filter:drop-shadow(0 0 14px #94a3b8)}
+#c06-axes .c06ax-pt{opacity:0}
+#c06-axes.active .c06ax-pt{animation:fadeIn .6s ease forwards;animation-delay:calc(var(--i)*260ms + 900ms)}
+#c06-axes .c06ax-pt circle{fill:var(--c);filter:drop-shadow(0 0 10px var(--c))}
+#c06-axes .c06ax-pt text{fill:var(--c);font-size:18px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#050816;stroke-width:5px}
+</style>
+<script>
+HOOKS['c06-axes'] = {
+  init(s) {
+    this.rows = [...s.querySelectorAll('.c06ax-r[data-i]')];
+    const pick = (r) => { this.auto = false; this.show(s, +r.dataset.i); };
+    this.rows.forEach((r) => { r.addEventListener('mouseenter', () => pick(r)); r.addEventListener('click', () => pick(r)); });
+  },
+  show(s, i) {
+    this.i = i;
+    s.dataset.k = i;
+    this.rows.forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.later(() => this.show(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 3600);
+  },
+  reset(s) { delete s.dataset.k; this.rows.forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c06-scales" data-part="0" data-trans="rise" data-title="同一个问题，四个时间尺度" data-dur="13000" data-notes="四个场景对应四个时间尺度，越往后环境变化越快：<br>① 秒 — 天 · 异步与事件驱动：观察侧，Agent 会被外部事件主动唤醒；动作侧，动作跨回合——先发起，后续靠事件收尾。<br>② 10 毫秒 — 1 秒 · 语音：边说边听，不等一句说完；边想边说，可被打断。<br>③ 亚秒 — 秒 · Computer Use：屏幕在两帧之间持续变化；动作后必须重新确认现实是否仍符合计划。<br>④ 毫秒 · 机器人：传感器连续回流；动作分块，一次规划一小段，可被抢占。<br>异步与事件驱动让世界能够在任务进行中唤醒 Agent；后面三节进一步压缩时间尺度：当环境变化的速度达到甚至超过模型的生成速度时，能接收更新还不够，系统还必须及时作出反应。<br>上方时间轴是对数刻度，色带的起止只是示意；每条色带上的光点按各自的节奏往复。表格会自动轮换，也可以点击任意一行或色带。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一个问题，<em>四个时间尺度</em></h2>
+  <p class="lead fx fx-up" style="--d:2">环境变化得越快，能接收更新还不够——系统还必须及时作出反应</p></header>
+  <div class="c06sc-ax panel fx fx-up" style="--d:3"><svg class="c06sc-svg" viewBox="0 0 1660 300" width="1660" height="300"></svg><span class="chip warn c06sc-sim">对数刻度 · 色带范围示意</span></div>
+  <div class="c06sc-tb fx fx-up" style="--d:5">
+    <div class="c06sc-r c06sc-h"><span>尺度</span><span>场景</span><span>观察侧的变化</span><span>动作侧的变化</span></div>
+  </div>
+  <div class="src">第六章 ·「模态与触发时机的扩展」· 尺度 / 场景 / 观察侧的变化 / 动作侧的变化 对照表</div>
+</section>
+<style>
+#c06-scales .c06sc-ax{position:relative;height:316px;padding:8px 0}
+#c06-scales .c06sc-svg{overflow:visible}
+#c06-scales .c06sc-sim{position:absolute;right:20px;top:12px;font-size:15px}
+#c06-scales .c06sc-axis{stroke:rgba(255,255,255,.3);stroke-width:2}
+#c06-scales .c06sc-tick{stroke:rgba(255,255,255,.12);stroke-width:1;stroke-dasharray:3 6}
+#c06-scales .c06sc-tl{fill:var(--text3);font-size:16px;text-anchor:middle}
+#c06-scales .c06sc-band rect{fill:color-mix(in srgb,var(--c) 16%,transparent);stroke:color-mix(in srgb,var(--c) 55%,transparent);stroke-width:1.5;transition:all .4s}
+#c06-scales .c06sc-band text{fill:var(--c);font-size:19px;font-weight:700;dominant-baseline:central;pointer-events:none}
+#c06-scales .c06sc-band{cursor:pointer;opacity:.55;transition:opacity .4s}
+#c06-scales .c06sc-band.on{opacity:1}
+#c06-scales .c06sc-band.on rect{fill:color-mix(in srgb,var(--c) 30%,transparent);stroke:var(--c);filter:drop-shadow(0 0 12px var(--c))}
+#c06-scales .c06sc-band circle{fill:#fff;filter:drop-shadow(0 0 8px var(--c))}
+#c06-scales .c06sc-tb{margin-top:22px;border-radius:20px;border:1px solid var(--line);background:rgba(12,18,40,.72);overflow:hidden}
+#c06-scales .c06sc-r{--c:var(--line2);display:grid;grid-template-columns:210px 200px 1fr 1fr;gap:20px;align-items:center;padding:15px 28px;border-left:4px solid transparent;transition:all .4s var(--ease);cursor:pointer}
+#c06-scales .c06sc-r+.c06sc-r{border-top:1px solid var(--line)}
+#c06-scales .c06sc-h{cursor:default;font-size:16px;letter-spacing:.1em;color:var(--text3);padding-top:12px;padding-bottom:12px}
+#c06-scales .c06sc-r b{font:700 22px var(--num);color:var(--c)}
+#c06-scales .c06sc-r em{font-style:normal;font-size:22px;font-weight:700}
+#c06-scales .c06sc-r p{font-size:19px;line-height:1.5;color:var(--text2)}
+#c06-scales .c06sc-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent)}
+#c06-scales .c06sc-r.on p{color:var(--text)}
+</style>
+<script>
+HOOKS['c06-scales'] = {
+  R: [
+    { k: '秒 — 天', n: '异步与事件驱动', a: 1, b: 86400, c: '#fb7185', o: '会被外部事件主动唤醒的 Agent', d: '动作跨回合：先发起，后续靠事件收尾', per: 6400 },
+    { k: '10 毫秒 — 1 秒', n: '语音', a: 0.01, b: 1, c: '#e879f9', o: '边说边听，不等一句说完', d: '边想边说，可被打断', per: 2000 },
+    { k: '亚秒 — 秒', n: 'Computer Use', a: 0.2, b: 10, c: '#38bdf8', o: '屏幕在两帧之间持续变化', d: '动作后必须重新确认现实是否仍符合计划', per: 3200 },
+    { k: '毫秒', n: '机器人', a: 0.001, b: 0.05, c: '#fb923c', o: '传感器连续回流', d: '动作分块：一次规划一小段，可被抢占', per: 900 },
+  ],
+  X(t) { return 70 + ((Math.log10(t) + 3) / (Math.log10(86400) + 3)) * 1520; },
+  init(s) {
+    const T = [[0.001, '1 毫秒'], [0.01, '10 毫秒'], [0.1, '100 毫秒'], [1, '1 秒'], [10, '10 秒'], [60, '1 分钟'], [3600, '1 小时'], [86400, '1 天']];
+    let h = `<line class="c06sc-axis" x1="70" y1="262" x2="1590" y2="262"/>`;
+    T.forEach(([t, l]) => { const x = this.X(t).toFixed(1); h += `<line class="c06sc-tick" x1="${x}" y1="20" x2="${x}" y2="262"/><text class="c06sc-tl" x="${x}" y="290">${l}</text>`; });
+    this.R.forEach((r, i) => {
+      const x1 = this.X(r.a), x2 = this.X(r.b), y = 30 + i * 56;
+      h += `<g class="c06sc-band" data-i="${i}" style="--c:${r.c}"><rect x="${x1.toFixed(1)}" y="${y}" width="${(x2 - x1).toFixed(1)}" height="44" rx="12"/><circle cx="${x1.toFixed(1)}" cy="${y + 22}" r="6"/><text x="${(x1 + 16).toFixed(1)}" y="${y + 22}">${r.k} · ${r.n}</text></g>`;
+    });
+    s.querySelector('.c06sc-svg').innerHTML = h;
+    s.querySelector('.c06sc-tb').insertAdjacentHTML('beforeend', this.R.map((r, i) => `<div class="c06sc-r" data-i="${i}" style="--c:${r.c}"><b>${r.k}</b><em>${r.n}</em><p>${r.o}</p><p>${r.d}</p></div>`).join(''));
+    const pick = (i) => { this.auto = false; this.show(s, i); };
+    s.querySelectorAll('.c06sc-band').forEach((g) => g.addEventListener('click', () => pick(+g.dataset.i)));
+    s.querySelectorAll('.c06sc-r[data-i]').forEach((r) => r.addEventListener('click', () => pick(+r.dataset.i)));
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c06sc-band,.c06sc-r[data-i]').forEach((e) => e.classList.toggle('on', +e.dataset.i === i));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    const dots = [...s.querySelectorAll('.c06sc-band circle')], t0 = performance.now();
+    ctx.raf((now) => {
+      this.R.forEach((r, i) => {
+        const u = ((now - t0) % r.per) / r.per, w = u < 0.5 ? u * 2 : 2 - u * 2;
+        dots[i].setAttribute('cx', (this.X(r.a) + 8 + w * (this.X(r.b) - this.X(r.a) - 16)).toFixed(1));
+      });
+    });
+    ctx.later(() => this.show(s, 0), 800);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 3200);
+  },
+  reset(s) { s.querySelectorAll('.c06sc-band,.c06sc-r').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c06-map" data-part="0" data-trans="iris" data-title="本章导览" data-dur="13000" data-notes="本章按时间尺度由长到短、模态由简到繁展开四个场景。<br><b>异步与事件驱动</b>是从前五章的回合制世界迈出的第一步：模态没有变化，仍然是文本，变的只有时机（第 1、2 部分）。<b>语音</b>把时机轴推到了毫秒级，但它的观察仍是一维的声音流（第 3、4 部分）。<b>Computer Use</b> 把同一个问题搬上二维的屏幕：观察变成持续变化的像素，动作变成坐标上的点击与输入；语音场景强调「何时开口」，Computer Use 则强调「下一步点哪里」，以及一个语音交互中不存在的问题——动作执行之后，现实是否还与计划一致（第 5 部分）。<b>机器人</b>则把它推到物理世界：模型不但要看懂画面，还要在真实世界里连续做出动作，而每个动作都会改变下一刻的情况（第 6、7 部分）。<br>四节共享同一条控制骨架，也共享同一组原语——唤醒、安全点、取消、抢占、快慢分离，收束部分会回到这里。各站下方的标签都可以点击，直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：<em>尺度越压越短，模态越来越丰富</em></h2></header>
+  <div class="c06mp-stage">
+    <svg class="c06mp-svg" viewBox="0 0 1660 470" width="1660" height="470">
+      <defs><linearGradient id="c06mp-g" x1="0" x2="1"><stop offset="0" stop-color="#fb7185"/><stop offset=".36" stop-color="#e879f9"/><stop offset=".68" stop-color="#38bdf8"/><stop offset="1" stop-color="#fb923c"/></linearGradient></defs>
+      <path id="c06mp-p" class="c06mp-route" d="M150 120 C 360 20, 420 220, 610 120 S 900 20, 1060 120 S 1330 220, 1510 120"/>
+      <path class="c06mp-flow" d="M150 120 C 360 20, 420 220, 610 120 S 900 20, 1060 120 S 1330 220, 1510 120"/>
+      <circle class="c06mp-comet" r="9"><animateMotion dur="7s" repeatCount="indefinite"><mpath href="#c06mp-p"/></animateMotion></circle>
+      <path class="c06mp-trend" d="M150 430 H1530"/>
+      <text class="c06mp-tt" x="150" y="418">时间尺度：秒 — 天</text><text class="c06mp-tt" x="1530" y="418" text-anchor="end">毫秒</text>
+      <text class="c06mp-tt2" x="840" y="458" text-anchor="middle">模态：文本 → 一维的声音流 → 二维的屏幕 → 物理世界</text>
+    </svg>
+    <div class="c06mp-st"></div>
+  </div>
+  <div class="c06mp-sk fx fx-up" style="--d:10">
+    <span class="c06mp-skl">共享的控制骨架</span>
+    <div class="c06mp-chain"></div>
+    <button class="c06mp-end" data-p="8">收束：原语与思考题<svg class="ic"><use href="#i-arrow"/></svg></button>
+  </div>
+  <div class="src">第六章 · 本章结构（「异步与事件驱动：当世界主动找上门」「语音：最自然的人机接口」「Computer Use：GUI 自动化 Agent」「机器人操作：以 XLeRobot 整理桌面为例」）</div>
+</section>
+<style>
+#c06-map .c06mp-stage{position:relative;height:470px;margin-top:-6px}
+#c06-map .c06mp-svg{position:absolute;inset:0;overflow:visible}
+#c06-map .c06mp-route{fill:none;stroke:url(#c06mp-g);stroke-width:4;stroke-linecap:round;opacity:.5;stroke-dasharray:2200;stroke-dashoffset:2200}
+#c06-map.active .c06mp-route{animation:arcDraw 2.4s var(--ease) .3s forwards}
+#c06-map .c06mp-flow{fill:none;stroke:#fff;stroke-width:2;stroke-dasharray:2 18;opacity:0;animation:flow 1.2s linear infinite}
+#c06-map.active .c06mp-flow{opacity:.4;transition:opacity 1s 2.4s}
+#c06-map .c06mp-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff);opacity:0}
+#c06-map.active .c06mp-comet{opacity:1;transition:opacity 1s 2.6s}
+#c06-map .c06mp-trend{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2;stroke-dasharray:6 8}
+#c06-map .c06mp-tt{fill:var(--text2);font-size:18px;font-weight:600}
+#c06-map .c06mp-tt2{fill:var(--text3);font-size:17px}
+#c06-map .c06mp-s{--c:var(--acc);position:absolute;top:120px;width:380px;margin-left:-190px;text-align:center}
+#c06-map .c06mp-dot{position:relative;width:96px;height:96px;margin:-48px auto 0;border-radius:50%;display:grid;place-items:center;font-size:40px;color:var(--c);background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid var(--c);box-shadow:0 0 0 8px color-mix(in srgb,var(--c) 12%,transparent),0 0 50px color-mix(in srgb,var(--c) 45%,transparent);transform:scale(0)}
+#c06-map.active .c06mp-dot{animation:pop .6s var(--spring) forwards;animation-delay:calc(var(--i)*380ms + 600ms)}
+#c06-map .c06mp-txt{opacity:0;transform:translateY(16px);transition:opacity .8s var(--ease),transform .8s var(--ease);transition-delay:calc(var(--i)*380ms + 900ms)}
+#c06-map.active .c06mp-txt{opacity:1;transform:none}
+#c06-map .c06mp-s b{display:block;margin-top:22px;font-size:32px;color:var(--c)}
+#c06-map .c06mp-sub{display:block;margin-top:6px;font-size:18px;color:var(--text2)}
+#c06-map .c06mp-chips{margin-top:16px;display:flex;flex-direction:column;align-items:center;gap:8px}
+#c06-map .c06mp-chips button{padding:7px 16px;border-radius:999px;font-size:17px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .25s}
+#c06-map .c06mp-chips button:hover{color:#06101f;background:var(--c);border-color:var(--c)}
+#c06-map .c06mp-sk{display:flex;align-items:center;gap:16px;padding:16px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+#c06-map .c06mp-skl{flex:none;font-size:17px;letter-spacing:.14em;color:var(--text3)}
+#c06-map .c06mp-chain{flex:1;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+#c06-map .c06mp-chain span{padding:6px 12px;border-radius:10px;font-size:17px;color:var(--text2);border:1px solid var(--line);transition:all .35s var(--ease)}
+#c06-map .c06mp-chain i{font-style:normal;color:var(--text3)}
+#c06-map .c06mp-chain span.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent)}
+#c06-map .c06mp-end{flex:none;display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:12px;font-size:17px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-map .c06mp-end:hover{background:color-mix(in srgb,var(--acc) 14%,transparent)}
+</style>
+<script>
+HOOKS['c06-map'] = {
+  S: [
+    { x: 150, c: '#fb7185', ic: 'bell', b: '异步与事件驱动', sub: '秒 — 天 · 模态不变，只变时机', p: [[1, '01 世界主动找上门'], [2, '02 事件处理机制']] },
+    { x: 610, c: '#e879f9', ic: 'mic', b: '语音', sub: '10 毫秒 — 1 秒 · 一维的声音流', p: [[3, '03 级联与流式'], [4, '04 全双工与快慢思考']] },
+    { x: 1060, c: '#38bdf8', ic: 'cursor', b: 'Computer Use', sub: '亚秒 — 秒 · 二维的屏幕', p: [[5, '05 感知、定位与观察接口']] },
+    { x: 1510, c: '#fb923c', ic: 'arm', b: '机器人', sub: '毫秒 · 物理世界', p: [[6, '06 闭环与分层'], [7, '07 VLA · 世界模型 · Sim2Real']] },
+  ],
+  K: ['持续感知', '判断当前状态与时机', '选择回复或动作', '让输出进入环境', '观察反馈', '继续、修正、重试、停止或重新规划'],
+  init(s) {
+    s.querySelector('.c06mp-st').innerHTML = this.S.map((t, i) => `
+      <div class="c06mp-s" style="left:${t.x}px;--c:${t.c};--i:${i}">
+        <div class="c06mp-dot"><svg class="ic"><use href="#i-${t.ic}"/></svg></div>
+        <div class="c06mp-txt"><b>${t.b}</b><span class="c06mp-sub">${t.sub}</span>
+        <div class="c06mp-chips">${t.p.map(([p, n]) => `<button data-p="${p}">${n}</button>`).join('')}</div></div>
+      </div>`).join('');
+    s.querySelector('.c06mp-chain').innerHTML = this.K.map((k, i) => `${i ? '<i>→</i>' : ''}<span>${k}</span>`).join('');
+    s.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-p]');
+      if (!b) return;
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +b.dataset.p);
+      if (idx >= 0) DECK.go(idx, 0);
+    });
+  },
+  enter(s, ctx) {
+    const ks = [...s.querySelectorAll('.c06mp-chain span')];
+    let n = -1;
+    ctx.later(() => ctx.every(() => { n = (n + 1) % ks.length; ks.forEach((k, i) => k.classList.toggle('on', i === n)); }, 1100), 2400);
+  },
+  reset(s) { s.querySelectorAll('.c06mp-chain span').forEach((k) => k.classList.remove('on')); },
+};
+</script>

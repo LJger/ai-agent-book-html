@@ -1,0 +1,706 @@
+<!-- ================= PART 07（续）：动作分块、VLA 的局限、世界模型、实验 6-13、Sim2Real、实验 6-14 ================= -->
+<section class="slide" id="c06-chunk" data-part="7" data-trans="rise" data-dur="16000" data-title="动作分块：平滑与反应速度的取舍" data-notes="大模型每秒通常只能推理 1—10 次，而传统控制器每秒可能要更新几十到上千次。工程上常用<b>“动作分块”</b>：模型一次生成一小段未来动作，控制线程按较高频率执行这一小段，模型则在后台准备下一段。这样可以把一部分推理等待藏在动作执行时间里。<br>代价是，<b>动作段越长，运动越平滑，模型在这段时间里看到的新画面却越少</b>；如果 XLeRobot 伸手抓杯子时杯子被碰动，它可能仍在执行根据旧画面生成的动作。因此，<b>动作分块是在平滑性和反应速度之间做取舍，而不是没有代价的加速。</b><br>演示（全部为示意）：上方俯视图中夹爪伸向杯子，途中杯子被碰动；虚线圈是夹爪当前这段动作所依据的旧画面中的杯子位置。下方时间线的上一条是模型推理（每段动作在执行前由后台生成），下一条是控制线程逐段执行。拖动右上角滑块改变块长：块越短，段与段之间的衔接越多、轨迹越抖，但能更快看到杯子被碰动；块越长，轨迹越平滑，但旧画面上的动作会一直执行到块末。不操作时会在短、中、长三档之间轮换。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">动作分块：<em>平滑性与反应速度</em>的取舍</h2></div>
+    <div class="ck-ctl fx fx-up" style="--d:2"><span class="lbl">动作块长</span><input class="rng ck-rng" type="range" min="25" max="150" value="60"><b class="ck-v">0.60 s</b><span class="chip warn">示意</span></div></header>
+  <div class="ck-body">
+    <div class="ck-scene panel fx fx-left" style="--d:2">
+      <svg class="ck-svg" viewBox="0 0 760 380" width="760" height="380">
+        <rect x="0" y="0" width="760" height="380" rx="16" fill="#141a2e"/>
+        <polyline class="ck-trail" fill="none" stroke="#fb923c" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points=""/>
+        <circle class="ck-ghost" r="30" fill="none" stroke="#fca5a5" stroke-width="2.5" stroke-dasharray="6 6" opacity="0"/>
+        <text class="ck-gt" font-size="16" fill="#fca5a5" text-anchor="middle" opacity="0">旧画面中的杯子</text>
+        <g class="ck-cup"><circle r="24" fill="#ef4444" stroke="#fca5a5" stroke-width="2"/><circle r="14" fill="#7f1d1d"/></g>
+        <g class="ck-bump" opacity="0"><text font-size="18" fill="#fde68a" font-weight="700" text-anchor="middle">杯子被碰动</text></g>
+        <g class="ck-ee"><circle r="20" fill="none" stroke="#e2e8f0" stroke-width="4"/><circle r="5" fill="#fb923c"/></g>
+      </svg>
+    </div>
+    <div class="ck-r fx fx-right" style="--d:3">
+      <div class="ck-hz"><div><b>1—10 次/秒</b><span>大模型推理</span></div><i>vs</i><div><b>几十到上千次/秒</b><span>传统控制器更新</span></div></div>
+      <div class="ck-m"><span>运动平滑度</span><div class="meter"><i class="ck-m0"></i></div><small>段越长，衔接越少，越平滑</small></div>
+      <div class="ck-m"><span>对新画面的反应</span><div class="meter"><i class="ck-m1"></i></div><small>本轮：杯子被碰动后 <b class="ck-rt">—</b> 才开始转向</small></div>
+      <p class="ck-note">模型一次生成一小段未来动作，控制线程高频执行，后台准备下一段——<b>把一部分推理等待藏在动作执行时间里</b></p>
+    </div>
+  </div>
+  <div class="ck-tl fx fx-up" style="--d:4">
+    <div class="ck-lane"><span>模型推理</span><div class="ck-inf"></div></div>
+    <div class="ck-lane"><span>控制线程执行</span><div class="ck-exe"></div></div>
+    <i class="ck-bm"></i><i class="ck-ph"></i>
+  </div>
+  <p class="tagline ck-tag fx fx-up" style="--d:5">动作分块是在平滑性和反应速度之间做取舍，<b>而不是没有代价的加速</b></p>
+  <div class="src">第六章 ·「VLA 控制」· 动作分块</div>
+</section>
+<style>
+#c06-chunk .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-chunk .ck-ctl{display:flex;align-items:center;gap:14px;width:600px}
+#c06-chunk .ck-ctl .rng{flex:1}
+#c06-chunk .ck-v{font:800 24px var(--num);color:var(--acc);min-width:90px;text-align:right}
+#c06-chunk .ck-ctl .chip{font-size:15px;padding:2px 10px}
+#c06-chunk .ck-body{display:grid;grid-template-columns:800px 1fr;gap:24px}
+#c06-chunk .ck-scene{padding:10px 20px}
+#c06-chunk .ck-svg{display:block}
+#c06-chunk .ck-r{display:flex;flex-direction:column;gap:14px}
+#c06-chunk .ck-hz{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-chunk .ck-hz b{display:block;font:800 23px var(--num);color:var(--llm)}
+#c06-chunk .ck-hz div:last-child b{color:var(--ok)}
+#c06-chunk .ck-hz span{font-size:16px;color:var(--text2)}
+#c06-chunk .ck-hz i{font-style:normal;font-size:18px;color:var(--text3)}
+#c06-chunk .ck-m{padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);display:flex;flex-direction:column;gap:8px}
+#c06-chunk .ck-m>span{font-size:18px;font-weight:700}
+#c06-chunk .ck-m small{font-size:16px;color:var(--text2)}
+#c06-chunk .ck-m small b{font:700 18px var(--num);color:var(--warn)}
+#c06-chunk .ck-m0{--c:var(--ok)}
+#c06-chunk .ck-m1{--c:var(--warn)}
+#c06-chunk .ck-note{font-size:18px;line-height:1.6;color:var(--text2)}
+#c06-chunk .ck-note b{color:var(--acc)}
+#c06-chunk .ck-tl{position:relative;margin-top:16px;padding:10px 0;border-radius:16px;border:1px solid var(--line);background:rgba(8,12,30,.55)}
+#c06-chunk .ck-lane{position:relative;height:42px;display:flex;align-items:center}
+#c06-chunk .ck-lane>span{width:150px;padding-left:18px;font-size:16px;color:var(--text2)}
+#c06-chunk .ck-inf,#c06-chunk .ck-exe{position:absolute;left:160px;right:20px;top:6px;bottom:6px}
+#c06-chunk .ck-b{position:absolute;top:0;bottom:0;border-radius:6px;opacity:.25;transition:opacity .25s}
+#c06-chunk .ck-b.on{opacity:1}
+#c06-chunk .ck-inf .ck-b{background:color-mix(in srgb,var(--llm) 55%,transparent);border:1px solid var(--llm)}
+#c06-chunk .ck-exe .ck-b{background:color-mix(in srgb,var(--acc) 40%,transparent);border:1px solid var(--acc)}
+#c06-chunk .ck-exe .ck-b.stale{background:repeating-linear-gradient(135deg,rgba(251,113,133,.5) 0 8px,rgba(251,113,133,.2) 8px 16px);border-color:var(--bad)}
+#c06-chunk .ck-bm{position:absolute;top:4px;bottom:4px;width:2px;background:var(--warn);box-shadow:0 0 10px var(--warn);opacity:0}
+#c06-chunk .ck-ph{position:absolute;top:4px;bottom:4px;width:2px;background:#fff;box-shadow:0 0 10px #fff}
+#c06-chunk .ck-tag{margin-top:14px;font-size:22px}
+</style>
+<script>
+HOOKS['c06-chunk'] = {
+  T: 6, I: 0.25, TB: 2.3, V: 150,
+  C0: [600, 140], C1: [610, 300], E0: [90, 250],
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.rng = q('.ck-rng');
+    this.rng.addEventListener('input', () => { this.auto = false; this.setL(s, this.rng.value / 100); this.t = this.T; });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    this.E = { trail: q('.ck-trail'), ghost: q('.ck-ghost'), gt: q('.ck-gt'), cup: q('.ck-cup'), ee: q('.ck-ee'), bump: q('.ck-bump'), inf: q('.ck-inf'), exe: q('.ck-exe'), bm: q('.ck-bm'), ph: q('.ck-ph'), rt: q('.ck-rt'), v: q('.ck-v') };
+  },
+  X(t) { return 160 + (t / this.T) * (1660 - 180); },
+  setL(s, L) {
+    this.L = L;
+    this.rng.value = Math.round(L * 100);
+    this.rng.style.setProperty('--p', ((L * 100 - 25) / 125) * 100 + '%');
+    this.E.v.textContent = L.toFixed(2) + ' s';
+    s.querySelector('.ck-m0').style.setProperty('--v', Math.round((L / (L + 0.25)) * 100) + '%');
+  },
+  // 生成本轮的分块时间表：第 k 段在 e_k 开始执行，依据 g_k 时刻的画面（推理耗时 I，后台流水线）
+  plan() {
+    const L = this.L, I = this.I, ch = [], rnd = U.rand(7 + Math.round(L * 100));
+    for (let e = I, k = 0; e < this.T; e += L, k++) ch.push({ g: e - I, e, off: (rnd() - 0.5) * 2 * Math.min(34, 5 / L) });
+    this.ch = ch;
+    const r = ch.find((c) => c.g >= this.TB);
+    this.react = r ? r.e - this.TB : null;
+    const W = this.X(this.T) - 160, sx = (t) => (t / this.T) * W;
+    this.E.inf.innerHTML = ch.map((c) => `<i class="ck-b" style="left:${sx(c.g)}px;width:${sx(I)}px"></i>`).join('');
+    this.E.exe.innerHTML = ch.map((c) => `<i class="ck-b${c.g < this.TB && c.e + this.L > this.TB ? ' stale' : ''}" style="left:${sx(c.e)}px;width:${Math.max(2, sx(this.L) - 2)}px"></i>`).join('');
+    this.bi = [...this.E.inf.children]; this.be = [...this.E.exe.children];
+    this.E.bm.style.left = this.X(this.TB) + 'px';
+    this.E.rt.textContent = this.react != null ? this.react.toFixed(2) + ' s' : '—';
+    this.E.rt.parentElement.parentElement.querySelector('.ck-m1').style.setProperty('--v', this.react != null ? Math.round(Math.max(8, 100 - this.react * 60)) + '%' : '8%');
+    this.ee = [...this.E0]; this.pts = []; this.k = -1; this.tg = null; this.got = false;
+  },
+  cupAt(t) { return t < this.TB ? this.C0 : this.C1; },
+  frame(t, dt) {
+    const E = this.E, f = (n) => n.toFixed(1);
+    const k = this.ch.findIndex((c) => t >= c.e && t < c.e + this.L);
+    if (k !== this.k && k >= 0) {
+      this.k = k;
+      const c = this.ch[k], cp = this.cupAt(c.g), dx = cp[0] - this.ee[0], dy = cp[1] - this.ee[1], d = Math.hypot(dx, dy) || 1;
+      this.tg = [cp[0] - (dy / d) * c.off, cp[1] + (dx / d) * c.off];
+      this.snap = cp;
+    }
+    if (this.tg && !this.got && t >= this.I) {
+      const dx = this.tg[0] - this.ee[0], dy = this.tg[1] - this.ee[1], d = Math.hypot(dx, dy), v = (this.V * dt) / 1000;
+      if (d > v) { this.ee = [this.ee[0] + (dx / d) * v, this.ee[1] + (dy / d) * v]; }
+      const cup = this.cupAt(t);
+      if (Math.hypot(cup[0] - this.ee[0], cup[1] - this.ee[1]) < 14) this.got = true;
+      this.pts.push(f(this.ee[0]) + ',' + f(this.ee[1]));
+    }
+    const cup = this.cupAt(t), stale = this.snap && (this.snap[0] !== cup[0] || this.snap[1] !== cup[1]);
+    E.cup.setAttribute('transform', `translate(${cup[0]} ${cup[1]})`);
+    E.ee.setAttribute('transform', `translate(${f(this.ee[0])} ${f(this.ee[1])})`);
+    E.trail.setAttribute('points', this.pts.join(' '));
+    E.ghost.setAttribute('cx', this.C0[0]); E.ghost.setAttribute('cy', this.C0[1]);
+    E.ghost.setAttribute('opacity', stale ? 1 : 0);
+    E.gt.setAttribute('x', this.C0[0]); E.gt.setAttribute('y', this.C0[1] - 40); E.gt.setAttribute('opacity', stale ? 1 : 0);
+    E.bump.setAttribute('transform', `translate(${this.C1[0]} ${this.C1[1] + 52})`);
+    E.bump.setAttribute('opacity', t >= this.TB && t < this.TB + 1.4 ? 1 : 0);
+    E.bm.style.opacity = t >= this.TB ? 1 : 0;
+    E.ph.style.left = this.X(Math.min(t, this.T)) + 'px';
+    this.bi.forEach((b, i) => b.classList.toggle('on', t >= this.ch[i].g));
+    this.be.forEach((b, i) => b.classList.toggle('on', t >= this.ch[i].e));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.li = 0;
+    this.setL(s, 0.6);
+    this.plan();
+    this.t = 0;
+    let last = 0, hold = 0;
+    ctx.raf((now) => {
+      const dt = last ? Math.min(60, now - last) : 0;
+      last = now;
+      if (this.t >= this.T) {
+        hold += dt;
+        if (hold > 1500) { hold = 0; if (this.auto) { this.li = (this.li + 1) % 3; this.setL(s, [0.6, 1.3, 0.3][this.li]); } this.plan(); this.t = 0; }
+        return;
+      }
+      this.t = Math.min(this.T, this.t + dt / 1000);
+      this.frame(this.t, dt);
+    });
+  },
+  reset() { this.t = 0; },
+};
+</script>
+
+<section class="slide" id="c06-vlalim" data-part="7" data-trans="flip" data-dur="15000" data-title="VLA 的局限" data-notes="“长程规划 + VLA”是一个实用的基本方案，但它仍然有几个容易被忽略的问题：<br>• <b>训练数据有限</b>：机器人演示远少于互联网文本和图像数据。模型见过“杯子”这个词，不代表它见过各种材质和摩擦条件下的杯子。<br>• <b>只学会模仿，不一定懂后果</b>：行为克隆主要学习“示范者下一步怎么做”，并没有明确要求模型回答“这个动作会造成什么结果”。<br>• <b>机器人各不相同</b>：不同机器人有不同的自由度、坐标系、夹爪和执行器延迟，同一个动作不一定能直接搬到另一台机器人上。<br>• <b>观察可能过时</b>：动作块开始执行后，物体可能被移动、遮挡或碰倒，但模型仍在依据上一帧画面做决定。<br>所以，语言模型知道“杯子”是什么，并不代表它知道摩擦、接触、液体晃动和电源线会怎样改变未来状态。<b>VLA 主要回答“现在应该做什么”，还需要另一类模型帮助判断“做了之后可能发生什么”。</b><br>四张卡片会依次翻面，也可以点击翻看；卡片正面的小动画只示意问题的性质，比例不是数据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“长程规划 + VLA”实用，但有<em>四个容易被忽略的问题</em></h2></header>
+  <div class="vm-cards">
+    <div class="flip vm-f fx fx-up" style="--d:2"><div class="flip-in">
+      <div class="flip-f"><svg class="ic vm-ic"><use href="#i-db"/></svg><b class="vm-t">训练数据有限</b>
+        <div class="vm-a a1"><div><span>互联网文本和图像</span><i style="--w:100%"></i></div><div><span>机器人演示</span><i style="--w:12%"></i></div></div><small class="vm-k">点击翻面</small></div>
+      <div class="flip-b"><b class="vm-t">训练数据有限</b><p>机器人演示<b>远少于</b>互联网文本和图像数据</p><p>模型见过“杯子”这个词，不代表它见过<b>各种材质和摩擦条件下的杯子</b></p></div>
+    </div></div>
+    <div class="flip vm-f fx fx-up" style="--d:3"><div class="flip-in">
+      <div class="flip-f"><svg class="ic vm-ic"><use href="#i-copy"/></svg><b class="vm-t">只学会模仿，不一定懂后果</b>
+        <div class="vm-a a2"><div class="y"><svg class="ic"><use href="#i-check"/></svg>示范者下一步怎么做</div><div class="n"><svg class="ic"><use href="#i-help"/></svg>这个动作会造成什么结果</div></div><small class="vm-k">点击翻面</small></div>
+      <div class="flip-b"><b class="vm-t">只学会模仿，不一定懂后果</b><p>行为克隆主要学习<b>“示范者下一步怎么做”</b></p><p>并没有明确要求模型回答<b>“这个动作会造成什么结果”</b></p></div>
+    </div></div>
+    <div class="flip vm-f fx fx-up" style="--d:4"><div class="flip-in">
+      <div class="flip-f"><svg class="ic vm-ic"><use href="#i-arm"/></svg><b class="vm-t">机器人各不相同</b>
+        <div class="vm-a a3"><span>自由度</span><span>坐标系</span><span>夹爪</span><span>执行器延迟</span></div><small class="vm-k">点击翻面</small></div>
+      <div class="flip-b"><b class="vm-t">机器人各不相同</b><p>不同机器人有不同的<b>自由度、坐标系、夹爪和执行器延迟</b></p><p>同一个动作不一定能直接搬到另一台机器人上</p></div>
+    </div></div>
+    <div class="flip vm-f fx fx-up" style="--d:5"><div class="flip-in">
+      <div class="flip-f"><svg class="ic vm-ic"><use href="#i-history"/></svg><b class="vm-t">观察可能过时</b>
+        <div class="vm-a a4"><div class="fr"><em>上一帧</em><i class="c0"></i></div><div class="fr now"><em>现在</em><i class="c1"></i></div></div><small class="vm-k">点击翻面</small></div>
+      <div class="flip-b"><b class="vm-t">观察可能过时</b><p>动作块开始执行后，物体可能被<b>移动、遮挡或碰倒</b></p><p>模型却仍在依据<b>上一帧画面</b>做决定</p></div>
+    </div></div>
+  </div>
+  <div class="vm-end fx fx-up" style="--d:7">
+    <p>语言模型知道“杯子”是什么，并不代表它知道<b>摩擦、接触、液体晃动和电源线</b>会怎样改变未来状态</p>
+    <div class="vm-two"><div class="v"><span>VLA</span>现在应该做什么</div><svg class="ic"><use href="#i-arrow"/></svg><div class="w"><span>另一类模型</span>做了之后可能发生什么</div></div>
+  </div>
+  <div class="src">第六章 ·「VLA 的局限」</div>
+</section>
+<style>
+#c06-vlalim .vm-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;height:430px}
+#c06-vlalim .vm-f .flip-f,#c06-vlalim .vm-f .flip-b{align-items:center;text-align:center}
+#c06-vlalim .vm-ic{font-size:46px;color:var(--acc)}
+#c06-vlalim .vm-t{font-size:24px}
+#c06-vlalim .flip-b .vm-t{color:var(--acc)}
+#c06-vlalim .flip-b p{font-size:19px;line-height:1.6;color:var(--text2)}
+#c06-vlalim .flip-b p b{color:var(--text)}
+#c06-vlalim .vm-k{margin-top:auto;font-size:15px;color:var(--text3)}
+#c06-vlalim .vm-a{width:100%;flex:1;display:flex;flex-direction:column;justify-content:center;gap:12px}
+#c06-vlalim .a1>div{text-align:left}
+#c06-vlalim .a1 span{font-size:16px;color:var(--text2)}
+#c06-vlalim .a1 i{display:block;height:20px;margin-top:4px;border-radius:6px;width:var(--w);background:linear-gradient(90deg,var(--acc),var(--acc2));animation:c06vm-grow 3s var(--ease) infinite}
+@keyframes c06vm-grow{0%{width:0}50%,100%{width:var(--w)}}
+#c06-vlalim .a2>div{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;font-size:17px;text-align:left}
+#c06-vlalim .a2 .y{color:#a7f3d0;border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c06-vlalim .a2 .n{color:#fde68a;border:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);animation:c06vm-q 1.6s ease-in-out infinite}
+#c06-vlalim .a2 .ic{flex:none;font-size:22px}
+@keyframes c06vm-q{50%{opacity:.45}}
+#c06-vlalim .a3{flex-direction:row;flex-wrap:wrap;align-content:center;justify-content:center}
+#c06-vlalim .a3 span{padding:6px 12px;border-radius:999px;font-size:17px;border:1px solid var(--line2);animation:c06vm-hl 4s ease-in-out infinite}
+#c06-vlalim .a3 span:nth-child(2){animation-delay:1s}#c06-vlalim .a3 span:nth-child(3){animation-delay:2s}#c06-vlalim .a3 span:nth-child(4){animation-delay:3s}
+@keyframes c06vm-hl{0%,20%,100%{border-color:var(--line2);color:var(--text2)}8%{border-color:var(--acc);color:var(--text);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 45%,transparent)}}
+#c06-vlalim .a4{flex-direction:row;gap:10px}
+#c06-vlalim .a4 .fr{position:relative;flex:1;height:120px;border-radius:12px;border:1px solid var(--line2);background:#141a2e}
+#c06-vlalim .a4 .fr em{position:absolute;left:8px;top:6px;font-style:normal;font-size:15px;color:var(--text3)}
+#c06-vlalim .a4 .fr i{position:absolute;width:30px;height:30px;border-radius:50%;background:#ef4444;left:50%;top:55%;translate:-50% -50%}
+#c06-vlalim .a4 .now i{animation:c06vm-mv 3s ease-in-out infinite}
+@keyframes c06vm-mv{0%,30%{left:50%;rotate:0deg}60%,100%{left:78%;top:70%;border-radius:40% 60% 50% 50%}}
+#c06-vlalim .a4 .now{border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
+#c06-vlalim .vm-end{display:grid;grid-template-columns:1fr auto;gap:30px;align-items:center;margin-top:24px;padding:18px 26px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+#c06-vlalim .vm-end p{font-size:22px;line-height:1.6}
+#c06-vlalim .vm-end p b{color:var(--acc)}
+#c06-vlalim .vm-two{display:flex;align-items:center;gap:14px}
+#c06-vlalim .vm-two>div{padding:10px 16px;border-radius:14px;font-size:18px;text-align:center}
+#c06-vlalim .vm-two span{display:block;font-size:16px;font-weight:700}
+#c06-vlalim .vm-two .v{border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-vlalim .vm-two .v span{color:var(--acc)}
+#c06-vlalim .vm-two .w{border:1px solid color-mix(in srgb,var(--ctx) 55%,transparent);background:color-mix(in srgb,var(--ctx) 10%,transparent)}
+#c06-vlalim .vm-two .w span{color:var(--ctx)}
+#c06-vlalim .vm-two>.ic{font-size:22px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-vlalim'] = {
+  init(s) {
+    this.fs = [...s.querySelectorAll('.vm-f')];
+    this.fs.forEach((f) => f.addEventListener('click', () => { this.auto = false; f.classList.toggle('flipped'); }));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.every(() => {
+      if (!this.auto) return;
+      this.i = (this.i + 1) % 8;
+      if (this.i < 4) this.fs[this.i].classList.add('flipped');
+      else this.fs[this.i - 4].classList.remove('flipped');
+    }, 2400);
+  },
+  reset() { this.fs.forEach((f) => f.classList.remove('flipped')); },
+};
+</script>
+
+<section class="slide" id="c06-wm" data-part="7" data-steps="2" data-trans="zoom" data-dur="16000" data-title="世界模型：动作结果预测器" data-notes="可以把<b>世界模型</b>理解成一个“动作结果预测器”。它学习的是：在当前状态下采取某个动作，下一刻的状态可能怎样变化——当前状态 + 候选动作 → 预测下一状态或未来片段 → 比较候选结果 → 选择动作、重新规划或安全停止。<br>一个能用于机器人的世界模型，至少要做好三件事：看懂当前状态；预测不同动作可能带来的结果；把这些预测交给规划器或控制器，帮助它们做选择。只会描述视频的 VLM，或者只会生成画面的模型，并不会自动变成可靠的机器人世界模型。它还必须知道动作是什么，并且能预测动作对物体和环境的影响。V-JEPA 2 代表在内部状态中预测未来的一条路线，World-Action Model 则明确学习“动作—未来观察”的关系。这些模型可以和 VLA 配合使用，不需要取代 VLA。<br>第二步：在实际系统中，世界模型通常有三种用法：1. <b>动手前</b>：比较抓取、推动、等待等候选动作，优先选择风险更小的方案；2. <b>执行时</b>：把真实观察和预测结果对照，发现偏差就缩短动作、停止或重新规划；3. <b>训练时</b>：利用视频、仿真数据和失败轨迹学习状态变化，减少真机上的试错次数。<br>第三步：回到 XLeRobot 的桌面任务。如果黄色废纸被红色杯子部分遮住，系统可以比较“先抓纸”“先移动杯子”和“换一个抓取方向”几个候选技能。世界模型不需要生成一段逼真的机器人视频，只要能预测哪些候选动作更可能让纸张变得可抓取、哪些动作可能碰倒杯子，就已经能帮助规划器排序。动作执行后，<b>真实摄像头观察仍然是最终事实；预测只能帮助选择，不能代替验收</b>。<br>世界模型给出的不是确定答案，而是“如果这样做，可能会发生什么”的可比较预测。预测得越远，误差通常越大；一段看起来逼真的未来画面，也可能不符合真实的接触和摩擦规律。因此，实际系统仍然需要短期预测、实时观察、对不确定性的估计，以及独立的硬件安全控制器。生成式世界模型（如 Genie 3、Cosmos）可以用来做交互式仿真或可视化，但不能把“会生成视频”和“能指导机器人动作”混为一谈。<br>第三步中三个候选动作的预测数值是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">世界模型：一个<em>动作结果预测器</em></h2></header>
+  <div class="wm-pipe fx fx-up" style="--d:2">
+    <div class="wm-n" style="--c:var(--ctx)"><b>当前状态 + 候选动作</b></div><i class="wm-ar"></i>
+    <div class="wm-n" style="--c:var(--llm)"><b>预测下一状态或未来片段</b></div><i class="wm-ar"></i>
+    <div class="wm-n" style="--c:var(--warn)"><b>比较候选结果</b></div><i class="wm-ar"></i>
+    <div class="wm-n" style="--c:var(--ok)"><b>选择动作 · 重新规划 · 安全停止</b></div>
+  </div>
+  <div class="wm-stage">
+    <div class="wm-v v0">
+      <div class="wm-c"><span class="lbl">至少要做好三件事</span><ol class="wm-3"><li><svg class="ic"><use href="#i-eye"/></svg>看懂当前状态</li><li><svg class="ic"><use href="#i-route"/></svg>预测不同动作可能带来的结果</li><li><svg class="ic"><use href="#i-send"/></svg>把预测交给规划器或控制器，帮助它们做选择</li></ol></div>
+      <div class="wm-c"><span class="lbl">并不会自动变成机器人世界模型</span><div class="wm-no"><span><svg class="ic"><use href="#i-x"/></svg>只会描述视频的 VLM</span><span><svg class="ic"><use href="#i-x"/></svg>只会生成画面的模型</span></div><p class="wm-must">还必须<b>知道动作是什么</b>，并能<b>预测动作对物体和环境的影响</b></p></div>
+      <div class="wm-c"><span class="lbl">两条路线</span><div class="wm-rt"><b>V-JEPA 2</b><p>在<b>内部状态</b>中预测未来</p></div><div class="wm-rt"><b>World-Action Model</b><p>明确学习<b>“动作—未来观察”</b>的关系</p></div><p class="wm-vla">可以和 VLA <b>配合使用</b>，不需要取代 VLA</p></div>
+    </div>
+    <div class="wm-v v1">
+      <div class="wm-u"><em>1</em><b>动手前</b><div class="wm-ua"><span>抓取</span><i style="--w:30%"></i><span>推动</span><i style="--w:72%"></i><span>等待</span><i style="--w:18%"></i></div><p>比较抓取、推动、等待等候选动作，<b>优先选择风险更小的方案</b></p></div>
+      <div class="wm-u"><em>2</em><b>执行时</b><svg class="wm-us" viewBox="0 0 300 130" width="300" height="130"><path d="M10 110 C 80 100, 150 60, 290 20" fill="none" stroke="#c4b5fd" stroke-width="3" stroke-dasharray="7 6"/><path class="wm-obs" d="M10 110 C 80 100, 140 80, 200 78 S 270 90, 290 96" fill="none" stroke="#67e8f9" stroke-width="3"/><text x="250" y="16" fill="#c4b5fd" font-size="15">预测</text><text x="236" y="124" fill="#67e8f9" font-size="15">真实观察</text></svg><p>真实观察与预测对照，<b>发现偏差就缩短动作、停止或重新规划</b></p></div>
+      <div class="wm-u"><em>3</em><b>训练时</b><div class="wm-ud"><span>视频</span><span>仿真数据</span><span>失败轨迹</span></div><p>学习状态变化，<b>减少真机上的试错次数</b></p></div>
+    </div>
+    <div class="wm-v v2">
+      <div class="wm-ex">
+        <svg class="wm-desk" viewBox="0 0 420 300" width="420" height="300"><rect x="2" y="2" width="416" height="296" rx="18" fill="#141a2e" stroke="rgba(255,255,255,.16)" stroke-width="2"/><path d="M190 120L214 104L240 112L262 106L268 132L256 156L262 176L232 172L208 180L196 158Z" fill="#facc15" stroke="#fef08a" stroke-width="2"/><g class="wm-cup"><circle cx="232" cy="150" r="34" fill="#ef4444" stroke="#fca5a5" stroke-width="2"/><circle cx="232" cy="150" r="20" fill="#7f1d1d"/></g><path class="wm-hint" d="" fill="none" stroke="#fdba74" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 7"/><text x="210" y="270" text-anchor="middle" fill="#fde68a" font-size="17">黄色废纸被红色杯子部分遮住</text></svg>
+      </div>
+      <div class="wm-cand">
+        <div class="wm-hd"><span>候选技能</span><span>纸张变得可抓取</span><span>可能碰倒杯子</span><i class="chip warn">示意</i></div>
+        <div class="wm-cs"></div>
+        <p class="wm-truth"><svg class="ic"><use href="#i-eye"/></svg>动作执行后，<b>真实摄像头观察仍然是最终事实</b>；预测只能帮助选择，不能代替验收</p>
+      </div>
+      <div class="wm-cone">
+        <svg viewBox="0 0 360 200" width="360" height="200"><path d="M20 100 L340 30 L340 170 Z" fill="rgba(196,181,253,.14)" stroke="rgba(196,181,253,.5)" stroke-width="2"/><path d="M20 100 L340 100" stroke="#c4b5fd" stroke-width="3" stroke-dasharray="6 6"/><circle cx="20" cy="100" r="7" fill="#67e8f9"/><text x="24" y="192" fill="#94a3b8" font-size="15">现在</text><text x="270" y="192" fill="#94a3b8" font-size="15">预测越远 →</text><text x="190" y="62" fill="#c4b5fd" font-size="15">误差通常越大</text></svg>
+        <ul><li>逼真的未来画面，也可能<b>不符合真实的接触和摩擦规律</b></li><li>仍需短期预测、实时观察、不确定性估计，以及<b>独立的硬件安全控制器</b></li><li>生成式世界模型（如 Genie 3、Cosmos）可做交互式仿真或可视化，但<b>“会生成视频” ≠ “能指导机器人动作”</b></li></ul>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「世界模型」</div>
+</section>
+<style>
+#c06-wm .wm-pipe{display:flex;align-items:center;gap:10px}
+#c06-wm .wm-n{flex:1;padding:14px 16px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(10,16,36,.9));animation:glowPulse 4s ease-in-out infinite}
+#c06-wm .wm-n:nth-of-type(2){animation-delay:1s}#c06-wm .wm-n:nth-of-type(3){animation-delay:2s}#c06-wm .wm-n:nth-of-type(4){animation-delay:3s}
+#c06-wm .wm-n b{font-size:20px;color:var(--c)}
+#c06-wm .wm-ar{flex:none;width:40px;height:3px;background:linear-gradient(90deg,transparent,var(--acc));position:relative}
+#c06-wm .wm-ar::after{content:"";position:absolute;right:-2px;top:-5px;border:6px solid transparent;border-left-color:var(--acc);border-right:none}
+#c06-wm .wm-stage{position:relative;height:540px;margin-top:20px}
+#c06-wm .wm-v{position:absolute;inset:0;display:grid;gap:20px;opacity:0;visibility:hidden;translate:0 18px;transition:opacity .55s,visibility .55s,translate .55s var(--ease)}
+#c06-wm[data-k="0"] .v0,#c06-wm[data-k="1"] .v1,#c06-wm[data-k="2"] .v2{opacity:1;visibility:visible;translate:0 0}
+#c06-wm .v0{grid-template-columns:1fr 1fr 1fr}
+#c06-wm .wm-c{padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75);display:flex;flex-direction:column;gap:12px}
+#c06-wm .wm-3{display:flex;flex-direction:column;gap:12px}
+#c06-wm .wm-3 li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;font-size:19px;border:1px solid var(--line2);animation:c06wm-li 4.5s ease-in-out infinite}
+#c06-wm .wm-3 li:nth-child(2){animation-delay:1.5s}#c06-wm .wm-3 li:nth-child(3){animation-delay:3s}
+@keyframes c06wm-li{0%,25%,100%{border-color:var(--line2)}10%{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}}
+#c06-wm .wm-3 .ic{flex:none;font-size:26px;color:var(--acc)}
+#c06-wm .wm-no{display:flex;flex-direction:column;gap:10px}
+#c06-wm .wm-no span{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;font-size:19px;color:#fecdd3;border:1px dashed rgba(251,113,133,.5)}
+#c06-wm .wm-no .ic{color:var(--bad);font-size:22px}
+#c06-wm .wm-must{font-size:19px;line-height:1.6}
+#c06-wm .wm-must b,#c06-wm .wm-vla b,#c06-wm .wm-rt p b{color:var(--acc)}
+#c06-wm .wm-rt{padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 8%,transparent)}
+#c06-wm .wm-rt b{font:700 20px var(--num);color:#ddd6fe}
+#c06-wm .wm-rt p{font-size:18px;margin-top:4px}
+#c06-wm .wm-vla{margin-top:auto;font-size:18px;color:var(--text2)}
+#c06-wm .v1{grid-template-columns:1fr 1fr 1fr}
+#c06-wm .wm-u{position:relative;padding:20px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75);display:flex;flex-direction:column;gap:14px}
+#c06-wm .wm-u em{position:absolute;right:20px;top:14px;font:800 46px var(--num);font-style:normal;color:color-mix(in srgb,var(--acc) 40%,transparent)}
+#c06-wm .wm-u>b{font-size:26px;color:var(--acc)}
+#c06-wm .wm-u p{margin-top:auto;font-size:19px;line-height:1.6;color:var(--text2)}
+#c06-wm .wm-u p b{color:var(--text)}
+#c06-wm .wm-ua{display:grid;grid-template-columns:60px 1fr;gap:10px 12px;align-items:center;font-size:17px}
+#c06-wm .wm-ua i{height:18px;border-radius:6px;width:var(--w);background:linear-gradient(90deg,var(--ok),var(--bad));animation:c06vm-grow 3s var(--ease) infinite}
+#c06-wm .wm-obs{stroke-dasharray:400;animation:c06wm-draw 3s ease-in-out infinite}
+@keyframes c06wm-draw{from{stroke-dashoffset:400}60%,to{stroke-dashoffset:0}}
+#c06-wm .wm-ud{display:flex;gap:10px;flex-wrap:wrap}
+#c06-wm .wm-ud span{padding:8px 14px;border-radius:12px;font-size:18px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-wm .v2{grid-template-columns:440px 1fr 390px}
+#c06-wm .wm-ex{display:flex;align-items:center}
+#c06-wm .wm-cup{transition:transform .8s var(--ease)}
+#c06-wm .wm-cand{display:flex;flex-direction:column;gap:10px}
+#c06-wm .wm-hd{display:grid;grid-template-columns:170px 1fr 1fr auto;gap:12px;font-size:16px;color:var(--text3);align-items:center}
+#c06-wm .wm-hd .chip{font-style:normal;font-size:15px;padding:1px 8px}
+#c06-wm .wm-cs{display:flex;flex-direction:column;gap:10px}
+#c06-wm .wm-cd{display:grid;grid-template-columns:170px 1fr 1fr;gap:12px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .35s,box-shadow .35s}
+#c06-wm .wm-cd b{font-size:18px}
+#c06-wm .wm-cd .meter{height:16px}
+#c06-wm .wm-cd.on{border-color:var(--acc);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 30%,transparent)}
+#c06-wm .wm-cd.best b::after{content:"  优先";font-size:15px;color:var(--ok)}
+#c06-wm .wm-truth{display:flex;gap:10px;align-items:flex-start;margin-top:auto;padding:12px 14px;border-radius:12px;font-size:18px;line-height:1.55;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c06-wm .wm-truth .ic{flex:none;font-size:22px;color:var(--ok);margin-top:3px}
+#c06-wm .wm-truth b{color:var(--ok)}
+#c06-wm .wm-cone{display:flex;flex-direction:column;gap:8px}
+#c06-wm .wm-cone ul{display:flex;flex-direction:column;gap:8px}
+#c06-wm .wm-cone li{font-size:16px;line-height:1.5;color:var(--text2);padding-left:14px;border-left:3px solid var(--llm)}
+#c06-wm .wm-cone li b{color:var(--text)}
+</style>
+<script>
+HOOKS['c06-wm'] = {
+  // 三个候选技能：纸张可抓取概率 / 碰倒杯子风险（示意）
+  C: [['先抓纸', 35, 55, 'M150 240 C 190 200, 210 170, 226 146', null], ['先移动杯子', 90, 12, 'M330 250 C 300 220, 280 190, 256 162', [300, 200]], ['换一个抓取方向', 70, 25, 'M80 90 C 130 100, 170 115, 196 130', null]],
+  init(s) {
+    s.querySelector('.wm-cs').innerHTML = this.C.map(([t, a, b], i) => `<div class="wm-cd${i === 1 ? ' best' : ''}" data-i="${i}"><b>${t}</b><div class="meter" style="--c:var(--ok)"><i style="--v:${a}%"></i></div><div class="meter" style="--c:var(--bad)"><i style="--v:${b}%"></i></div></div>`).join('');
+    this.cds = [...s.querySelectorAll('.wm-cd')];
+    s.querySelector('.wm-cs').addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) { this.auto = false; this.pick(s, +c.dataset.i); } });
+  },
+  pick(s, i) {
+    this.i = i;
+    this.cds.forEach((c, j) => c.classList.toggle('on', j === i));
+    const [, , , d, mv] = this.C[i];
+    s.querySelector('.wm-hint').setAttribute('d', d);
+    s.querySelector('.wm-cup').style.transform = mv ? 'translate(68px,50px)' : '';
+  },
+  apply(s, k) { s.dataset.k = k; },
+  enter(s, ctx, k) {
+    this.apply(s, k);
+    this.auto = true;
+    this.pick(s, 0);
+    ctx.every(() => { if (this.auto) this.pick(s, (this.i + 1) % 3); }, 2600);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.dataset.k = 0; this.cds.forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c06-exp13" data-part="7" data-trans="rise" data-dur="16000" data-title="实验 6-13 ★★：模拟器中比较三种闭环" data-notes="<b>实验 6-13 ★★：在模拟器中比较三种自主整理桌面的闭环。</b>把实验 6-12 的任务、对象状态、成功条件和五个工具原样放进桌面模拟器，只把真实 XLeRobot 执行器换成可控的模拟执行器，并让抓取偶尔出现可恢复的瞬时失败。这样可以在不改变问题的前提下比较三种策略：<b>开环执行</b>一次生成完整动作序列，中途不重新观察；<b>逐步检查</b>在每个 pick 和 place 之后重新读取状态，失败时只重试当前技能；<b>预测式执行</b>再增加一个短期世界模型，先比较候选技能的预期结果，再选择下一步。实验比较任务成功率、工具调用开销和失败恢复能力，并检查最终成功是否都由 verify_state 的新观察确认。<br>这个实验不是为了证明小型模拟世界模型等同于真实机器人的物理模型，而是验证一个更基础的关系：开环计划会把一次局部失败带到任务末尾，逐步检查能够恢复，动作预测则可以进一步帮助规划器为候选技能排序。<b>最终是否真的完成，仍然必须由环境反馈决定。</b><br>配套仓库的真实数据（3 个种子 × 失败概率 0 / 0.25 / 0.5 × 每格 128 回合，共 3456 回合；注入的是模拟器一次性瞬时抓取失败，不是真机故障率）：失败概率 0 时三者成功率都是 100%，平均工具调用 4.0 / 6.0 / 6.0；0.25 时开环 73.7%，逐步检查与预测式都是 100%，调用 4.0 / 6.53 / 6.53，共注入 101 次失败；0.5 时开环 53.4%，另两者 100%，调用 4.0 / 6.93 / 6.93，共注入 179 次失败。世界模型测试 MSE 0.012–0.017（每个种子重新训练）。在这个简化模拟里，预测式与逐步检查的成功率、调用次数相同。<br>左侧三条泳道是单个回合的示意回放，右侧数字来自验收记录。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-13 ★★：模拟器中比较<em>三种闭环</em></h2></div>
+    <div class="x13-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">失败概率 0</button><button data-v="1">0.25</button><button data-v="2">0.5</button></div></header>
+  <div class="x13-body">
+    <div class="x13-lanes panel fx fx-left" style="--d:2">
+      <div class="x13-lh"><span class="lbl">单个回合回放</span><span class="chip warn x13-sim">示意</span></div>
+      <div class="x13-ln" data-m="0"><div class="x13-n"><b>开环执行</b><small>一次生成完整动作序列，中途不重新观察</small></div><div class="x13-seq"></div><span class="x13-res"></span></div>
+      <div class="x13-ln" data-m="1"><div class="x13-n"><b>逐步检查</b><small>每个 pick、place 后读取状态，失败只重试当前技能</small></div><div class="x13-seq"></div><span class="x13-res"></span></div>
+      <div class="x13-ln" data-m="2"><div class="x13-n"><b>预测式执行</b><small>短期世界模型先比较候选技能的预期结果</small></div><div class="x13-seq"></div><span class="x13-res"></span></div>
+      <p class="x13-k">开环计划会把一次局部失败<b>带到任务末尾</b>；逐步检查<b>能够恢复</b>；动作预测进一步帮助规划器<b>为候选技能排序</b></p>
+    </div>
+    <div class="x13-r fx fx-right" style="--d:3">
+      <div class="x13-ch panel"><span class="lbl">任务成功率</span><div class="x13-bars s"></div></div>
+      <div class="x13-ch panel"><span class="lbl">平均工具调用次数</span><div class="x13-bars c"></div></div>
+      <div class="x13-meta"><div><span>注入失败次数</span><b class="x13-inj">0</b></div><div><span>世界模型测试 MSE</span><b>0.012–0.017</b></div></div>
+      <p class="x13-same">在这个简化模拟里，<b>预测式与逐步检查的成功率、调用次数相同</b></p>
+      <small class="x13-data">数据：配套仓库 chapter6/gemini-xlerobot-navigation 本地 GPU 验收记录（3 个种子 × 3 档 × 128 回合，共 3456 回合；注入的是模拟器瞬时抓取失败，不是真机故障率）</small>
+    </div>
+  </div>
+  <div class="src">第六章 ·「世界模型」· 实验 6-13</div>
+</section>
+<style>
+#c06-exp13 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp13 .x13-seg button{font-size:19px;padding:9px 22px}
+#c06-exp13 .x13-body{display:grid;grid-template-columns:1fr 560px;gap:26px;height:650px}
+#c06-exp13 .x13-lanes{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+#c06-exp13 .x13-lh{display:flex;align-items:center;gap:12px}
+#c06-exp13 .x13-sim{font-size:15px;padding:1px 8px}
+#c06-exp13 .x13-ln{display:grid;grid-template-columns:230px 1fr 120px;gap:14px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+#c06-exp13 .x13-n b{display:block;font-size:20px;color:var(--acc)}
+#c06-exp13 .x13-n small{font-size:15px;line-height:1.4;color:var(--text3)}
+#c06-exp13 .x13-seq{display:flex;flex-wrap:wrap;gap:6px;min-height:76px;align-content:center}
+#c06-exp13 .x13-t{padding:4px 9px;border-radius:8px;font:15px var(--mono);border:1px solid color-mix(in srgb,var(--tool) 45%,transparent);color:#fde68a;background:color-mix(in srgb,var(--tool) 8%,transparent);animation:upIn .3s var(--ease) both}
+#c06-exp13 .x13-t.v{color:#a5f3fc;border-color:color-mix(in srgb,var(--ctx) 45%,transparent);background:color-mix(in srgb,var(--ctx) 8%,transparent)}
+#c06-exp13 .x13-t.p{color:#ddd6fe;border-color:color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 8%,transparent)}
+#c06-exp13 .x13-t.f{color:#fecdd3;border-color:var(--bad);background:rgba(251,113,133,.12)}
+#c06-exp13 .x13-t.g{opacity:.45;text-decoration:line-through}
+#c06-exp13 .x13-res{font-size:18px;font-weight:700;text-align:center}
+#c06-exp13 .x13-res.ok{color:var(--ok)}#c06-exp13 .x13-res.bad{color:var(--bad)}
+#c06-exp13 .x13-k{margin-top:auto;font-size:19px;line-height:1.6;color:var(--text2)}
+#c06-exp13 .x13-k b{color:var(--text)}
+#c06-exp13 .x13-r{display:flex;flex-direction:column;gap:14px}
+#c06-exp13 .x13-ch{padding:14px 18px}
+#c06-exp13 .x13-bars{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+#c06-exp13 .x13-b{display:grid;grid-template-columns:110px 1fr 74px;gap:12px;align-items:center;font-size:17px;color:var(--text2)}
+#c06-exp13 .x13-b .bt{height:22px;border-radius:7px;background:rgba(255,255,255,.05);overflow:hidden}
+#c06-exp13 .x13-b .bt i{display:block;height:100%;width:var(--w,0%);border-radius:7px;background:var(--c);transition:width .8s var(--ease)}
+#c06-exp13 .x13-b b{font:800 20px var(--num);color:var(--text);text-align:right}
+#c06-exp13 .x13-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c06-exp13 .x13-meta>div{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-exp13 .x13-meta span{display:block;font-size:16px;color:var(--text3)}
+#c06-exp13 .x13-meta b{font:800 28px var(--num);color:var(--acc)}
+#c06-exp13 .x13-same{font-size:18px;line-height:1.55;padding:12px 16px;border-radius:12px;border-left:4px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c06-exp13 .x13-same b{color:var(--warn)}
+#c06-exp13 .x13-data{font-size:15px;line-height:1.5;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-exp13'] = {
+  // 配套仓库验收记录：[成功率 %] 与 [平均工具调用]，顺序 开环 / 逐步检查 / 预测式
+  D: [{ s: [100, 100, 100], c: [4.0, 6.0, 6.0], inj: 0 }, { s: [73.7, 100, 100], c: [4.0, 6.53, 6.53], inj: 101 }, { s: [53.4, 100, 100], c: [4.0, 6.93, 6.93], inj: 179 }],
+  M: ['开环', '逐步检查', '预测式'],
+  COL: ['#fb7185', '#22d3ee', '#a78bfa'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.x13-seg'), (v) => { this.auto = false; this.pick(s, +v); });
+    const bar = (k) => this.M.map((m, i) => `<div class="x13-b"><span>${m}</span><div class="bt"><i style="--c:${this.COL[i]}"></i></div><b data-k="${k}${i}">—</b></div>`).join('');
+    s.querySelector('.x13-bars.s').innerHTML = bar('s');
+    s.querySelector('.x13-bars.c').innerHTML = bar('c');
+    this.lanes = [...s.querySelectorAll('.x13-ln')];
+  },
+  pick(s, p) {
+    this.p = p;
+    this.set(String(p));
+    const d = this.D[p];
+    s.querySelectorAll('.x13-bars.s .bt i').forEach((b, i) => b.style.setProperty('--w', d.s[i] + '%'));
+    s.querySelectorAll('.x13-bars.c .bt i').forEach((b, i) => b.style.setProperty('--w', (d.c[i] / 8) * 100 + '%'));
+    d.s.forEach((v, i) => (s.querySelector(`[data-k="s${i}"]`).textContent = v + '%'));
+    d.c.forEach((v, i) => (s.querySelector(`[data-k="c${i}"]`).textContent = v.toFixed(2).replace(/0$/, '')));
+    s.querySelector('.x13-inj').textContent = d.inj;
+    this.replay();
+  },
+  // 示意回合：失败概率 > 0 时，在抓纸那一步注入一次瞬时失败
+  SEQ(m, fail) {
+    const t = (x, c = '') => [x, c];
+    if (m === 0) return [t('pick(cup)'), t('place(cup, tray)'), ...(fail ? [t('pick(paper) ✗', 'f'), t('place(paper, bin)', 'g')] : [t('pick(paper)'), t('place(paper, bin)')]), t('verify_state', 'v')];
+    const pre = m === 2 ? [t('预测排序', 'p')] : [];
+    return [...pre, t('pick(cup)'), t('检查', 'v'), t('place(cup, tray)'), t('检查', 'v'), ...(m === 2 ? [t('预测排序', 'p')] : []), ...(fail ? [t('pick(paper) ✗', 'f'), t('检查', 'v'), t('重试 pick(paper)')] : [t('pick(paper)')]), t('检查', 'v'), t('place(paper, bin)'), t('检查', 'v'), t('verify_state', 'v')];
+  },
+  async replay() {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, fail = this.p > 0;
+    const seqs = [0, 1, 2].map((m) => this.SEQ(m, fail));
+    this.lanes.forEach((l) => { l.querySelector('.x13-seq').innerHTML = ''; const r = l.querySelector('.x13-res'); r.textContent = ''; r.className = 'x13-res'; });
+    const n = Math.max(...seqs.map((x) => x.length));
+    for (let i = 0; i < n; i++) {
+      seqs.forEach((q, m) => { if (q[i]) this.lanes[m].querySelector('.x13-seq').insertAdjacentHTML('beforeend', `<span class="x13-t ${q[i][1]}">${q[i][0]}</span>`); });
+      await U.wait(ctx, 420); if (!ok()) return;
+    }
+    this.lanes.forEach((l, m) => { const r = l.querySelector('.x13-res'), bad = m === 0 && fail; r.textContent = bad ? '✗ 失败带到末尾' : '✓ 新观察确认'; r.className = 'x13-res ' + (bad ? 'bad' : 'ok'); });
+    await U.wait(ctx, 2600); if (!ok()) return;
+    if (this.auto) this.pick(this.s, (this.p + 1) % 3); else this.replay();
+  },
+  enter(s, ctx) { this.s = s; this.ctx = ctx; this.auto = true; this.pick(s, 1); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.lanes.forEach((l) => { l.querySelector('.x13-seq').innerHTML = ''; l.querySelector('.x13-res').textContent = ''; }); },
+};
+</script>
+
+<section class="slide" id="c06-s2r" data-part="7" data-trans="zoom" data-dur="15000" data-title="从仿真环境到真实机器人" data-notes="实验 6-13 即使在模拟器里表现稳定，也不能直接推出实验 6-12 的 XLeRobot 真机会同样成功。<b>从仿真环境走到真实机器人，并不是再换一种控制器，而是要处理两个环境之间的差异。</b><br>训练时可以使用遥操作数据、视频数据或仿真交互数据；真正部署时，同一个红色杯子、黄色废纸、托盘和垃圾盒会出现在不同的背景、光照、相机位置和遮挡关系中，机械臂还会遇到不同的摩擦、传感器噪声和执行器延迟。<b>只要这些差异足够大，模拟中学会的动作就可能在现实中失效。</b><br>拖动右上角的“现实差距”滑块（不操作时自动来回），同一张桌面会从干净的仿真画面逐步加入背景、光照、相机位置、遮挡与视觉噪声的变化；右侧同时点亮对应的视觉差异与物理差异。画面变化方式与程度都是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从仿真环境到真实机器人：<em>处理两个环境之间的差异</em></h2></div>
+    <div class="sr-ctl fx fx-up" style="--d:2"><span class="lbl">仿真</span><input class="rng sr-rng" type="range" min="0" max="1000" value="0"><span class="lbl">现实</span><span class="chip warn">示意</span></div></header>
+  <p class="lead sr-lead fx fx-up" style="--d:2">实验 6-13 在模拟器里表现稳定，也<b>不能直接推出</b>实验 6-12 的 XLeRobot 真机会同样成功</p>
+  <div class="sr-body">
+    <div class="sr-l fx fx-left" style="--d:3"><div class="sr-cam" data-clip-ok><div class="sr-scene"></div><div class="sr-occ"></div></div><div class="sr-tag"><span class="sr-env">仿真画面</span></div></div>
+    <div class="sr-r fx fx-right" style="--d:4">
+      <div class="sr-g"><span class="lbl">视觉差异</span><div class="sr-list v"></div></div>
+      <div class="sr-g"><span class="lbl">物理差异</span><div class="sr-list p"></div></div>
+      <div class="sr-src"><span class="lbl">训练数据可以来自</span><div><span>遥操作数据</span><span>视频数据</span><span>仿真交互数据</span></div></div>
+    </div>
+  </div>
+  <p class="tagline sr-tag2 fx fx-up" style="--d:5">只要这些差异足够大，<b>模拟中学会的动作就可能在现实中失效</b></p>
+  <div class="src">第六章 ·「从仿真环境到真实机器人」</div>
+</section>
+<style>
+#c06-s2r .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-s2r .sr-ctl{display:flex;align-items:center;gap:12px;width:560px}
+#c06-s2r .sr-ctl .rng{flex:1}
+#c06-s2r .sr-ctl .chip{font-size:15px;padding:2px 10px}
+#c06-s2r .sr-lead{margin:-4px 0 14px;font-size:22px}
+#c06-s2r .sr-lead b{color:var(--acc)}
+#c06-s2r .sr-body{display:grid;grid-template-columns:700px 1fr;gap:30px;height:560px}
+#c06-s2r .sr-l{display:flex;flex-direction:column;gap:10px;align-items:center}
+#c06-s2r .sr-cam{position:relative;width:640px;height:457px;border-radius:20px;overflow:hidden;background:#05070f}
+#c06-s2r .sr-scene{width:640px;height:457px;transform-origin:50% 60%}
+#c06-s2r .sr-occ{position:absolute;right:-40px;bottom:-30px;width:260px;height:220px;border-radius:50% 40% 0 0;background:radial-gradient(circle at 40% 40%,rgba(30,41,59,.95),rgba(15,23,42,.98));opacity:0;transition:opacity .3s}
+#c06-s2r .sr-tag{font-size:18px;color:var(--text2)}
+#c06-s2r .sr-env{font-weight:700;color:var(--acc)}
+#c06-s2r .sr-r{display:flex;flex-direction:column;gap:16px}
+#c06-s2r .sr-g{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-s2r .sr-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+#c06-s2r .sr-it{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;font-size:18px;color:var(--text3);border:1px solid var(--line);transition:all .4s var(--ease)}
+#c06-s2r .sr-it .ic{flex:none;font-size:22px}
+#c06-s2r .sr-it.on{color:var(--text);border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 25%,transparent)}
+#c06-s2r .sr-it.on .ic{color:var(--c)}
+#c06-s2r .sr-list.v .sr-it{--c:#fbbf24}
+#c06-s2r .sr-list.p .sr-it{--c:#fb7185}
+#c06-s2r .sr-src{padding:14px 18px;border-radius:16px;border:1px dashed var(--line2)}
+#c06-s2r .sr-src div{display:flex;gap:10px;margin-top:10px}
+#c06-s2r .sr-src div span{padding:6px 14px;border-radius:999px;font-size:17px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);color:var(--acc)}
+#c06-s2r .sr-tag2{margin-top:16px;font-size:22px}
+</style>
+<script>
+HOOKS['c06-s2r'] = {
+  V: [['image', '背景', 0.15], ['sun', '光照', 0.3], ['camera', '相机位置', 0.45], ['eyeoff', '遮挡关系', 0.6]],
+  P: [['hand', '摩擦', 0.55], ['wave', '传感器噪声', 0.7], ['clock', '执行器延迟', 0.85]],
+  init(s) {
+    this.desk = HOOKS['c06-robot'].mkDesk(s.querySelector('.sr-scene'), { w: 640, h: 457, p: 'c06s2' });
+    const it = (a) => a.map(([ic, t]) => `<div class="sr-it"><svg class="ic"><use href="#i-${ic}"/></svg>${t}</div>`).join('');
+    s.querySelector('.sr-list.v').innerHTML = it(this.V);
+    s.querySelector('.sr-list.p').innerHTML = it(this.P);
+    this.vi = [...s.querySelectorAll('.sr-list.v .sr-it')];
+    this.pi = [...s.querySelectorAll('.sr-list.p .sr-it')];
+    this.rng = s.querySelector('.sr-rng');
+    this.rng.addEventListener('input', () => { this.auto = false; this.set(s, this.rng.value / 1000); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    // 背景杂物（随现实差距逐渐出现）
+    const r = U.rand(5);
+    let h = '';
+    for (let i = 0; i < 14; i++) h += `<rect class="sr-bg" x="${(r() * 640) | 0}" y="${(220 + r() * 260) | 0}" width="${(20 + r() * 70) | 0}" height="${(14 + r() * 40) | 0}" rx="6" fill="hsl(${(r() * 360) | 0} 30% 35%)" opacity="0"/>`;
+    this.desk.under(h);
+    this.bgs = [...s.querySelectorAll('.sr-bg')];
+  },
+  set(s, g) {
+    this.g = g;
+    this.rng.value = Math.round(g * 1000);
+    this.rng.style.setProperty('--p', g * 100 + '%');
+    const D = this.desk, sv = D.svg, cl = (a, b) => Math.max(0, Math.min(1, (g - a) / b));
+    this.bgs.forEach((b, i) => b.setAttribute('opacity', (cl(0.15, 0.2) * (0.5 + (i % 3) * 0.2)).toFixed(2)));
+    sv.querySelector('.dk6-lt').setAttribute('opacity', cl(0.3, 0.25).toFixed(2));
+    sv.querySelector('.dk6-nz').setAttribute('opacity', (cl(0.65, 0.35) * 0.45).toFixed(2));
+    const desk = sv.querySelector('.dk6-desk');
+    desk.setAttribute('fill', g < 0.15 ? '#0f1a2a' : '#1a1f30');
+    desk.setAttribute('stroke', g < 0.15 ? 'rgba(103,232,249,.45)' : 'rgba(255,255,255,.16)');
+    const cam = cl(0.45, 0.2);
+    s.querySelector('.sr-scene').style.transform = `rotate(${(cam * 6).toFixed(2)}deg) scale(${(1 + cam * 0.12).toFixed(3)}) translate(${(cam * 18).toFixed(1)}px,${(cam * -10).toFixed(1)}px)`;
+    s.querySelector('.sr-occ').style.opacity = cl(0.6, 0.15).toFixed(2);
+    this.vi.forEach((x, i) => x.classList.toggle('on', g >= this.V[i][2]));
+    this.pi.forEach((x, i) => x.classList.toggle('on', g >= this.P[i][2]));
+    s.querySelector('.sr-env').textContent = g < 0.15 ? '仿真画面' : g < 0.85 ? '逐渐接近真实部署环境' : '真实部署环境（示意）';
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.set(s, 0);
+    let dir = 1, last = 0, hold = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      if (!this.auto) return;
+      if (hold > 0) { hold -= dt; return; }
+      let g = this.g + (dir * dt) / 6000;
+      if (g >= 1) { g = 1; dir = -1; hold = 1800; } else if (g <= 0) { g = 0; dir = 1; hold = 1200; }
+      this.set(s, g);
+    });
+  },
+  reset(s) { this.set(s, 0); },
+};
+</script>
+
+<section class="slide" id="c06-exp14" data-part="7" data-trans="flip" data-dur="16000" data-title="实验 6-14 ★★★：同一桌面任务的 RGB 跨环境测试" data-notes="<b>实验 6-14 ★★★：同一桌面任务的 RGB 跨环境测试。</b>在模拟环境中继续使用“把物体移动到对应目标”的基本问题，把每个样本理解为整理桌面中的一个局部决策：根据 RGB 画面判断应该向哪个方向接近物体，或是否已经可以抓取。训练四种结构相同的视觉策略：一组只看固定画面，一组改变背景，一组改变物体外观，最后一组同时改变背景、外观、光照和噪声。所有策略都在原始环境和变化后的新环境中测试，比较视觉条件变化前后的动作判断准确率。<br>这个实验要回答的不是“模拟器是否已经等于 XLeRobot 真机”，而是一个更窄的问题：<b>训练时主动扩大画面变化范围，是否有助于同一个杯子—托盘、废纸—垃圾盒任务适应新的摄像头画面。</b>即使结果改善，真机部署仍然需要真实相机标定、执行器测试和完整的安全闭环。<br>配套仓库的真实数据（本地 GPU，Apple MPS；3 个种子，每种条件 4096 个训练样本、训练 10 轮，每个测试环境 1024 个样本；准确率为三个种子的均值，柱上的小点是每个种子各自的结果）：只看固定画面——原始环境 93.0%，新环境 bright 56.5%（±21.1），新环境 realistic 54.8%（±23.1）；只改背景——90.9%、52.9%、36.9%；只改外观——89.2%、83.1%、74.4%；全部随机化——87.5%、80.2%、76.1%。验收：固定画面策略在原始环境高于 0.85；全随机化策略在两个新环境都高于 0.65，并且都优于固定画面策略。它只证明“扩大训练分布可以缓解视觉差距”，不证明仿真等于真机。<br>左侧四个缩略图示意四种训练条件的画面变化方式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-14 ★★★：同一桌面任务的 <em>RGB 跨环境测试</em></h2></div>
+    <div class="x14-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">原始环境</button><button data-v="1">新环境 bright</button><button data-v="2">新环境 realistic</button></div></header>
+  <div class="x14-body">
+    <div class="x14-l panel fx fx-left" style="--d:2">
+      <div class="x14-lh"><span class="lbl">四种训练条件（结构相同的视觉策略）</span><span class="chip warn">示意</span></div>
+      <div class="x14-th"></div>
+      <p class="x14-q">每个样本 = 整理桌面中的一个局部决策：<b>向哪个方向接近物体，或是否已经可以抓取</b></p>
+    </div>
+    <div class="x14-r fx fx-right" style="--d:3">
+      <div class="x14-chart panel"><div class="x14-ch"><span class="lbl">动作判断准确率（三个种子均值 · 小点为各种子）</span></div><div class="x14-plot"></div></div>
+      <div class="x14-pass"><svg class="ic"><use href="#i-check"/></svg><p>验收：固定画面策略原始环境 <b>&gt; 0.85</b>；全随机化策略两个新环境都 <b>&gt; 0.65</b>，且都优于固定画面</p></div>
+      <div class="x14-bd"><svg class="ic"><use href="#i-alert"/></svg><p>只证明<b>扩大训练分布可以缓解视觉差距</b>，不证明仿真等于真机；真机仍需相机标定、执行器测试和完整的安全闭环</p></div>
+      <small class="x14-data">数据：配套仓库 chapter6/rgb-sim2real-grasping 本地 GPU 验收记录（Apple MPS，3 个种子，每种条件 4096 训练样本、10 轮，每个测试环境 1024 样本）</small>
+    </div>
+  </div>
+  <div class="src">第六章 ·「从仿真环境到真实机器人」· 实验 6-14</div>
+</section>
+<style>
+#c06-exp14 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp14 .x14-seg button{font-size:18px;padding:9px 18px}
+#c06-exp14 .x14-body{display:grid;grid-template-columns:620px 1fr;gap:26px;height:660px}
+#c06-exp14 .x14-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c06-exp14 .x14-lh{display:flex;align-items:center;gap:10px}
+#c06-exp14 .x14-lh .chip{font-size:15px;padding:1px 8px}
+#c06-exp14 .x14-th{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#c06-exp14 .x14-tc{display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;border:1px solid var(--line);transition:border-color .35s,box-shadow .35s}
+#c06-exp14 .x14-tc canvas{width:270px;height:180px;border-radius:10px}
+#c06-exp14 .x14-tc b{font-size:17px;color:var(--c)}
+#c06-exp14 .x14-tc small{font-size:15px;color:var(--text3)}
+#c06-exp14 .x14-tc.on{border-color:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 35%,transparent)}
+#c06-exp14 .x14-q{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+#c06-exp14 .x14-q b{color:var(--text)}
+#c06-exp14 .x14-r{display:flex;flex-direction:column;gap:14px}
+#c06-exp14 .x14-chart{padding:14px 18px}
+#c06-exp14 .x14-plot{position:relative;height:330px;margin-top:8px}
+#c06-exp14 .x14-grid{position:absolute;left:150px;right:10px;top:0;bottom:30px}
+#c06-exp14 .x14-gl{position:absolute;left:0;right:0;height:0;border-top:1px dashed rgba(255,255,255,.12)}
+#c06-exp14 .x14-gl span{position:absolute;left:-42px;top:-10px;font:15px var(--num);color:var(--text3)}
+#c06-exp14 .x14-gl.th{border-top:2px dashed var(--warn)}
+#c06-exp14 .x14-gl.th span{color:var(--warn)}
+#c06-exp14 .x14-grp{position:absolute;bottom:0;display:flex;flex-direction:column;align-items:center}
+#c06-exp14 .x14-bs{display:flex;align-items:flex-end;gap:6px;height:300px}
+#c06-exp14 .x14-b{position:relative;width:46px;height:var(--h);border-radius:6px 6px 2px 2px;background:var(--c);opacity:.32;transition:opacity .4s,height .8s var(--ease)}
+#c06-exp14 .x14-b.on{opacity:1;box-shadow:0 0 18px color-mix(in srgb,var(--c) 50%,transparent)}
+#c06-exp14 .x14-b em{position:absolute;left:50%;top:-24px;translate:-50% 0;font:700 15px var(--num);font-style:normal;color:var(--text);opacity:0;white-space:nowrap;transition:opacity .3s}
+#c06-exp14 .x14-b.on em{opacity:1}
+#c06-exp14 .x14-b i{position:absolute;left:50%;width:9px;height:9px;margin-left:-4.5px;border-radius:50%;background:#fff;border:1.5px solid #0b1020;bottom:calc(var(--y) - 4.5px)}
+#c06-exp14 .x14-gn{margin-top:6px;font-size:15px;color:var(--text2);white-space:nowrap}
+#c06-exp14 .x14-pass,#c06-exp14 .x14-bd{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55}
+#c06-exp14 .x14-pass{border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c06-exp14 .x14-pass .ic{flex:none;font-size:22px;color:var(--ok);margin-top:3px}
+#c06-exp14 .x14-pass b{color:var(--ok)}
+#c06-exp14 .x14-bd{border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c06-exp14 .x14-bd .ic{flex:none;font-size:22px;color:var(--warn);margin-top:3px}
+#c06-exp14 .x14-bd b{color:var(--warn)}
+#c06-exp14 .x14-data{font-size:15px;line-height:1.5;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-exp14'] = {
+  // 配套仓库验收记录：每种训练条件在 [原始, bright, realistic] 上的三个种子准确率（%）
+  R: [
+    ['只看固定画面', 'source_clean', '#94a3b8', [[92.2, 93.9, 93.0], [79.9, 28.8, 60.9], [81.0, 24.8, 58.7]], [93.0, 56.5, 54.8]],
+    ['只改背景', 'source_background', '#60a5fa', [[90.8, 92.2, 89.6], [53.3, 47.9, 57.6], [41.7, 35.4, 33.6]], [90.9, 52.9, 36.9]],
+    ['只改外观', 'source_appearance', '#fbbf24', [[90.2, 87.7, 89.7], [85.7, 80.5, 83.1], [78.8, 75.7, 68.7]], [89.2, 83.1, 74.4]],
+    ['全部随机化', 'source_full', '#2dd4bf', [[85.7, 90.7, 86.0], [77.1, 82.1, 81.3], [75.8, 79.7, 72.9]], [87.5, 80.2, 76.1]],
+  ],
+  ENV: ['原始环境', '新环境 bright', '新环境 realistic'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.x14-seg'), (v) => { this.auto = false; this.pick(s, +v); });
+    s.querySelector('.x14-th').innerHTML = this.R.map(([n, k, c], i) => `<div class="x14-tc" style="--c:${c}"><canvas width="540" height="360"></canvas><b>${n}</b><small>${k}</small></div>`).join('');
+    this.tcs = [...s.querySelectorAll('.x14-tc')];
+    this.cvs = this.tcs.map((t) => t.querySelector('canvas').getContext('2d'));
+    // 分组柱状图：每组一个测试环境，组内四种训练条件
+    const H = 300;
+    let h = '<div class="x14-grid">';
+    [0, 25, 50, 65, 75, 100].forEach((v) => { h += `<div class="x14-gl${v === 65 ? ' th' : ''}" style="bottom:${(v / 100) * H}px"><span>${v === 65 ? '0.65' : v + '%'}</span></div>`; });
+    h += '</div>';
+    this.ENV.forEach((e, g) => {
+      h += `<div class="x14-grp" style="left:${190 + g * 300}px"><div class="x14-bs">`;
+      this.R.forEach(([, , c, seeds, mu]) => {
+        h += `<div class="x14-b" data-g="${g}" style="--c:${c};--h:${(mu[g] / 100) * H}px"><em>${mu[g]}%</em>${seeds[g].map((v) => `<i style="--y:${(v / 100) * H}px"></i>`).join('')}</div>`;
+      });
+      h += `</div><span class="x14-gn">${e}</span></div>`;
+    });
+    s.querySelector('.x14-plot').innerHTML = h;
+    this.bars = [...s.querySelectorAll('.x14-b')];
+  },
+  pick(s, g) {
+    this.g = g;
+    this.set(String(g));
+    this.bars.forEach((b) => b.classList.toggle('on', +b.dataset.g === g));
+  },
+  // 画一张玩具桌面：v 0 固定 / 1 改背景 / 2 改外观 / 3 全部随机化
+  thumb(g, v, r) {
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    const bg = v === 1 || v === 3 ? `hsl(${(r() * 360) | 0} ${20 + r() * 30}% ${12 + r() * 18}%)` : '#141a2e';
+    g.fillStyle = bg; g.fillRect(0, 0, 270, 180);
+    if (v === 1 || v === 3) for (let i = 0; i < 6; i++) { g.fillStyle = `hsla(${(r() * 360) | 0},40%,50%,.25)`; g.fillRect(r() * 270, r() * 180, 20 + r() * 60, 10 + r() * 40); }
+    const ap = v === 2 || v === 3;
+    g.strokeStyle = '#60a5fa'; g.lineWidth = 3; g.strokeRect(20, 20, 80, 52);
+    g.strokeStyle = '#34d399'; g.beginPath(); g.arc(220, 46, 26, 0, 6.283); g.stroke();
+    g.fillStyle = ap ? `hsl(${(r() * 40) | 0} ${60 + r() * 30}% ${40 + r() * 20}%)` : '#ef4444';
+    const cs = ap ? 12 + r() * 10 : 16;
+    g.beginPath(); g.arc(90 + (ap ? r() * 20 : 0), 120, cs, 0, 6.283); g.fill();
+    g.fillStyle = ap ? `hsl(${(45 + r() * 20) | 0} 90% ${50 + r() * 15}%)` : '#facc15';
+    g.fillRect(170, 110, ap ? 22 + r() * 16 : 28, ap ? 16 + r() * 16 : 24);
+    if (v === 3) {
+      g.fillStyle = `rgba(253,230,138,${(0.05 + r() * 0.2).toFixed(2)})`; g.fillRect(0, 0, 270, 180);
+      for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(255,255,255,${(r() * 0.25).toFixed(2)})`; g.fillRect(r() * 270, r() * 180, 2, 2); }
+    }
+  },
+  draw() { const r = Math.random; this.cvs.forEach((g, i) => this.thumb(g, i, r)); },
+  enter(s, ctx) {
+    this.auto = true;
+    this.pick(s, 0);
+    this.draw();
+    let n = 0;
+    ctx.every(() => {
+      this.draw();
+      this.tcs.forEach((t, i) => t.classList.toggle('on', i === n % 4));
+      n++;
+      if (this.auto && n % 4 === 0) this.pick(s, (this.g + 1) % 3);
+    }, 1300);
+  },
+  reset() { this.tcs.forEach((t) => t.classList.remove('on')); },
+};
+</script>

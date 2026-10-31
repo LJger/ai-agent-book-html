@@ -1,0 +1,687 @@
+<!-- ================= PART 01 一条任务的解剖 ================= -->
+<section class="slide chapter" id="c07-d1" data-part="1" data-title="PART 01 · 一条任务的解剖" data-notes="「一条评估任务的解剖：τ²-bench 的 telecom 领域」。我们先完整解剖 τ²-bench 的 telecom 领域一条真实任务。τ²-bench 是 Sierra 的开源项目，按照 chapter7/tau2-bench-eval/README.md 中的命令克隆到本地后，打开任务文件 data/tau2/domains/telecom/tasks_small.json。<br>这一部分依次看：任务定义的四个组成部分、其中四处值得说明的设计、实验 7-1 的双控环境，以及配套仓库保留的一次真实运行——一条满分轨迹和一条失败轨迹。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">一条评估任务<br>的解剖</h1>
+  <div class="ch-s fx fx-up" style="--d:3">τ²-bench 的 telecom 领域：从任务定义到一次真实运行</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">这条任务已经把一个评估集必须回答的问题摆全了：什么算成功、任务从何而来、由谁验证、分数如何转化为决策。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c07-task" data-part="1" data-trans="zoom" data-title="任务定义的四个组成部分" data-notes="以下是 τ²-bench telecom 任务文件中的一条任务（为便于阅读做了删节）。它由四部分组成：<br>① <b>ticket</b>：提供给 Agent 的工单——用户手机无法上网、状态栏显示 No Service；客户 John Smith，号码 555-123-2002，当前在法国；速度测试结果为 excellent 才算解决；不更换套餐，必要时愿意充值 2.0 GB 流量。<br>② <b>user_scenario</b>：提供给用户模拟器的行为规范——known_info 只有姓名、号码与所在国家；task_instructions 规定情绪、验收口径与事实锚定。<br>③ <b>initial_state</b>：运行前将两侧状态重置到同一起点——initialization_actions 在用户侧打开飞行模式、关闭漫游，在运营商侧为线路 L1002 开通漫游。<br>④ <b>evaluation_criteria</b>：评分标准——actions 检验关键动作是否发生，env_assertions 检验终态，communicate_info 与 nl_assertions 检验必要信息是否已告知，reward_basis 是聚合规则。<br>右侧四张卡片自动轮播，代码窗口同步滚动到对应字段；也可以点击卡片。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一条任务 = <em>四个组成部分</em></h2>
+  <p class="lead fx fx-up" style="--d:2">τ²-bench 任务文件 tasks_small.json 中的一条（删节）</p></header>
+  <div class="c7tk-body">
+    <div class="c7tk-win win fx fx-left" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>data/tau2/domains/telecom/tasks_small.json</span></div>
+      <div class="c7tk-view" data-clip-ok data-ok-overflow><div class="c7tk-code code"></div></div>
+    </div>
+    <div class="c7tk-cards"></div>
+  </div>
+  <div class="src">第七章 ·「任务定义的四个组成部分」</div>
+</section>
+<style>
+.c7tk-body{display:flex;gap:28px}
+.c7tk-win{width:940px;flex:none}
+.c7tk-view{height:560px;overflow:hidden;position:relative}
+.c7tk-code{font-size:16px;line-height:1.55;padding:14px 22px;transition:transform .9s var(--ease)}
+.c7tk-code .ln{opacity:.42;transition:opacity .5s,background .35s,box-shadow .35s}
+.c7tk-code .ln.hl{opacity:1}
+.c7tk-cards{flex:1;display:flex;flex-direction:column;gap:14px}
+.c7tk-c{--c:var(--acc);cursor:pointer;padding:16px 20px}
+.c7tk-ch{display:flex;align-items:center;gap:12px}
+.c7tk-ch em{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font:800 18px var(--num);font-style:normal;color:#06101f;background:var(--c)}
+.c7tk-ch code{font:700 20px var(--mono);color:var(--c)}
+.c7tk-ch span{margin-left:auto;font-size:16px;color:var(--text3)}
+.c7tk-c p{margin-top:8px;font-size:18px;line-height:1.55;color:var(--text2)}
+.c7tk-c.on p{color:var(--text)}
+.c7tk-c .runbar{margin-top:10px;opacity:0}
+.c7tk-c.on .runbar{opacity:1}
+</style>
+<script>
+HOOKS['c07-task'] = {
+  // 每行：[分组(-1 无), 内容 HTML]
+  L: [
+    [-1, '{'],
+    [-1, '  <span class="t-p">"id"</span>: <span class="t-s">"[mobile_data_issue]airplane_mode_on|user_abroad_roaming_enabled_off"</span>,'],
+    [-1, ''],
+    [0, '  <span class="t-c">// 提供给 Agent 的工单</span>'],
+    [0, '  <span class="t-p">"ticket"</span>: <span class="t-s">"用户手机无法上网，状态栏显示 \'No Service\'。客户 John Smith，</span>'],
+    [0, '<span class="t-s">             号码 555-123-2002，当前在法国。速度测试结果为 excellent 才算解决。</span>'],
+    [0, '<span class="t-s">             不更换套餐，必要时愿意充值 2.0 GB 流量。"</span>,'],
+    [-1, ''],
+    [1, '  <span class="t-c">// 提供给用户模拟器的行为规范</span>'],
+    [1, '  <span class="t-p">"user_scenario"</span>: { <span class="t-p">"instructions"</span>: {'],
+    [1, '      <span class="t-p">"known_info"</span>: <span class="t-s">"You are John Smith with phone number 555-123-2002.</span>'],
+    [1, '<span class="t-s">                     You are currently abroad in France."</span>,'],
+    [1, '      <span class="t-p">"unknown_info"</span>: <span class="t-k">null</span>,'],
+    [1, '      <span class="t-p">"task_instructions"</span>:'],
+    [1, '<span class="t-s">        "…express mild frustration after the first unsuccessful attempt.</span>'],
+    [1, '<span class="t-s">         You will consider the issue resolved only when speed test returns</span>'],
+    [1, '<span class="t-s">         excellent internet speed and nothing else. If it returns poor, fair</span>'],
+    [1, '<span class="t-s">         or good, you will not consider the issue resolved.</span>'],
+    [1, '<span class="t-s">         Whenever the agent asks you about your device, always ground your</span>'],
+    [1, '<span class="t-s">         responses on the results of tool calls. …</span>'],
+    [1, '<span class="t-s">         Never make up the results of tool calls."</span>'],
+    [1, '  }},'],
+    [-1, ''],
+    [2, '  <span class="t-c">// 运行前将两侧状态重置到同一起点</span>'],
+    [2, '  <span class="t-p">"initial_state"</span>: { <span class="t-p">"initialization_actions"</span>: ['],
+    [2, '      { <span class="t-p">"env_type"</span>: <span class="t-s">"user"</span>,      <span class="t-p">"func_name"</span>: <span class="t-s">"turn_airplane_mode_on"</span> },'],
+    [2, '      { <span class="t-p">"env_type"</span>: <span class="t-s">"user"</span>,      <span class="t-p">"func_name"</span>: <span class="t-s">"turn_roaming_off"</span> },'],
+    [2, '      { <span class="t-p">"env_type"</span>: <span class="t-s">"assistant"</span>, <span class="t-p">"func_name"</span>: <span class="t-s">"enable_roaming"</span>,'],
+    [2, '        <span class="t-p">"arguments"</span>: { <span class="t-p">"customer_id"</span>: <span class="t-s">"C1001"</span>, <span class="t-p">"line_id"</span>: <span class="t-s">"L1002"</span> } }'],
+    [2, '  ]},'],
+    [-1, ''],
+    [3, '  <span class="t-c">// 评分标准</span>'],
+    [3, '  <span class="t-p">"evaluation_criteria"</span>: {'],
+    [3, '      <span class="t-p">"actions"</span>: ['],
+    [3, '        { <span class="t-p">"requestor"</span>: <span class="t-s">"user"</span>, <span class="t-p">"name"</span>: <span class="t-s">"toggle_airplane_mode"</span> },'],
+    [3, '        { <span class="t-p">"requestor"</span>: <span class="t-s">"user"</span>, <span class="t-p">"name"</span>: <span class="t-s">"toggle_roaming"</span> }'],
+    [3, '      ],'],
+    [3, '      <span class="t-p">"env_assertions"</span>: ['],
+    [3, '        { <span class="t-p">"func_name"</span>: <span class="t-s">"assert_mobile_data_status"</span>, <span class="t-p">"expected_status"</span>: <span class="t-k">true</span> },'],
+    [3, '        { <span class="t-p">"func_name"</span>: <span class="t-s">"assert_internet_speed"</span>,'],
+    [3, '          <span class="t-p">"expected_speed"</span>: <span class="t-n">200</span>, <span class="t-p">"expected_desc"</span>: <span class="t-s">"excellent"</span> }'],
+    [3, '      ],'],
+    [3, '      <span class="t-p">"communicate_info"</span>: <span class="t-k">null</span>,'],
+    [3, '      <span class="t-p">"nl_assertions"</span>: <span class="t-k">null</span>,'],
+    [3, '      <span class="t-p">"reward_basis"</span>: [<span class="t-s">"ENV_ASSERTION"</span>]'],
+    [3, '  }'],
+    [-1, '}'],
+  ],
+  C: [
+    { k: 'ticket', c: '#fbbf24', r: '给 Agent', p: '工单：故障现象（No Service）、客户身份、验收口径（测速 excellent 才算解决）与约束（不换套餐、可充值 2.0 GB）' },
+    { k: 'user_scenario', c: '#22d3ee', r: '给用户模拟器', p: 'known_info 界定用户知道什么；task_instructions 规定情绪、验收口径和事实锚定——模拟器照此扮演用户' },
+    { k: 'initial_state', c: '#34d399', r: '给环境', p: 'initialization_actions 把两侧状态重置到同一起点：用户侧开飞行模式、关漫游；运营商侧为 L1002 开通漫游' },
+    { k: 'evaluation_criteria', c: '#c084fc', r: '给验证器', p: 'actions 查关键动作、env_assertions 查终态、communicate_info / nl_assertions 查信息告知，reward_basis 决定如何聚合' },
+  ],
+  init(s) {
+    s.querySelector('.c7tk-code').innerHTML = this.L.map(([g, h]) => `<span class="ln" data-g="${g}">${h || ' '}</span>`).join('');
+    s.querySelector('.c7tk-cards').innerHTML = this.C.map((c, i) => `
+      <div class="c7tk-c c7-card fx fx-right" data-i="${i}" style="--d:${4 + i};--c:${c.c}">
+        <div class="c7tk-ch"><em>${i + 1}</em><code>${c.k}</code><span>${c.r}</span></div>
+        <p>${c.p}</p><div class="runbar" style="--c:${c.c};--dur:4.6s"><i></i></div>
+      </div>`).join('');
+    s.querySelectorAll('.c7tk-c').forEach((c) => c.addEventListener('click', () => { this.auto = false; this.show(s, +c.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    const lines = [...s.querySelectorAll('.c7tk-code .ln')], code = s.querySelector('.c7tk-code');
+    lines.forEach((l) => { const on = +l.dataset.g === i; l.classList.toggle('hl', on); });
+    s.querySelectorAll('.c7tk-c').forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+    const first = lines.find((l) => +l.dataset.g === i), last = [...lines].reverse().find((l) => +l.dataset.g === i);
+    const view = s.querySelector('.c7tk-view').clientHeight;
+    const mid = (first.offsetTop + last.offsetTop + last.offsetHeight) / 2;
+    const max = code.scrollHeight - view;
+    code.style.transform = `translateY(${-Math.max(0, Math.min(max, mid - view / 2))}px)`;
+    const rb = s.querySelectorAll('.c7tk-c .runbar')[i];
+    rb.classList.remove('run');
+    if (this.auto) { void rb.offsetWidth; rb.classList.add('run'); }
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 4, 4800, (i) => this.show(s, i), 900); },
+  reset(s) {
+    this.i = null;
+    s.querySelector('.c7tk-code').style.transform = '';
+    s.querySelectorAll('.c7tk-code .ln').forEach((l) => l.classList.remove('hl'));
+    s.querySelectorAll('.c7tk-c').forEach((c) => c.classList.remove('on', 'dim'));
+    s.querySelectorAll('.c7tk-c .runbar').forEach((r) => r.classList.remove('run'));
+  },
+};
+</script>
+
+<section class="slide" id="c07-sim" data-part="1" data-steps="1" data-trans="flip" data-title="用户模拟器：认知边界与事实锚定" data-notes="这段定义中有四处设计值得说明，本页讲前两处。<br><b>显式建模用户的认知边界。</b>known_info 仅包含姓名、号码与所在国家三项信息。飞行模式开启、数据漫游关闭这两项真正的故障原因不在其中——用户并不知情，因而无法主动陈述，Agent 只能通过提问和引导用户查询来获取。这就是<b>渐进式信息透露（Progressive Information Disclosure）</b>在任务定义层面的实现方式：它并非依靠一句“不要一次说完”的提示词去约束模拟器，而是将用户的知识范围建模为一个独立字段。多数基准在任务开始时即给出完整需求，而真实用户的初始表述往往只是“我上不了网”。将需求澄清到可执行的程度，本身就是 Agent 必须具备的能力之一。<br><b>防止用户模拟器被 Agent 忽悠。</b>task_instructions 包含三类约束：情绪设定（首次修复失败后应表现出轻度不满）、验收口径（仅当测速结果为 excellent 时才认定问题解决，poor、fair、good 均不接受），以及<b>事实锚定（Grounding）</b>要求，即关于设备状态的任何回答都必须以工具返回结果为依据。缺少事实锚定约束时，模拟用户会顺应 Agent 的引导确认问题已解决，评估随之退化为两个模型之间的相互确认。<br>按 → 进入第二个演示；右侧开关可以手动切换事实锚定。对话为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">用户模拟器的两处设计：<em>认知边界</em>与<em>事实锚定</em></h2></header>
+  <div class="c7sm-body">
+    <div class="c7sm-l panel fx fx-left" style="--d:2">
+      <div class="c7sm-h"><em>1</em><b>显式建模用户的认知边界</b></div>
+      <div class="c7sm-know">
+        <div class="c7sm-kl"><svg class="ic"><use href="#i-user"/></svg>known_info · 用户知道的</div>
+        <div class="c7sm-chips"><span>John Smith</span><span>555-123-2002</span><span>人在法国</span></div>
+      </div>
+      <div class="c7sm-fog">
+        <div class="c7sm-kl"><svg class="ic"><use href="#i-eyeoff"/></svg>真正的故障原因 · 用户并不知情</div>
+        <div class="c7sm-hid"><span data-h="0">飞行模式：开启</span><span data-h="1">数据漫游：关闭</span></div>
+      </div>
+      <div class="c7sm-chat"></div>
+      <p class="c7sm-cap">渐进式信息透露（Progressive Information Disclosure）：不靠一句“不要一次说完”的提示词，而是把用户的知识范围<b>建模为一个独立字段</b></p>
+    </div>
+    <div class="c7sm-r panel fx fx-right" data-step="1">
+      <div class="c7sm-in">
+        <div class="c7sm-h"><em>2</em><b>防止用户模拟器被 Agent 忽悠</b><button class="tgl c7sm-tg" style="--tc:var(--ok)"><i></i>事实锚定</button></div>
+        <div class="c7sm-cons"><span><svg class="ic"><use href="#i-wave"/></svg>情绪设定<small>首次修复失败后轻度不满</small></span><span><svg class="ic"><use href="#i-target"/></svg>验收口径<small>只有 excellent 算解决</small></span><span class="g"><svg class="ic"><use href="#i-pin"/></svg>事实锚定（Grounding）<small>设备状态以工具返回为准</small></span></div>
+        <div class="c7sm-chat2"></div>
+        <div class="c7sm-stamp stamp"></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「任务定义的四个组成部分」设计一、二 · 对话为示意</div>
+</section>
+<style>
+.c7sm-body{display:flex;gap:26px;height:670px}
+.c7sm-l,.c7sm-r{flex:1;padding:22px 26px;display:flex;flex-direction:column;gap:14px}
+.c7sm-in{display:flex;flex-direction:column;gap:14px;height:100%}
+.c7sm-h{display:flex;align-items:center;gap:12px}
+.c7sm-h em{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font:800 18px var(--num);font-style:normal;color:#06101f;background:var(--acc)}
+.c7sm-h b{font-size:24px}
+.c7sm-h .tgl{margin-left:auto}
+.c7sm-know,.c7sm-fog{padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7sm-know{background:color-mix(in srgb,var(--tool) 8%,transparent);border-color:color-mix(in srgb,var(--tool) 35%,transparent)}
+.c7sm-fog{background:rgba(255,255,255,.02);border-style:dashed}
+.c7sm-kl{display:flex;align-items:center;gap:8px;font-size:17px;color:var(--text2);margin-bottom:10px}
+.c7sm-kl .ic{color:var(--acc)}
+.c7sm-chips,.c7sm-hid{display:flex;gap:10px;flex-wrap:wrap}
+.c7sm-chips span{padding:7px 14px;border-radius:10px;font-size:18px;background:color-mix(in srgb,var(--tool) 14%,transparent);color:var(--text)}
+.c7sm-hid span{padding:7px 14px;border-radius:10px;font-size:18px;color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);filter:blur(7px);opacity:.55;transition:filter .8s,opacity .8s}
+.c7sm-hid span.on{filter:none;opacity:1;box-shadow:0 0 18px color-mix(in srgb,var(--bad) 40%,transparent)}
+.c7sm-chat,.c7sm-chat2{flex:1;display:flex;flex-direction:column;gap:9px;min-height:0}
+.c7sm-m{display:flex;gap:10px;align-items:flex-start;font-size:18px;line-height:1.5;animation:upIn .5s var(--spring) both}
+.c7sm-m b{flex:none;min-width:66px;font:600 15px/1.9 var(--mono);color:var(--c)}
+.c7sm-m span{padding:8px 13px;border-radius:12px;background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.c7sm-m.tool span{font:16px/1.5 var(--mono)}
+.c7sm-cap{font-size:18px;line-height:1.6;color:var(--text2);padding:12px 16px;border-radius:12px;background:color-mix(in srgb,var(--acc) 8%,transparent);border-left:3px solid var(--acc)}
+.c7sm-cap b{color:var(--acc)}
+.c7sm-cons{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c7sm-cons span{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;font-size:18px;font-weight:600;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.c7sm-cons span .ic{font-size:22px;color:var(--acc)}
+.c7sm-cons small{font-size:15px;font-weight:400;color:var(--text3)}
+.c7sm-cons span.g{transition:all .4s}
+#c07-sim[data-g="1"] .c7sm-cons span.g{border-color:color-mix(in srgb,var(--ok) 60%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c07-sim[data-g="0"] .c7sm-cons span.g{opacity:.35;text-decoration:line-through}
+.c7sm-stamp{align-self:center;padding:10px 22px;border-radius:12px;font-size:22px;font-weight:800;border:3px solid currentColor}
+.c7sm-stamp.bad{color:var(--bad)}.c7sm-stamp.ok{color:var(--ok)}
+</style>
+<script>
+HOOKS['c07-sim'] = {
+  A: [
+    ['u', '用户', '我上不了网。'],
+    ['a', 'Agent', '能请您看一下手机状态栏显示什么吗？'],
+    ['t', '用户→工具', 'check_status_bar() → Airplane Mode', 0],
+    ['a', 'Agent', '再请查一下：数据漫游是否开启？'],
+    ['t', '用户→工具', 'check_network_status() → Data Roaming Enabled: No', 1],
+  ],
+  COL: { u: 'var(--tool)', a: 'var(--llm)', t: 'var(--env)' },
+  init(s) {
+    this.tg = s.querySelector('.c7sm-tg');
+    this.tg.addEventListener('click', () => { this.manual = true; this.ground(s, !this.g); });
+  },
+  msg(host, [r, who, tx], cls = '') {
+    host.insertAdjacentHTML('beforeend', `<div class="c7sm-m ${r === 't' ? 'tool' : ''} ${cls}" style="--c:${this.COL[r]}"><b>${who}</b><span>${tx}</span></div>`);
+  },
+  // 演示一：已知信息之外的故障原因，只能靠提问和引导用户查询逐步透露
+  async know(s) {
+    const tk = (this.tk1 = (this.tk1 || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk1;
+    const chat = s.querySelector('.c7sm-chat'), hid = [...s.querySelectorAll('.c7sm-hid span')];
+    chat.innerHTML = '';
+    hid.forEach((h) => h.classList.remove('on'));
+    await U.wait(ctx, 700);
+    for (const m of this.A) {
+      if (!ok()) return;
+      this.msg(chat, m);
+      if (m[3] != null) hid[m[3]].classList.add('on');
+      await U.wait(ctx, m[0] === 't' ? 1500 : 1100);
+    }
+    await U.wait(ctx, 3600);
+    if (ok()) this.know(s);
+  },
+  // 演示二：事实锚定开 / 关两种情况下，模拟用户如何回应 Agent 的诱导
+  async ground(s, on) {
+    this.g = on;
+    s.dataset.g = on ? 1 : 0;
+    this.tg.classList.toggle('on', on);
+    const tk = (this.tk2 = (this.tk2 || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk2;
+    if (!ctx) return;
+    const chat = s.querySelector('.c7sm-chat2'), st = s.querySelector('.c7sm-stamp');
+    chat.innerHTML = '';
+    st.classList.remove('on', 'bad', 'ok');
+    st.textContent = '';
+    const seq = on
+      ? [['a', 'Agent', '我已经帮您处理好了，现在网速应该很快了吧？'], ['t', '用户→工具', 'run_speed_test() → Speed: Good'], ['u', '用户', '测速只是 good，不是 excellent，问题没有解决。（有点失望）']]
+      : [['a', 'Agent', '我已经帮您处理好了，现在网速应该很快了吧？'], ['u', '用户', '是的，看起来好了，谢谢！']];
+    await U.wait(ctx, 500);
+    for (const m of seq) {
+      if (!ok()) return;
+      this.msg(chat, m);
+      await U.wait(ctx, 1200);
+    }
+    if (!ok()) return;
+    st.textContent = on ? '以工具返回为依据：验收真实生效' : '评估退化为两个模型的相互确认';
+    st.classList.add(on ? 'ok' : 'bad');
+    U.restart(st, 'on');
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.manual = false;
+    this.know(s);
+    if (k >= 1) this.startG(s, ctx);
+  },
+  step(s, ctx, k) { if (k >= 1 && !this.gOn) this.startG(s, ctx); },
+  startG(s, ctx) {
+    this.gOn = true;
+    this.ground(s, false);
+    ctx.every(() => { if (!this.manual) this.ground(s, !this.g); }, 6200);
+  },
+  leave() { this.ctx = null; this.gOn = false; },
+  reset(s) {
+    this.tk1 = (this.tk1 || 0) + 1; this.tk2 = (this.tk2 || 0) + 1; this.gOn = false;
+    s.querySelector('.c7sm-chat').innerHTML = ''; s.querySelector('.c7sm-chat2').innerHTML = '';
+    s.querySelectorAll('.c7sm-hid span').forEach((h) => h.classList.remove('on'));
+    s.querySelector('.c7sm-stamp').classList.remove('on', 'bad', 'ok');
+    this.tg.classList.remove('on'); delete s.dataset.g;
+  },
+};
+</script>
+
+<section class="slide" id="c07-dual" data-part="1" data-steps="3" data-trans="rise" data-title="实验 7-1：双控环境与分层验证" data-notes="本页对应<b>实验 7-1 ★：运行 τ²-bench 并对比 τ-bench 的演进</b>与<b>图7-3</b>，也讲完任务定义里的后两处设计。<br><b>模拟用户和 Agent 都不具备完全信息。</b>飞行模式与漫游开关属于用户侧，运营商侧的 enable_roaming 属于 Agent 侧。这一划分决定了故障的形态——运营商侧漫游已开通，用户设备侧却处于关闭状态，Agent 查询数据库只能得到“配置正常”的结论。故障位于数据库不可见的一侧，只有引导用户查询才能发现。<br>双控环境还给验证增加了一个维度：用户执行 toggle_roaming 后环境已改变，Agent 必须重新调用工具才能获知结果，验证因此覆盖“是否读到了用户侧的操作结果”。<br><b>多个维度的过程和结果校验。</b>env_assertions 检验终态（移动数据可用、测速达 200 Mbps 以上且评级为 excellent），actions 检验关键动作是否发生（本题要求 requestor 为 user），communicate_info 与 nl_assertions 检验必要信息是否已告知用户。每个任务可以检查四个维度中一个或多个维度的结果；本题 reward_basis = [ENV_ASSERTION]，仅采信第一层，其余各层照常记录但不计入奖励。<br>实验 7-1 通过运行 τ²-bench 理解人机交互型评估环境的设计要点：先按本节路径通读任务定义文件（已知信息、任务指令、初始状态与成功条件），再运行完整评估流程，观察用户模拟器与 Agent 的多轮对话，分析典型失败模式（政策违规、信息遗漏、过度转接人工等）。按 → 逐步高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="c7-exp">实验 7-1 <span class="c7-star">★</span></span> 双控环境与<em>分层验证</em></h2></header>
+  <div class="c7du-body">
+    <div class="c7du-stage fx fx-scale" style="--d:2">
+      <div class="c7du-box us" data-z="1"><b><svg class="ic"><use href="#i-user"/></svg>用户模拟器（LLM）</b><p>known_info：John Smith / 555-123-2002 / 在法国</p><p>task_instructions：渐进透露 · 情绪 · 事实锚定</p><p>验收口径：仅 excellent 算解决</p></div>
+      <div class="c7du-box ag" data-z="1"><b><svg class="ic"><use href="#i-robot"/></svg>Agent（待评估）</b><p>输入：工单 + 领域政策</p><p class="c7du-blind"><svg class="ic"><use href="#i-eyeoff"/></svg>不可见：用户设备的真实状态</p><p>只能引导用户操作，无法代其执行</p></div>
+      <div class="c7du-talk">多轮对话 · 渐进式信息透露</div>
+      <div class="c7du-env"><span class="c7du-et">共享环境（双控：两侧都能改写状态）</span>
+        <div class="c7du-half dev"><b>设备侧状态</b><div class="c7du-st"><span class="c7du-sw on" data-s="air">飞行模式 ON</span><span class="c7du-sw bad" data-s="roam">数据漫游 OFF</span><span class="c7du-sw">省流模式</span><span class="c7du-sw">剩余流量</span></div><small>用户工具：toggle_airplane_mode / toggle_roaming / check_status_bar / run_speed_test</small></div>
+        <div class="c7du-half db"><b>运营商侧数据库</b><div class="c7du-st"><span class="c7du-sw">客户 C1001</span><span class="c7du-sw">线路 L1001 / L1002 / L1003</span><span class="c7du-sw ok" data-s="dbr">L1002 漫游：已开通</span></div><small>Agent 工具：get_customer_by_phone / get_data_usage / enable_roaming / refuel_data</small></div>
+      </div>
+      <div class="c7du-say"></div>
+      <div class="c7du-chk"><span class="c7du-ct">任务结束后：四层检查 + 聚合规则</span>
+        <div class="c7du-c on1" data-c="0"><b>env_assertions</b><small>移动数据可用；测速 ≥ 200 / excellent</small></div>
+        <div class="c7du-c" data-c="1"><b>actions</b><small>toggle_airplane_mode；requestor 必须为 user</small></div>
+        <div class="c7du-c" data-c="2"><b>communicate_info</b><small>必要信息是否告知 · 本题为 null</small></div>
+        <div class="c7du-c" data-c="3"><b>nl_assertions</b><small>自然语言层判定 · 本题为 null</small></div>
+        <div class="c7du-rb">reward_basis = ["ENV_ASSERTION"] → 仅采信第一层；其余各层照常记录但不计入奖励</div>
+      </div>
+      <svg class="c7du-svg" viewBox="0 0 1100 640" width="1100" height="640">
+        <path class="c7du-p tk" d="M440 92 H660"/><path class="c7du-p tk2" d="M660 138 H440"/>
+        <path class="c7du-p us" d="M215 214 V282"/><path class="c7du-p ag" d="M885 214 V282"/>
+        <circle class="c7du-k k1" r="9"/><circle class="c7du-k k2" r="9"/><circle class="c7du-k k3" r="9"/><circle class="c7du-k k4" r="9"/>
+      </svg>
+    </div>
+    <div class="c7du-side">
+      <div class="c7du-exp c7-card fx fx-right" style="--d:3">
+        <b>实验要做什么</b>
+        <ol><li>按本节路径通读任务定义文件：已知信息、任务指令、初始状态与成功条件</li><li>运行完整评估流程，观察用户模拟器与 Agent 的多轮对话</li><li>分析典型失败模式</li></ol>
+        <div class="c7du-fail"><span>政策违规</span><span>信息遗漏</span><span>过度转接人工</span></div>
+      </div>
+      <div class="c7du-steps fx fx-right" style="--d:4">
+        <div class="c7du-sp" data-k="1"><em>1</em>两侧都不具备完全信息</div>
+        <div class="c7du-sp" data-k="2"><em>2</em>双控：用户也能改写环境</div>
+        <div class="c7du-sp" data-k="3"><em>3</em>四层检查 + reward_basis</div>
+      </div>
+      <div class="c7du-run c7-data fx fx-up" style="--d:6">配套运行（chapter7/tau2-bench-eval，2026-08-02）：telecom 5 题各跑 1 次，<b>通过 4 题，Pass@1 = 0.80</b>；客服 Agent 与用户模拟器均为 gpt-4.1-mini，提供商计费合计约 $0.151</div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「任务定义的四个组成部分」设计三、四 ·「一次真实运行的轨迹」实验 7-1 · 图7-3</div>
+</section>
+<style>
+.c7du-body{display:flex;gap:26px}
+.c7du-stage{position:relative;width:1100px;height:640px;flex:none}
+.c7du-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.c7du-box{position:absolute;top:0;width:440px;height:214px;padding:16px 20px;border-radius:18px;background:rgba(12,18,40,.88);border:2px solid var(--line2);transition:all .5s var(--ease)}
+.c7du-box.us{left:0;--c:var(--tool);border-color:color-mix(in srgb,var(--tool) 50%,transparent)}
+.c7du-box.ag{left:660px;--c:var(--llm);border-color:color-mix(in srgb,var(--llm) 50%,transparent)}
+.c7du-box b{display:flex;align-items:center;gap:10px;font-size:22px;color:var(--c);margin-bottom:8px}
+.c7du-box p{font-size:17px;line-height:1.5;color:var(--text2);margin-top:5px}
+.c7du-blind{display:flex;align-items:center;gap:8px;transition:all .5s}
+#c07-dual[data-k="1"] .c7du-blind{color:var(--bad);font-weight:700}
+.c7du-talk{position:absolute;left:440px;width:220px;top:100px;text-align:center;font-size:16px;color:var(--text3)}
+.c7du-env{position:absolute;left:0;top:282px;width:1100px;height:176px;padding:38px 16px 12px;border-radius:20px;border:2px solid color-mix(in srgb,var(--env) 45%,transparent);background:color-mix(in srgb,var(--env) 5%,rgba(10,16,36,.6));display:flex;gap:16px}
+.c7du-et{position:absolute;left:20px;top:10px;font-size:17px;font-weight:700;color:var(--env)}
+.c7du-half{flex:1;padding:10px 14px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);display:flex;flex-direction:column;gap:8px;transition:all .5s}
+.c7du-half b{font-size:18px}
+.c7du-half small{font:15px/1.4 var(--mono);color:var(--text3)}
+.c7du-st{display:flex;gap:8px;flex-wrap:wrap}
+.c7du-sw{padding:4px 10px;border-radius:8px;font-size:16px;color:var(--text2);background:rgba(255,255,255,.05);border:1px solid var(--line);transition:all .5s}
+.c7du-sw.on{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+.c7du-sw.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.c7du-sw.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.c7du-sw.flip{animation:shake .5s}
+.c7du-say{position:absolute;left:0;right:0;top:466px;height:34px;text-align:center;font-size:18px;color:var(--acc);opacity:0;transition:opacity .5s}
+.c7du-say.on{opacity:1}
+.c7du-chk{position:absolute;left:0;top:506px;width:1100px;height:134px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px;align-content:end}
+.c7du-ct{position:absolute;left:4px;top:0;font-size:16px;color:var(--text3)}
+.c7du-c{padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .5s}
+.c7du-c b{display:block;font:700 16px var(--mono);color:var(--text)}
+.c7du-c small{font-size:15px;color:var(--text3)}
+.c7du-rb{grid-column:1/-1;font:15px var(--mono);color:var(--text2);padding:6px 10px;border-radius:10px;background:rgba(255,255,255,.03);transition:all .5s}
+#c07-dual[data-k="3"] .c7du-c[data-c="0"]{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--ok) 30%,transparent)}
+#c07-dual[data-k="3"] .c7du-c:not([data-c="0"]){opacity:.55}
+#c07-dual[data-k="3"] .c7du-rb{color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+#c07-dual[data-k="1"] .c7du-half.db,#c07-dual[data-k="2"] .c7du-half.dev{border-color:var(--acc);box-shadow:0 0 24px -4px var(--acc)}
+#c07-dual[data-k="2"] .c7du-box.us{box-shadow:0 0 30px -6px var(--tool)}
+.c7du-p{fill:none;stroke-width:3;stroke-dasharray:6 8;animation:flow 1s linear infinite;opacity:.6}
+.c7du-p.tk{stroke:var(--tool)}.c7du-p.tk2{stroke:var(--llm)}.c7du-p.us{stroke:var(--tool)}.c7du-p.ag{stroke:var(--llm)}
+.c7du-k{opacity:0}
+.c7du-k.k1,.c7du-k.k3{fill:var(--tool);filter:drop-shadow(0 0 8px var(--tool))}
+.c7du-k.k2,.c7du-k.k4{fill:var(--llm);filter:drop-shadow(0 0 8px var(--llm))}
+.c7du-side{flex:1;display:flex;flex-direction:column;gap:16px}
+.c7du-exp{padding:18px 20px}
+.c7du-exp>b{font-size:21px;color:var(--acc)}
+.c7du-exp ol{margin-top:10px;display:flex;flex-direction:column;gap:8px;counter-reset:c}
+.c7du-exp li{position:relative;padding-left:30px;font-size:17px;line-height:1.5;color:var(--text2);counter-increment:c}
+.c7du-exp li::before{content:counter(c);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font:700 14px var(--num);color:#06101f;background:var(--acc)}
+.c7du-fail{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.c7du-fail span{padding:5px 12px;border-radius:999px;font-size:16px;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.c7du-steps{display:flex;flex-direction:column;gap:8px}
+.c7du-sp{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;font-size:18px;color:var(--text3);border:1px solid var(--line);transition:all .45s}
+.c7du-sp em{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 15px var(--num);font-style:normal;border:2px solid var(--line2)}
+#c07-dual[data-k="1"] .c7du-sp[data-k="1"],#c07-dual[data-k="2"] .c7du-sp[data-k="2"],#c07-dual[data-k="3"] .c7du-sp[data-k="3"]{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c07-dual[data-k="1"] .c7du-sp[data-k="1"] em,#c07-dual[data-k="2"] .c7du-sp[data-k="2"] em,#c07-dual[data-k="3"] .c7du-sp[data-k="3"] em{background:var(--acc);border-color:var(--acc);color:#06101f}
+</style>
+<script>
+HOOKS['c07-dual'] = {
+  SAY: ['', 'Agent 查数据库：L1002 漫游已开通 →“配置正常”；故障却在它看不见的设备侧', '用户执行 toggle_roaming，设备状态被改写；Agent 必须重新调用工具才能读到结果', '四层检查都会记录，但本题只有 env_assertions 计入奖励'],
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.E = { p: [...s.querySelectorAll('.c7du-p')], k: [...s.querySelectorAll('.c7du-k')], roam: q('[data-s=roam]'), air: q('[data-s=air]'), say: q('.c7du-say') };
+  },
+  // 每一步各自的数据包循环
+  async loop(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, E = this.E, ok = () => ctx.alive && tk === this.tk;
+    const [tk1, tk2, pu, pa] = E.p, [k1, k2, k3, k4] = E.k;
+    while (ok()) {
+      const k = this.k;
+      if (k === 2) {
+        await U.fly(k3, pu, 900, { ctx });
+        if (!ok()) return;
+        E.roam.textContent = '数据漫游 ON'; E.roam.classList.remove('bad'); E.roam.classList.add('ok'); U.restart(E.roam, 'flip');
+        await U.wait(ctx, 600);
+        await U.fly(k4, pa, 900, { ctx });
+        if (!ok()) return;
+        await U.wait(ctx, 1400);
+        E.roam.textContent = '数据漫游 OFF'; E.roam.classList.add('bad'); E.roam.classList.remove('ok');
+      } else if (k === 1) {
+        await U.fly(k4, pa, 900, { ctx });
+        if (!ok()) return;
+        await U.wait(ctx, 1600);
+      } else {
+        await U.fly(k1, tk1, 1000, { ctx });
+        if (!ok()) return;
+        await U.fly(k2, tk2, 1000, { ctx });
+      }
+      await U.wait(ctx, 500);
+    }
+  },
+  apply(s, k) {
+    this.k = k;
+    s.dataset.k = k;
+    this.E.say.textContent = this.SAY[k];
+    this.E.say.classList.toggle('on', k > 0);
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, k); ctx.later(() => this.loop(s), 1100); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.k = 0;
+    this.E.roam.textContent = '数据漫游 OFF'; this.E.roam.classList.add('bad'); this.E.roam.classList.remove('ok');
+    this.E.say.classList.remove('on');
+  },
+};
+</script>
+
+<section class="slide" id="c07-replay" data-part="1" data-dur="62000" data-title="一次真实运行的轨迹" data-notes="配套仓库保留了一次运行记录（chapter7/tau2-bench-eval），这里回放其中一条成功的运行。<br>前十余轮为账户识别阶段：Agent 依据号码查得客户 C1001，随后逐一查询 L1001、L1002、L1003 三条线路的流量，又回头询问用户在法国实际使用的号码。第 17 条消息中它给出了一个错误结论：“号码 555-123-2002 不在您的活跃线路中，最接近的是 555-123-2001……”——该结论仅基于 L1001 一条线路的查询结果。用户坚持号码无误后，Agent 继续查询 L1002，方才对应上。<br>关键转折出现在第 30 条：<b>用户</b>调用 check_network_status()、check_status_bar()；<b>工具返回</b>（31）显示 Airplane Mode: ON、Cellular Connection: no_service、Mobile Data Enabled: Yes、Data Roaming Enabled: No；用户（33）说：“我看到手机当前处于飞行模式，因此没有信号……需要我关掉飞行模式试一下吗？”发出工具调用的是<b>用户</b>而非 <b>Agent</b>。这就是<b>双控（Dual-Control）</b>机制：模拟用户拥有一套独立的工具集，如 check_status_bar、toggle_airplane_mode、reseat_sim_card、run_speed_test 等。<br>其后的排查较为顺利：Agent 要求用户关闭飞行模式并开启漫游，用户执行相应操作（35、37），状态栏转为 5G 满格；Agent 要求测速，返回 275 Mbps、评级 Excellent（46），用户确认问题解决。两条 env_assertions 均通过，reward = 1.0。<br>左侧对话是真实记录的中文译述（有删节，编号与原始记录一致）；右侧同步显示环境真实状态与验证结果。可以暂停、单步或重播。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一次真实运行：<em>谁在调用工具？</em></h2></div>
+    <div class="c7-ctl fx fx-up" style="--d:2"><span class="c7rp-pos">消息 <b>0</b> / 49</span><button class="btn c7rp-play"><svg class="ic"><use href="#i-pause"/></svg><span>暂停</span></button><button class="btn c7rp-one"><svg class="ic"><use href="#i-right"/></svg>单步</button><button class="btn c7rp-re"><svg class="ic"><use href="#i-refresh"/></svg>重播</button></div></header>
+  <div class="c7rp-body">
+    <div class="c7rp-win win fx fx-left" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>telecom · airplane_mode_on | user_abroad_roaming_enabled_off · 真实运行记录（译述删节）</span></div>
+      <div class="c7rp-log" data-clip-ok data-ok-overflow></div>
+    </div>
+    <div class="c7rp-side">
+      <div class="c7rp-p c7-card fx fx-right" style="--d:4;--c:var(--env)"><div class="c7rp-ph"><svg class="ic"><use href="#i-mobile"/></svg>设备侧真实状态<small>只有用户能查看和操作</small></div>
+        <div class="c7rp-dev"><span data-d="air">飞行模式 <b>ON</b></span><span data-d="sig">信号 <b>no_service</b></span><span data-d="data">移动数据 <b>Yes</b></span><span data-d="roam">数据漫游 <b>No</b></span><span data-d="spd">测速 <b>—</b></span></div></div>
+      <div class="c7rp-p c7-card fx fx-right" style="--d:5;--c:var(--llm)"><div class="c7rp-ph"><svg class="ic"><use href="#i-db"/></svg>运营商侧查询<small>Agent 的工具</small></div>
+        <div class="c7rp-db"><span data-l="L1001">L1001 · 555-123-2001 · 3.2 / 5.0 GB</span><span data-l="L1002">L1002 · 555-123-2002 · 8.7 / 15.0 GB · 漫游已开通</span><span data-l="L1003">L1003 · 0.0 / 5.0 GB</span></div></div>
+      <div class="c7rp-p c7-card fx fx-right" style="--d:6;--c:var(--ok)"><div class="c7rp-ph"><svg class="ic"><use href="#i-check"/></svg>验证器（结束后）<small>reward_basis = ENV_ASSERTION</small></div>
+        <div class="c7rp-ck"><span data-c="e1">assert_mobile_data_status</span><span data-c="e2">assert_internet_speed ≥ 200 / excellent</span><span data-c="a1" class="rec">action：toggle_airplane_mode（user）</span><span data-c="a2" class="rec">action：toggle_roaming（user）</span></div>
+        <div class="c7rp-rw">reward = <b>?</b></div></div>
+      <div class="c7rp-note"><svg class="ic"><use href="#i-lightbulb"/></svg><span>回放开始：前十余轮是账户识别阶段</span></div>
+    </div>
+  </div>
+  <div class="c7rp-data c7-data">数据：配套仓库 chapter7/tau2-bench-eval 运行记录 exp7-1-openrouter-gpt41mini-telecom-20260802-v1（2026-08-02）；Agent 与用户模拟器均为 gpt-4.1-mini，温度 0，seed 300</div>
+  <div class="src">第七章 ·「一次真实运行的轨迹」· 实验 7-1</div>
+</section>
+<style>
+#c07-replay .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+.c7rp-pos{font-size:17px;color:var(--text3);margin-right:6px}
+.c7rp-pos b{font:800 22px var(--num);color:var(--acc)}
+.c7rp-body{display:flex;gap:24px}
+.c7rp-win{width:1010px;flex:none}
+.c7rp-log{height:600px;overflow:hidden;padding:14px 18px;display:flex;flex-direction:column;gap:9px;scroll-behavior:smooth}
+.c7rp-m{--c:var(--text3);flex:none;display:flex;gap:12px;align-items:flex-start;padding:9px 14px;border-radius:12px;font-size:17px;line-height:1.5;background:color-mix(in srgb,var(--c) 8%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 28%,transparent);animation:upIn .45s var(--spring) both}
+.c7rp-m[data-r=a]{--c:var(--llm)}.c7rp-m[data-r=u]{--c:var(--tool)}.c7rp-m[data-r=t]{--c:var(--env)}
+.c7rp-m .n{flex:none;width:44px;font:700 15px/1.75 var(--num);color:var(--text3)}
+.c7rp-m .r{flex:none;width:58px;font:600 15px/1.75 var(--mono);color:var(--c)}
+.c7rp-m .x{flex:1;min-width:0}
+.c7rp-m code{font:15px/1.6 var(--mono);color:var(--c);word-break:break-all}
+.c7rp-m.hot{box-shadow:0 0 0 2px var(--warn),0 0 26px color-mix(in srgb,var(--warn) 40%,transparent)}
+.c7rp-m.end{--c:var(--ok);font-weight:700}
+.c7rp-side{flex:1;display:flex;flex-direction:column;gap:12px}
+.c7rp-p{padding:12px 16px}
+.c7rp-ph{display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;color:var(--c);margin-bottom:8px}
+.c7rp-ph small{margin-left:auto;font-size:15px;font-weight:400;color:var(--text3)}
+.c7rp-dev,.c7rp-db,.c7rp-ck{display:flex;flex-wrap:wrap;gap:6px}
+.c7rp-dev span,.c7rp-db span,.c7rp-ck span{padding:4px 10px;border-radius:8px;font-size:15px;color:var(--text2);background:rgba(255,255,255,.04);border:1px solid var(--line);transition:all .45s}
+.c7rp-dev b{font-family:var(--mono);color:var(--bad)}
+.c7rp-dev span.fix b{color:var(--ok)}
+.c7rp-dev span.flash,.c7rp-db span.flash{box-shadow:0 0 18px color-mix(in srgb,var(--c) 55%,transparent);border-color:var(--c)}
+.c7rp-db span.q{color:var(--text)}
+.c7rp-db span.wrong{border-color:var(--bad);color:var(--bad)}
+.c7rp-db span.match{border-color:var(--ok);color:var(--ok)}
+.c7rp-ck span.pass{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.c7rp-ck span.rec.pass{opacity:.7}
+.c7rp-rw{margin-top:8px;font:700 18px var(--num);color:var(--text2)}
+.c7rp-rw b{font-size:24px;color:var(--text3)}
+.c7rp-rw.done b{color:var(--ok)}
+.c7rp-note{flex:1;display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55;color:var(--text);background:color-mix(in srgb,var(--warn) 9%,transparent);border:1px solid color-mix(in srgb,var(--warn) 38%,transparent)}
+.c7rp-note .ic{flex:none;margin-top:4px;color:var(--warn)}
+.c7rp-data{margin-top:12px}
+</style>
+<script>
+HOOKS['c07-replay'] = {
+  // [编号, 角色 a=Agent u=用户 t=工具, 文本, 工具调用, 副作用, 解说]
+  M: [
+    ['0', 'a', '您好！有什么可以帮您？'],
+    ['1', 'u', '我的移动数据要么断、要么很慢。我现在在法国，手机上必须有 excellent 的网速。能帮我解决吗？'],
+    ['2', 'a', '为了处理您在法国的移动数据问题，需要先确认账户和正在使用的线路。请提供电话号码，或全名和出生日期。'],
+    ['3', 'u', '我叫 John Smith，号码 555-123-2002。'],
+    ['4', 'a', '', 'get_customer_by_phone("555-123-2002")  +  get_customer_by_name("John Smith")', null, '第 4 条：Agent 一次发出了两个工具调用——而 telecom 政策首段规定 “You should only make one tool call at a time”', 1],
+    ['5–6', 't', '', '{"customer_id": "C1001", "full_name": "John Smith", …}  ·  []'],
+    ['7–8', 'a', '', 'get_data_usage(L1001) → 3.2 / 5.0 GB', { db: 'L1001' }],
+    ['9–10', 'a', '', 'get_data_usage(L1002) → 8.7 / 15.0 GB', { db: 'L1002' }],
+    ['11–12', 'a', '', 'get_data_usage(L1003) → 0.0 / 5.0 GB', { db: 'L1003' }],
+    ['13', 'a', '您的账户下有三条线路。请确认您在法国使用的是哪个号码？'],
+    ['14', 'u', '我在法国用的是 555-123-2002。'],
+    ['15–16', 'a', '', 'get_details_by_id(L1001) → phone_number: 555-123-2001 · roaming_enabled: false', { db: 'L1001' }],
+    ['17', 'a', '号码 555-123-2002 不在您的活跃线路中，最接近的是 555-123-2001……', null, { wrong: 'L1001' }, '第 17 条：错误结论——它只查了 L1001 一条线路的详情', 1],
+    ['18', 'u', '抱歉造成困扰，但我确定在法国用的就是 555-123-2002。能查一下这个号码的激活或漫游设置吗？'],
+    ['19–20', 'a', '', 'get_details_by_id(L1002) → phone_number: 555-123-2002 · roaming_enabled: true', { match: 'L1002' }, '用户坚持号码无误后，Agent 继续查询 L1002，方才对应上'],
+    ['21–28', 'a', '', 'get_customer_by_id(C1001) ×2 · get_data_usage(L1002) ×2（重复查询）'],
+    ['29', 'a', '您的 555-123-2002 线路处于活跃状态且已开通漫游，本周期已用 8.7 / 15 GB。接下来检查手机的网络状态和设置。'],
+    ['30', 'u', '', 'check_network_status()  +  check_status_bar()', null, '第 30 条：发出工具调用的是用户，而不是 Agent——这就是双控（Dual-Control）', 1],
+    ['31–32', 't', '', 'Airplane Mode: ON | Cellular Connection: no_service | Mobile Data Enabled: Yes | Data Roaming Enabled: No', { flash: ['air', 'sig', 'roam'] }],
+    ['33', 'u', '我看到手机当前处于飞行模式，因此没有信号。移动数据是开启的，但数据漫游是关闭的。需要我关掉飞行模式试一下吗？'],
+    ['34', 'a', '是的，请关闭飞行模式；您在国外，关闭后还要打开数据漫游。'],
+    ['35–36', 'u', '', 'toggle_airplane_mode() → Airplane Mode is now OFF · 5G · Excellent', { set: { air: 'OFF', sig: '5G Excellent' }, act: 'a1' }, '第 35、37 条：用户在自己的设备上执行操作，环境状态随之改变'],
+    ['37–38', 'u', '', 'toggle_roaming() → Data Roaming is now ON', { set: { roam: 'Yes' }, act: 'a2' }],
+    ['39', 'u', '我已关闭飞行模式并打开数据漫游，状态栏显示 5G 满格、数据已开启。下一步呢？'],
+    ['40–43', 'a', '', 'get_customer_by_phone(…) · get_data_usage(L1002)（再次确认）'],
+    ['44', 'a', '信号已是 5G 满格，请在手机上跑一次测速，确认网速问题是否解决。'],
+    ['45–46', 'u', '', 'run_speed_test() → Speed Test Result: 275.00 Mbps (Excellent)', { set: { spd: '275 Mbps' } }, '第 46 条：测速 275 Mbps、评级 Excellent', 1],
+    ['47', 'u', '测速结果是 275 Mbps，非常快，问题似乎解决了。谢谢！'],
+    ['48', 'a', '不客气！很高兴您的移动数据恢复了。祝您在法国愉快！'],
+    ['49', 'u', '谢谢！###STOP###', null, { end: 1 }, '用户输出 ###STOP###，正常终止（user_stop）。两条 env_assertions 均通过，reward = 1.0'],
+  ],
+  R: { a: 'Agent', u: '用户', t: '工具' },
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.E = { log: q('.c7rp-log'), pos: q('.c7rp-pos b'), note: q('.c7rp-note span'), play: q('.c7rp-play'), rw: q('.c7rp-rw') };
+    this.E.play.addEventListener('click', () => this.setPlay(!this.playing));
+    q('.c7rp-one').addEventListener('click', () => { this.setPlay(false); this.next(s); });
+    q('.c7rp-re').addEventListener('click', () => { this.restart(s); this.setPlay(true); });
+  },
+  setPlay(v) {
+    this.playing = v;
+    this.E.play.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play');
+    this.E.play.querySelector('span').textContent = v ? '暂停' : '继续';
+    if (v) this.tick();
+  },
+  restart(s) {
+    this.n = 0;
+    this.E.log.innerHTML = '';
+    this.E.pos.textContent = 0;
+    this.E.note.textContent = '回放开始：前十余轮是账户识别阶段';
+    const set = (d, v, bad) => { const e = s.querySelector(`[data-d=${d}]`); e.querySelector('b').textContent = v; e.classList.toggle('fix', !bad); };
+    set('air', 'ON', 1); set('sig', 'no_service', 1); set('data', 'Yes', 0); set('roam', 'No', 1); set('spd', '—', 1);
+    s.querySelectorAll('.c7rp-db span').forEach((e) => e.classList.remove('q', 'wrong', 'match', 'flash'));
+    s.querySelectorAll('.c7rp-ck span').forEach((e) => e.classList.remove('pass'));
+    this.E.rw.classList.remove('done');
+    this.E.rw.querySelector('b').textContent = '?';
+  },
+  // 追加下一条消息并更新右侧面板
+  next(s) {
+    if (this.n >= this.M.length) return false;
+    const [no, r, tx, tc, fx, note, hot] = this.M[this.n++];
+    const log = this.E.log;
+    log.querySelectorAll('.hot').forEach((e) => e.classList.remove('hot'));
+    s.querySelectorAll('.c7rp-dev span.flash,.c7rp-db span.flash').forEach((e) => e.classList.remove('flash'));
+    const body = (tx ? `<span>${tx}</span>` : '') + (tc ? `<code>${tc.replace(/</g, '&lt;')}</code>` : '');
+    log.insertAdjacentHTML('beforeend', `<div class="c7rp-m${hot ? ' hot' : ''}${fx && fx.end ? ' end' : ''}" data-r="${r}"><span class="n">#${no}</span><span class="r">${this.R[r]}${tc ? ' →' : ''}</span><span class="x">${body}</span></div>`);
+    log.scrollTop = log.scrollHeight;
+    this.E.pos.textContent = no.split('–').pop();
+    if (note) this.E.note.textContent = note;
+    if (fx) {
+      if (fx.db) { const e = s.querySelector(`[data-l=${fx.db}]`); e.classList.add('q'); U.restart(e, 'flash'); }
+      if (fx.wrong) s.querySelector(`[data-l=${fx.wrong}]`).classList.add('wrong');
+      if (fx.match) { const e = s.querySelector(`[data-l=${fx.match}]`); e.classList.add('q', 'match'); U.restart(e, 'flash'); }
+      if (fx.flash) fx.flash.forEach((d) => U.restart(s.querySelector(`[data-d=${d}]`), 'flash'));
+      if (fx.set) Object.entries(fx.set).forEach(([d, v]) => { const e = s.querySelector(`[data-d=${d}]`); e.querySelector('b').textContent = v; e.classList.add('fix'); U.restart(e, 'flash'); });
+      if (fx.act) s.querySelector(`[data-c=${fx.act}]`).classList.add('pass');
+      if (fx.end) {
+        ['e1', 'e2'].forEach((c) => s.querySelector(`[data-c=${c}]`).classList.add('pass'));
+        this.E.rw.classList.add('done');
+        this.E.rw.querySelector('b').textContent = '1.0';
+      }
+    }
+    return note ? (hot ? 2600 : 1900) : r === 't' ? 1150 : 1250;
+  },
+  tick() {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, s = this.s;
+    const go = () => {
+      if (!ctx || !ctx.alive || tk !== this.tk || !this.playing) return;
+      const ms = this.next(s);
+      if (ms === false) { ctx.later(() => { if (tk === this.tk && this.playing) { this.restart(s); go(); } }, 6000); return; }
+      ctx.later(go, ms);
+    };
+    go();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.s = s;
+    this.restart(s);
+    this.playing = true;
+    this.E.play.querySelector('use').setAttribute('href', '#i-pause');
+    this.E.play.querySelector('span').textContent = '暂停';
+    ctx.later(() => this.tick(), 1200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.restart(s); },
+};
+</script>
+
+<section class="slide" id="c07-flaw" data-part="1" data-steps="2" data-trans="zoom" data-title="满分里的漏洞，失败里的线索" data-notes="这条满分轨迹中还包含一处未被验证器捕获的问题。telecom 的 Agent 政策首段即规定 “You should only make one tool call at a time”，而第 4 条消息中 Agent 一次发出了 get_customer_by_phone 与 get_customer_by_name 两个调用。验证器没有因此判定出错，原因在于本题的 reward_basis 只考虑最终状态。这并非 τ²-bench 的疏漏，而是二元奖励的固有代价：它以过程颗粒度换取跨模型可比的单一数字。但生产环境中的评估系统往往需要更多：不仅要判定对错，还要指出问题出在哪里。<br>失败的那条任务同样具有分析价值（配套仓库记录，71 条消息）。用户号码为 555-123-2002，Agent 却选定 L1001 线路，并以其 3.2/5 GB 的用量为依据继续推进。期间 get_details_by_id(L1001) 明确返回该线路号码为 555-123-2001，Agent 读取了这一结果却未修正判断，此后在无关排查上消耗数十条消息，最终转接人工。它实际完成了任务的一半——引导用户关闭了省流模式，该用户侧动作真实发生并被环境验证；但线路选择错误导致所需的 2 GB 流量充值未执行，三条终态断言全部失败。这一失败形态与后文“失败归因”一节讨论的 AndroidWorld 案例高度相似：修正判断所需的证据已进入上下文，Agent 未据此回溯。<br>这条任务已经把一个评估集必须回答的问题摆全了：什么算成功、任务从何而来、由谁验证、分数如何转化为决策。以下几部分依次展开。按 → 逐步展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">满分里的漏洞，<em>失败里的线索</em></h2></header>
+  <div class="c7fl-body">
+    <div class="c7fl-l panel fx fx-left" style="--d:2">
+      <div class="c7fl-h"><span class="badge" style="--c:var(--ok)">reward = 1.0</span><b>满分轨迹里未被捕获的问题</b></div>
+      <div class="c7fl-pol"><small>telecom Agent 政策 · 首段</small><code>“You should only make one tool call at a time”</code></div>
+      <div class="c7fl-m"><span class="n">#4</span><code>get_customer_by_phone(…)</code><code>get_customer_by_name(…)</code><span class="c7fl-x">一轮两个调用</span></div>
+      <div class="c7fl-gate">
+        <div class="c7fl-g ok"><b>终态</b><span>env_assertions 2/2 通过</span><em>计入奖励</em></div>
+        <div class="c7fl-g off"><b>过程</b><span>一次一个工具的政策被违反</span><em>reward_basis 不考虑</em></div>
+      </div>
+      <p class="c7fl-cap">这并非 τ²-bench 的疏漏，而是<b>二元奖励的固有代价</b>：以过程颗粒度换取跨模型可比的单一数字。生产评估往往需要更多——不仅判定对错，还要指出问题出在哪里。</p>
+    </div>
+    <div class="c7fl-r panel fx fx-right" data-step="1">
+      <div class="c7fl-in">
+        <div class="c7fl-h"><span class="badge" style="--c:var(--bad)">reward = 0.0</span><b>失败的那条任务 · 71 条消息</b></div>
+        <div class="c7fl-tl"></div>
+        <div class="c7fl-res"><span class="ok">toggle_data_saver_mode ✓</span><span class="bad">refuel_data(L1002, 2.0 GB) ✗</span><span class="bad">3 条终态断言 ✗</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline c7fl-tag fx fx-up" data-step="2">修正判断所需的证据<b>已进入上下文</b>，Agent 却未据此回溯——这条任务把评估集必须回答的问题摆全了：<b>什么算成功、任务从何而来、由谁验证、分数如何转化为决策</b></p>
+  <div class="src">第七章 ·「一次真实运行的轨迹」· 数据：配套仓库 chapter7/tau2-bench-eval（2026-08-02）</div>
+</section>
+<style>
+.c7fl-body{display:flex;gap:26px;height:600px}
+.c7fl-l{width:700px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.c7fl-r{flex:1;padding:22px 26px}
+.c7fl-in{display:flex;flex-direction:column;gap:12px;height:100%}
+.c7fl-h{display:flex;align-items:center;gap:14px}
+.c7fl-h b{font-size:22px}
+.c7fl-pol{padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.c7fl-pol small{display:block;font-size:15px;color:var(--text3);margin-bottom:4px}
+.c7fl-pol code{font:17px var(--mono);color:var(--har)}
+.c7fl-m{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:color-mix(in srgb,var(--llm) 9%,transparent);border:1px solid color-mix(in srgb,var(--llm) 35%,transparent)}
+.c7fl-m .n{font:700 16px var(--num);color:var(--text3)}
+.c7fl-m code{font:16px var(--mono);color:var(--llm);padding:3px 8px;border-radius:6px;background:rgba(0,0,0,.25)}
+.c7fl-x{margin-left:auto;font-size:16px;font-weight:700;color:var(--bad)}
+.c7fl-gate{display:flex;flex-direction:column;gap:10px}
+.c7fl-g{display:grid;grid-template-columns:70px 1fr auto;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--line)}
+.c7fl-g b{font-size:19px}
+.c7fl-g span{font-size:17px;color:var(--text2)}
+.c7fl-g em{font-style:normal;font-size:15px;padding:3px 10px;border-radius:999px}
+.c7fl-g.ok{border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.c7fl-g.ok em{color:#06101f;background:var(--ok)}
+.c7fl-g.off{border-style:dashed}
+.c7fl-g.off em{color:var(--text3);border:1px dashed var(--line2)}
+.c7fl-cap{margin-top:auto;font-size:18px;line-height:1.65;color:var(--text2)}
+.c7fl-cap b{color:var(--acc)}
+.c7fl-tl{flex:1;display:flex;flex-direction:column;gap:8px;position:relative;padding-left:20px}
+.c7fl-tl::before{content:"";position:absolute;left:6px;top:8px;bottom:8px;width:2px;background:var(--line2)}
+.c7fl-e{--c:var(--text3);position:relative;display:flex;gap:12px;align-items:baseline;font-size:17px;line-height:1.5;opacity:0;transform:translateX(16px);transition:all .5s var(--ease)}
+.c7fl-e.on{opacity:1;transform:none}
+.c7fl-e::before{content:"";position:absolute;left:-19px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+.c7fl-e .n{flex:none;width:62px;font:700 15px var(--num);color:var(--text3)}
+.c7fl-e .t{color:var(--text2)}
+.c7fl-e .t code{font:15px var(--mono);color:var(--text)}
+.c7fl-e.ev{--c:var(--warn)}.c7fl-e.ev .t{color:var(--text)}
+.c7fl-e.bad{--c:var(--bad)}.c7fl-e.ok{--c:var(--ok)}
+.c7fl-e .tg{flex:none;margin-left:auto;font-size:15px;font-weight:700;color:var(--c)}
+.c7fl-res{display:flex;gap:8px;flex-wrap:wrap;opacity:0;transition:opacity .6s}
+.c7fl-res.on{opacity:1}
+.c7fl-res span{padding:6px 12px;border-radius:10px;font:15px var(--mono)}
+.c7fl-res .ok{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent)}
+.c7fl-res .bad{color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 50%,transparent)}
+.c7fl-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c07-flaw'] = {
+  T: [
+    ['#3', '', '用户：我叫 John Smith，号码 <code>555-123-2002</code>'],
+    ['#6', 'bad', '同样一次发出两个客户查询调用', '政策违规'],
+    ['#11–12', 'bad', '<code>get_data_usage(L1001)</code> → 3.2 / 5 GB', '选错线路'],
+    ['#13–14', 'ev', '<code>get_details_by_id(L1001)</code> → phone_number: <code>555-123-2001</code>', '证据已进上下文'],
+    ['#15', 'bad', 'Agent：“您的 555-123-2002 线路……已用 3.2 GB / 5 GB”', '读到却未修正'],
+    ['#21–22', 'ok', '用户执行 <code>toggle_data_saver_mode()</code>，省流模式关闭', '用户侧动作被验证'],
+    ['#26', '', '测速：Speed test failed: No Connection'],
+    ['#28–66', '', 'APN、重启、网络模式、VPN、Wi-Fi Calling、数据限制……无关排查耗掉数十条消息'],
+    ['#67', 'bad', '<code>transfer_to_human_agents()</code> → 转接人工', '过度转接'],
+  ],
+  init(s) {
+    s.querySelector('.c7fl-tl').innerHTML = this.T.map(([n, c, t, tg]) => `<div class="c7fl-e ${c}"><span class="n">${n}</span><span class="t">${t}</span>${tg ? `<span class="tg">${tg}</span>` : ''}</div>`).join('');
+  },
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, es = [...s.querySelectorAll('.c7fl-e')], res = s.querySelector('.c7fl-res');
+    es.forEach((e) => e.classList.remove('on'));
+    res.classList.remove('on');
+    es.forEach((e, i) => ctx.later(() => { if (tk === this.tk) e.classList.add('on'); }, 400 + i * 650));
+    ctx.later(() => { if (tk === this.tk) res.classList.add('on'); }, 400 + es.length * 650);
+  },
+  enter(s, ctx, k) { this.ctx = ctx; if (k >= 1) this.run(s); },
+  step(s, ctx, k, dir) { if (k === 1 && dir > 0) this.run(s); if (k === 2 && !s.querySelector('.c7fl-res.on')) this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7fl-e,.c7fl-res').forEach((e) => e.classList.remove('on')); },
+};
+</script>

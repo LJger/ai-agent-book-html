@@ -1,0 +1,503 @@
+<!-- ================= PART 06 感知工具 ================= -->
+<section class="slide chapter" id="c04-d6" data-part="6" data-title="PART 06 · 感知工具" data-notes="以上都是所有工具共通的问题。从这一部分开始转入三类工具各自的设计重点，先看感知工具。感知工具是 Agent 获取外部信息的主要渠道，设计上需要<b>在粒度、组织方式和输出格式等多个维度精心权衡</b>。依次看：信息洪流与搜索结果的形态、读取类工具的 offset/limit 与截断、只读性带来的工程红利、多模态感知的输出形态、实验 4-2；然后是多模态感知的三条路径——原生多模态处理、提取为文本、工具化多模态分析，以及实验 4-3。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">感知工具</h1>
+  <div class="ch-s fx fx-up" style="--d:3">Agent 获取外部信息的主要渠道</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">设计上需要在粒度、组织方式和输出格式等多个维度精心权衡。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c04-flood" data-part="6" data-steps="1" data-trans="zoom" data-dur="11000" data-title="信息洪流与搜索结果的形态" data-notes="感知工具常常面临返回信息量远超 Agent 处理能力的挑战：一次搜索可能返回数万个字符，一份 PDF 可能多达上百页，直接塞入上下文既会耗尽窗口空间，又会让关键内容淹没在噪声中。通用做法是在工具层面集成第二章介绍的<b>上下文感知压缩</b>——当输出超过阈值（如 10000 个字符）时，基于 Agent 当前的查询意图自动压缩（其原理与压缩效果第二章已详述）。除了这一通用机制，几类常见的感知工具还各有其特有的设计问题。<br><b>搜索类工具的返回格式与分页</b>。搜索工具的返回值应该是结构化的候选列表（标题、位置、摘要片段），而不是拼接后的全文——让 Agent 先浏览候选，再决定深入读取哪一条。当结果数量较多时，应提供分页或游标（cursor）参数：默认只返回前若干条，并在返回值中注明结果总数和获取下一页的方式，由 Agent 自主决定是否继续翻页，而不是一次性倾倒全部结果。<br>按 → 从信息洪流切到结构化候选列表；搜索结果内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">信息洪流：<em>压缩</em>与<em>结构化分页</em></h2></header>
+  <div class="fl4-st fx fx-up" style="--d:2">
+    <div class="fl4-v v0">
+      <div class="fl4-win"><span class="lbl">上下文窗口</span><div class="fl4-flood"></div><div class="fl4-th"><span>阈值：如 10000 个字符</span></div></div>
+      <div class="fl4-cmp"><b>工具层集成上下文感知压缩</b><p>输出超过阈值时，<b>基于 Agent 当前的查询意图</b>自动压缩（第二章）</p><div class="fl4-out">—</div></div>
+    </div>
+    <div class="fl4-v v1">
+      <div class="fl4-res win"><div class="win-bar"><i></i><i></i><i></i><span>search_web("OpenAI 联合创始人 近况") → 结构化候选</span><span class="c4x-sx">示意</span></div><div class="fl4-list"></div><div class="fl4-pg"><span>共 <b>128</b> 条结果 · 第 <b class="fl4-p">1</b> 页</span><button class="btn fl4-next">next_cursor →</button></div></div>
+      <div class="fl4-rule"><p><b>结构化候选列表</b>（标题、位置、摘要片段），不是拼接后的全文——先浏览候选，再决定深入读哪一条</p><p><b>分页或游标</b>：默认只返回前若干条，注明总数与下一页方式，由 Agent 决定是否继续翻页</p></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「感知工具」· 上下文感知压缩 · 搜索类工具的返回格式与分页</div>
+</section>
+<style>
+#c04-flood .fl4-st{position:relative;height:700px}
+#c04-flood .fl4-v{position:absolute;inset:0;display:grid;gap:26px;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+#c04-flood[data-k="0"] .v0,#c04-flood[data-k="1"] .v1{opacity:1;visibility:visible}
+#c04-flood .v0{grid-template-columns:1fr 600px}
+#c04-flood .fl4-win{position:relative;padding:16px 20px;border-radius:18px;border:2px solid var(--line2);background:rgba(8,12,30,.5);overflow:hidden}
+#c04-flood .fl4-flood{position:absolute;left:20px;right:20px;bottom:16px;top:50px;overflow:hidden;font:15px/1.5 var(--mono);color:rgba(148,163,184,.55);word-break:break-all}
+#c04-flood .fl4-th{position:absolute;left:0;right:0;top:46%;border-top:3px dashed var(--warn)}
+#c04-flood .fl4-th span{position:absolute;right:16px;top:-30px;padding:2px 10px;border-radius:8px;font-size:15px;color:#06101f;background:var(--warn)}
+#c04-flood .fl4-cmp{padding:20px 24px;border-radius:18px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent);display:flex;flex-direction:column;gap:12px}
+#c04-flood .fl4-cmp>b{font-size:22px;color:var(--ok)}
+#c04-flood .fl4-cmp p{font-size:18px;line-height:1.55}
+#c04-flood .fl4-cmp p b{color:var(--ok)}
+#c04-flood .fl4-out{flex:1;padding:14px;border-radius:12px;font-size:17px;line-height:1.6;background:rgba(255,255,255,.04)}
+#c04-flood .v1{grid-template-columns:1fr 520px}
+#c04-flood .fl4-list{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+#c04-flood .fl4-it{padding:10px 14px;border-radius:12px;border:1px solid var(--line);animation:upIn .35s both}
+#c04-flood .fl4-it b{display:block;font-size:17px;color:var(--ctx)}
+#c04-flood .fl4-it code{font:15px var(--mono);color:var(--ok)}
+#c04-flood .fl4-it p{font-size:15px;color:var(--text2);margin-top:2px}
+#c04-flood .fl4-pg{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line);font-size:17px}
+#c04-flood .fl4-pg b{font-family:var(--num);color:var(--acc)}
+#c04-flood .fl4-rule{display:flex;flex-direction:column;gap:14px}
+#c04-flood .fl4-rule p{padding:16px 18px;border-radius:14px;font-size:18px;line-height:1.6;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-flood .fl4-rule b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-flood'] = {
+  R: [['Ilya Sutskever 离开 OpenAI', 'news.example.com/…/sutskever', '2024 年 5 月宣布离开……'], ['Greg Brockman 回归', 'blog.example.org/brockman', '休假后重返……'], ['OpenAI 早期团队回顾', 'wiki.example.org/OpenAI', '2015 年由……共同创立'], ['联合创始人去向一览', 'tech.example.com/founders', '多位联合创始人已……'], ['John Schulman 加入新公司', 'news.example.com/schulman', '2024 年 8 月……']],
+  init(s) { s.querySelector('.fl4-next').addEventListener('click', () => { this.auto = false; this.page(s, this.p + 1); }); },
+  page(s, p) {
+    this.p = p > 3 ? 1 : p;
+    s.querySelector('.fl4-p').textContent = this.p;
+    s.querySelector('.fl4-list').innerHTML = this.R.slice(0, 4).map(([t, u, d], i) => { const k = (i + (this.p - 1)) % this.R.length; const [tt, uu, dd] = this.R[k]; return `<div class="fl4-it"><b>${(this.p - 1) * 4 + i + 1}. ${tt}</b><code>${uu}</code><p>${dd}</p></div>`; }).join('');
+  },
+  apply(s, k) { s.dataset.k = k; },
+  enter(s, ctx, k) {
+    this.apply(s, k); this.auto = true; this.page(s, 1);
+    const fl = s.querySelector('.fl4-flood'), out = s.querySelector('.fl4-out');
+    let n = 0;
+    ctx.every(() => {
+      if (n > 60) { n = 0; fl.textContent = ''; out.textContent = '—'; }
+      fl.textContent += 'OpenAI was founded in December 2015 … navigation | footer | related articles | ad | cookie banner | '.repeat(2); n++;
+      if (n === 30) out.innerHTML = '按查询“联合创始人近况”压缩后：<br>· Sutskever：2024 年 5 月离开<br>· Brockman：休假后回归<br>· Schulman：2024 年 8 月离开<br><span class="c4x-sx">示意</span>';
+    }, 120);
+    ctx.every(() => { if (this.auto) this.page(s, this.p + 1); }, 2600);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.dataset.k = 0; s.querySelector('.fl4-flood').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c04-read" data-part="6" data-trans="rise" data-dur="15000" data-title="读取类工具的 offset/limit 与截断" data-notes="<b>读取类工具的 offset/limit 与截断策略</b>。read 类工具应支持 offset/limit 参数，按需读取大文件的指定片段。当内容超过阈值必须截断时，应明确标示截断情况：注明省略了多少内容、如何读取剩余部分（如“已显示第 1-200 行，共 5000 行，可用 offset 参数继续读取”）。<b>静默截断是危险的</b>——Agent 会误以为自己看到了全部内容，基于不完整的信息做出错误判断。<br>演示：同一个 5000 行的日志文件，关键的报错在第 3,217 行（示意）。右上角切换两种截断方式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">读取类工具：<em>offset/limit</em> 与显式截断</h2></div>
+    <div class="seg rd4-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">静默截断</button><button data-v="1">显式截断</button></div></header>
+  <div class="rd4-body">
+    <div class="rd4-f panel fx fx-left" style="--d:2"><div class="rd4-h"><code>app.log</code><span>共 5000 行</span><span class="c4x-sx">示意</span></div><div class="rd4-map"><i class="rd4-seen"></i><i class="rd4-seen2"></i><i class="rd4-err"></i><span class="rd4-el">第 3,217 行：ERROR 数据库连接池耗尽</span></div></div>
+    <div class="rd4-r fx fx-right" style="--d:3"><div class="rd4-log"></div><p class="rd4-k">—</p></div>
+  </div>
+  <div class="src">第四章 ·「感知工具」· 读取类工具的 offset/limit 与截断策略</div>
+</section>
+<style>
+#c04-read .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-read .rd4-seg button{font-size:18px;padding:9px 18px}
+#c04-read .rd4-body{display:grid;grid-template-columns:520px 1fr;gap:26px;height:670px}
+#c04-read .rd4-f{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c04-read .rd4-h{display:flex;align-items:center;gap:12px}
+#c04-read .rd4-h code{font:700 18px var(--mono);color:var(--ctx)}
+#c04-read .rd4-h span{font-size:16px;color:var(--text3)}
+#c04-read .rd4-map{position:relative;flex:1;border-radius:10px;background:repeating-linear-gradient(0deg,rgba(148,163,184,.12) 0 3px,transparent 3px 6px)}
+#c04-read .rd4-map i{position:absolute;left:0;right:0}
+#c04-read .rd4-seen{top:0;height:4%;background:color-mix(in srgb,var(--ok) 45%,transparent)}
+#c04-read .rd4-seen2{top:64%;height:4%;background:color-mix(in srgb,var(--ok) 45%,transparent);opacity:0;transition:opacity .4s}
+#c04-read .rd4-err{top:64.3%;height:6px;background:var(--bad);box-shadow:0 0 12px var(--bad)}
+#c04-read .rd4-el{position:absolute;right:8px;top:calc(64% + 12px);font-size:15px;color:#fecdd3}
+#c04-read[data-ok="1"] .rd4-seen2{opacity:1}
+#c04-read .rd4-r{display:flex;flex-direction:column;gap:12px}
+#c04-read .rd4-log{display:flex;flex-direction:column;gap:8px}
+#c04-read .rd4-m{display:grid;grid-template-columns:100px 1fr;gap:10px;padding:10px 14px;border-radius:12px;font-size:16px;border-left:5px solid var(--c);background:rgba(255,255,255,.03);animation:upIn .35s both}
+#c04-read .rd4-m b{font:600 15px var(--mono);color:var(--c)}
+#c04-read .rd4-m code{font:15px var(--mono)}
+#c04-read .rd4-m mark{background:color-mix(in srgb,var(--warn) 35%,transparent);color:var(--text);padding:0 4px;border-radius:4px}
+#c04-read .rd4-k{margin-top:auto;padding:14px 18px;border-radius:14px;font-size:19px;line-height:1.55;border:1.5px solid var(--line2)}
+</style>
+<script>
+HOOKS['c04-read'] = {
+  init(s) { this.set = U.seg(s.querySelector('.rd4-seg'), (v) => { this.auto = false; this.v = +v; this.run(s); }); },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    this.set(String(this.v)); s.dataset.ok = 0;
+    const log = s.querySelector('.rd4-log'), k = s.querySelector('.rd4-k');
+    const add = (r, c, t) => log.insertAdjacentHTML('beforeend', `<div class="rd4-m" style="--c:${c}"><b>${r}</b><code>${t}</code></div>`);
+    log.innerHTML = ''; k.textContent = ''; k.style.borderColor = '';
+    add('assistant', '#a78bfa', 'read_file("app.log")');
+    await U.wait(ctx, 800); if (!ok()) return;
+    if (this.v === 0) {
+      add('tool', '#34d399', '[第 1–200 行内容……]');
+      await U.wait(ctx, 900); if (!ok()) return;
+      add('assistant', '#fb7185', '“日志里没有错误，服务运行正常。”');
+      k.innerHTML = '<span style="color:var(--bad)">静默截断是危险的：Agent 误以为看到了全部内容，基于不完整的信息做出错误判断</span>'; k.style.borderColor = 'var(--bad)';
+    } else {
+      add('tool', '#34d399', '[第 1–200 行内容……]<br><mark>已显示第 1-200 行，共 5000 行，可用 offset 参数继续读取</mark>');
+      await U.wait(ctx, 900); if (!ok()) return;
+      add('assistant', '#a78bfa', 'grep_file("app.log", "ERROR") → 第 3,217 行');
+      await U.wait(ctx, 700); if (!ok()) return;
+      add('assistant', '#a78bfa', 'read_file("app.log", offset=3200, limit=100)');
+      s.dataset.ok = 1;
+      await U.wait(ctx, 800); if (!ok()) return;
+      add('assistant', '#34d399', '“第 3,217 行：数据库连接池耗尽。”');
+      k.innerHTML = '<span style="color:var(--ok)">显式截断：注明省略了多少、如何读取剩余部分——Agent 用 offset 读到关键行</span>'; k.style.borderColor = 'var(--ok)';
+    }
+    await U.wait(ctx, 3000); if (!ok()) return;
+    if (this.auto) this.v = 1 - this.v;
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.v = 0; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.ok = 0; },
+};
+</script>
+
+<section class="slide" id="c04-ro" data-part="6" data-trans="flip" data-dur="15000" data-title="只读性带来的工程红利" data-notes="<b>只读性带来的工程红利</b>。感知工具不改变外部世界，这一只读特性带来两个天然优势：结果更适合<b>缓存</b>（相同查询在数据未过期时直接复用，节省时间和费用——但缓存键仍需包含用户身份与授权范围，并为天气、股价、搜索结果这类会变化的数据设置 TTL），多个感知工具调用也更适合<b>并行执行</b>（如同时读取五个文件、并发发起三个搜索），不必担心相互改写状态——只需留意速率限制，以及多次读取之间外部数据发生变化导致的快照不一致。执行工具则没有这种自由——调用顺序和副作用都必须严格控制。<br>左侧缓存条目与 TTL、右侧耗时为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">只读性带来的工程红利：<em>缓存</em>与<em>并行</em></h2></header>
+  <div class="ro4-body">
+    <div class="ro4-c panel fx fx-left" style="--d:2"><b class="ro4-h">缓存：相同查询直接复用</b><div class="ro4-cache"></div><p class="ro4-n">缓存键要包含<b>用户身份与授权范围</b>；天气、股价、搜索结果这类会变的数据要设 <b>TTL</b></p><span class="c4x-sx">示意</span></div>
+    <div class="ro4-c panel fx fx-right" style="--d:3"><b class="ro4-h">并行：不必担心相互改写状态</b><div class="ro4-g"><span class="lbl">串行</span><div class="ro4-lane a"></div><span class="lbl">并行</span><div class="ro4-lane b"></div></div><p class="ro4-n">只需留意<b>速率限制</b>，以及多次读取之间外部数据变化导致的<b>快照不一致</b></p></div>
+  </div>
+  <p class="tagline ro4-tag fx fx-up" style="--d:5">执行工具没有这种自由：<b>调用顺序和副作用都必须严格控制</b></p>
+  <div class="src">第四章 ·「感知工具」· 只读性带来的工程红利</div>
+</section>
+<style>
+#c04-ro .ro4-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:600px}
+#c04-ro .ro4-c{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c04-ro .ro4-c>.c4x-sx{position:absolute;right:16px;top:16px}
+#c04-ro .ro4-h{font-size:22px;color:var(--acc)}
+#c04-ro .ro4-cache{display:flex;flex-direction:column;gap:8px}
+#c04-ro .ro4-e{display:grid;grid-template-columns:1fr 160px;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--line2);font-size:16px}
+#c04-ro .ro4-e code{font:15px var(--mono)}
+#c04-ro .ro4-e small{display:block;font-size:15px;color:var(--text3)}
+#c04-ro .ro4-e .meter i{transition:width .2s linear!important}
+#c04-ro .ro4-e.hit{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c04-ro .ro4-e.exp{border-color:var(--bad)}
+#c04-ro .ro4-n{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+#c04-ro .ro4-n b{color:var(--text)}
+#c04-ro .ro4-g{display:flex;flex-direction:column;gap:8px}
+#c04-ro .ro4-lane{position:relative;height:150px;border-radius:12px;background:rgba(8,12,30,.5)}
+#c04-ro .ro4-bk{position:absolute;height:20px;border-radius:5px;font-size:15px;line-height:20px;padding-left:6px;white-space:nowrap;color:#06101f;background:var(--tp-per);width:0;transition:width .4s linear}
+#c04-ro .ro4-tag{margin-top:16px;font-size:22px}
+</style>
+<script>
+HOOKS['c04-ro'] = {
+  C: [['get_weather("上海")', 'user=A · scope=public', 0.4], ['get_stock_quote("NVDA")', 'user=A · scope=public', 0.15], ['search_web("Agent 评测")', 'user=A · scope=public', 0.6], ['read_calendar()', 'user=B · scope=calendar.read', 0.8]],
+  J: [['read ×5', 5], ['search ×3', 3]],
+  init(s) { s.querySelector('.ro4-cache').innerHTML = this.C.map(([q, k]) => `<div class="ro4-e"><span><code>${q}</code><small>键：${q} + ${k}</small></span><div><small class="ro4-st">TTL</small><div class="meter" style="--c:var(--ok)"><i></i></div></div></div>`).join(''); this.es = [...s.querySelectorAll('.ro4-e')]; },
+  enter(s, ctx) {
+    const ttl = this.C.map((c) => c[2]);
+    ctx.every(() => {
+      this.es.forEach((e, i) => {
+        ttl[i] -= 0.04; if (ttl[i] < 0) ttl[i] = 1;
+        e.querySelector('.meter i').style.width = Math.max(0, ttl[i]) * 100 + '%';
+        const exp = ttl[i] < 0.1; e.classList.toggle('exp', exp); e.classList.toggle('hit', !exp && Math.random() < 0.3);
+        e.querySelector('.ro4-st').textContent = exp ? 'TTL 过期 → 重新查询' : '命中：直接复用';
+      });
+    }, 400);
+    const A = s.querySelector('.ro4-lane.a'), B = s.querySelector('.ro4-lane.b');
+    const go = () => {
+      A.innerHTML = ''; B.innerHTML = '';
+      const jobs = [];
+      for (let i = 0; i < 8; i++) jobs.push(i < 5 ? `read ${i + 1}` : `search ${i - 4}`);
+      jobs.forEach((n, i) => {
+        A.insertAdjacentHTML('beforeend', `<i class="ro4-bk" style="left:${i * 12}%;top:${8 + (i % 6) * 22}px">${n}</i>`);
+        B.insertAdjacentHTML('beforeend', `<i class="ro4-bk" style="left:0;top:${4 + i * 18}px">${n}</i>`);
+      });
+      ctx.later(() => { A.querySelectorAll('.ro4-bk').forEach((b, i) => ctx.later(() => (b.style.width = '11%'), i * 400)); B.querySelectorAll('.ro4-bk').forEach((b) => (b.style.width = '13%')); }, 100);
+    };
+    go(); ctx.every(go, 4800);
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c04-mmform" data-part="6" data-trans="zoom" data-dur="14000" data-title="多模态感知的输出形态" data-notes="<b>多模态感知的输出形态</b>。对于截图、图表、扫描件等多模态输入，工具需要决定以什么形态交给模型：直接返回图像交给具备视觉能力的模型，还是先用 OCR、图表解析等手段转成文本？前者保留布局和视觉细节但消耗更多 token，后者精简高效但可能丢失关键的空间结构（如表格的行列对应关系）。实践中常按内容类型选择：纯文字内容用文本提取，布局敏感的内容（UI 界面、复杂表格、设计稿）保留图像。<br>点选内容类型看推荐的形态；右侧示意一张表格 OCR 后行列对应关系的丢失。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">多模态感知的输出形态：<em>返回图像，还是转成文本</em></h2></div>
+    <div class="seg mf4-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">纯文字文档</button><button data-v="1">UI 界面</button><button data-v="2">复杂表格</button><button data-v="3">设计稿</button></div></header>
+  <div class="mf4-body">
+    <div class="mf4-two fx fx-left" style="--d:2"><div class="mf4-o img"><b>直接返回图像</b><p>保留布局和视觉细节 · 消耗更多 token</p></div><div class="mf4-o txt"><b>转成文本（OCR、图表解析）</b><p>精简高效 · 可能丢失关键的空间结构</p></div><div class="mf4-rec">—</div></div>
+    <div class="mf4-tb panel fx fx-right" style="--d:3"><span class="lbl">表格图像 → OCR 文本 <span class="c4x-sx">示意</span></span><div class="mf4-grid"><span></span><span>Q1</span><span>Q2</span><span>Q3</span><span>华东</span><span>120</span><span>—</span><span>95</span><span>华南</span><span>88</span><span>140</span><span>—</span></div><i class="mf4-ar">↓ OCR</i><code class="mf4-ocr">Q1 Q2 Q3 华东 120 95 华南 88 140</code><p class="mf4-q">华南的 Q2 是多少？——空单元格消失后，<b>行列对应关系丢了</b></p></div>
+  </div>
+  <div class="src">第四章 ·「感知工具」· 多模态感知的输出形态</div>
+</section>
+<style>
+#c04-mmform .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-mmform .mf4-seg button{font-size:17px;padding:8px 14px}
+#c04-mmform .mf4-body{display:grid;grid-template-columns:1fr 700px;gap:26px;height:640px}
+#c04-mmform .mf4-two{display:flex;flex-direction:column;gap:14px}
+#c04-mmform .mf4-o{padding:16px 20px;border-radius:16px;border:1.5px solid var(--line2);background:rgba(12,18,40,.72);transition:all .4s}
+#c04-mmform .mf4-o b{font-size:22px}
+#c04-mmform .mf4-o p{margin-top:4px;font-size:17px;color:var(--text2)}
+#c04-mmform .mf4-o.on{border-color:var(--ok);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 30%,transparent)}
+#c04-mmform .mf4-o.on b{color:var(--ok)}
+#c04-mmform .mf4-rec{margin-top:auto;padding:16px 20px;border-radius:16px;font-size:20px;line-height:1.55;border:1px dashed var(--line2)}
+#c04-mmform .mf4-tb{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c04-mmform .mf4-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line2);border-radius:10px;overflow:hidden}
+#c04-mmform .mf4-grid span{padding:12px;text-align:center;font:600 18px var(--num);border:1px solid var(--line)}
+#c04-mmform .mf4-ar{font-style:normal;text-align:center;font-size:18px;color:var(--text3)}
+#c04-mmform .mf4-ocr{display:block;padding:12px 16px;border-radius:10px;font:18px var(--mono);background:rgba(255,255,255,.05)}
+#c04-mmform .mf4-q{margin-top:auto;font-size:18px;line-height:1.55}
+#c04-mmform .mf4-q b{color:var(--bad)}
+</style>
+<script>
+HOOKS['c04-mmform'] = {
+  R: [[1, '纯文字内容：<b style="color:var(--ok)">用文本提取</b>——精简，几乎不丢信息'], [0, 'UI 界面：布局敏感，<b style="color:var(--ok)">保留图像</b>'], [0, '复杂表格：行列对应关系重要，<b style="color:var(--ok)">保留图像</b>'], [0, '设计稿：视觉细节就是内容，<b style="color:var(--ok)">保留图像</b>']],
+  init(s) { this.set = U.seg(s.querySelector('.mf4-seg'), (v) => { this.auto = false; this.pick(s, +v); }); },
+  pick(s, i) { this.i = i; this.set(String(i)); const [t, r] = this.R[i]; s.querySelector('.mf4-o.img').classList.toggle('on', !t); s.querySelector('.mf4-o.txt').classList.toggle('on', !!t); s.querySelector('.mf4-rec').innerHTML = r; },
+  enter(s, ctx) { this.auto = true; this.pick(s, 0); ctx.every(() => { if (this.auto) this.pick(s, (this.i + 1) % 4); }, 2600); },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c04-x42" data-part="6" data-trans="rise" data-dur="17000" data-title="实验 4-2 ★★：感知工具 MCP 服务器" data-notes="<b>实验 4-2 ★★：感知工具 MCP 服务器。</b>本实验构建一套感知工具 MCP 服务器，覆盖五类感知场景：<b>搜索</b>（网络搜索、本地知识库搜索、文件下载）；<b>多模态理解</b>（网页阅读、PDF/Word/PPT 等文档提取、图片 OCR 与 AI 分析、音视频转录与分析）；<b>文件系统</b>（文件读取与搜索、目录浏览、文件操作——移动/复制/删除等严格来说属于执行工具，但通常与文件读取打包在同一个 MCP 服务器中）；<b>公开数据源</b>（天气、股价、汇率、Wikipedia、ArXiv 论文等免费 API）；<b>私有数据源</b>（日历、Notion 等需要授权的个人数据）。这些工具大多基于免费、开放的 API，无需注册即可使用；MCP 生态中已有大量现成的感知工具服务器可供选用。第五章将论证，其中大部分功能可以用七个核心工具配合 Skill 文档来覆盖。<br>配套仓库的验收记录（chapter4/perception-tools，real_mcp_dashscope_intl_20260730T070000Z）：真实 MCP 目录共 126 个工具；23 个用例成功（搜索 3、多模态 9、文件系统 6、公开数据 5）；3 个越界探针被拒（父目录穿越、绝对路径、逃逸符号链接）；私有数据源（Google Calendar、Notion）缺授权凭据，状态为 blocked。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 4-2 ★★：<em>感知工具 MCP 服务器</em></h2></header>
+  <div class="x42-body">
+    <div class="x42-cats fx fx-left" style="--d:2"></div>
+    <div class="x42-r fx fx-right" style="--d:3">
+      <div class="x42-k"><div><b data-count="126">0</b><span>真实 MCP 目录中的工具</span></div><div><b data-count="23">0</b><span>个用例成功</span></div><div><b data-count="3">0</b><span>个越界探针被拒</span></div></div>
+      <div class="x42-pr"><span class="lbl">越界探针（全部被拒）</span><code>../../etc/passwd</code><code>/etc/hosts</code><code>link → /（逃逸符号链接）</code></div>
+      <div class="x42-bl"><b>私有数据源：blocked</b><p>Google Calendar、Notion 缺授权凭据——如实记录，不用模拟数据替代</p></div>
+      <p class="x42-n">第五章将论证：其中大部分功能可以用<b>七个核心工具配合 Skill 文档</b>来覆盖</p>
+      <div class="x42-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter4/perception-tools（real_mcp_dashscope_intl_20260730T070000Z）</div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「感知工具」· 实验 4-2</div>
+</section>
+<style>
+#c04-x42 .x42-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:690px}
+#c04-x42 .x42-cats{display:flex;flex-direction:column;gap:10px}
+#c04-x42 .x42-c{display:grid;grid-template-columns:170px 1fr 110px;gap:14px;align-items:center;padding:12px 16px;border-radius:14px;border:1.5px solid var(--line);background:rgba(12,18,40,.72);transition:all .4s}
+#c04-x42 .x42-c>b{font-size:20px;color:var(--c)}
+#c04-x42 .x42-c p{font-size:15px;line-height:1.5;color:var(--text2)}
+#c04-x42 .x42-c em{font-style:normal;text-align:right;font:700 18px var(--num)}
+#c04-x42 .x42-c.on{border-color:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
+#c04-x42 .x42-c .dots{grid-column:2;display:flex;gap:4px}
+#c04-x42 .x42-c .dots i{width:14px;height:14px;border-radius:4px;background:rgba(255,255,255,.1);transition:background .3s}
+#c04-x42 .x42-c .dots i.on{background:var(--ok)}
+#c04-x42 .x42-c.blk em{color:var(--warn)}
+#c04-x42 .x42-r{display:flex;flex-direction:column;gap:12px}
+#c04-x42 .x42-k{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#c04-x42 .x42-k>div{padding:12px;border-radius:14px;text-align:center;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x42 .x42-k b{display:block;font:800 38px var(--num);color:var(--acc)}
+#c04-x42 .x42-k span{font-size:15px;color:var(--text2)}
+#c04-x42 .x42-pr{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;border:1px solid var(--bad)}
+#c04-x42 .x42-pr code{font:15px var(--mono);color:#fecdd3}
+#c04-x42 .x42-bl{padding:12px 16px;border-radius:14px;border:1.5px dashed var(--warn)}
+#c04-x42 .x42-bl b{font-size:18px;color:var(--warn)}
+#c04-x42 .x42-bl p{font-size:16px;color:var(--text2);margin-top:4px}
+#c04-x42 .x42-n{font-size:17px;line-height:1.55;color:var(--text2)}
+#c04-x42 .x42-n b{color:var(--text)}
+#c04-x42 .x42-src{margin-top:auto;display:flex;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+#c04-x42 .x42-src .ic{flex:none;color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-x42'] = {
+  C: [['搜索', '网络搜索、本地知识库搜索、文件下载', '#22d3ee', 3], ['多模态理解', '网页阅读、PDF/Word/PPT 提取、图片 OCR 与 AI 分析、音视频转录', '#a78bfa', 9], ['文件系统', '文件读取与搜索、目录浏览、文件操作（严格说属执行工具，通常一起打包）', '#34d399', 6], ['公开数据源', '天气、股价、汇率、Wikipedia、ArXiv 等免费 API', '#fbbf24', 5], ['私有数据源', '日历、Notion 等需要授权的个人数据', '#f472b6', -1]],
+  init(s) {
+    s.querySelector('.x42-cats').innerHTML = this.C.map(([n, d, c, k]) => `<div class="x42-c${k < 0 ? ' blk' : ''}" style="--c:${c}"><b>${n}</b><p>${d}</p><em>${k < 0 ? 'blocked' : k + ' 个成功'}</em><div class="dots">${k > 0 ? '<i></i>'.repeat(k) : ''}</div></div>`).join('');
+    this.cs = [...s.querySelectorAll('.x42-c')];
+  },
+  enter(s, ctx) {
+    let i = 0;
+    ctx.every(() => { const c = i % 6; this.cs.forEach((x, j) => { x.classList.toggle('on', j === c); if (j === c) x.querySelectorAll('.dots i').forEach((d, m) => ctx.later(() => d.classList.add('on'), m * 120)); if (c === 5) x.querySelectorAll('.dots i').forEach((d) => d.classList.remove('on')); }); i++; }, 1500);
+  },
+  reset() { this.cs.forEach((x) => { x.classList.remove('on'); x.querySelectorAll('.dots i').forEach((d) => d.classList.remove('on')); }); },
+};
+</script>
+
+<section class="slide" id="c04-mm3" data-part="6" data-trans="zoom" data-dur="15000" data-title="多模态感知的三条路径" data-notes="Agent 要能够理解图片、视频、音频、PDF 等多模态数据，就必须具备多模态感知能力。有三条路径可以实现多模态感知：<b>模型原生的多模态处理</b>、<b>将多模态内容自动提取为文本再处理</b>、<b>把多模态模型封装为工具处理</b>。后面三页分别展开。<br>演示中同一张含图表的图片沿三条路径流动，右侧显示各自的上下文占用与保真度（数值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">多模态感知的<em>三条路径</em></h2></header>
+  <div class="m3-st fx fx-up" style="--d:2"></div>
+  <div class="src">第四章 ·「多模态感知」</div>
+</section>
+<style>
+#c04-mm3 .m3-st{display:flex;flex-direction:column;gap:18px}
+#c04-mm3 .m3-r{display:grid;grid-template-columns:220px 1fr 300px;gap:18px;align-items:center;padding:16px 20px;border-radius:18px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.72)}
+#c04-mm3 .m3-r>b{font-size:21px;color:var(--c)}
+#c04-mm3 .m3-flow{position:relative;display:flex;align-items:center;gap:10px}
+#c04-mm3 .m3-flow span{padding:10px 14px;border-radius:12px;font-size:16px;border:1px solid var(--line2);background:rgba(10,16,36,.9);white-space:nowrap}
+#c04-mm3 .m3-flow i{flex:1;height:2px;background:var(--line2);position:relative;overflow:visible}
+#c04-mm3 .m3-flow i::after{content:"";position:absolute;top:-5px;left:0;width:12px;height:12px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c);animation:c04m3-go 2.4s linear infinite;animation-delay:var(--dl)}
+@keyframes c04m3-go{from{left:0}to{left:calc(100% - 12px)}}
+#c04-mm3 .m3-m{display:flex;flex-direction:column;gap:6px;font-size:15px;color:var(--text2)}
+#c04-mm3 .m3-m div{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center}
+</style>
+<script>
+HOOKS['c04-mm3'] = {
+  R: [['原生多模态', '#22d3ee', ['含图表的图片', '视觉编码器', '共享空间', 'LLM'], 85, 95], ['提取为文本', '#fbbf24', ['含图表的图片', 'OCR', '纯文本', 'LLM'], 25, 40], ['工具化分析', '#a78bfa', ['LLM 调 analyze_image(文件, 问题)', '多模态模型', '简短结论回到上下文'], 12, 80]],
+  init(s) {
+    s.querySelector('.m3-st').innerHTML = this.R.map(([n, c, f, ctxv, fid], i) => `<div class="m3-r" style="--c:${c}"><b>${n}</b><div class="m3-flow">${f.map((x, j) => (j ? `<i style="--dl:${i * 0.3 + j * 0.2}s"></i>` : '') + `<span>${x}</span>`).join('')}</div><div class="m3-m"><div><span>上下文占用</span><div class="meter" style="--c:var(--warn)"><i style="--v:${ctxv}%"></i></div></div><div><span>保真度</span><div class="meter" style="--c:var(--ok)"><i style="--v:${fid}%"></i></div></div><span class="c4x-sx">示意</span></div></div>`).join('');
+  },
+};
+</script>
+
+<section class="slide" id="c04-vit" data-part="6" data-trans="flip" data-dur="15000" data-title="原生多模态处理" data-notes="<b>原生多模态处理</b>是能力上限最高的技术路线。其核心技术突破在于，通过专门的编码器将不同类型的数据全部映射到统一的高维语义空间。以图像为例，架构公开的多模态模型（如 Qwen-VL、LLaVA）通常集成了基于 <b>Vision Transformer</b>（ViT）的视觉编码器。具体来说，ViT 将图像分割为固定大小的图像块（Patches），像处理句子中的单词一样将每个块序列化为向量，与文本词向量共存于共享的多模态嵌入空间。Transformer 的自注意力机制能同等对待文本和图像 Tokens，计算任意跨模态关联。在原生支持多模态的模型中，模型可以直接“看到”PDF 的页面布局、图表和文字，能理解图文之间的空间和语义关系。<br>画布演示：图像切成 Patches → 序列化为向量 → 与文本词向量混排 → 自注意力跨模态连线。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">原生多模态处理：<em>能力上限最高</em></h2></header>
+  <div class="vt-body">
+    <div class="vt-cv panel fx fx-left" style="--d:2"><canvas class="vt-c" width="1960" height="1040"></canvas></div>
+    <div class="vt-r fx fx-right" style="--d:3">
+      <div class="vt-s"><em>1</em><p>ViT 把图像切成固定大小的<b>图像块（Patches）</b></p></div>
+      <div class="vt-s"><em>2</em><p>像句子里的单词一样，把每块<b>序列化为向量</b></p></div>
+      <div class="vt-s"><em>3</em><p>与文本词向量共存于<b>共享的多模态嵌入空间</b></p></div>
+      <div class="vt-s"><em>4</em><p>自注意力<b>同等对待</b>文本和图像 Tokens，计算任意跨模态关联</p></div>
+      <p class="vt-n">Qwen-VL、LLaVA 等架构公开的模型通常集成基于 ViT 的视觉编码器；模型能直接“看到”PDF 的<b>页面布局、图表和文字</b></p>
+    </div>
+  </div>
+  <div class="src">第四章 ·「原生多模态处理」</div>
+</section>
+<style>
+#c04-vit .vt-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:640px}
+#c04-vit .vt-cv{padding:10px}
+#c04-vit .vt-c{display:block;width:980px;height:520px}
+#c04-vit .vt-r{display:flex;flex-direction:column;gap:10px}
+#c04-vit .vt-s{display:flex;gap:14px;align-items:center;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+#c04-vit .vt-s em{flex:none;font-style:normal;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:800 17px var(--num);color:#06101f;background:var(--acc)}
+#c04-vit .vt-s p{font-size:17px;line-height:1.5}
+#c04-vit .vt-s b{color:var(--acc)}
+#c04-vit .vt-s.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c04-vit .vt-n{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2)}
+#c04-vit .vt-n b{color:var(--text)}
+</style>
+<script>
+HOOKS['c04-vit'] = {
+  init(s) { this.g = s.querySelector('.vt-c').getContext('2d'); this.ss = [...s.querySelectorAll('.vt-s')]; },
+  enter(s, ctx) {
+    const g = this.g, t0 = performance.now(), W = 980, H = 520;
+    const words = ['这', '张', '图', '里', 'Q4', '最高'];
+    ctx.raf((t) => {
+      const u = ((t - t0) % 10000) / 10000, ph = Math.min(3, Math.floor(u * 4.4));
+      this.ss.forEach((x, i) => x.classList.toggle('on', i === ph));
+      g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, W, H);
+      // 原图
+      const ox = 40, oy = 40, sz = 240, n = 4, ps = sz / n;
+      for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+        const sep = ph >= 0 ? Math.min(1, u * 6) * 8 : 0;
+        g.fillStyle = `hsl(${200 + i * 15 + j * 10} 60% ${35 + ((i + j) % 3) * 8}%)`;
+        g.fillRect(ox + j * (ps + sep), oy + i * (ps + sep), ps - 2, ps - 2);
+      }
+      g.fillStyle = '#fbbf24'; [[0.2, 0.7], [0.45, 0.5], [0.7, 0.8], [0.9, 0.2]].forEach(([x, h]) => g.fillRect(ox + x * sz * 1.1, oy + sz * 1.1 - h * sz * 0.9, 18, h * sz * 0.9));
+      // 序列
+      const sy = 380, tok = [];
+      if (ph >= 1) {
+        for (let k = 0; k < 16; k++) tok.push({ x: 40 + k * 44, c: '#22d3ee', img: 1 });
+        words.forEach((w, k) => tok.push({ x: 40 + (16 + k) * 44, c: '#a78bfa', w }));
+        tok.forEach((tk, k) => { const a = Math.min(1, Math.max(0, (u * 4.4 - 1) * 3 - k * 0.05)); g.globalAlpha = a; g.fillStyle = tk.c; g.fillRect(tk.x, sy, 36, 36); if (tk.w) { g.fillStyle = '#0b1020'; g.font = 'bold 15px sans-serif'; g.textAlign = 'center'; g.fillText(tk.w, tk.x + 18, sy + 24); } });
+        g.globalAlpha = 1;
+        g.fillStyle = '#94a3b8'; g.font = '15px sans-serif'; g.textAlign = 'left';
+        g.fillText('图像 Patch 向量', 40, sy + 62); g.fillText('文本词向量', 40 + 16 * 44, sy + 62);
+      }
+      if (ph >= 2) { g.strokeStyle = 'rgba(167,139,250,.5)'; g.lineWidth = 2; g.setLineDash([6, 6]); g.strokeRect(30, sy - 14, 22 * 44 + 4, 64); g.setLineDash([]); g.fillStyle = '#c4b5fd'; g.fillText('共享的多模态嵌入空间', 340, sy - 22); }
+      if (ph >= 3) {
+        for (let k = 0; k < 8; k++) { const a = tok[16 + (k % 6)], b = tok[(k * 5) % 16]; const h = 60 + 30 * Math.sin(t / 400 + k); g.strokeStyle = `rgba(52,211,153,${0.35 + 0.3 * Math.sin(t / 300 + k)})`; g.beginPath(); g.moveTo(a.x + 18, sy); g.quadraticCurveTo((a.x + b.x) / 2 + 18, sy - h - 40, b.x + 18, sy); g.stroke(); }
+        g.fillStyle = '#6ee7b7'; g.fillText('自注意力：跨模态关联', 620, sy - 100);
+      }
+      g.fillStyle = '#94a3b8'; g.font = '15px sans-serif'; g.fillText('输入图像', ox, oy - 12);
+    });
+  },
+  reset() { this.ss.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c04-ext" data-part="6" data-trans="rise" data-dur="16000" data-title="提取为文本与工具化多模态分析" data-notes="<b>提取为文本。</b>目前很多能力较强的模型，例如 GLM 5.2、DeepSeek V4 Flash，不支持原生多模态处理。此时一种变通方法是将多模态内容<b>提取为文本（Extract to Text）</b>。这是一个两阶段过程：先通过专门工具（如 OCR 服务、音频转录服务）将非文本内容转为纯文本，再输入语言模型。对于文本内容占主体的 PDF 文档等，提取为文本的方法比转换为图片的原生多模态处理方法往往更节约 token。例如，一页 PDF 的截图往往需要上千个 token，而一页 PDF 上的文字一般只有几百个 token。但提取为文本的代价是信息损失：所有版式、图表、图像信息都在提取过程中被丢弃。<br><b>工具化多模态分析。</b>当 Agent 的主模型不支持多模态时，<b>将多模态分析作为工具</b>是一种比提取为文本更好的方法。它赋予 Agent 可对原始文件深入分析的工具（如 analyze_image、analyze_pdf、analyze_audio），工具接受一个多模态文件和一个自然语言问题作为参数，返回自然语言描述的分析结果。工具内部可以使用多模态模型实现，这个多模态模型不一定需要很强的 Agent 能力，从而有更多技术选型空间。相比原生多模态处理方案，工具化多模态分析仅在上下文中保留简短的问题和分析结果，可以避免多模态数据（如图片、视频等）的大量 token 占据上下文。<br>右上角切换两种做法。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">主模型不支持多模态时：<em>提取为文本</em>，还是<em>工具化</em></h2></div>
+    <div class="seg ex4-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">提取为文本</button><button data-v="1">工具化多模态分析</button></div></header>
+  <div class="ex4-st fx fx-up" style="--d:2">
+    <div class="ex4-v v0">
+      <div class="ex4-c"><b>两阶段</b><div class="ex4-fl"><span>PDF / 音频</span><i>→</i><span>OCR / 转录服务</span><i>→</i><span>纯文本</span><i>→</i><span>语言模型</span></div><p>GLM 5.2、DeepSeek V4 Flash 等较强的模型不支持原生多模态时的变通方法</p></div>
+      <div class="ex4-tk"><div><span>一页 PDF 截图</span><div class="meter" style="--c:var(--warn)"><i style="--v:100%"></i></div><b>上千 token</b></div><div><span>同一页的文字</span><div class="meter" style="--c:var(--ok)"><i style="--v:28%"></i></div><b>几百 token</b></div></div>
+      <div class="ex4-c bad"><b>代价：信息损失</b><p>所有<b>版式、图表、图像信息</b>都在提取过程中被丢弃</p></div>
+    </div>
+    <div class="ex4-v v1">
+      <div class="ex4-c"><b>把多模态分析做成工具</b><div class="ex4-api"><code>analyze_image(文件, 问题)</code><code>analyze_pdf(文件, 问题)</code><code>analyze_audio(文件, 问题)</code></div><p>返回<b>自然语言描述的分析结果</b>；内部的多模态模型<b>不必有很强的 Agent 能力</b>，选型空间更大</p></div>
+      <div class="ex4-ctx"><span class="lbl">主模型上下文里只留下</span><div class="ex4-m"><b>assistant</b><code>analyze_pdf("report.pdf", "哪个季度收入最高？")</code></div><div class="ex4-m"><b>tool</b><code>“Q4 最高，约 $180M。”</code></div><p>避免图片、视频等多模态数据的<b>大量 token 占据上下文</b></p></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「提取为文本」·「工具化多模态分析」</div>
+</section>
+<style>
+#c04-ext .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-ext .ex4-seg button{font-size:18px;padding:9px 18px}
+#c04-ext .ex4-st{position:relative;height:690px}
+#c04-ext .ex4-v{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+#c04-ext[data-v="0"] .v0,#c04-ext[data-v="1"] .v1{opacity:1;visibility:visible}
+#c04-ext .ex4-c{padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c04-ext .ex4-c>b{font-size:22px;color:var(--acc)}
+#c04-ext .ex4-c p{font-size:18px;line-height:1.55;color:var(--text2)}
+#c04-ext .ex4-c p b{color:var(--text)}
+#c04-ext .ex4-c.bad{border-color:var(--bad)}#c04-ext .ex4-c.bad>b{color:var(--bad)}
+#c04-ext .ex4-fl{display:flex;align-items:center;gap:12px}
+#c04-ext .ex4-fl span{padding:10px 16px;border-radius:12px;font-size:18px;border:1px solid var(--line2)}
+#c04-ext .ex4-fl i{font-style:normal;color:var(--text3)}
+#c04-ext .ex4-tk{display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-ext .ex4-tk>div{display:grid;grid-template-columns:180px 1fr 120px;gap:14px;align-items:center;font-size:17px}
+#c04-ext .ex4-tk b{font:700 18px var(--num);text-align:right}
+#c04-ext .ex4-api{display:flex;gap:12px}
+#c04-ext .ex4-api code{padding:8px 14px;border-radius:10px;font:17px var(--mono);color:var(--tp-col);border:1px solid color-mix(in srgb,var(--tp-col) 45%,transparent)}
+#c04-ext .ex4-ctx{flex:1;padding:18px 22px;border-radius:18px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 5%,transparent);display:flex;flex-direction:column;gap:10px}
+#c04-ext .ex4-m{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.04)}
+#c04-ext .ex4-m b{font:600 15px var(--mono);color:var(--acc)}
+#c04-ext .ex4-m code{font:16px var(--mono)}
+#c04-ext .ex4-ctx p{margin-top:auto;font-size:18px;color:var(--text2)}
+#c04-ext .ex4-ctx p b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c04-ext'] = {
+  init(s) { this.set = U.seg(s.querySelector('.ex4-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  show(s, v) { this.v = v; s.dataset.v = v; this.set(String(v)); },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, 1 - this.v); }, 5000); },
+  reset(s) { this.show(s, 0); },
+};
+</script>
+
+<section class="slide" id="c04-x43" data-part="6" data-trans="zoom" data-dur="17000" data-title="实验 4-3 ★★：三种技术范式的对比分析" data-notes="<b>实验 4-3 ★★：多模态信息提取——三种技术范式的对比分析。</b>multimodal-agent 项目在统一框架内对三种策略进行系统比较和评估：通过 demo.py 将同一多模态文件（如含图表的 PDF 报告）和同一问题分别交给三种模式处理，观察表现差异。原书结论：<b>原生多模态模式</b>凭借对视觉和空间信息的深刻理解，在分析图表、理解文档布局等任务上表现最佳。<b>提取为文本模式</b>在处理纯文本占主导的文档时成本效益最高，但完全无法处理需要视觉信息的查询。<b>工具化模式</b>在交互式场景中展现灵活性，能以较低成本处理大多数初步查询并在需要时通过调用工具进行高成本深度分析，但在需要一次性端到端深度理解的场景下表现不如原生模式。<br>配套仓库的验收（chapter4/multimodal-agent，20260729T185433Z，作答模型 doubao-seed-1-6-250615，评判 moonshot-v1-8k）：样例为 Acme Corp Quarterly Revenue 2024 图表（Q1 $120M、Q2 $150M、Q3 $95M、Q4 $180M），两个问题、PNG 与 PDF 两种格式。原生 4/4 正确（平均 8.0 秒）；提取为文本 0/4（平均 10.9 秒，OCR 把 Q1 读成 Ql，进而答成“Q1 最高 $180M”）；工具化 4/4（平均 29.8 秒）。右上角切换范式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 4-3 ★★：<em>三种技术范式</em>的对比分析</h2></div>
+    <div class="seg x43-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">原生多模态</button><button data-v="1">提取为文本</button><button data-v="2">工具化</button></div></header>
+  <div class="x43-body">
+    <div class="x43-ch panel fx fx-left" style="--d:2"><span class="lbl">样例：Acme Corp Quarterly Revenue 2024</span><div class="x43-bars"></div><div class="x43-see"><span class="lbl">模型实际看到的</span><code class="x43-sw">—</code></div></div>
+    <div class="x43-r fx fx-right" style="--d:3">
+      <div class="x43-res"><div class="x43-k"><b class="x43-sc">—</b><span>正确率（2 个问题 × PNG / PDF）</span></div><div class="x43-k"><b class="x43-t">—</b><span>平均耗时</span></div></div>
+      <div class="x43-ans"><span class="lbl">回答示例</span><p class="x43-a">—</p></div>
+      <div class="x43-bk"><b>原书结论</b><p class="x43-bc">—</p></div>
+      <div class="x43-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter4/multimodal-agent 验收 20260729T185433Z（2026-07-29，作答 doubao-seed-1-6-250615，评判 moonshot-v1-8k）</div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「工具化多模态分析」· 实验 4-3</div>
+</section>
+<style>
+#c04-x43 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-x43 .x43-seg button{font-size:18px;padding:9px 18px}
+#c04-x43 .x43-body{display:grid;grid-template-columns:760px 1fr;gap:26px;height:690px}
+#c04-x43 .x43-ch{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c04-x43 .x43-bars{flex:1;display:flex;align-items:flex-end;gap:30px;padding:0 30px;border-bottom:2px solid var(--line2)}
+#c04-x43 .x43-bars div{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px}
+#c04-x43 .x43-bars i{width:100%;border-radius:8px 8px 0 0;background:linear-gradient(180deg,#fbbf24,#fb923c)}
+#c04-x43 .x43-bars b{font:700 18px var(--num)}
+#c04-x43 .x43-bars span{font-size:16px;color:var(--text2)}
+#c04-x43 .x43-see{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04)}
+#c04-x43 .x43-see code{display:block;margin-top:6px;font:16px/1.6 var(--mono);min-height:52px}
+#c04-x43 .x43-r{display:flex;flex-direction:column;gap:14px}
+#c04-x43 .x43-res{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#c04-x43 .x43-k{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x43 .x43-k b{display:block;font:800 44px var(--num)}
+#c04-x43 .x43-k span{font-size:15px;color:var(--text2)}
+#c04-x43 .x43-ans,#c04-x43 .x43-bk{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x43 .x43-a{margin-top:6px;font-size:18px;line-height:1.55}
+#c04-x43 .x43-bk b{font-size:18px;color:var(--acc)}
+#c04-x43 .x43-bk p{margin-top:4px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c04-x43 .x43-src{margin-top:auto;display:flex;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+#c04-x43 .x43-src .ic{flex:none;color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-x43'] = {
+  D: [['Q1', 120], ['Q2', 150], ['Q3', 95], ['Q4', 180]],
+  M: [
+    { sc: '4/4', c: 'var(--ok)', t: '8.0 s', see: '[图像本身：坐标轴、四根柱子、数值标签]', a: '“Q4 最高，$180M；Q3 最低，$95M。” ✓', bk: '对视觉和空间信息理解深刻：<b>分析图表、理解文档布局</b>表现最佳' },
+    { sc: '0/4', c: 'var(--bad)', t: '10.9 s', see: 'Acme Corp Quarterly Revenue 2024 Ql Q2 Q3 Q4 $120M $150M $95M $180M', a: '“Q1 最高，$180M。” ✗——OCR 把 Q1 读成了 “Ql”，柱子与数值的对应关系丢了', bk: '纯文本主导的文档<b>成本效益最高</b>，但<b>完全无法处理需要视觉信息的查询</b>' },
+    { sc: '4/4', c: 'var(--ok)', t: '29.8 s', see: 'analyze_image("chart.png", "哪个季度收入最高？") → “Q4，约 $180M”', a: '“Q4 最高，$180M。” ✓', bk: '交互式场景灵活：低成本处理初步查询、需要时再做高成本深度分析；<b>一次性端到端深度理解</b>不如原生' },
+  ],
+  init(s) {
+    s.querySelector('.x43-bars').innerHTML = this.D.map(([q, v]) => `<div><b>$${v}M</b><i style="height:${v * 1.8}px"></i><span>${q}</span></div>`).join('');
+    this.set = U.seg(s.querySelector('.x43-seg'), (v) => { this.auto = false; this.show(s, +v); });
+  },
+  show(s, i) {
+    this.i = i; this.set(String(i));
+    const m = this.M[i], q = (x) => s.querySelector(x);
+    q('.x43-sc').textContent = m.sc; q('.x43-sc').style.color = m.c; q('.x43-t').textContent = m.t;
+    q('.x43-sw').textContent = m.see; q('.x43-a').textContent = m.a; q('.x43-bc').innerHTML = m.bk;
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 3600); },
+  reset() {},
+};
+</script>

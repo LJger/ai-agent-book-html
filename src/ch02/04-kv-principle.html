@@ -1,0 +1,939 @@
+<!-- ================= PART 04 Chat Template 与 KV Cache 原理 ================= -->
+<section class="slide chapter" id="c02-d4" data-part="4" data-title="PART 04 · Chat Template 与 KV Cache 原理" data-notes="这一部分从 API 走到模型内部：结构化的 JSON 消息如何被 Chat Template 翻译成线性的 token 流；这种翻译为什么决定了“必须使用标准 API 格式”；各家模型对历史思维链的处理有何不同；以及 KV Cache 的原理——为什么它只认前缀、为什么改动前缀会让变动点之后的缓存全部失效。最后用实验 2-3 看五种常见的错误上下文管理模式。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:84px">Chat Template 与<br>KV Cache 原理</h1>
+  <div class="ch-s fx fx-up" style="--d:3">结构化消息如何变成 token 流；缓存为什么只认前缀</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">Chat Template 是一项贯穿全书的基础机制：它不只关系到 KV Cache，还决定了多轮工具调用、思维链保留、状态栏注入等机制能否正确工作。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c02-tpl" data-part="4" data-dur="14000" data-title="Chat Template：信封格式" data-notes="Chat Template 是一项<b>贯穿全书的基础机制</b>：它不只关系到 KV Cache，还决定了多轮工具调用、思维链保留、状态栏注入等诸多机制能否正确工作。注意力可视化实验中的 token 序列（如 &lt;|im_start|&gt;、&lt;|im_end|&gt; 等特殊标记）看起来与 API 的 JSON 格式很不一样，这是因为 API 层面的结构化消息需要被转换为模型能理解的线性 token 流——负责这个转换的就是 <b>Chat Template</b>（聊天模板），见<b>图2-8</b>。<br>可以把 Chat Template 想象成<b>信封格式</b>：API 消息是信的内容，Chat Template 规定了如何在信封上写明寄件人、收件人——用特殊标记（如 &lt;|im_start|&gt;system、&lt;|im_end|&gt;）划分每条消息的边界和角色。不同的模型家族（Qwen、Llama、Gemma）使用不同的“信封格式”，就像不同国家有不同的邮政编码规则。API 服务端（vLLM、Ollama 等）会根据模型的 Chat Template 自动完成这个转换，开发者通常不需要手动处理。<br>演示以 Qwen 系列的格式为例：三条消息依次穿过模板，被拼成一段连续的 token 序列；最后停在 &lt;|im_start|&gt;assistant 之后，模型从这里开始生成。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Chat Template：给每条消息套上<em>信封</em></h2>
+  <p class="lead fx fx-up" style="--d:2">结构化的 API 消息 → 模型实际处理的线性 token 流（以 Qwen 系列为例）</p></header>
+  <div class="tp-stage fx fx-scale" style="--d:3">
+    <div class="tp-msgs">
+      <div class="tp-m" data-i="0" style="--c:#cbd5e1"><b>system</b><span>“You are a helpful assistant.”</span></div>
+      <div class="tp-m" data-i="1" style="--c:#fbbf24"><b>user</b><span>“北京今天天气怎么样？”</span></div>
+      <div class="tp-m" data-i="2" style="--c:#a78bfa"><b>assistant</b><span>（待生成）</span></div>
+      <p class="tp-cap">结构化 API 消息：信的内容</p>
+    </div>
+    <div class="tp-mac"><svg class="ic"><use href="#i-wand"/></svg><b>Chat Template</b><small>写信封：标明角色与边界</small></div>
+    <div class="tp-out win"><div class="win-bar"><i></i><i></i><i></i><span>模型实际处理的线性 token 流</span></div><div class="tp-tk"></div></div>
+    <svg class="tp-svg" viewBox="0 0 1660 520" width="1660" height="520"><path class="tp-p" d="M470 90 C 540 90, 540 250, 600 250"/><path class="tp-p" d="M470 210 C 540 210, 540 250, 600 250"/><path class="tp-p" d="M470 330 C 540 330, 540 250, 600 250"/><path class="tp-p" d="M820 250 H880"/><circle class="pk tp-k" r="9"/></svg>
+  </div>
+  <div class="tp-fam fx fx-up" style="--d:5"><span class="lbl">不同的模型家族，不同的“信封格式”</span><span class="tp-f on">Qwen：&lt;|im_start|&gt; … &lt;|im_end|&gt;</span><span class="tp-f">Llama</span><span class="tp-f">Gemma</span><span class="tp-fx">服务端（vLLM、Ollama 等）按模型的模板自动转换</span></div>
+  <div class="src">第二章 ·「从 API 消息到模型 Token：Chat Template」· 图2-8</div>
+</section>
+<style>
+.tp-stage{position:relative;height:520px}
+.tp-msgs{position:absolute;left:0;top:30px;width:470px;display:flex;flex-direction:column;gap:20px}
+.tp-m{--c:var(--text3);height:100px;padding:16px 20px;border-radius:16px;display:flex;flex-direction:column;justify-content:center;gap:6px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.92));transition:box-shadow .4s,border-color .4s,translate .4s var(--ease)}
+.tp-m b{font:700 20px var(--mono);color:var(--c)}
+.tp-m span{font-size:19px}
+.tp-m.on{border-color:var(--c);box-shadow:0 0 28px color-mix(in srgb,var(--c) 40%,transparent);translate:8px 0}
+.tp-cap{font-size:16px;color:var(--text3);text-align:center}
+.tp-mac{position:absolute;left:600px;top:180px;width:220px;height:140px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;border:2px solid color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(10,16,36,.95));z-index:2;transition:box-shadow .3s}
+.tp-mac .ic{font-size:36px;color:var(--acc)}
+.tp-mac b{font-size:21px}
+.tp-mac small{font-size:15px;color:var(--text3)}
+.tp-mac.on{box-shadow:0 0 40px color-mix(in srgb,var(--acc) 50%,transparent)}
+.tp-mac.on .ic{animation:spin 1.6s linear infinite}
+.tp-out{position:absolute;left:880px;top:0;width:780px;height:520px;display:flex;flex-direction:column}
+.tp-tk{flex:1;padding:20px 24px;font:21px/1.8 var(--mono);white-space:pre-wrap;color:#cbd5f5}
+.tp-tk .sp{color:#f0abfc;font-weight:700;background:color-mix(in srgb,#f0abfc 12%,transparent);border-radius:5px;padding:0 3px}
+.tp-tk .rl{font-weight:700}
+.tp-tk .gen{display:inline-block;margin-top:6px;padding:2px 10px;border-radius:8px;font:16px var(--font);color:#06101f;background:var(--llm);animation:blink 1.2s steps(1) infinite}
+.tp-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.tp-p{fill:none;stroke:var(--acc);stroke-width:2.5;stroke-dasharray:6 8;opacity:.4;animation:flow 1s linear infinite}
+.tp-k{fill:#fff;filter:drop-shadow(0 0 8px var(--acc))}
+.tp-fam{display:flex;align-items:center;gap:14px;margin-top:22px;flex-wrap:wrap}
+.tp-f{padding:8px 16px;border-radius:12px;font-size:17px;color:var(--text3);border:1px dashed var(--line2)}
+.tp-f.on{color:var(--text);border-style:solid;border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);font-family:var(--mono)}
+.tp-fx{margin-left:auto;font-size:17px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c02-tpl'] = {
+  // 每条消息套上信封后的片段
+  P: [
+    [['<|im_start|>', 'sp'], ['system', 'rl', '#cbd5e1'], ['\n'], ['You are a helpful assistant.', '', '#e2e8f0'], ['<|im_end|>', 'sp'], ['\n']],
+    [['<|im_start|>', 'sp'], ['user', 'rl', '#fbbf24'], ['\n'], ['北京今天天气怎么样？', '', '#fde68a'], ['<|im_end|>', 'sp'], ['\n']],
+    [['<|im_start|>', 'sp'], ['assistant', 'rl', '#a78bfa'], ['\n']],
+  ],
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const out = s.querySelector('.tp-tk'), ms = [...s.querySelectorAll('.tp-m')], mac = s.querySelector('.tp-mac');
+    const ps = [...s.querySelectorAll('.tp-p')], dot = s.querySelector('.tp-k');
+    while (ok()) {
+      out.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        ms.forEach((m, j) => m.classList.toggle('on', j === i));
+        await U.fly(dot, ps[i], 700, { ctx });
+        if (!ok()) return;
+        mac.classList.add('on');
+        await U.fly(dot, ps[3], 400, { ctx });
+        if (!ok()) return;
+        for (const [t, c, col] of this.P[i]) {
+          const sp = document.createElement('span');
+          if (c) sp.className = c;
+          if (col) sp.style.color = col;
+          sp.textContent = t;
+          out.appendChild(sp);
+          await U.wait(ctx, 160);
+          if (!ok()) return;
+        }
+        mac.classList.remove('on');
+      }
+      ms.forEach((m) => m.classList.remove('on'));
+      out.insertAdjacentHTML('beforeend', '<span class="gen">← 模型从这里开始生成</span>');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.tp-tk').innerHTML = ''; s.querySelectorAll('.on').forEach((x) => { if (!x.classList.contains('tp-f')) x.classList.remove('on'); }); },
+};
+</script>
+
+<section class="slide" id="c02-tpl2" data-part="4" data-trans="flip" data-dur="15000" data-title="API 层与模型层：同一段对话的两种样子" data-notes="以 Qwen 系列模型为例，同一段对话在 API 和模型内部看到的是完全不同的形式（<b>图2-9</b>）：左侧是结构化的 JSON 消息，右侧是模型实际处理的线性 token 流。&lt;|im_start|&gt; 和 &lt;|im_end|&gt; 是特殊 token，告诉模型每条消息的角色和边界；末尾的 &lt;|im_start|&gt;assistant 之后就是模型开始生成的位置。<br>对于 Agent 开发者来说，<b>你不需要手动编写或修改 Chat Template</b>——API 服务端会自动处理。但理解它的存在对 Agent 开发有两个实用价值，接下来两页分别展开。<br>第二个标签页是实验 2-1 真实运行时送进 Qwen3-0.6B 的 token 流（第二次调用，节选）：可以看到工具定义被模板写进了 system 段（这就是“静态前缀”在 token 层的样子），模型的工具调用变成 &lt;tool_call&gt; 标签，而 tool 角色的工具结果被包在一个 user 段里的 &lt;tool_response&gt; 标签中——模板正是靠这层包装区分“工具结果”与“真实的用户提问”。把鼠标移到左侧 JSON 上，右侧对应的 token 会高亮。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一段对话：API 层 vs <em>模型层</em></h2></div>
+    <div class="t2-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="fig">图2-9 示例</button><button data-v="real">实验 2-1 真实渲染</button></div></header>
+  <div class="t2-view" data-v="fig">
+    <div class="t2-api panel fx fx-left" style="--d:2">
+      <div class="lbl">API 层面（开发者看到的）</div>
+      <div class="t2-json mono">
+        <div class="t2-msg" data-g="m0"><span data-g="m0">{</span> <span class="k">"role"</span>: <span class="v" data-g="r0">"system"</span>, <span class="k">"content"</span>: <span class="v" data-g="c0">"你是助手"</span> <span data-g="m0">}</span></div>
+        <div class="t2-msg" data-g="m1"><span data-g="m1">{</span> <span class="k">"role"</span>: <span class="v" data-g="r1">"user"</span>, <span class="k">"content"</span>: <span class="v" data-g="c1">"你好"</span> <span data-g="m1">}</span></div>
+      </div>
+    </div>
+    <svg class="ic t2-arr fx fx-scale" style="--d:3"><use href="#i-arrow"/></svg>
+    <div class="t2-tok panel fx fx-right" style="--d:3">
+      <div class="lbl">模型层面（经 Chat Template 转换后）</div>
+      <div class="t2-ts mono"><span class="sp" data-g="m0">&lt;|im_start|&gt;</span><span class="rl" data-g="r0">system</span><br><span class="ct" data-g="c0">你是助手</span><span class="sp" data-g="m0">&lt;|im_end|&gt;</span><br><span class="sp" data-g="m1">&lt;|im_start|&gt;</span><span class="rl" data-g="r1">user</span><br><span class="ct" data-g="c1">你好</span><span class="sp" data-g="m1">&lt;|im_end|&gt;</span><br><span class="sp" data-g="g">&lt;|im_start|&gt;</span><span class="rl" data-g="g">assistant</span><br><span class="t2-gen" data-g="g">（模型从这里开始生成）</span></div>
+    </div>
+  </div>
+  <div class="t2-view" data-v="real">
+    <div class="t2-raw win">
+      <div class="win-bar"><i></i><i></i><i></i><span>qwen3:0.6b · 第 2 次调用的完整 prompt（节选）</span></div>
+<pre class="t2-pre"><span class="sp">&lt;|im_start|&gt;</span>system
+You are a helpful assistant. Use tools for current facts. …
+<span class="ra" data-a="0"># Tools
+You are provided with function signatures within &lt;tools&gt;&lt;/tools&gt; XML tags:
+&lt;tools&gt;
+{"type": "function", "function": {"name": "get_current_temperature", …}}
+{"type": "function", "function": {"name": "get_current_time", …}}
+&lt;/tools&gt;</span>
+For each function call, return a json object … within &lt;tool_call&gt;&lt;/tool_call&gt; XML tags<span class="sp">&lt;|im_end|&gt;</span>
+<span class="sp">&lt;|im_start|&gt;</span>user
+What are the current time and weather in Vancouver? Call both tools.<span class="sp">&lt;|im_end|&gt;</span>
+<span class="sp">&lt;|im_start|&gt;</span>assistant
+<span class="ra" data-a="1">&lt;tool_call&gt;
+{"name": "get_current_time", "arguments": {"timezone": "America/Vancouver"}}
+&lt;/tool_call&gt;</span> …<span class="sp">&lt;|im_end|&gt;</span>
+<span class="ra" data-a="2"><span class="sp">&lt;|im_start|&gt;</span>user
+&lt;tool_response&gt;
+{"timezone": "America/Vancouver", "datetime": "2026-07-29 11:11:28", …}
+&lt;/tool_response&gt;</span> …<span class="sp">&lt;|im_end|&gt;</span>
+<span class="sp">&lt;|im_start|&gt;</span>assistant</pre>
+    </div>
+    <div class="t2-notes">
+      <div class="t2-n" data-a="0"><em>①</em><div><b>工具定义被写进 system 段</b><p>tools 字段变成 system 里的 # Tools 段落——“静态前缀”在 token 层的样子</p></div></div>
+      <div class="t2-n" data-a="1"><em>②</em><div><b>工具调用变成 &lt;tool_call&gt; 标签</b><p>assistant 的 tool_calls 以标签形式写在它自己的段里</p></div></div>
+      <div class="t2-n" data-a="2"><em>③</em><div><b>工具结果包在 user 段的 &lt;tool_response&gt; 里</b><p>模板靠这层包装区分“工具结果”与“真实的用户提问”——下一页的关键</p></div></div>
+      <p class="cap">数据：配套仓库 chapter2/local_llm_serving 运行记录（2026-07-29）</p>
+    </div>
+  </div>
+  <p class="tagline t2-tag fx fx-up" style="--d:5"><b>你不需要手动编写或修改 Chat Template</b>——服务端自动处理；但理解它，有两个实用价值 →</p>
+  <div class="src">第二章 ·「从 API 消息到模型 Token：Chat Template」· 图2-9 · 实验 2-1 运行记录</div>
+</section>
+<style>
+#c02-tpl2 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.t2-view{display:none;height:590px;gap:26px;align-items:stretch}
+#c02-tpl2[data-v=fig] .t2-view[data-v=fig],#c02-tpl2[data-v=real] .t2-view[data-v=real]{display:flex}
+.t2-api,.t2-tok{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:20px}
+.t2-arr{align-self:center;font-size:44px;color:var(--acc);flex:none}
+.t2-json{display:flex;flex-direction:column;gap:24px;font-size:24px;line-height:1.6}
+.t2-json .k{color:#7dd3fc}.t2-json .v{color:#86efac}
+.t2-json span[data-g],.t2-ts span[data-g]{border-radius:6px;transition:background .3s,box-shadow .3s;cursor:default}
+.t2-ts{font-size:27px;line-height:1.75}
+.t2-ts .sp{color:#f0abfc;font-weight:700}
+.t2-ts .rl{color:var(--acc);font-weight:700;margin-left:4px}
+.t2-ts .ct{color:var(--text)}
+.t2-gen{font:20px var(--font);color:var(--llm)}
+#c02-tpl2 .hl{background:color-mix(in srgb,var(--tool) 30%,transparent);box-shadow:0 0 0 2px var(--tool)}
+.t2-raw{width:1060px;flex:none;display:flex;flex-direction:column}
+.t2-pre{flex:1;margin:0;padding:14px 18px;font:15.5px/1.58 var(--mono);color:#cbd5f5;white-space:pre-wrap}
+.t2-pre .sp{color:#f0abfc;font-weight:700}
+.t2-pre .ra{border-radius:6px;transition:background .4s,box-shadow .4s}
+.t2-pre .ra.on{background:color-mix(in srgb,var(--acc) 22%,transparent);box-shadow:0 0 0 2px color-mix(in srgb,var(--acc) 70%,transparent)}
+.t2-notes{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.t2-n{display:flex;gap:14px;padding:16px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.5;transition:all .45s var(--ease)}
+.t2-n em{flex:none;font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.t2-n b{font-size:20px}
+.t2-n p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:4px}
+.t2-n.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.t2-notes .cap{margin-top:auto}
+.t2-tag{margin-top:20px;font-size:23px}
+</style>
+<script>
+HOOKS['c02-tpl2'] = {
+  G: ['m0', 'r0', 'c0', 'm1', 'r1', 'c1', 'g'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.t2-seg'), (v) => { this.auto = false; this.view(s, v); });
+    s.querySelectorAll('.t2-view[data-v=fig] [data-g]').forEach((e) => e.addEventListener('mouseenter', () => { this.auto = false; this.hl(s, e.dataset.g); }));
+  },
+  hl(s, g) { s.querySelectorAll('.t2-view[data-v=fig] [data-g]').forEach((e) => e.classList.toggle('hl', e.dataset.g === g && !e.classList.contains('t2-msg'))); },
+  view(s, v) { this.v = v; s.dataset.v = v; this.set(v); },
+  enter(s, ctx) {
+    this.auto = true;
+    this.view(s, 'fig');
+    let i = 0, a = 0, n = 0;
+    ctx.every(() => {
+      if (!this.auto) return;
+      n++;
+      if (this.v === 'fig') {
+        this.hl(s, this.G[i++ % this.G.length]);
+        if (n % 9 === 0) this.view(s, 'real');
+      } else {
+        s.querySelectorAll('.ra,.t2-n').forEach((e) => e.classList.toggle('on', +e.dataset.a === a % 3));
+        a++;
+        if (n % 9 === 0) this.view(s, 'fig');
+      }
+    }, 1500);
+  },
+  reset(s) { s.querySelectorAll('.hl,.on').forEach((e) => e.classList.remove('hl', 'on')); },
+};
+</script>
+
+<section class="slide" id="c02-tplv1" data-part="4" data-trans="rise" data-dur="16000" data-title="价值一：为什么必须使用标准 API 格式" data-notes="<b>第一，解释了为什么必须使用标准 API 格式</b>。如果开发者绕过 API、自行拼接消息（比如把工具结果作为普通 user 消息而非 tool 类型传递），Chat Template 会误将工具响应识别为新的用户查询，导致模型的思维链保留机制被破坏。<br>以 Qwen3 的 Chat Template 为例：模型在多轮工具调用中，会把之前的内部思考过程（&lt;think&gt; 标签内的内容）保留下来，像草稿纸上的推导步骤，确保思路的连贯性。但当 Chat Template 检测到新的用户查询时，会默认“用户换了个话题”，于是清理之前的思考过程重新开始。问题在于，如果工具结果被错误地标记为用户消息，就会误触发这种清理——相当于模型正算到一半，草稿纸被人收走了，只能从头再来，严重影响多步思考的连贯性。<br>右上角切换两种写法：工具结果用 tool 角色时，草稿纸一路保留；错标成 user 时，每来一个结果，之前的思考就被清空。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">价值一：错标一个角色，<em>草稿纸就被收走</em></h2></div>
+    <div class="v1-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="ok">工具结果用 tool 角色</button><button data-v="bad">错标为 user 消息</button></div></header>
+  <div class="v1-body">
+    <div class="v1-tr panel fx fx-left" style="--d:2">
+      <div class="v1-th"><b>多轮工具调用的轨迹</b><span class="v1-st"></span></div>
+      <div class="v1-list"></div>
+    </div>
+    <div class="v1-side fx fx-right" style="--d:3">
+      <div class="v1-pad glass"><div class="v1-ph"><svg class="ic"><use href="#i-note"/></svg><b>模型的草稿纸</b><span class="lbl">保留下来的 &lt;think&gt;</span></div><div class="v1-notes"></div></div>
+      <div class="v1-rule"><b>Qwen3 模板的规则</b><p>多轮工具调用中保留之前的思考；检测到<b>新的用户查询</b>时，默认“用户换了个话题”，清理之前的思考重新开始</p></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「从 API 消息到模型 Token：Chat Template」· 价值一</div>
+</section>
+<style>
+#c02-tplv1 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.v1-body{display:flex;gap:28px;height:640px}
+.v1-tr{width:930px;flex:none;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.v1-th{display:flex;align-items:baseline;gap:14px;font-size:20px}
+.v1-st{font-size:17px;color:var(--text2)}
+.v1-st.bad{color:var(--bad)}
+.v1-list{display:flex;flex-direction:column;gap:9px}
+.v1-list .mr{font-size:17px}
+.v1-list .mr .rl{min-width:96px}
+.v1-th2{display:inline-block;margin-right:8px;padding:1px 8px;border-radius:6px;font-size:15px;color:#c4b5fd;border:1px dashed #c4b5fd}
+.v1-list .mr.wrong{border-color:var(--bad);box-shadow:0 0 18px color-mix(in srgb,var(--bad) 35%,transparent)}
+.v1-list .mr.wrong::after{content:"模板以为：新的用户查询";position:absolute;right:12px;top:50%;translate:0 -50%;font-size:14px;color:#fff;background:var(--bad);padding:2px 8px;border-radius:6px}
+.v1-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.v1-pad{padding:20px 22px;display:flex;flex-direction:column;gap:12px;min-height:390px}
+.v1-ph{display:flex;align-items:center;gap:10px;font-size:20px}
+.v1-ph .ic{font-size:26px;color:var(--llm)}
+.v1-ph .lbl{margin-left:auto}
+.v1-notes{display:flex;flex-direction:column;gap:10px}
+.v1-n{padding:12px 14px;border-radius:12px;font-size:17px;line-height:1.5;color:#e9d5ff;background:color-mix(in srgb,var(--llm) 12%,transparent);border:1px solid color-mix(in srgb,var(--llm) 40%,transparent);animation:upIn .5s var(--spring) both;transition:opacity .5s,transform .5s,filter .5s}
+.v1-n.gone{opacity:0;transform:translateX(60px) rotate(8deg);filter:blur(4px)}
+.v1-x{padding:12px 14px;border-radius:12px;font-size:17px;color:var(--bad);border:1px dashed var(--bad);animation:shake .5s}
+.v1-rule{padding:18px 22px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent)}
+.v1-rule b{font-size:20px;color:var(--acc)}
+.v1-rule p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:4px}
+.v1-rule p b{font-size:18px}
+</style>
+<script>
+HOOKS['c02-tplv1'] = {
+  THINK: ['先查用户的账户状态，再决定退款方式', '账户正常；还要确认订单是否在退款期内', '在退款期内，可以发起退款并通知用户'],
+  init(s) { this.set = U.seg(s.querySelector('.v1-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  async run(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.m = m;
+    this.set(m);
+    const list = s.querySelector('.v1-list'), notes = s.querySelector('.v1-notes'), st = s.querySelector('.v1-st');
+    list.innerHTML = ''; notes.innerHTML = '';
+    st.className = 'v1-st' + (m === 'bad' ? ' bad' : '');
+    st.textContent = m === 'ok' ? '工具结果以 tool 角色传回' : '工具结果被当成普通 user 消息传回';
+    if (!ctx) return;
+    const add = (html) => list.insertAdjacentHTML('beforeend', html);
+    add(C02.mr('user', '帮我把上周的订单退款'));
+    await U.wait(ctx, 700);
+    for (let i = 0; i < 3 && ok(); i++) {
+      add(C02.mr('assistant', `<span class="v1-th2">think</span>${this.THINK[i]} → <span class="mono">tool_call #${i + 1}</span>`, { cls: 'new' }));
+      notes.insertAdjacentHTML('beforeend', `<div class="v1-n">第 ${i + 1} 步：${this.THINK[i]}</div>`);
+      await U.wait(ctx, 1200); if (!ok()) return;
+      if (i === 2) break;
+      if (m === 'ok') add(C02.mr('tool', `工具结果 #${i + 1}`, { cls: 'new', mono: true }));
+      else {
+        add(C02.mr('user', `工具结果 #${i + 1}`, { cls: 'new wrong', mono: true }));
+        await U.wait(ctx, 700); if (!ok()) return;
+        // 模板误判为新的用户查询：清理之前保留的思考
+        notes.querySelectorAll('.v1-n').forEach((n) => n.classList.add('gone'));
+        await U.wait(ctx, 600); if (!ok()) return;
+        notes.innerHTML = '<div class="v1-x">草稿纸被收走：之前的思考全部清空，只能从头再来</div>';
+      }
+      await U.wait(ctx, 1000); if (!ok()) return;
+    }
+    if (this.auto) { await U.wait(ctx, 2600); if (ok()) this.run(s, m === 'ok' ? 'bad' : 'ok'); }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.run(s, 'ok'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.v1-list').innerHTML = ''; s.querySelector('.v1-notes').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c02-cot" data-part="4" data-dur="16000" data-title="历史思维链：各家策略" data-notes="需要注意的是，不同模型家族对历史思维链的处理策略差异很大，而且策略本身也在快速演变。<br>DeepSeek R1 时代的官方做法是<b>剥离全部历史思考</b>：多轮对话时只回传 content，不回传 reasoning_content——因为 R1 训练时历史 CoT 从不出现在输入里，塞回去属于分布外输入，反而可能干扰输出，同时也能省下可观的 token。但这个策略对 Agent 场景是有缺陷的：中间思考承载着“为什么调用这个工具、排除了哪些假设”等关键状态，剥离后模型每轮都从零开始推理，容易重复犯错、丢失长程计划。<br>因此 DeepSeek 在 V4 上<b>彻底反转</b>：只要请求携带 tools 参数，两个 user 消息之间的每条 assistant 消息（哪怕这一轮并未真的调用工具）都必须原样回传 reasoning_content，否则 API 直接返回 400 错误；不带 tools 的纯聊天则仍然忽略历史思考。Agent 天然携带 tools，因此这条强制规则躲不开——Kimi K2、GLM-5 等也采用了同样的协议。<br>Claude 同样要求把 thinking block 连同签名原样回传；较新的 Claude 模型还能跨越用户轮次使用历史 thinking，但签名把每个 thinking block 绑定在产生它时的前缀上，前缀一改，它就作废（详见 PART 05“缓存作为架构约束”）。<br>因此，使用前应查阅对应模型的最新文档。这些差异在多轮对话里只关系到省不省 token，一旦要把跑到一半的轨迹交给另一家模型接着跑，就会变成实打实的接口错误，详见第五章的实验 5-1。<br>页面上方选择模型策略，右上角开关决定下一次请求是否回传历史思考，看看会发生什么。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">历史思维链要不要回传？<em>各家差异很大</em></h2></div>
+    <button class="tgl on ct2-tg fx fx-up" style="--d:2"><i></i>下一次请求回传历史思考</button></header>
+  <div class="ct2-tabs tabs fx fx-up" style="--d:2"><button data-v="r1">DeepSeek R1</button><button data-v="v4">DeepSeek V4</button><button data-v="km">Kimi K2 · GLM-5</button><button data-v="cl">Claude</button></div>
+  <div class="ct2-body">
+    <div class="ct2-req panel fx fx-left" style="--d:3">
+      <div class="ct2-h"><b>下一次请求的 messages</b><span class="chip har">带 tools 参数（Agent 天然携带）</span></div>
+      <div class="ct2-list"></div>
+      <div class="ct2-res"><span class="ct2-badge"></span><p class="ct2-rt"></p></div>
+    </div>
+    <div class="ct2-card glass fx fx-right" style="--d:4">
+      <span class="ct2-pol"></span>
+      <p class="ct2-d"></p>
+      <p class="ct2-df"></p>
+    </div>
+  </div>
+  <p class="ct2-foot fx fx-up" style="--d:5"><svg class="ic"><use href="#i-alert"/></svg>策略在快速演变，使用前应查阅对应模型的最新文档；跨模型接力时，这些差异会变成实打实的接口错误（第五章实验 5-1）</p>
+  <div class="src">第二章 ·「从 API 消息到模型 Token：Chat Template」· 历史思维链的处理</div>
+</section>
+<style>
+#c02-cot .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.ct2-tabs button{font-size:19px;padding:10px 24px}
+.ct2-body{display:flex;gap:26px;height:560px;margin-top:18px}
+.ct2-req{width:900px;flex:none;padding:20px 22px;display:flex;flex-direction:column;gap:12px}
+.ct2-h{display:flex;align-items:center;justify-content:space-between;font-size:20px}
+.ct2-h .chip{font-size:15px}
+.ct2-list{display:flex;flex-direction:column;gap:8px}
+.ct2-list .mr{font-size:16px;padding:8px 12px 8px 16px}
+.ct2-rc{display:inline-block;margin-right:8px;padding:1px 8px;border-radius:6px;font:14.5px var(--mono);color:#c4b5fd;border:1px solid #c4b5fd;transition:all .4s}
+.ct2-rc.off{color:var(--text3);border-color:var(--line2);text-decoration:line-through;opacity:.6}
+.ct2-rc.sig::after{content:" + 签名";color:var(--ok)}
+.ct2-res{margin-top:auto;display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ct2-badge{flex:none;padding:6px 14px;border-radius:10px;font:800 18px var(--num);color:#06101f}
+.ct2-rt{font-size:18px;line-height:1.5}
+.ct2-res.sw{animation:upIn .45s var(--spring) both}
+.ct2-card{flex:1;min-width:0;padding:24px 26px;display:flex;flex-direction:column;gap:14px}
+.ct2-pol{align-self:flex-start;padding:8px 16px;border-radius:12px;font-size:22px;font-weight:700;color:#06101f;background:var(--acc)}
+.ct2-d{font-size:19px;line-height:1.7}
+.ct2-df{font-size:18px;line-height:1.65;color:var(--text2);padding:14px 16px;border-radius:12px;border:1px dashed var(--line2)}
+.ct2-df:empty{display:none}
+.ct2-card.sw .ct2-pol,.ct2-card.sw .ct2-d,.ct2-card.sw .ct2-df{animation:swIn .5s var(--ease) both}
+.ct2-foot{display:flex;align-items:center;gap:12px;margin-top:18px;font-size:18px;color:var(--warn)}
+</style>
+<script>
+HOOKS['c02-cot'] = {
+  V: {
+    r1: { pol: '剥离全部历史思考', d: '多轮对话时只回传 content，不回传 reasoning_content：R1 训练时历史 CoT 从不出现在输入里，塞回去属于<b>分布外输入</b>，反而可能干扰输出；同时也能省下可观的 token。', df: '对 Agent 场景有缺陷：中间思考承载着“为什么调用这个工具、排除了哪些假设”等关键状态，剥离后每轮都从零开始推理，容易重复犯错、丢失长程计划。' },
+    v4: { pol: '彻底反转：带 tools 必须回传', d: '只要请求携带 tools，两个 user 消息之间的<b>每条</b> assistant 消息（哪怕这一轮没真的调用工具）都必须原样回传 reasoning_content，否则 API 直接返回 <b>400 错误</b>；不带 tools 的纯聊天仍然忽略历史思考。', df: 'Agent 天然携带 tools，因此这条强制规则躲不开。' },
+    km: { pol: '与 DeepSeek V4 同样的协议', d: 'Kimi K2、GLM-5 等也采用了同样的协议：带 tools 时，历史 assistant 消息的思考必须原样回传。', df: '' },
+    cl: { pol: 'thinking block 连同签名原样回传', d: 'Claude 要求把 thinking block 连同<b>签名</b>原样回传；较新的 Claude 模型还能跨越用户轮次使用历史 thinking。', df: '签名把每个 thinking block 绑定在产生它时的前缀上：前缀一改，它就作废——见 PART 05“缓存作为架构约束”。' },
+  },
+  init(s) {
+    s.querySelector('.ct2-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) { this.auto = false; this.pick(s, b.dataset.v); } });
+    s.querySelector('.ct2-tg').addEventListener('click', () => { this.auto = false; this.send = !this.send; this.pick(s, this.v); });
+  },
+  pick(s, v) {
+    this.v = v;
+    s.querySelectorAll('.ct2-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+    s.querySelector('.ct2-tg').classList.toggle('on', this.send);
+    const p = this.V[v], c = s.querySelector('.ct2-card');
+    c.querySelector('.ct2-pol').textContent = p.pol;
+    c.querySelector('.ct2-d').innerHTML = p.d;
+    c.querySelector('.ct2-df').innerHTML = p.df;
+    U.restart(c, 'sw');
+    const rc = (t) => `<span class="ct2-rc${this.send ? '' : ' off'}${v === 'cl' && this.send ? ' sig' : ''}">${v === 'cl' ? 'thinking' : 'reasoning_content'}</span>`;
+    s.querySelector('.ct2-list').innerHTML = [
+      C02.mr('system', '…'),
+      C02.mr('user', '帮我排查线上的支付回调失败'),
+      C02.mr('assistant', `${rc()}tool_call: grep("callback")`, { mono: true }),
+      C02.mr('tool', '找到 3 处调用点…', { mono: true }),
+      C02.mr('assistant', `${rc()}tool_call: read_file("callbacks.py")`, { mono: true }),
+      C02.mr('tool', 'def handle_callback(…)…', { mono: true }),
+      C02.mr('assistant', `${rc()}（这一轮没有调用工具，只做了分析）`),
+      C02.mr('user', '继续，修复它'),
+    ].join('');
+    // 结果判定
+    const R = {
+      r1: this.send ? ['偏离训练', 'var(--warn)', '分布外输入：R1 训练时从没见过历史思考，塞回去反而可能干扰输出，还多花 token'] : ['符合官方做法', 'var(--ok)', '只回传 content；代价是每轮从零推理，Agent 容易重复犯错、丢失长程计划'],
+      v4: this.send ? ['200 OK', 'var(--ok)', '带 tools 时原样回传了每条 assistant 消息的 reasoning_content'] : ['HTTP 400', 'var(--bad)', '请求携带 tools，却缺少历史 assistant 消息的 reasoning_content：API 直接拒绝'],
+      km: this.send ? ['200 OK', 'var(--ok)', '与 V4 同样的协议：历史思考原样回传'] : ['HTTP 400', 'var(--bad)', '与 V4 同样的协议：带 tools 时缺少历史思考会被拒绝'],
+      cl: this.send ? ['签名校验通过', 'var(--ok)', 'thinking 连同签名原样回传；只要前缀没被改动，这些推理继续有效'] : ['不符合要求', 'var(--bad)', 'Claude 要求把 thinking block 连同签名原样回传'],
+    }[v];
+    const res = s.querySelector('.ct2-res'), b = res.querySelector('.ct2-badge');
+    b.textContent = R[0]; b.style.background = R[1];
+    res.querySelector('.ct2-rt').textContent = R[2];
+    U.restart(res, 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.send = true;
+    this.pick(s, 'r1');
+    const seq = [['r1', false], ['r1', true], ['v4', true], ['v4', false], ['km', false], ['cl', true]];
+    let i = 0;
+    ctx.every(() => { if (!this.auto) return; i = (i + 1) % seq.length; this.send = seq[i][1]; this.pick(s, seq[i][0]); }, 3000);
+    this.send = false; this.pick(s, 'r1');
+  },
+  reset(s) { this.send = true; },
+};
+</script>
+
+<section class="slide" id="c02-psens" data-part="4" data-steps="3" data-trans="zoom" data-dur="9000" data-title="价值二：前缀敏感与 Prompt Cache" data-notes="<b>第二，解释了 KV Cache 为什么对前缀如此敏感</b>。Chat Template 将 system 消息和工具定义转换为固定的 token 序列放在最前面。这些 token 的键值对（Key-Value pairs）被缓存后可以跨请求复用。但如果前缀中某个 token 发生变化——哪怕只是系统提示词里多了一个空格——首个不同 token 及其后的缓存就无法复用。<br><b>图2-10</b> 展示的正是这种跨请求的前缀复用：按 PART 05“两个层级的缓存”的区分，它属于 <b>Prompt Cache</b> 层，复用的对象则是前缀的 KV Cache。请求 1 建立缓存；请求 2 前缀不变，直接命中；请求 3 把动态时间戳放在系统提示词最前面，变动点在最前，其后全部重算。<br>图中给出的性能对比（3000 token 总上下文）：缓存命中时首 token 延迟约 0.5 秒、只为新 token 计费；缓存失效时约 3-5 秒、变动点后的 token 全部重新计费。原图注明：TTFT 为示意值，随模型、硬件与部署方式而变，此处仅用于说明相对量级差异。按 → 依次发出三个请求。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">价值二：前缀敏感——<em>Prompt Cache</em> 跨请求复用</h2>
+  <p class="lead fx fx-up" style="--d:2">Chat Template 把 system 和工具定义变成固定的 token 序列放在最前面，它们的 K/V 可以跨请求复用</p></header>
+  <div class="ps-body">
+    <div class="ps-reqs fx fx-left" style="--d:3">
+      <div class="ps-r" data-r="0"><span class="ps-n">请求 1</span><div class="ps-bar"><span class="ps-s pre">System Prompt + Tools（1200 token）</span><span class="ps-s u">用户消息 …</span></div><span class="ps-o">→ 生成回答</span><span class="ps-tag"></span></div>
+      <div class="ps-r" data-r="1"><span class="ps-n">请求 2</span><div class="ps-bar"><span class="ps-s pre">System Prompt + Tools（缓存命中 ✓）</span><span class="ps-s u">新的用户消息 …</span></div><span class="ps-o">→ 生成回答</span><span class="ps-tag"></span></div>
+      <div class="ps-r" data-r="2"><span class="ps-n">请求 3</span><div class="ps-bar"><span class="ps-s ts">"Time: 10:30:45"</span><span class="ps-s pre">System Prompt + Tools（缓存失效 ✗）</span><span class="ps-s u">用户消息 …</span></div><span class="ps-o">→ 生成回答</span><span class="ps-tag"></span></div>
+    </div>
+    <div class="ps-cache panel fx fx-right" style="--d:4"><svg class="ic"><use href="#i-db"/></svg><b>Prompt Cache</b><small>服务端保存的前缀 KV</small><div class="ps-cells"></div><span class="ps-cs"></span></div>
+  </div>
+  <div class="ps-cmp fx fx-up" style="--d:5">
+    <div class="ps-ch"><b>性能对比</b><span>3000 token 总上下文</span></div>
+    <div class="ps-row"><span></span><b class="c-ok">缓存命中</b><b class="c-bad">缓存失效</b></div>
+    <div class="ps-row"><span>TTFT *</span><em class="c-ok">~0.5 秒</em><em class="c-bad">3 - 5 秒</em></div>
+    <div class="ps-row"><span>成本</span><em class="c-ok">仅新 token 计费</em><em class="c-bad">变动点后的 token 全部重新计费</em></div>
+    <p class="cap">* TTFT 为示意值，随模型、硬件与部署方式而变，此处仅用于说明相对量级差异（原图注）</p>
+  </div>
+  <div class="src">第二章 ·「从 API 消息到模型 Token：Chat Template」价值二 · 图2-10</div>
+</section>
+<style>
+.ps-body{display:flex;gap:26px;height:420px}
+.ps-reqs{flex:1;min-width:0;display:flex;flex-direction:column;gap:22px;justify-content:center}
+.ps-r{display:flex;align-items:center;gap:14px;opacity:.25;transition:opacity .5s}
+.ps-r.on{opacity:1}
+.ps-n{flex:none;width:76px;font-size:19px;font-weight:700;color:var(--text2)}
+.ps-bar{flex:1;display:flex;gap:6px;height:84px}
+.ps-s{display:flex;align-items:center;justify-content:center;padding:0 14px;border-radius:12px;font-size:17px;text-align:center;border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:all .5s}
+.ps-s.pre{flex:3}
+.ps-s.u{flex:1.4;color:var(--tool);border-color:color-mix(in srgb,var(--tool) 45%,transparent)}
+.ps-s.ts{flex:none;width:180px;font:600 16px var(--mono);color:#fff;background:var(--bad);border-color:var(--bad)}
+.ps-r.build .ps-s.pre{border-color:var(--har);background:color-mix(in srgb,var(--har) 16%,rgba(12,18,40,.9))}
+.ps-r.hit .ps-s.pre{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 18%,rgba(12,18,40,.9));color:#bbf7d0}
+.ps-r.miss .ps-s.pre,.ps-r.miss .ps-s.u{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 16%,rgba(12,18,40,.9));color:#fecdd3}
+.ps-o{flex:none;font-size:16px;color:var(--text3)}
+.ps-tag{flex:none;width:200px;font-size:16px;line-height:1.4}
+.ps-r.build .ps-tag{color:var(--har)}.ps-r.hit .ps-tag{color:var(--ok)}.ps-r.miss .ps-tag{color:var(--bad)}
+.ps-cache{width:340px;flex:none;padding:22px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.ps-cache>.ic{font-size:40px;color:var(--acc)}
+.ps-cache b{font-size:23px}
+.ps-cache small{font-size:16px;color:var(--text3)}
+.ps-cells{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:14px;width:100%}
+.ps-cells i{height:26px;border-radius:5px;background:rgba(255,255,255,.06);transition:background .3s}
+.ps-cells i.w{background:var(--har)}.ps-cells i.r{background:var(--ok);box-shadow:0 0 10px var(--ok)}.ps-cells i.x{background:var(--bad)}
+.ps-cs{margin-top:auto;font-size:17px;min-height:48px}
+.ps-cmp{display:grid;grid-template-columns:1fr;gap:6px;margin-top:20px;padding:16px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ps-ch{display:flex;align-items:baseline;gap:14px;font-size:20px}
+.ps-ch span{font-size:16px;color:var(--text3)}
+.ps-row{display:grid;grid-template-columns:140px 1fr 1fr;gap:16px;font-size:20px;align-items:baseline}
+.ps-row span{color:var(--text2)}
+.ps-row em{font-style:normal;font-weight:600}
+</style>
+<script>
+HOOKS['c02-psens'] = {
+  cells(s, cls, n = 32) { s.querySelector('.ps-cells').innerHTML = Array.from({ length: n }, () => `<i class="${cls}"></i>`).join(''); },
+  async apply(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const rs = [...s.querySelectorAll('.ps-r')], cs = s.querySelector('.ps-cs');
+    const T = ['建立缓存：前缀 KV 写入', 'Prompt Cache 命中：前缀 KV 复用', '系统提示变了：变动点在最前 → 其后全部重算'];
+    rs.forEach((r, i) => { r.classList.toggle('on', i <= k); r.classList.remove('build', 'hit', 'miss'); r.querySelector('.ps-tag').textContent = i <= k ? T[i] : ''; });
+    rs.forEach((r, i) => { if (i <= k) r.classList.add(['build', 'hit', 'miss'][i]); });
+    if (!ctx) return;
+    const cl = s.querySelector('.ps-cells');
+    this.cells(s, '');
+    const is = [...cl.children];
+    for (let i = 0; i < is.length && ok(); i++) {
+      is[i].className = k === 0 ? 'w' : k === 1 ? 'r' : 'x';
+      await U.wait(ctx, 45);
+    }
+    if (!ok()) return;
+    cs.innerHTML = ['<span class="c-har">首次请求：前缀 1200 token 全部计算并写入缓存</span>', '<span class="c-ok">前缀逐字节相同：直接复用，只算新 token</span>', '<span class="c-bad">首个 token 就不同：缓存一个都用不上</span>'][k];
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, Math.min(k, 2)); },
+  step(s, ctx, k) { this.apply(s, Math.min(k, 2)); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.ps-cells').innerHTML = ''; s.querySelector('.ps-cs').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c02-abcd" data-part="4" data-trans="rise" data-dur="16000" data-title="用 [A, B, C, D] 理解 KV Cache" data-notes="<b>用一个简单例子理解 KV Cache</b>。假设上下文有 4 个 token [A, B, C, D]，模型正要生成第 5 个 token E。注意力的核心操作是：这一步的查询向量（Query）来自最后一个已知 token D，它与 A、B、C、D 四个 token 的键向量（Key）做点积来计算匹配度（点积的直观含义见实验 2-2），再根据匹配度对这 4 个 token 的值向量（Value）加权求和，得到 D 这个位置的输出表示——模型正是用它预测出下一个 token E。<br>注意：E 自己的 Q、K、V 要等 E 被采样出来、重新送回模型之后才会被计算。<br>演示会循环播放这四步：D 发出 Query → 与每个 Key 打分 → 对 Value 加权求和 → 预测出 E；随后 E 被追加进上下文，它的 K、V 这时才被算出来（权重数值为示意）。下一页看：生成很多个 token 时，有没有缓存的计算量差多少。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">用一个简单例子理解 <em>KV Cache</em></h2>
+  <p class="lead fx fx-up" style="--d:2">上下文是 [A, B, C, D]，模型正要生成第 5 个 token E</p></header>
+  <div class="ab-stage fx fx-scale" style="--d:3">
+    <svg class="ab-svg" viewBox="0 0 1660 560" width="1660" height="560"></svg>
+    <div class="ab-toks"></div>
+    <div class="ab-sum"><span class="lbl">D 位置的输出 = Σ 权重 × Value</span><div class="ab-mix"></div><b class="ab-pred">→ 预测出 E</b></div>
+  </div>
+  <div class="ab-cap"><span class="ab-k">①</span><span class="ab-t"></span></div>
+  <div class="src">第二章 ·「KV Cache 的原理与约束」</div>
+</section>
+<style>
+.ab-stage{position:relative;height:540px}
+.ab-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.ab-toks{position:absolute;left:60px;top:150px;display:flex;gap:56px}
+.ab-tk{--c:var(--acc);position:relative;width:190px;display:flex;flex-direction:column;align-items:center;gap:10px;transition:opacity .5s}
+.ab-tk b{width:120px;height:72px;border-radius:16px;display:grid;place-items:center;font:800 34px var(--num);border:2px solid var(--line2);background:rgba(12,18,40,.92);transition:all .4s}
+.ab-vec{display:flex;gap:8px}
+.ab-vec span{width:54px;height:40px;border-radius:9px;display:grid;place-items:center;font:700 17px var(--mono);border:1px solid var(--line2);color:var(--text3);background:rgba(255,255,255,.03);transition:all .4s}
+.ab-vec .q.on{color:#06101f;background:var(--tool);border-color:var(--tool)}
+.ab-vec .k.on{color:#06101f;background:var(--ctx);border-color:var(--ctx)}
+.ab-vec .v.on{color:#06101f;background:var(--llm);border-color:var(--llm)}
+.ab-w{height:30px;font:800 22px var(--num);color:var(--acc);opacity:0;transition:opacity .4s}
+.ab-w.on{opacity:1}
+.ab-tk.e{opacity:0}
+.ab-tk.e.on{opacity:1}
+.ab-tk.e b{border-style:dashed;border-color:var(--llm);color:var(--llm)}
+.ab-tk.e .ab-vec span.pend{border-style:dashed;color:var(--text3)}
+.ab-p{fill:none;stroke:var(--tool);stroke-width:3;stroke-dasharray:6 7;opacity:0;transition:opacity .4s;animation:flow 1s linear infinite}
+.ab-p.on{opacity:.9}
+.ab-sum{position:absolute;left:60px;right:60px;top:420px;display:flex;align-items:center;gap:20px;opacity:0;transition:opacity .5s}
+.ab-sum.on{opacity:1}
+.ab-mix{flex:1;display:flex;height:34px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.ab-mix i{height:100%}
+.ab-pred{font-size:26px;color:var(--llm);white-space:nowrap}
+.ab-cap{display:flex;align-items:center;gap:16px;margin-top:8px;padding:16px 22px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-height:84px}
+.ab-k{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:800 22px var(--num);color:#06101f;background:var(--acc)}
+.ab-t{font-size:22px;line-height:1.55}
+.ab-cap.sw .ab-t{animation:swIn .45s var(--ease) both}
+</style>
+<script>
+HOOKS['c02-abcd'] = {
+  T: ['A', 'B', 'C', 'D', 'E'],
+  W: [0.1, 0.2, 0.3, 0.4],
+  COL: ['#22d3ee', '#60a5fa', '#a78bfa', '#f472b6'],
+  init(s) {
+    s.querySelector('.ab-toks').innerHTML = this.T.map((t, i) => `<div class="ab-tk${i === 4 ? ' e' : ''}" data-i="${i}"><span class="ab-w">${i < 4 ? this.W[i].toFixed(1) : ''}</span><b>${t}</b><div class="ab-vec"><span class="q">Q</span><span class="k">K</span><span class="v">V</span></div></div>`).join('');
+    s.querySelector('.ab-mix').innerHTML = this.W.map((w, i) => `<i style="width:${w * 100}%;background:${this.COL[i]}"></i>`).join('');
+    // D 的 Query 连向 A~D 的 Key
+    const st = s.querySelector('.ab-stage'), toks = [...s.querySelectorAll('.ab-tk')];
+    const qD = C02.rel(toks[3].querySelector('.q'), st);
+    s.querySelector('.ab-svg').innerHTML = toks.slice(0, 4).map((t, i) => {
+      const k = C02.rel(t.querySelector('.k'), st), x1 = qD.x + qD.w / 2, y1 = qD.y + qD.h, x2 = k.x + k.w / 2, y2 = k.y + k.h;
+      return `<path class="ab-p" d="M${x1} ${y1} C ${x1} ${y1 + 110}, ${x2} ${y2 + 110}, ${x2} ${y2}"/>`;
+    }).join('');
+  },
+  cap(s, n, t) { const c = s.querySelector('.ab-cap'); c.querySelector('.ab-k').textContent = n; c.querySelector('.ab-t').innerHTML = t; U.restart(c, 'sw'); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const toks = [...s.querySelectorAll('.ab-tk')], ps = [...s.querySelectorAll('.ab-p')], sum = s.querySelector('.ab-sum');
+    const clear = () => { s.querySelectorAll('.ab-vec span,.ab-w,.ab-p,.ab-tk.e').forEach((e) => e.classList.remove('on', 'pend')); sum.classList.remove('on'); toks.forEach((t) => (t.querySelector('b').style.boxShadow = '')); };
+    while (ok()) {
+      clear();
+      this.cap(s, '①', '这一步的 <b>Query 来自最后一个已知 token D</b>：它代表“我在找什么”');
+      toks[3].querySelector('.q').classList.add('on');
+      await U.wait(ctx, 1800); if (!ok()) return;
+      this.cap(s, '②', 'D 的 Query 与 A、B、C、D 四个 token 的 <b>Key</b> 做点积，算出匹配度（权重为示意）');
+      for (let i = 0; i < 4; i++) { toks[i].querySelector('.k').classList.add('on'); ps[i].classList.add('on'); toks[i].querySelector('.ab-w').classList.add('on'); await U.wait(ctx, 380); if (!ok()) return; }
+      await U.wait(ctx, 1200); if (!ok()) return;
+      this.cap(s, '③', '按匹配度对这 4 个 token 的 <b>Value</b> 加权求和，得到 D 位置的输出——模型用它预测出 E');
+      ps.forEach((p) => p.classList.remove('on'));
+      for (let i = 0; i < 4; i++) toks[i].querySelector('.v').classList.add('on');
+      sum.classList.add('on');
+      await U.wait(ctx, 2400); if (!ok()) return;
+      this.cap(s, '④', 'E 被采样出来、送回模型之后，<b>E 自己的 Q、K、V 才会被计算</b>——并追加进缓存，供生成第 6 个 token 使用');
+      toks[4].classList.add('on');
+      toks[4].querySelectorAll('.ab-vec span').forEach((e) => e.classList.add('pend'));
+      await U.wait(ctx, 1300); if (!ok()) return;
+      toks[4].querySelectorAll('.ab-vec span').forEach((e) => { e.classList.remove('pend'); e.classList.add('on'); });
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.on,.pend').forEach((e) => e.classList.remove('on', 'pend')); },
+};
+</script>
+
+<section class="slide" id="c02-n2" data-part="4" data-trans="zoom" data-dur="18000" data-title="无缓存 N² vs 有缓存：每个 K/V 只算一次" data-notes="要理解 KV Cache 的价值，先看看没有它时会发生什么。假设一个 Agent 在进行第 6 轮对话，上下文已经累积了 2000 个 token。在没有缓存的情况下，模型每生成一个新 token，都需要重新计算这 2000 个 token 的 K、V 向量——相当于重跑整个前缀的前向计算。尽管前 5 轮的内容完全没变，第 6 轮仍要像第 1 轮那样从头计算整个前缀，而且此时前缀更长，代价比第 1 轮大得多。无缓存时，prefill 阶段（模型生成回复之前处理输入全部 token 的阶段）的注意力计算量随上下文长度平方级增长，随着对话深入，延迟和成本都会急剧攀升——这对需要几十轮工具调用的 Agent 任务来说是不可接受的。<br>继续 [A, B, C, D] 的例子。<b>不使用 KV Cache</b> 时，每生成一个新 token 都要把整个前缀从头前向计算一遍：生成 E 时要算 A、B、C、D 这 4 组 K、V，生成第 6 个 token 时要连 E 一起算 5 组……前缀长到 N 个 token 时要算 N 组，累计计算量与 N² 成正比。<br><b>使用 KV Cache</b> 时，每个 token 的 K、V 只在它第一次进入上下文时计算一次，之后一直留在缓存里：生成 E 这一步，A～D 的 4 组 K、V 已在缓存中，直接取用；等 E 被采样出来、送回模型之后，才计算 E 自身的 K、V 并追加进缓存，缓存增长到 5 组。<br>需要注意：KV Cache 省去的是历史 token 的 K、V 投影重算，使每步解码不必重算整个前缀；但每个新 token 的注意力计算仍要<b>遍历全部缓存</b>的 K、V，计算量随上下文长度线性增长——这正是长上下文解码越来越慢、KV Cache 的显存与带宽成为推理瓶颈的原因。<br>网格每行是一步生成，每格是一组 K/V：橙色是这一步新算的，绿框是从缓存里读取的。可以切换模式或单步生成。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">无缓存是 <em>N²</em>，有缓存每组 K/V <em>只算一次</em></h2></div>
+    <div class="n2-ctl fx fx-up" style="--d:2"><div class="n2-seg seg"><i class="knob"></i><button data-v="none">不使用 KV Cache</button><button data-v="cache">使用 KV Cache</button></div><button class="btn n2-one"><svg class="ic"><use href="#i-right"/></svg>生成下一个</button></div></header>
+  <div class="n2-ban fx fx-up" style="--d:2"><svg class="ic"><use href="#i-history"/></svg><span>设想第 6 轮对话、上下文已累积 <b>2000 token</b>：无缓存时，每生成一个新 token 都要重算这 2000 个 token 的 K、V——前 5 轮没变，也要从头再来</span><div class="n2-rounds"><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i><i class="cur">6</i></div></div>
+  <div class="n2-body">
+    <div class="n2-grid panel fx fx-left" style="--d:3"><div class="n2-hd"></div><div class="n2-rows"></div></div>
+    <div class="n2-side fx fx-right" style="--d:4">
+      <div class="n2-m bad"><span>不使用 KV Cache · 累计算了</span><b class="n2-a">0</b><small>组 K/V（∝ N²）</small></div>
+      <div class="n2-m ok"><span>使用 KV Cache · 累计算了</span><b class="n2-b">0</b><small>组 K/V（每个 token 一次）</small></div>
+      <div class="n2-note"><svg class="ic"><use href="#i-alert"/></svg><p>但每个新 token 的注意力仍要<b>遍历全部缓存</b>：每步线性增长——长上下文解码越来越慢，KV Cache 的显存与带宽成为瓶颈</p></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「KV Cache 的原理与约束」</div>
+</section>
+<style>
+#c02-n2 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.n2-ctl{display:flex;align-items:center;gap:14px}
+.n2-ban{display:flex;align-items:center;gap:16px;padding:12px 20px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);font-size:18px;color:var(--text2)}
+.n2-ban>.ic{font-size:26px;color:var(--warn);flex:none}
+.n2-ban b{color:var(--warn)}
+.n2-rounds{display:flex;gap:6px;flex:none}
+.n2-rounds i{width:40px;height:34px;border-radius:8px;display:grid;place-items:center;font:700 16px var(--num);font-style:normal;color:#06101f;background:var(--warn);animation:blink 1.4s steps(1) infinite}
+.n2-rounds i.cur{background:var(--bad);color:#fff}
+.n2-body{display:flex;gap:26px;height:540px;margin-top:16px}
+.n2-grid{width:1080px;flex:none;padding:16px 20px}
+.n2-hd,.n2-row{display:grid;grid-template-columns:150px repeat(12,1fr);gap:6px;align-items:center}
+.n2-hd span{text-align:center;font:700 18px var(--num);color:var(--text2)}
+.n2-rows{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.n2-row>span:first-child{font-size:16px;color:var(--text3)}
+.n2-c{height:46px;border-radius:7px;background:rgba(255,255,255,.025);transition:background .3s,border-color .3s}
+.n2-c.calc{background:var(--tool);box-shadow:0 0 10px color-mix(in srgb,var(--tool) 50%,transparent)}
+.n2-c.read{background:color-mix(in srgb,var(--ok) 18%,transparent);border:2px solid color-mix(in srgb,var(--ok) 70%,transparent)}
+.n2-row.pend{opacity:.35}
+.n2-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+.n2-m{padding:18px 20px;border-radius:16px;display:flex;flex-direction:column;gap:4px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.n2-m span{font-size:18px;color:var(--text2)}
+.n2-m b{font:800 52px var(--num)}
+.n2-m small{font-size:16px;color:var(--text3)}
+.n2-m.bad b{color:var(--bad)}.n2-m.ok b{color:var(--ok)}
+.n2-note{margin-top:auto;display:flex;gap:12px;padding:16px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+.n2-note .ic{font-size:24px;color:var(--warn);flex:none}
+.n2-note p{font-size:17px;line-height:1.6;color:var(--text2)}
+.n2-note b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c02-n2'] = {
+  T: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
+  init(s) {
+    s.querySelector('.n2-hd').innerHTML = '<span></span>' + this.T.map((t) => `<span>${t}</span>`).join('');
+    // 8 行：依次生成 E……L
+    s.querySelector('.n2-rows').innerHTML = Array.from({ length: 8 }, (_, r) => `<div class="n2-row pend" data-r="${r}"><span>生成 ${this.T[4 + r]}</span>${this.T.map((t, c) => `<i class="n2-c" data-c="${c}"></i>`).join('')}</div>`).join('');
+    this.set = U.seg(s.querySelector('.n2-seg'), (v) => { this.auto = false; this.mode = v; this.clear(s); });
+    s.querySelector('.n2-one').addEventListener('click', () => { this.auto = false; this.next(s); });
+  },
+  clear(s) {
+    this.r = 0; this.a = 0; this.b = 0;
+    this.set(this.mode);
+    s.querySelectorAll('.n2-row').forEach((x) => x.classList.add('pend'));
+    s.querySelectorAll('.n2-c').forEach((c) => c.classList.remove('calc', 'read'));
+    s.querySelector('.n2-a').textContent = 0; s.querySelector('.n2-b').textContent = 0;
+  },
+  // 第 r 步：上下文有 4 + r 个 token；无缓存全部重算，有缓存只算新进来的那个
+  next(s) {
+    if (this.r >= 8) this.clear(s);
+    const r = this.r++, n = 4 + r, row = s.querySelector(`.n2-row[data-r="${r}"]`);
+    row.classList.remove('pend');
+    row.querySelectorAll('.n2-c').forEach((c) => {
+      const j = +c.dataset.c;
+      if (j >= n) return;
+      if (this.mode === 'none') c.classList.add('calc');
+      else c.classList.add(r === 0 ? 'calc' : j === n - 1 ? 'calc' : 'read');
+    });
+    this.a += n;
+    this.b += r === 0 ? 4 : 1;
+    s.querySelector('.n2-a').textContent = this.a;
+    s.querySelector('.n2-b').textContent = this.b;
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.mode = 'none';
+    this.clear(s);
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (this.r >= 8) {
+        if ((this.hold = (this.hold || 0) + 1) < 3) return;
+        this.hold = 0;
+        this.mode = this.mode === 'none' ? 'cache' : 'none';
+        this.clear(s);
+        return;
+      }
+      this.next(s);
+    }, 900);
+  },
+  reset(s) { this.mode = 'none'; this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c02-layers" data-part="4" data-trans="flip" data-dur="16000" data-title="为什么变动点之后全部失效" data-notes="<b>为什么修改前缀会导致变动点后的缓存失效？</b>大语言模型由多层 Transformer 堆叠而成（现代大模型通常有数十到上百层），每一层都独立生成自己的 K、V 缓存。这些层是串联的：第 1 层的输出喂给第 2 层作为输入，第 2 层的输出再喂给第 3 层，层层向下传递，就像流水线上的工序。第 1 层在处理每个词时，会综合考虑该词及其前面所有词的信息，然后输出一个中间结果；第 2 层拿到这个中间结果再做进一步加工。<br>因此，如果第 k 个 token 发生变化（比如系统提示词改了一个字），k 之前的状态不受影响，但从 k 开始的表示会逐层受到影响——实际复用时，缓存只能保留到首个不同 token 之前，从该位置起需要重新计算。<br>代价取决于改动位置：变动点越靠前，需要重新计算和计费的 token 越多，延迟影响通常也越大（本章实验中实测可达数倍）。这就是为什么后文反复强调“<b>系统提示词一旦定下来就不要改</b>”。<br>拖动滑块（或点击顶部的 token）移动变动点：失效区域会从第 1 层开始逐层向下传播；右侧是需要重算的比例（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">改动第 k 个 token，为什么<em>之后全部失效</em>？</h2>
+  <p class="lead fx fx-up" style="--d:2">层是串联的流水线：每一层处理每个词时，都综合了它前面所有词的信息</p></header>
+  <div class="ly-body">
+    <div class="ly-grid panel fx fx-left" style="--d:3">
+      <div class="ly-top"></div>
+      <div class="ly-rows"></div>
+      <div class="ly-rng"><span>变动点</span><input class="rng ly-r" type="range" min="0" max="24" value="6"><b class="ly-rv"></b></div>
+    </div>
+    <div class="ly-side fx fx-right" style="--d:4">
+      <div class="ly-pre"><button class="btn" data-k="0">改系统提示词开头</button><button class="btn" data-k="12">改中间的历史</button><button class="btn" data-k="24">只在末尾追加</button></div>
+      <div class="ly-m"><span>需要重新计算和计费的 token</span><b class="ly-n">0</b><div class="meter" style="--c:var(--bad)"><i class="ly-mv"></i></div></div>
+      <div class="ly-m"><span>可以复用的缓存</span><b class="ly-ok">0</b><div class="meter" style="--c:var(--ok)"><i class="ly-mo"></i></div></div>
+      <p class="ly-t">变动点越靠前，要重算和计费的 token 越多，延迟影响通常也越大——本章实验中实测<b>可达数倍</b>。所以：<b>系统提示词一旦定下来就不要改</b>。</p>
+      <p class="cap">网格为示意：真实模型有数十到上百层</p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「KV Cache 的原理与约束」·「为什么修改前缀会导致变动点后的缓存失效？」</div>
+</section>
+<style>
+.ly-body{display:flex;gap:26px;height:610px}
+.ly-grid{width:1090px;flex:none;padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.ly-top,.ly-row{display:grid;grid-template-columns:96px repeat(24,1fr);gap:4px;align-items:center}
+.ly-top span{height:30px;border-radius:6px;display:grid;place-items:center;font:600 14px var(--num);color:var(--text3);cursor:pointer;transition:background .3s,color .3s}
+.ly-top span.k{background:var(--bad);color:#fff}
+.ly-top span:hover{background:rgba(255,255,255,.1)}
+.ly-rows{display:flex;flex-direction:column;gap:4px}
+.ly-row>span:first-child{font-size:15px;color:var(--text3)}
+.ly-c{height:44px;border-radius:5px;background:color-mix(in srgb,var(--ok) 32%,transparent);transition:background .25s}
+.ly-c.x{background:var(--bad)}
+.ly-gap{text-align:center;font-size:18px;color:var(--text3);letter-spacing:.3em}
+.ly-rng{display:flex;align-items:center;gap:16px;margin-top:auto;font-size:18px;color:var(--text2)}
+.ly-rng .rng{flex:1}
+.ly-rv{font:700 18px var(--num);color:var(--bad);min-width:150px;text-align:right}
+.ly-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+.ly-pre{display:flex;flex-direction:column;gap:10px}
+.ly-pre .btn{justify-content:center;font-size:18px}
+.ly-m{padding:16px 18px;border-radius:14px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ly-m span{font-size:17px;color:var(--text2)}
+.ly-m b{font:800 30px var(--num)}
+.ly-m .meter{grid-column:1/-1}
+.ly-n{color:var(--bad)}.ly-ok{color:var(--ok)}
+.ly-t{font-size:18px;line-height:1.65;color:var(--text2)}
+.ly-t b{color:var(--acc)}
+.ly-side .cap{margin-top:auto}
+</style>
+<script>
+HOOKS['c02-layers'] = {
+  N: 24, L: ['第 1 层', '第 2 层', '第 3 层', '第 4 层', null, '第 N−1 层', '第 N 层'],
+  init(s) {
+    s.querySelector('.ly-top').innerHTML = '<span></span>' + Array.from({ length: this.N }, (_, i) => `<span data-k="${i}">${i + 1}</span>`).join('');
+    s.querySelector('.ly-rows').innerHTML = this.L.map((l) => l ? `<div class="ly-row"><span>${l}</span>${Array.from({ length: this.N }, (_, i) => `<i class="ly-c" data-c="${i}"></i>`).join('')}</div>` : '<div class="ly-gap">⋮ 数十到上百层 ⋮</div>').join('');
+    const r = s.querySelector('.ly-r');
+    r.addEventListener('input', () => { this.auto = false; this.move(s, +r.value); });
+    s.querySelector('.ly-top').addEventListener('click', (e) => { const t = e.target.closest('[data-k]'); if (t) { this.auto = false; this.move(s, +t.dataset.k); } });
+    s.querySelector('.ly-pre').addEventListener('click', (e) => { const b = e.target.closest('[data-k]'); if (b) { this.auto = false; this.move(s, +b.dataset.k); } });
+  },
+  // 变动点 k：k 之前可复用；从 k 起，失效逐层向下传播
+  move(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, N = this.N;
+    const r = s.querySelector('.ly-r');
+    r.value = k;
+    r.style.setProperty('--p', (k / N) * 100 + '%');
+    s.querySelector('.ly-rv').textContent = k >= N ? '末尾追加（无改动）' : `第 ${k + 1} 个 token`;
+    s.querySelectorAll('.ly-top span[data-k]').forEach((t) => t.classList.toggle('k', +t.dataset.k === k));
+    const bad = N - k;
+    s.querySelector('.ly-n').textContent = `${bad} / ${N}`;
+    s.querySelector('.ly-ok').textContent = `${k} / ${N}`;
+    s.querySelector('.ly-mv').style.setProperty('--v', (bad / N) * 100 + '%');
+    s.querySelector('.ly-mo').style.setProperty('--v', (k / N) * 100 + '%');
+    const rows = [...s.querySelectorAll('.ly-row')];
+    rows.forEach((row) => row.querySelectorAll('.ly-c').forEach((c) => c.classList.remove('x')));
+    rows.forEach((row, li) => {
+      const paint = () => { if (tk === this.tk) row.querySelectorAll('.ly-c').forEach((c) => c.classList.toggle('x', +c.dataset.c >= k)); };
+      if (ctx) ctx.later(paint, li * 140); else paint();
+    });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    const seq = [6, 0, 14, 24, 3];
+    let i = 0;
+    this.move(s, seq[0]);
+    ctx.every(() => { if (this.auto) this.move(s, seq[(i = (i + 1) % seq.length)]); }, 3000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-exp3" data-part="4" data-dur="16000" data-title="实验 2-3 ★★：五种错误模式" data-notes="<b>实验 2-3 ★★：常见的错误上下文管理模式</b>。在 kv-cache 实验中，系统性地测试了几种常见但有害的上下文管理模式。它们不仅会破坏 KV Cache 的有效性，有些甚至会影响 Agent 的核心能力。<br><b>动态系统提示词</b>是最常见的错误，也就是本节开头那个时间戳故事。正确的做法是把时间信息作为用户消息追加到对话末尾，或者只在真正需要时通过工具调用获取。<br><b>动态用户配置</b>模式试图在每次请求中更新用户的状态信息（如剩余的 API 调用次数或账户余额），把这些信息嵌入上下文会破坏缓存。更好的方案是在需要时通过专门的状态管理机制来处理。<br><b>工具定义的动态排序</b>是另一个隐蔽的陷阱。有些系统会根据使用频率动态调整工具的顺序，但工具定义通常占据很大篇幅（每个工具可能包含数百个 token 的描述和参数说明），改变顺序会让缓存从首个变动的工具起全部失效。实验表明，保持固定顺序对模型选择工具的能力几乎没有影响，对性能的提升却很显著。<br><b>滑动窗口（Sliding Window）对话历史</b>只保留最近几条消息来控制长度：窗口设为 10 条时，第 11 条消息进来，最早的一条就被丢弃。它有两个严重问题：一是破坏前缀一致性，KV Cache 失效；二是可能丢失关键的工具调用结果——Agent 在第 2 轮读到的关键文件内容，到第 15 轮还要引用，却已滑出窗口，模型只能依赖被截断的对话推断，错误率显著上升。实验中使用滑动窗口的 Agent 经常陷入循环，反复执行相同的工具调用，因为它“忘记”了之前已经获得的结果。<br><b>文本格式化方法</b>是最具破坏性的模式之一：把结构化的 role-content 消息转换为“USER: ... ASSISTANT: ...”这样的纯文本流。问题的关键不在缓存，而在于偏离了模型训练时使用的标准消息格式：模型需要额外消耗注意力去推断角色边界和对话结构，于是问题接踵而至——重复执行已完成的操作、忽略工具调用结果、在应该调用工具时生成文本、格式解析错误。<br><b>小结</b>：这几种错误模式的解法，最终都收敛回三条核心结论。模型提供商为标准接口做了大量优化，偏离标准格式往往是在给自己挖坑。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-3 ★★：五种<em>常见的错误模式</em></h2></div></header>
+  <div class="e3-tabs tabs fx fx-up" style="--d:2"><button data-i="0">动态系统提示词</button><button data-i="1">动态用户配置</button><button data-i="2">工具定义的动态排序</button><button data-i="3">滑动窗口对话历史</button><button data-i="4">文本格式化方法</button></div>
+  <div class="e3-body">
+    <div class="e3-vis panel fx fx-left" style="--d:3"><div class="e3-v"></div></div>
+    <div class="e3-card glass fx fx-right" style="--d:4"><b class="e3-t"></b><p class="e3-d"></p><div class="e3-fix"><svg class="ic"><use href="#i-check"/></svg><p class="e3-f"></p></div><div class="runbar e3-bar"><i></i></div></div>
+  </div>
+  <p class="tagline e3-tag fx fx-up" style="--d:5"><b>小结</b>：五种模式的解法都收敛回三条核心结论——偏离标准格式，往往是在给自己挖坑</p>
+  <div class="src">第二章 · 实验 2-3「常见的错误上下文管理模式」</div>
+</section>
+<style>
+.e3-tabs button{font-size:18px}
+.e3-body{display:flex;gap:26px;height:520px;margin-top:18px}
+.e3-vis{width:1000px;flex:none;padding:22px 24px;overflow:hidden}
+.e3-v{display:flex;flex-direction:column;gap:14px;height:100%}
+.e3-rq{display:flex;align-items:center;gap:12px}
+.e3-rq>span{flex:none;width:90px;font-size:17px;color:var(--text2)}
+.e3-bk{display:flex;gap:6px;flex:1}
+.e3-b{--c:var(--text3);height:64px;padding:0 10px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15.5px;text-align:center;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 12%,rgba(10,16,36,.9));transition:all .4s;animation:swIn .4s var(--ease) both}
+.e3-b.dif{outline:2px solid var(--tool);outline-offset:2px}
+.e3-b.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,rgba(10,16,36,.9));color:#fecdd3}
+.e3-b.hit{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 15%,rgba(10,16,36,.9))}
+.e3-note{font-size:17px;color:var(--text2);padding:10px 14px;border-radius:10px;background:rgba(255,255,255,.04)}
+.e3-note b{color:var(--bad)}
+.e3-win{position:relative;display:flex;gap:6px;flex-wrap:nowrap;padding:14px 0}
+.e3-wm{flex:none;width:68px;height:56px;border-radius:9px;display:grid;place-items:center;font:600 14.5px var(--mono);color:var(--text2);border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:all .4s}
+.e3-wm.key{color:#06101f;background:var(--tool);border-color:var(--tool)}
+.e3-wm.out{opacity:.18}
+.e3-frame{position:absolute;top:6px;height:72px;border:3px solid var(--acc);border-radius:12px;transition:left .5s var(--ease);pointer-events:none}
+.e3-frame::after{content:"窗口：最近 10 条";position:absolute;top:-28px;left:0;font-size:15px;color:var(--acc);white-space:nowrap}
+.e3-loop{display:flex;gap:6px;flex-wrap:wrap}
+.e3-loop span{padding:6px 10px;border-radius:8px;font:14.5px var(--mono);color:#fecdd3;border:1px solid var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);animation:upIn .4s var(--spring) both}
+.e3-txt{font:17px/1.7 var(--mono);color:#cbd5f5;padding:14px 16px;border-radius:12px;background:rgba(0,0,0,.3);border:1px dashed var(--bad);white-space:pre-wrap}
+.e3-sym{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.e3-sym span{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;font-size:16.5px;color:#fecdd3;border:1px solid color-mix(in srgb,var(--bad) 50%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent);animation:upIn .45s var(--spring) both}
+.e3-card{flex:1;min-width:0;padding:24px 26px;display:flex;flex-direction:column;gap:14px}
+.e3-t{font-size:28px;color:var(--acc)}
+.e3-d{font-size:18.5px;line-height:1.7}
+.e3-fix{display:flex;gap:12px;padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.e3-fix .ic{font-size:22px;color:var(--ok);flex:none;margin-top:3px}
+.e3-f{font-size:17.5px;line-height:1.6}
+.e3-bar{margin-top:auto}
+.e3-card.sw .e3-t,.e3-card.sw .e3-d,.e3-card.sw .e3-fix{animation:swIn .5s var(--ease) both}
+.e3-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c02-exp3'] = {
+  P: [
+    { t: '动态系统提示词', d: '最常见的错误，也就是那个时间戳故事：系统提示词里每次都写入新的时间，token 序列从最前面就开始不同。', f: '把时间信息作为用户消息追加到对话末尾，或者只在真正需要时通过工具调用获取。',
+      a: [['system · Current time: 10:30:45', '#94a3b8', 3], ['tools', '#60a5fa', 2], ['user', '#fbbf24', 1], ['assistant', '#a78bfa', 1], ['tool', '#34d399', 1]], dif: 0, b0: 'system · Current time: 10:31:02' },
+    { t: '动态用户配置', d: '每次请求都更新用户的状态信息（如剩余的 API 调用次数、账户余额）并嵌入上下文：这一段一变，其后的缓存全部作废。', f: '需要时通过专门的状态管理机制来处理，不要让易变的配置进入稳定前缀。',
+      a: [['system', '#94a3b8', 2], ['tools', '#60a5fa', 2], ['用户配置：剩余 42 次 · 余额 $18.20', '#f472b6', 3], ['user', '#fbbf24', 1], ['assistant', '#a78bfa', 1]], dif: 2, b0: '用户配置：剩余 41 次 · 余额 $18.05' },
+    { t: '工具定义的动态排序', d: '按使用频率动态调整工具顺序。工具定义通常占据很大篇幅（每个工具可能有数百个 token），顺序一变，缓存从首个变动的工具起全部失效。', f: '保持固定顺序：实验表明它对模型选择工具的能力几乎没有影响，对性能的提升却很显著。',
+      a: [['system', '#94a3b8', 2], ['read_file', '#60a5fa', 1.3], ['find', '#60a5fa', 1.3], ['grep', '#60a5fa', 1.3], ['user', '#fbbf24', 1]], dif: 1, swap: ['grep', 'read_file', 'find'] },
+    { t: '滑动窗口对话历史', d: '只保留最近几条消息：①破坏前缀一致性，KV Cache 失效；②可能丢失关键的工具调用结果——第 2 轮读到的关键文件内容，第 15 轮还要引用，却已滑出窗口。', f: '用压缩代替丢弃、只追加不删改（见思考题 1 与 PART 09）；实验中滑动窗口的 Agent 经常陷入循环，反复执行相同的工具调用。', win: 1 },
+    { t: '文本格式化方法', d: '把结构化的 role-content 消息转成“USER: ... ASSISTANT: ...”纯文本流——最具破坏性的模式之一。关键不在缓存，而在于偏离了训练时的标准消息格式：模型要额外消耗注意力去推断角色边界。', f: '使用标准 API 格式：结构化消息由 Chat Template 翻译成模型训练时见过的固定 token 序列。', txt: 1 },
+  ],
+  init(s) { s.querySelector('.e3-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } }); },
+  blocks(arr, cls) { return arr.map(([t, c, f], i) => `<div class="e3-b${cls ? cls(i) : ''}" style="--c:${c};flex:${f}">${t}</div>`).join(''); },
+  async show(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.i = i;
+    const p = this.P[i], v = s.querySelector('.e3-v'), c = s.querySelector('.e3-card');
+    s.querySelectorAll('.e3-tabs button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    c.querySelector('.e3-t').textContent = p.t;
+    c.querySelector('.e3-d').textContent = p.d;
+    c.querySelector('.e3-f').textContent = p.f;
+    U.restart(c, 'sw');
+    const bar = c.querySelector('.e3-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) { bar.style.setProperty('--dur', '6.6s'); bar.classList.add('run'); }
+    if (p.win) return this.win(s, v, tk);
+    if (p.txt) return this.txt(s, v, tk);
+    const b = p.a.map((x) => x.slice());
+    if (p.b0) b[p.dif][0] = p.b0;
+    if (p.swap) p.swap.forEach((n, j) => (b[1 + j][0] = n));
+    v.innerHTML = `<div class="e3-rq"><span>请求 N</span><div class="e3-bk">${this.blocks(p.a, () => ' hit')}</div></div>
+      <div class="e3-rq"><span>请求 N+1</span><div class="e3-bk e3-nx">${this.blocks(b)}</div></div>
+      <p class="e3-note"></p>`;
+    if (!ctx) return;
+    await U.wait(ctx, 900); if (!ok()) return;
+    const nb = [...v.querySelectorAll('.e3-nx .e3-b')];
+    nb.forEach((x, j) => { if (j < p.dif) x.classList.add('hit'); });
+    nb[p.dif].classList.add('dif');
+    await U.wait(ctx, 900); if (!ok()) return;
+    nb.forEach((x, j) => { if (j >= p.dif) x.classList.add('bad'); });
+    v.querySelector('.e3-note').innerHTML = p.dif === 0 ? '首个不同的位置就在最前面：<b>整个请求都要重算</b>' : `从第 ${p.dif + 1} 段开始不同：<b>其后全部失效</b>，之前的仍可复用`;
+  },
+  async win(s, v, tk) {
+    const ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    v.innerHTML = `<div class="e3-win">${Array.from({ length: 13 }, (_, i) => `<div class="e3-wm${i === 1 ? ' key' : ''}">${i === 1 ? '第2轮\n文件' : '第' + (i + 1) + '轮'}</div>`).join('')}<i class="e3-frame"></i></div>
+      <p class="e3-note">第 2 轮读到的<b>关键文件内容</b>（橙色）——窗口滑过之后就看不见了</p><div class="e3-loop"></div>`;
+    if (!ctx) return;
+    const ms = [...v.querySelectorAll('.e3-wm')], fr = v.querySelector('.e3-frame'), lp = v.querySelector('.e3-loop');
+    const place = (st) => { fr.style.left = ms[st].offsetLeft - 4 + 'px'; fr.style.width = ms[st + Math.min(9, 12 - st)].offsetLeft + 68 - ms[st].offsetLeft + 8 + 'px'; ms.forEach((m, j) => m.classList.toggle('out', j < st)); };
+    place(0);
+    for (let st = 1; st <= 3 && ok(); st++) { await U.wait(ctx, 1000); if (!ok()) return; place(st); }
+    if (!ok()) return;
+    v.querySelector('.e3-note').innerHTML = '关键结果已滑出窗口：模型“忘记”自己已经读过，<b>反复执行相同的工具调用</b>；前缀也每轮都在变，缓存失效';
+    for (let j = 0; j < 4 && ok(); j++) { lp.insertAdjacentHTML('beforeend', '<span>read_file("config.yaml") · 又一次</span>'); await U.wait(ctx, 500); }
+  },
+  async txt(s, v, tk) {
+    const ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    v.innerHTML = `<div class="e3-rq"><span>标准格式</span><div class="e3-bk">${this.blocks([['system', '#94a3b8', 1], ['user', '#fbbf24', 1], ['assistant · tool_calls', '#a78bfa', 1.6], ['tool', '#34d399', 1]])}</div></div>
+      <div class="e3-txt">USER: 帮我统计 data/ 目录下的文件数\nASSISTANT: 我来调用 list_dir…\nTOOL RESULT: 42 files\nASSISTANT: …</div><div class="e3-sym"></div>`;
+    if (!ctx) return;
+    const sy = v.querySelector('.e3-sym');
+    const S = ['重复执行已完成的操作', '忽略工具调用结果', '该调用工具时却生成文本', '格式解析错误'];
+    await U.wait(ctx, 1000);
+    for (const t of S) { if (!ok()) return; sy.insertAdjacentHTML('beforeend', `<span><svg class="ic"><use href="#i-x"/></svg>${t}</span>`); await U.wait(ctx, 600); }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 5); }, 6800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.e3-v').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c02-exp3d" data-part="4" data-trans="zoom" data-dur="16000" data-title="实验 2-3：Kimi K2.6 实测记录" data-notes="配套仓库 kv-cache 实验保存了一次真实的 --compare 运行（Kimi K2.6，2026-07-18；任务：在实验目录里查找 Python 文件、读 main.py 和 agent.py、用 3 句话总结），六种实现各跑一遍：<br>正确实现（correct）：3 轮，首 TTFT 2.33 秒，总时间 18.2 秒，Cache%（来自缓存的 prompt token 占比）10.1%。<br>打乱工具顺序（shuffled_tools）：Cache% 从 10.1% 跌到 3.4%，首 TTFT 从约 2.3 秒升到 7.8 秒，总时间 33.4 秒。<br>纯文本格式（text_format）：总时间 43.3 秒，约为正确实现的 2.4 倍，平均 TTFT 14.4 秒。<br>动态系统提示 / 动态用户配置：动态数据接在已稳定前缀的末尾附近，只从改动点起失效，所以 Cache% 接近 correct；但动态系统提示的总时间仍然变差（24.3 秒）。<br>滑动窗口（sliding_window）：Cache% 高达 67.9%，只是因为提示词被截断到 2,224 token——小提示词上的高比例不等于高效运行，它还多跑了 2 轮（5 轮）。<br>读数提示：推理模型的 TTFT 受隐藏思考 token 影响方差较大，缓存比例是更干净的证据；这是单次运行，绝对值会波动。切换上方的指标查看各模式对比。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-3：<em>真实运行</em>里的五种错误</h2></div>
+    <div class="e3d-tabs tabs fx fx-up" style="--d:2"><button data-m="ttft">首 TTFT</button><button data-m="tot">总时间</button><button data-m="cache">Cache%</button><button data-m="avg">平均 TTFT</button></div></header>
+  <div class="e3d-body">
+    <div class="e3d-chart panel fx fx-left" style="--d:3"><div class="e3d-h"><b class="e3d-mt"></b><span class="e3d-u"></span></div><div class="e3d-bars"></div></div>
+    <div class="e3d-side fx fx-right" style="--d:4">
+      <div class="e3d-k" style="--c:var(--bad)"><b>打乱工具顺序</b><p>Cache% <em>10.1% → 3.4%</em>；首 TTFT <em>≈2.3 s → 7.8 s</em></p></div>
+      <div class="e3d-k" style="--c:var(--warn)"><b>纯文本格式</b><p>总时间 <em>43.3 s</em>，约为正确实现的 <em>2.4 倍</em></p></div>
+      <div class="e3d-k" style="--c:var(--har)"><b>动态数据接在前缀末尾</b><p>只从改动点起失效：Cache% 接近 correct，但动态系统提示的总时间仍变差（<em>24.3 s</em>）</p></div>
+      <div class="e3d-k" style="--c:var(--text3)"><b>滑动窗口的“高命中”</b><p>Cache% 67.9% 只因提示词被截断到 2,224 token，还多跑了 2 轮——<em>小提示词上的高比例 ≠ 高效</em></p></div>
+    </div>
+  </div>
+  <div class="src">第二章 · 实验 2-3 · 数据：配套仓库 chapter2/kv-cache 运行记录（Kimi K2.6，2026-07-18，单次运行）</div>
+</section>
+<style>
+#c02-exp3d .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.e3d-tabs button{font-size:18px}
+.e3d-body{display:flex;gap:26px;height:640px}
+.e3d-chart{width:1020px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:14px}
+.e3d-h{display:flex;align-items:baseline;gap:14px;font-size:22px}
+.e3d-u{font-size:16px;color:var(--text3)}
+.e3d-bars{flex:1;display:flex;flex-direction:column;justify-content:space-around}
+.e3d-r{display:grid;grid-template-columns:190px 1fr 110px;gap:16px;align-items:center}
+.e3d-r span{font:600 17px var(--mono);color:var(--text2);text-align:right}
+.e3d-r.ref span{color:var(--ok)}
+.e3d-r .meter{height:34px;border-radius:10px}
+.e3d-r .meter i{border-radius:10px}
+.e3d-r b{font:800 24px var(--num)}
+.e3d-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+.e3d-k{padding:16px 18px;border-radius:14px;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 8%,rgba(255,255,255,.02))}
+.e3d-k b{font-size:20px}
+.e3d-k p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:4px}
+.e3d-k em{font-style:normal;font-weight:700;color:var(--text)}
+</style>
+<script>
+HOOKS['c02-exp3d'] = {
+  // 配套仓库 kv-cache/result_*_20260718_kimi_k2_6.json
+  D: [
+    { m: 'correct', ttft: 2.328, avg: 6.054, tot: 18.163, cache: 10.1 },
+    { m: 'dynamic_profile', ttft: 2.206, avg: 5.986, tot: 17.962, cache: 10.0 },
+    { m: 'dynamic_system', ttft: 2.497, avg: 8.085, tot: 24.26, cache: 10.1 },
+    { m: 'shuffled_tools', ttft: 7.818, avg: 11.122, tot: 33.369, cache: 3.4 },
+    { m: 'sliding_window', ttft: 2.234, avg: 3.649, tot: 14.704, cache: 67.9 },
+    { m: 'text_format', ttft: 6.189, avg: 14.432, tot: 43.297, cache: 9.1 },
+  ],
+  M: { ttft: ['首 token 延迟（第 1 轮）', '秒，越低越好', 1, 's'], tot: ['总时间', '秒，越低越好', 1, 's'], cache: ['Cache%：来自缓存的 prompt token 占比', '越高越好（滑动窗口另有原因）', 1, '%'], avg: ['平均 TTFT', '秒，越低越好', 1, 's'] },
+  init(s) {
+    s.querySelector('.e3d-bars').innerHTML = this.D.map((d, i) => `<div class="e3d-r${i === 0 ? ' ref' : ''}"><span>${d.m}</span><div class="meter"><i></i></div><b>0</b></div>`).join('');
+    s.querySelector('.e3d-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) { this.auto = false; this.show(s, b.dataset.m); } });
+  },
+  show(s, m) {
+    this.m = m;
+    const [t, u, dec, suf] = this.M[m], max = Math.max(...this.D.map((d) => d[m]));
+    s.querySelectorAll('.e3d-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+    s.querySelector('.e3d-mt').textContent = t;
+    s.querySelector('.e3d-u').textContent = u;
+    const ref = this.D[0][m];
+    s.querySelectorAll('.e3d-r').forEach((r, i) => {
+      const v = this.D[i][m], worse = m === 'cache' ? v < ref - 0.5 : v > ref * 1.15;
+      const bar = r.querySelector('.meter');
+      bar.style.setProperty('--c', i === 0 ? 'var(--ok)' : worse ? 'var(--bad)' : 'var(--har)');
+      r.querySelector('i').style.setProperty('--v', (v / max) * 100 + '%');
+      r.querySelector('b').textContent = v.toFixed(dec) + suf;
+    });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    const order = ['ttft', 'tot', 'cache', 'avg'];
+    let i = 0;
+    ctx.later(() => this.show(s, order[0]), 500);
+    ctx.every(() => { if (this.auto) this.show(s, order[(i = (i + 1) % order.length)]); }, 3600);
+  },
+  reset(s) { s.querySelectorAll('.e3d-r i').forEach((x) => x.style.setProperty('--v', '0%')); },
+};
+</script>

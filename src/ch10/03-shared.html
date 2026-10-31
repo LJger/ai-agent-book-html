@@ -1,0 +1,732 @@
+<!-- ================= PART 03 共享上下文 ================= -->
+<section class="slide chapter" id="c10-d3" data-part="3" data-title="PART 03 · 共享上下文" data-notes="<b>共享上下文的多 Agent 协作</b>中，每个阶段都是一个独立的 Agent（拥有自己的系统提示词和工具集），但它继承了前序 Agent 的完整轨迹——就像接班的同事能翻阅前任留下的所有工作日志。这种<b>“继承式协作”</b>的核心优势在于<b>信息不会丢失</b>，每个 Agent 都能回顾之前任何阶段的细节；挑战则在于如何让当前 Agent 专注于自己的核心职责，而不被继承来的大量历史信息所干扰。<br>本部分依次讲：继承式协作与多阶段角色转换；一个常被忽略、却会直接改变架构的设计选择——角色转换究竟是替换 system prompt，还是加载 Skill；两者之间怎么选；最后是对比这两条路径的实验 10-1。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:90px">共享上下文的<br>多 Agent 协作</h1>
+  <div class="ch-s fx fx-up" style="--d:3">继承式协作：换了身份，保留前任的全部轨迹</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">每个阶段都是一个独立的 Agent，但它继承了前序 Agent 的完整轨迹——就像接班的同事能翻阅前任留下的所有工作日志。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c10-inherit" data-part="3" data-steps="2" data-trans="zoom" data-dur="12000" data-title="继承式协作与多阶段角色转换" data-notes="共享上下文的多 Agent 协作中，每个阶段都是一个独立的 Agent（拥有自己的系统提示词和工具集），但它继承了前序 Agent 的<b>完整轨迹</b>——就像接班的同事能翻阅前任留下的所有工作日志。这种<b>“继承式协作”</b>的核心优势在于信息不会丢失，每个 Agent 都能回顾之前任何阶段的细节；挑战则在于如何让当前 Agent 专注于自己的核心职责，而不被继承来的大量历史信息所干扰。<br>在复杂任务中，Agent 的角色和职责可能在不同阶段发生显著变化。如果始终使用同一套静态系统提示词，要么<b>过于笼统、缺乏针对性</b>，要么把所有阶段的指导塞在一起导致<b>过于冗长</b>。<b>多阶段角色转换</b>的做法是：根据当前阶段动态切换系统提示词和工具集，让 Agent 在每个阶段都以最合适的“身份”工作。<br>左侧沿用图10-1 的三阶段例子（需求分析师 → 软件工程师 → 代码审查员）做示意：每次切换只换掉请求头部的系统提示词与工具集，下方的共享历史原样保留并持续增长。按 → 依次看静态提示词的两难与动态切换。第 2 步时，阶段 3 开始后阶段 1 的历史会被标出——这对应思考题 1 讨论的“思维惯性”：继承了需求分析师上下文的代码审查员，可能仍倾向于从需求角度、而不是代码质量角度思考。点击上方的阶段标签可直接查看该阶段的请求。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">换了身份，<em>保留前任的全部轨迹</em></h2>
+  <p class="lead fx fx-up" style="--d:2">每个阶段都是一个独立的 Agent：只替换系统提示词与工具集，历史原样继承</p></header>
+  <div class="ih-body">
+    <div class="ih-stage panel fx fx-left" style="--d:3">
+      <div class="ih-track"></div>
+      <span class="k10-sim ih-sim">示意 · 沿用图10-1 的三阶段例子</span>
+      <div class="ih-main">
+        <div class="ih-req">
+          <div class="ih-head">
+            <div class="ih-row"><em>system</em><span class="ih-sys"></span></div>
+            <div class="ih-row"><em>tools</em><span class="ih-tools"></span></div>
+            <span class="ih-swap">切换阶段时只换这里</span>
+          </div>
+          <div class="ih-hl"><svg class="ic"><use href="#i-history"/></svg>共享历史 · 全程保留，新角色继承全部</div>
+          <div class="ml ih-ml"></div>
+        </div>
+        <div class="ih-meter"><span>上下文</span><div class="ih-mt"><i></i></div><b class="ih-mv">持续增长</b></div>
+      </div>
+    </div>
+    <div class="ih-side">
+      <div class="ih-c fx fx-right" style="--d:4"><b class="ih-ct"><svg class="ic"><use href="#i-history"/></svg>继承式协作</b>
+        <p class="ih-pro"><span class="c-ok"><svg class="ic"><use href="#i-check"/></svg>优势</span><span class="ih-pt">信息不会丢失：每个 Agent 都能回顾之前任何阶段的细节</span></p>
+        <p class="ih-pro"><span class="c-warn"><svg class="ic"><use href="#i-alert"/></svg>挑战</span><span class="ih-pt">让当前 Agent 专注于自己的核心职责，不被继承来的大量历史信息干扰</span></p></div>
+      <div class="ih-c fx fx-up" data-step="1"><b class="ih-ct"><svg class="ic"><use href="#i-file"/></svg>若始终用同一套静态系统提示词</b>
+        <div class="ih-two">
+          <div class="ih-p"><div class="ih-doc s"><i></i></div><div><b>过于笼统</b><small>缺乏针对性</small></div></div>
+          <div class="ih-p"><div class="ih-doc l"><i></i><i></i><i></i></div><div><b>全部塞在一起</b><small>所有阶段的指导堆叠，过于冗长</small></div></div>
+        </div></div>
+      <div class="ih-c hot fx fx-up" data-step="2"><b class="ih-ct"><svg class="ic"><use href="#i-swap"/></svg>多阶段角色转换</b>
+        <p>根据当前阶段<b>动态切换系统提示词和工具集</b>，让 Agent 在每个阶段都以最合适的“身份”工作</p>
+        <p class="ih-q">继承来的历史仍在：前一个角色的“思维惯性”可能延续——继承了需求分析师上下文的代码审查员，可能仍从需求角度思考（思考题 1）</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「共享上下文的多 Agent 协作」· 示意沿用图10-1 的三阶段例子</div>
+</section>
+<style>
+.ih-body{display:grid;grid-template-columns:1010px 1fr;gap:30px}
+.ih-stage{position:relative;height:664px;padding:22px 26px}
+.ih-track{display:flex;align-items:center;gap:10px;height:46px}
+.ih-tr{--c:var(--text3);display:inline-flex;align-items:center;gap:10px;padding:8px 16px;border-radius:12px;font-size:18px;color:var(--text3);border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:color .45s,border-color .45s,background .45s,box-shadow .45s}
+.ih-tr em{font:700 15px var(--num);font-style:normal}
+.ih-tr.on{color:var(--text);border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 35%,transparent)}
+.ih-tr.on em{color:var(--c)}
+.ih-tr.done{color:var(--text2);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.ih-ar{color:var(--text3);font-size:18px}
+.ih-sim{position:absolute;right:26px;top:32px}
+.ih-main{display:grid;grid-template-columns:1fr 80px;gap:18px;margin-top:16px}
+.ih-req{border-radius:16px;border:1px solid var(--line2);background:rgba(5,9,22,.55);padding:18px 16px 14px;height:552px}
+.ih-head{--c:var(--acc);position:relative;padding:12px 16px;border-radius:12px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9));display:flex;flex-direction:column;gap:8px;transition:border-color .5s,background .5s}
+.ih-head.sw2{animation:ihSwap .7s var(--ease)}
+@keyframes ihSwap{0%{opacity:.15;transform:perspective(700px) rotateX(75deg)}100%{opacity:1;transform:none}}
+.ih-row{display:flex;align-items:center;gap:12px;font-size:17px;min-height:28px}
+.ih-row em{min-width:64px;font:600 15px var(--mono);font-style:normal;color:var(--c)}
+.ih-sys{color:var(--text)}
+.ih-tools span{display:inline-block;margin-right:8px;padding:2px 10px;border-radius:8px;font:15px var(--mono);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.ih-swap{position:absolute;right:12px;top:-13px;padding:1px 10px;border-radius:999px;font-size:15px;color:var(--c);background:#081022;border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.ih-hl{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:15px;color:var(--text3);letter-spacing:.06em}
+.ih-ml{gap:7px}
+.ih-ml .mr{font-size:17px;padding:7px 14px 7px 18px}
+.ih-ml .mr .rl{min-width:96px;font-size:15px}
+.ih-ml .mr .tx{font-family:var(--mono);font-size:16px}
+.ih-ml .mr.ih-noise{border-color:var(--warn);box-shadow:0 0 16px color-mix(in srgb,var(--warn) 35%,transparent)}
+.ih-ml .mr.ih-noise::after{content:"继承来的历史";position:absolute;right:12px;top:50%;margin-top:-11px;font-size:15px;line-height:22px;color:var(--warn)}
+.ih-sep{--c:var(--acc);padding:4px 0 2px;text-align:center;font-size:15px;color:var(--c);border-top:1px dashed color-mix(in srgb,var(--c) 50%,transparent);animation:upIn .5s var(--spring) both}
+.ih-meter{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ih-meter span{font-size:15px;color:var(--text3)}
+.ih-mt{position:relative;width:30px;flex:1;border-radius:999px;background:rgba(255,255,255,.07)}
+.ih-mt i{position:absolute;left:0;right:0;bottom:0;height:var(--v,0%);border-radius:999px;background:linear-gradient(0deg,var(--acc),var(--warn));box-shadow:0 0 16px color-mix(in srgb,var(--warn) 40%,transparent);transition:height .8s var(--ease)}
+.ih-mv{font-size:15px;color:var(--warn);writing-mode:vertical-rl;letter-spacing:.2em}
+.ih-side{display:flex;flex-direction:column;gap:16px}
+.ih-c{padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.ih-c.hot{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.ih-ct{display:flex;align-items:center;gap:10px;font-size:21px;color:var(--acc)}
+.ih-c p{font-size:18px;line-height:1.6;margin-top:10px;color:var(--text)}
+.ih-c p b{color:var(--acc)}
+.ih-pro{display:flex;gap:12px;align-items:flex-start}
+.ih-pro>span:first-child{flex:none;display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:17px;margin-top:1px}
+.ih-two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.ih-p{display:flex;gap:12px;align-items:center;padding:12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ih-p b{display:block;font-size:18px;color:var(--warn)}
+.ih-p small{display:block;font-size:15px;color:var(--text2);margin-top:2px;line-height:1.4}
+.ih-doc{flex:none;width:44px;padding:6px;border-radius:6px;border:1.5px solid var(--text3);display:flex;flex-direction:column;gap:5px}
+.ih-doc.s{height:34px}
+.ih-doc.l{height:86px}
+.ih-doc i{flex:1;border-radius:3px;background:rgba(148,163,184,.28)}
+.ih-doc.l i:nth-child(1){background:rgba(34,211,238,.35)}.ih-doc.l i:nth-child(2){background:rgba(251,191,36,.35)}.ih-doc.l i:nth-child(3){background:rgba(167,139,250,.35)}
+.ih-q{font-size:16px!important;color:var(--text2)!important;padding:10px 12px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--warn) 50%,transparent)}
+</style>
+<script>
+HOOKS['c10-inherit'] = {
+  // 图10-1 左半部分的三阶段例子（示意）
+  S: [
+    { n: '需求分析师', c: '#22d3ee', sys: '你的职责是充分理解需求……', tools: ['ask_question', 'save_req'],
+      m: [['user', '写一个 CSV 分析脚本'], ['assistant', '需要处理哪些文件类型？']] },
+    { n: '软件工程师', c: '#fbbf24', sys: '根据已确认需求编写代码……', tools: ['write_file', 'execute_code'],
+      m: [['assistant', 'write_file("analyze.py", …)'], ['assistant', 'execute_code("python test.py")']] },
+    { n: '代码审查员', c: '#a78bfa', sys: '审查代码质量和安全性……', tools: ['run_linter', 'run_tests'],
+      m: [['assistant', 'run_linter → 2 warnings'], ['assistant', 'approve_code()']] },
+  ],
+  init(s) {
+    const tr = s.querySelector('.ih-track');
+    tr.innerHTML = this.S.map((x, i) => `${i ? '<span class="ih-ar">→</span>' : ''}<span class="ih-tr" data-i="${i}" style="--c:${x.c}"><em>阶段 ${i + 1}</em>${x.n}</span>`).join('');
+    tr.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) this.jump(s, +b.dataset.i); });
+    this.hdr(s, 0, false);
+  },
+  // 切换请求头部（系统提示词 + 工具集），历史不动
+  hdr(s, i, anim) {
+    const x = this.S[i], h = s.querySelector('.ih-head');
+    this.cur = i;
+    h.style.setProperty('--c', x.c);
+    s.querySelector('.ih-sys').textContent = x.sys;
+    s.querySelector('.ih-tools').innerHTML = x.tools.map((t) => `<span>${t}</span>`).join('');
+    if (anim) U.restart(h, 'sw2');
+    s.querySelectorAll('.ih-tr').forEach((t, j) => { t.classList.toggle('on', j === i); t.classList.toggle('done', j < i); });
+    this.noise(s);
+  },
+  sep(s, i) {
+    s.querySelector('.ih-ml').insertAdjacentHTML('beforeend', `<div class="ih-sep" style="--c:${this.S[i].c}">交接 → 阶段 ${i + 1}：换系统提示词与工具集，历史原样保留</div>`);
+  },
+  msg(s, i, r, t) {
+    s.querySelector('.ih-ml').insertAdjacentHTML('beforeend', `<div class="mr new" data-r="${r}" data-st="${i}"><span class="rl">${r}</span><span class="tx">${t}</span></div>`);
+  },
+  meter(s, n) { s.querySelector('.ih-mt').style.setProperty('--v', Math.min(96, 12 + n * 14) + '%'); },
+  // 第 2 步：阶段 3 时把阶段 1 的历史标出（思维惯性）
+  noise(s) {
+    const on = this.k >= 2 && this.cur === 2;
+    s.querySelectorAll('.ih-ml [data-st="0"]').forEach((m) => m.classList.toggle('ih-noise', on));
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    s.querySelector('.ih-ml').innerHTML = '';
+    let n = 0;
+    this.meter(s, 0);
+    for (let i = 0; i < 3; i++) {
+      if (i) this.sep(s, i);
+      this.hdr(s, i, true);
+      await U.wait(ctx, 1000);
+      if (!ok()) return;
+      for (const [r, t] of this.S[i].m) {
+        this.msg(s, i, r, t);
+        this.meter(s, ++n);
+        this.noise(s);
+        await U.wait(ctx, 1150);
+        if (!ok()) return;
+      }
+    }
+    await U.wait(ctx, 3400);
+    if (ok() && this.auto) this.run(s);
+  },
+  // 点击阶段标签：直接显示该阶段时的请求（手动模式）
+  jump(s, i) {
+    this.auto = false;
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.ih-ml').innerHTML = '';
+    let n = 0;
+    for (let j = 0; j <= i; j++) {
+      if (j) this.sep(s, j);
+      this.S[j].m.forEach(([r, t]) => { this.msg(s, j, r, t); n++; });
+    }
+    this.hdr(s, i, true);
+    this.meter(s, n);
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.k = k;
+    this.auto = true;
+    this.run(s);
+  },
+  step(s, ctx, k) { this.k = k; this.noise(s); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.k = 0;
+    s.querySelector('.ih-ml').innerHTML = '';
+    this.meter(s, 0);
+    this.hdr(s, 0, false);
+    s.querySelectorAll('.ih-tr').forEach((t) => t.classList.remove('on', 'done'));
+  },
+};
+</script>
+
+<section class="slide" id="c10-carrier" data-part="3" data-trans="rise" data-dur="16000" data-title="替换 system prompt，还是加载 Skill？" data-notes="这里有一个常被忽略、但会直接改变架构的设计选择：<b>角色转换究竟是替换 system prompt，还是加载 Skill？</b>两者都可以让同一个模型在不同阶段采用不同的行为规程，却不是同一种成本模型。<br><b>transfer_to_agent</b>：角色规程的载体是被替换的当前 system prompt，并通常同时替换工具集；工具可见性上只暴露当前角色的工具；代价是<b>每次切换都改变请求前缀，从变化点起的前缀缓存通常无法复用</b>（KV Cache 见第二章）；好处是约束能力强——越界工具可在 schema 层不可见。<br><b>Skill</b>：在固定的 system prompt 中放一个 Skill 目录，按需把 SKILL.md 追加到轨迹；工具通常固定暴露全集，或使用稳定的工具搜索入口；<b>静态前缀保持不变，Skill 内容成为末尾轨迹，已有前缀可继续复用</b>；但约束能力弱——Skill 是行为指令，硬权限仍需 Harness 门。<br>下方示意图按调用顺序画出三次请求：绿色是可以复用的已有前缀，红色是从变化点起需要重新计算的部分，灰色是首次调用。system 块位于请求最前面，transfer 一换它，变化点就在开头；Skill 只在末尾追加，前面的前缀都能命中。右上角开关或表格行都可以切换。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">替换 system prompt，还是<em>加载 Skill</em>？</h2>
+  <p class="lead fx fx-up" style="--d:2">两者都能让同一个模型在不同阶段采用不同的行为规程，却不是同一种成本模型</p></div>
+  <div class="sk-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="t">transfer_to_agent</button><button data-v="s">Skill</button></div></header>
+  <div class="k10-tbl sk-tbl fx fx-up" style="--d:3;--cols:190px 1.25fr 1fr 1.35fr 1.05fr">
+    <div class="k10-tr k10-th"><span>选择</span><span>角色规程的载体</span><span>工具可见性</span><span>上下文/KV Cache 影响</span><span>约束能力</span></div>
+    <div class="k10-tr" data-i="0"><b class="sk-k">transfer_to_agent</b><span>替换当前 system prompt，并通常替换工具集</span><span>只暴露当前角色工具</span><span>每次切换都改变请求前缀；从变化点起的前缀缓存通常无法复用</span><span><em class="sk-s">强</em>：越界工具可在 schema 层不可见</span></div>
+    <div class="k10-tr" data-i="1"><b>Skill</b><span>固定 system prompt 中的 Skill 目录，按需把 <code>SKILL.md</code> 追加到轨迹</span><span>通常固定暴露工具全集，或使用稳定的工具搜索入口</span><span>静态前缀保持不变；Skill 内容成为末尾轨迹，已有前缀可继续复用</span><span><em class="sk-w">弱</em>：Skill 是行为指令，硬权限仍需 Harness 门</span></div>
+  </div>
+  <div class="sk-viz panel fx fx-up" style="--d:5">
+    <div class="sk-vh"><b class="sk-vt"></b><span class="k10-sim">示意 · 块宽只表示相对长度</span></div>
+    <div class="sk-rows"></div>
+    <div class="sk-leg"><span><i class="g"></i>首次调用：整段计算</span><span><i class="h"></i>与上一次请求前缀相同：缓存可复用</span><span><i class="m"></i>从变化点起：需要重新计算</span></div>
+  </div>
+  <div class="src">第十章 ·「共享上下文的多 Agent 协作」· 角色转换载体对照表（选择 / 角色规程的载体 / 工具可见性 / 上下文/KV Cache 影响 / 约束能力）</div>
+</section>
+<style>
+#c10-carrier .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.sk-seg button{font-family:var(--mono);font-size:18px}
+.sk-tbl .k10-tr{font-size:17px;padding:12px 20px}
+.sk-tbl .k10-th{font-size:16px}
+.sk-tbl .k10-tr b{font-size:20px;color:var(--text)}
+.sk-tbl .sk-k{font-family:var(--mono);font-size:17px!important}
+.sk-tbl code{font-family:var(--mono);font-size:.95em;color:var(--ctx)}
+.sk-s,.sk-w{font-style:normal;font-weight:800}
+.sk-s{color:var(--ok)}.sk-w{color:var(--warn)}
+.sk-viz{margin-top:18px;padding:16px 24px 14px}
+.sk-vh{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.sk-vt{font-size:20px;color:var(--acc)}
+.sk-vh.sw .sk-vt{animation:swIn .45s var(--ease) both}
+.sk-rows{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.sk-r{display:grid;grid-template-columns:160px 1fr 280px;gap:16px;align-items:center;opacity:.22;transition:opacity .5s}
+.sk-r.in{opacity:1}
+.sk-l b{display:block;font-size:17px}
+.sk-l small{display:block;font:15px var(--mono);color:var(--text3);margin-top:2px}
+.sk-bar{display:flex;gap:4px}
+.sk-b{flex:none;height:56px;border-radius:10px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:1px;border:1.5px solid var(--line2);background:rgba(255,255,255,.03);transition:background .35s,border-color .35s,box-shadow .35s}
+.sk-b small{font:15px var(--mono);line-height:1.2;color:var(--text3)}
+.sk-b em{font-style:normal;font-size:15px;line-height:1.3;color:var(--text);white-space:nowrap}
+.sk-b.lit[data-st="0"]{background:rgba(148,163,184,.16);border-color:#94a3b8}
+.sk-b.lit[data-st="1"]{background:rgba(52,211,153,.18);border-color:var(--ok);box-shadow:0 0 14px rgba(52,211,153,.3)}
+.sk-b.lit[data-st="-1"]{background:rgba(251,113,133,.16);border-color:var(--bad);box-shadow:0 0 14px rgba(251,113,133,.28)}
+.sk-v{font-size:17px;line-height:1.45;color:var(--text2);opacity:0;transition:opacity .5s}
+.sk-r.done .sk-v{opacity:1}
+.sk-v b{color:var(--ok)}.sk-v strong{color:var(--bad)}
+.sk-leg{display:flex;gap:28px;margin-top:12px;font-size:15px;color:var(--text3)}
+.sk-leg span{display:inline-flex;align-items:center;gap:8px}
+.sk-leg i{width:16px;height:16px;border-radius:4px;border:1.5px solid}
+.sk-leg i.g{border-color:#94a3b8;background:rgba(148,163,184,.16)}
+.sk-leg i.h{border-color:var(--ok);background:rgba(52,211,153,.18)}
+.sk-leg i.m{border-color:var(--bad);background:rgba(251,113,133,.16)}
+</style>
+<script>
+HOOKS['c10-carrier'] = {
+  // 块：[上标签, 主标签, 状态(0 首次 / 1 命中 / -1 重算), 宽度]
+  M: {
+    t: {
+      name: 'transfer_to_agent：每次移交都换掉位于最前面的 system 块和工具集',
+      rows: [
+        { l: '第 1 次调用', sub: 'research', v: '首次调用，整段计算', b: [['system', '检索角色规程', 0, 150], ['tools', '检索工具 + 移交', 0, 150], ['', 'user', 0, 76]] },
+        { l: '移交之后', sub: 'data_analysis', v: '前缀从开头就变了：<strong>整段重新计算</strong>', b: [['system', '分析角色规程', -1, 150], ['tools', '计算工具 + 移交', -1, 150], ['', 'user', -1, 76], ['', '检索结果', -1, 104]] },
+        { l: '再次移交', sub: 'writing', v: '又一次从开头失效：<strong>整段重新计算</strong>', b: [['system', '写作角色规程', -1, 150], ['tools', '计数工具 + 移交', -1, 150], ['', 'user', -1, 76], ['', '检索结果', -1, 104], ['', '计算结果', -1, 104]] },
+      ],
+    },
+    s: {
+      name: 'Skill：静态前缀不动，SKILL.md 作为 tool result 追加到轨迹末尾',
+      rows: [
+        { l: '第 1 次调用', sub: 'load research', v: '首次调用，整段计算', b: [['system', '规程 + Skill 目录', 0, 150], ['tools', '全部工具 schema', 0, 186], ['', 'user', 0, 76], ['SKILL.md', 'research', 0, 136]] },
+        { l: '加载下一个', sub: 'load data_analysis', v: '已有前缀全部命中，<b>只算新增末尾</b>', b: [['system', '规程 + Skill 目录', 1, 150], ['tools', '全部工具 schema', 1, 186], ['', 'user', 1, 76], ['SKILL.md', 'research', 1, 136], ['', '检索结果', -1, 104], ['SKILL.md', 'data_analysis', -1, 136]] },
+        { l: '再加载一个', sub: 'load writing', v: '仍然<b>只算新增末尾</b>', b: [['system', '规程 + Skill 目录', 1, 150], ['tools', '全部工具 schema', 1, 186], ['', 'user', 1, 76], ['SKILL.md', 'research', 1, 136], ['', '检索结果', 1, 104], ['SKILL.md', 'data_analysis', 1, 136], ['', '计算结果', -1, 104], ['SKILL.md', 'writing', -1, 136]] },
+      ],
+    },
+  },
+  init(s) {
+    this.set = U.seg(s.querySelector('.sk-seg'), (v) => { this.auto = false; this.show(s, v); });
+    s.querySelectorAll('.sk-tbl .k10-tr[data-i]').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.show(s, r.dataset.i === '0' ? 't' : 's'); }));
+  },
+  show(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.M[m];
+    this.m = m;
+    this.set(m);
+    s.querySelectorAll('.sk-tbl .k10-tr[data-i]').forEach((r) => r.classList.toggle('on', (r.dataset.i === '0') === (m === 't')));
+    s.querySelector('.sk-vt').textContent = D.name;
+    U.restart(s.querySelector('.sk-vh'), 'sw');
+    const box = s.querySelector('.sk-rows');
+    box.innerHTML = D.rows.map((r) => `<div class="sk-r"><div class="sk-l"><b>${r.l}</b><small>${r.sub}</small></div><div class="sk-bar">${r.b.map(([top, main, st, w]) => `<span class="sk-b" data-st="${st}" style="width:${w}px">${top ? `<small>${top}</small>` : ''}<em>${main}</em></span>`).join('')}</div><div class="sk-v">${r.v}</div></div>`).join('');
+    if (!ctx) return;
+    // 逐次请求入场，缓存扫描从左到右点亮每个块
+    [...box.querySelectorAll('.sk-r')].forEach((row, i) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      row.classList.add('in');
+      const bs = [...row.querySelectorAll('.sk-b')];
+      bs.forEach((b, j) => ctx.later(() => tk === this.tk && b.classList.add('lit'), 250 + j * 170));
+      ctx.later(() => tk === this.tk && row.classList.add('done'), 350 + bs.length * 170);
+    }, 400 + i * 1900));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 't');
+    ctx.every(() => { if (this.auto) this.show(s, this.m === 't' ? 's' : 't'); }, 7800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.sk-rows').innerHTML = '';
+    s.querySelector('.sk-vt').textContent = '';
+    s.querySelectorAll('.sk-tbl .k10-tr').forEach((r) => r.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c10-choose" data-part="3" data-trans="flip" data-dur="13000" data-title="怎么选：Skill 还是独立 Agent" data-notes="对照表之后，原书给出了选择原则：<b>角色差异主要来自知识、流程和写作风格时，优先使用 Skill</b>；角色差异涉及<b>权限、工具隔离、合规边界或需要在运行时强制禁止某类动作</b>时，使用独立 Agent 或 transfer_to_agent 工具，并在 Harness 层通过代码限制工具调用。<br>道理来自上一页表格的最后一列：Skill 是行为指令，约束能力弱，硬权限仍需 Harness 门；transfer_to_agent 可以让越界工具在 schema 层直接不可见，独立 Agent 则从结构上把工具与上下文隔离开。配套仓库的实验说明写得更直白：<b>Skill 是软行为边界，不是权限边界</b>——删除、付款、发信等高风险工具，仍必须用 Harness allowlist、审批门或独立沙盒限制。<br>画面中的卡片会自动分拣到两侧；也可以点击卡片手动分拣，再点一次放回原处。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">角色差在哪里，<em>就选哪种载体</em></h2>
+  <p class="lead fx fx-up" style="--d:2">先看角色之间的差异来自什么：知识与流程，还是权限与边界</p></header>
+  <div class="ck-stage fx fx-scale" style="--d:3">
+    <svg class="ck-svg" viewBox="0 0 1660 540" width="1660" height="540">
+      <path class="ck-ar" d="M700 122 C 620 150, 470 140, 390 168" stroke="#22d3ee"/>
+      <path class="ck-ar" d="M960 122 C 1040 150, 1190 140, 1270 168" stroke="#a78bfa"/>
+    </svg>
+    <div class="ck-pool"><span>角色差异主要来自……</span></div>
+    <div class="ck-bin l">
+      <div class="ck-bh"><svg class="ic"><use href="#i-layers"/></svg><div><b>优先使用 Skill</b><small>差异主要来自知识、流程和写作风格</small></div></div>
+      <div class="ck-ft">固定 system prompt 中的 Skill 目录，按需追加 SKILL.md · 静态前缀可继续复用</div>
+    </div>
+    <div class="ck-bin r">
+      <div class="ck-bh"><svg class="ic"><use href="#i-shield"/></svg><div><b>独立 Agent 或 transfer_to_agent</b><small>差异涉及权限、工具隔离、合规边界，或需要在运行时强制禁止某类动作</small></div></div>
+      <div class="ck-ft">并在 Harness 层通过代码限制工具调用 · 越界工具可在 schema 层不可见</div>
+    </div>
+    <div class="ck-chips"></div>
+  </div>
+  <div class="ck-warn fx fx-up" style="--d:6"><svg class="ic"><use href="#i-alert"/></svg><div><b>Skill 是软行为边界，不是权限边界</b><span>删除、付款、发信等高风险工具，仍必须用 Harness allowlist、审批门或独立沙盒限制</span></div><em>配套仓库 multi-role-transfer · 结论解释与局限</em></div>
+  <div class="src">第十章 ·「共享上下文的多 Agent 协作」· 对照表后的选择原则</div>
+</section>
+<style>
+.ck-stage{position:relative;width:1660px;height:540px}
+.ck-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.ck-ar{fill:none;stroke-width:2.4;stroke-dasharray:6 8;opacity:.6;animation:flow 1.2s linear infinite}
+.ck-pool{position:absolute;left:300px;top:0;width:1060px;height:120px;border-radius:20px;border:1px dashed var(--line2);background:rgba(255,255,255,.02)}
+.ck-pool>span{position:absolute;left:50%;top:-13px;transform:translateX(-50%);padding:0 12px;font-size:16px;letter-spacing:.12em;color:var(--text3);background:#060a1b;white-space:nowrap}
+.ck-bin{--c:var(--acc);position:absolute;top:170px;width:780px;height:370px;padding:22px 28px;border-radius:22px;border:1.5px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 6%,rgba(12,18,40,.78))}
+.ck-bin.l{left:0}
+.ck-bin.r{left:880px;--c:#a78bfa}
+.ck-bin.hit{animation:ckHit .9s ease}
+@keyframes ckHit{35%{box-shadow:0 0 46px color-mix(in srgb,var(--c) 50%,transparent);border-color:var(--c)}}
+.ck-bh{display:flex;align-items:flex-start;gap:16px}
+.ck-bh>.ic{flex:none;font-size:38px;color:var(--c);margin-top:2px}
+.ck-bh b{display:block;font-size:26px;color:var(--c)}
+.ck-bh small{display:block;font-size:18px;line-height:1.5;color:var(--text2);margin-top:4px}
+.ck-ft{position:absolute;left:28px;right:28px;bottom:20px;padding-top:12px;font-size:17px;line-height:1.5;color:var(--c);border-top:1px dashed color-mix(in srgb,var(--c) 40%,transparent)}
+.ck-chip{position:absolute;left:0;top:0;height:48px;border-radius:999px;display:grid;place-items:center;font-size:20px;font-weight:600;color:var(--text);border:1.5px solid var(--line2);background:rgba(16,24,48,.96);cursor:pointer;z-index:2;transition:left .8s var(--ease),top .8s var(--ease),background .4s,border-color .4s,box-shadow .4s,color .4s}
+.ck-chip:hover{border-color:var(--text3)}
+.ck-chip.in.l{color:#06101f;border-color:#22d3ee;background:#22d3ee;box-shadow:0 0 22px rgba(34,211,238,.45)}
+.ck-chip.in.r{color:#06101f;border-color:#a78bfa;background:#a78bfa;box-shadow:0 0 22px rgba(167,139,250,.45)}
+.ck-warn{display:flex;align-items:center;gap:18px;margin-top:22px;padding:14px 22px;border-radius:16px;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.32)}
+.ck-warn>.ic{flex:none;font-size:30px;color:var(--warn)}
+.ck-warn b{display:block;font-size:21px;color:var(--warn)}
+.ck-warn div span{display:block;font-size:18px;color:var(--text2);margin-top:4px}
+.ck-warn em{margin-left:auto;font-style:normal;font-size:15px;color:var(--text3);white-space:nowrap}
+</style>
+<script>
+HOOKS['c10-choose'] = {
+  // s：落到哪一侧；x：落点；hx：在差异池里的位置（init 时计算）
+  C: [
+    { t: '权限', s: 'r', w: 84, x: 920 },
+    { t: '知识', s: 'l', w: 84, x: 40 },
+    { t: '工具隔离', s: 'r', w: 126, x: 1020 },
+    { t: '流程', s: 'l', w: 84, x: 140 },
+    { t: '合规边界', s: 'r', w: 126, x: 1162 },
+    { t: '写作风格', s: 'l', w: 126, x: 240 },
+    { t: '运行时强制禁止某类动作', s: 'r', w: 270, x: 1304 },
+  ],
+  ORDER: [1, 3, 5, 0, 2, 4, 6],
+  init(s) {
+    const tot = this.C.reduce((a, c) => a + c.w, 0) + 16 * (this.C.length - 1);
+    let x = 300 + (1060 - tot) / 2;
+    this.C.forEach((c) => { c.hx = Math.round(x); x += c.w + 16; });
+    const box = s.querySelector('.ck-chips');
+    box.innerHTML = this.C.map((c, i) => `<button class="ck-chip ${c.s}" data-i="${i}" style="width:${c.w}px">${c.t}</button>`).join('');
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      this.auto = false;
+      if (b.classList.contains('in')) this.back(s, +b.dataset.i); else this.fly(s, +b.dataset.i);
+    });
+    this.home(s);
+  },
+  chip(s, i) { return s.querySelectorAll('.ck-chip')[i]; },
+  back(s, i) { const b = this.chip(s, i), c = this.C[i]; b.classList.remove('in'); b.style.left = c.hx + 'px'; b.style.top = '36px'; },
+  home(s) { this.C.forEach((c, i) => this.back(s, i)); },
+  fly(s, i) {
+    const b = this.chip(s, i), c = this.C[i];
+    b.style.left = c.x + 'px';
+    b.style.top = '300px';
+    b.classList.add('in');
+    U.restart(s.querySelector('.ck-bin.' + c.s), 'hit');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.home(s);
+    let n = 0;
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (n < this.ORDER.length) this.fly(s, this.ORDER[n]);
+      else if (n >= 11) { this.home(s); n = -1; }
+      n++;
+    }, 1000);
+  },
+  reset(s) { this.home(s); s.querySelectorAll('.ck-bin').forEach((b) => b.classList.remove('hit')); },
+};
+</script>
+
+<section class="slide" id="c10-exp1" data-part="3" data-trans="iris" data-dur="28000" data-title="实验 10-1 ★★：共享上下文中的多角色转换——系统提示词与 Skill 的对比" data-notes="<b>实验 10-1 ★★</b>在共享上下文的前提下，对比两种实现多角色行为的方法。<br><b>共同任务与变量</b>：两条路径都使用同一模型、同一用户任务、同一工具实现、同一份角色规程和全量共享轨迹。任务是查找中国 2021—2023 年新能源汽车销量、计算 CAGR、写不超过 120 字的投资人摘要。<br><b>路径一：系统提示词切换</b>。五种角色为 triage（用户需求收集，默认入口）、research（信息检索）、coding（编程）、data_analysis（数据分析）和 writing（写作）。每个角色只看到自己的专属工具和 transfer_to_agent；调用移交时保存历史、加载目标角色提示词 / 工具集，再继续调用。旧实现保留在配套项目中，作为这一实验分支的基线。<br><b>路径二：Skill</b>。system prompt 和完整工具全集在整个会话中固定；模型按需调用 load_skill(name)，读取的 SKILL.md 作为 tool result 进入共享轨迹。这样静态前缀不因角色变化而重写，但工具仍然可见，硬权限由 harness 中的规则保证。<br>右侧先回放路径一的移交链 triage → research → data_analysis → writing → triage，取自配套仓库 README 的控制台输出形态示例（具体措辞与步数每次运行会不同；正式验收以 kimi-k2.5 v3 记录为准：3 次带来源 URL 的真实 Tavily 检索、完整移交链、计算工具调用与长度核对，9/9 行为门禁、6/6 溯源门禁全部通过）。<b>writing 从未自己检索或计算，却能引用准确的销量数字和增长率——这正是共享上下文的证据。</b>随后切到路径二的机制示意：前缀固定，Skill 逐个作为 tool result 追加；工具全部可见，但 Harness 策略门会拒绝未加载 Skill 或当前 Skill 未授权的工具调用。上方开关可以手动切换，点击角色可查看它的工具。">
+  <header class="sh"><div class="kicker"></div><h2 class="title e1-title fx fx-up" style="--d:1">实验 10-1 ★★：共享上下文中的多角色转换——<em>系统提示词与 Skill 的对比</em></h2></header>
+  <div class="e1-body">
+    <div class="e1-design fx fx-left" style="--d:2">
+      <div class="e1-b"><b><svg class="ic"><use href="#i-target"/></svg>共同任务与变量</b>
+        <p>两条路径都使用<em>同一模型、同一用户任务、同一工具实现、同一份角色规程和全量共享轨迹</em></p>
+        <div class="e1-task"><span>查找中国 2021—2023 年新能源汽车销量</span><i>→</i><span>计算 CAGR</span><i>→</i><span>写不超过 120 字的投资人摘要</span></div></div>
+      <div class="e1-b"><b><svg class="ic"><use href="#i-swap"/></svg>路径一：系统提示词切换</b>
+        <div class="e1-rl"><span>triage<em>用户需求收集，默认入口</em></span><span>research<em>信息检索</em></span><span>coding<em>编程</em></span><span>data_analysis<em>数据分析</em></span><span>writing<em>写作</em></span></div>
+        <p>每个角色只看到自己的专属工具和 transfer_to_agent；调用移交时保存历史、加载目标角色提示词 / 工具集，再继续调用。旧实现保留在配套项目中，作为这一实验分支的基线</p></div>
+      <div class="e1-b"><b><svg class="ic"><use href="#i-layers"/></svg>路径二：Skill</b>
+        <p>system prompt 和完整工具全集在整个会话中固定；模型按需调用 load_skill(name)，读取的 SKILL.md 作为 tool result 进入共享轨迹</p>
+        <p class="e1-sm">静态前缀不因角色变化而重写，但工具仍然可见，硬权限由 harness 中的规则保证</p></div>
+    </div>
+    <div class="e1-run fx fx-right" style="--d:3">
+      <div class="e1-top"><div class="e1-seg seg"><i class="knob"></i><button data-v="p1">路径一 · transfer_to_agent</button><button data-v="p2">路径二 · load_skill</button></div><span class="e1-tag"></span></div>
+      <div class="e1-roles"><i class="e1-bt"></i></div>
+      <div class="e1-tl"><span class="e1-tll"></span><span class="e1-tlc"></span></div>
+      <div class="e1-log win" data-clip-ok><div class="win-bar"><i></i><i></i><i></i><span class="e1-wt"></span></div><div class="e1-lines"></div></div>
+      <div class="e1-note"></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「共享上下文的多 Agent 协作」· 实验 10-1 · 配套仓库 chapter10/multi-role-transfer（角色表与控制台输出形态示例）</div>
+</section>
+<style>
+.e1-title{font-size:44px}
+.e1-body{display:grid;grid-template-columns:590px 1fr;gap:30px}
+.e1-design{display:flex;flex-direction:column;gap:14px}
+.e1-b{padding:16px 20px;border-radius:16px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.e1-b>b{display:flex;align-items:center;gap:10px;font-size:21px;color:var(--acc)}
+.e1-b p{font-size:17px;line-height:1.62;margin-top:8px;color:var(--text)}
+.e1-b p em{font-style:normal;color:var(--acc)}
+.e1-b p.e1-sm{color:var(--text2)}
+.e1-task{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.e1-task span{padding:5px 12px;border-radius:10px;font-size:16px;background:color-mix(in srgb,var(--acc) 10%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+.e1-task i{font-style:normal;color:var(--text3)}
+.e1-rl{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.e1-rl span{padding:3px 10px;border-radius:8px;font:15px var(--mono);color:var(--text);border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.e1-rl em{margin-left:6px;font-style:normal;font-family:var(--font);color:var(--text3)}
+.e1-run{display:flex;flex-direction:column;gap:12px;min-width:0}
+.e1-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.e1-seg button{font-size:18px;padding:9px 20px}
+.e1-tag{font-size:15px;color:var(--text3)}
+.e1-roles{position:relative;display:grid;grid-template-columns:repeat(5,1fr);height:124px;padding-top:8px}
+.e1-r b{font-family:var(--mono);font-size:17px}
+.e1-sk{position:absolute;top:0;left:50%;margin-left:22px;padding:0 6px;border-radius:6px;font:600 15px var(--mono);color:#06101f;background:var(--ctx);opacity:0;transition:opacity .4s}
+#c10-exp1[data-m="p2"] .e1-r.ld .e1-sk{opacity:1}
+.e1-bt{position:absolute;top:-1px;left:0;width:82px;height:82px;border-radius:50%;border:3px solid var(--acc);box-shadow:0 0 24px var(--acc);opacity:0;pointer-events:none;transition:left .75s var(--ease),opacity .4s}
+#c10-exp1[data-m="p1"] .e1-bt{opacity:1}
+.e1-tl{display:flex;align-items:center;gap:10px;min-height:42px;padding:6px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.e1-tll{flex:none;font-size:15px;color:var(--text3)}
+.e1-tlc{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.e1-tc{padding:2px 10px;border-radius:8px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line2);transition:opacity .35s,color .35s,border-color .35s}
+.e1-tc.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.e1-tc.dim{opacity:.38}
+.e1-tc.no{color:var(--bad);border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);animation:shake .5s}
+.e1-tn{font-size:15px;color:var(--text3)}
+.e1-log{height:338px;display:flex;flex-direction:column}
+.e1-lines{flex:1;min-height:0;padding:12px 16px;display:flex;flex-direction:column;justify-content:flex-end;gap:7px;overflow:hidden}
+.e1-ln{font-size:16px;line-height:1.5;color:var(--text2);animation:upIn .45s var(--spring) both}
+.e1-who{display:inline-block;margin-right:8px;padding:0 8px;border-radius:6px;font:600 15px var(--mono);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.e1-op{font:15px var(--mono);color:var(--text3)}
+.e1-ln code{margin-right:6px;font:15px var(--mono);color:#cbd5f5}
+.e1-res{color:var(--ok)}
+.e1-rs{display:block;margin-top:2px;padding-left:12px;font-size:15px;color:var(--text3)}
+.e1-ln.fin{padding:8px 12px;border-radius:10px;color:var(--text);background:color-mix(in srgb,var(--ok) 9%,transparent);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.e1-ln.fin b{margin-right:8px;color:var(--ok)}
+.e1-ln.skill code{color:var(--ctx)}
+.e1-ln.deny .e1-res{color:var(--bad)}
+.e1-note{min-height:56px;padding:12px 18px;border-radius:14px;font-size:18px;line-height:1.5;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent);border-left:4px solid var(--acc);opacity:0;transition:opacity .6s}
+.e1-note.on{opacity:1}
+.e1-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-exp1'] = {
+  // 五个角色及专属工具（配套仓库 multi-role-transfer 的角色表；每个角色另持有 transfer_to_agent）
+  R: [
+    { k: 'triage', d: '默认入口', t: ['transfer_to_agent'], c: '#94a3b8', ic: 'inbox' },
+    { k: 'research', d: '信息检索', t: ['web_search'], c: '#22d3ee', ic: 'search' },
+    { k: 'coding', d: '编程', t: ['execute_python'], c: '#fbbf24', ic: 'code' },
+    { k: 'data_analysis', d: '数据分析', t: ['calculate', 'descriptive_stats'], c: '#a78bfa', ic: 'chart' },
+    { k: 'writing', d: '写作', t: ['count_characters'], c: '#4ade80', ic: 'edit' },
+  ],
+  ALL: ['web_search', 'execute_python', 'calculate', 'descriptive_stats', 'count_characters', 'load_skill'],
+  // 路径一：配套仓库 README 的控制台输出形态示例
+  P1: [
+    { at: 0, ty: 'hand', to: 1, x: '需要先检索中国2021、2022、2023年新能源汽车销量及可靠来源，为后续CAGR计算和投资人摘要提供数据依据。' },
+    { at: 1, ty: 'tool', x: 'web_search("中国 2021年 2022年 2023年 新能源汽车销量 乘联会 中汽协")', r: '…2021 年：352.1 万辆 / 2022 年：688.7 万辆 / 2023 年：949.5 万辆' },
+    { at: 1, ty: 'hand', to: 3, x: '已检索到2021、2022、2023年新能源汽车销量，请计算2021至2023年的两年CAGR，并给出结果供后续写作。' },
+    { at: 3, ty: 'tool', x: 'calculate("(949.5/352.1)**(1/2)-1")', r: '0.6421562289791105' },
+    { at: 3, ty: 'hand', to: 4, x: '销量数据与CAGR已完成……CAGR=(949.5/352.1)^(1/2)-1=64.22%。请据此写不超过120字的投资人中文总结。' },
+    { at: 4, ty: 'tool', x: 'count_characters(交付稿)', r: '101 字符，不超过 120 字' },
+    { at: 4, ty: 'hand', to: 0, x: '已完成投资人摘要并核对篇幅（101字符，不超过120字）…请做最终收尾确认。' },
+    { at: 0, ty: 'fin', x: '据中汽协公开数据，中国新能源汽车销量由2021年的352.1万辆增至2022年的688.7万辆、2023年的949.5万辆。2021—2023年两年CAGR达64.2%，市场保持高速扩张，成长潜力显著。' },
+  ],
+  // 路径二：同一任务的机制示意
+  P2: [
+    { at: 0, ty: 'skill' },
+    { at: 0, ty: 'deny', x: 'web_search(…)' },
+    { at: 1, ty: 'skill' },
+    { at: 1, ty: 'tool', x: 'web_search(…)', r: '三年销量与来源 URL' },
+    { at: 3, ty: 'skill' },
+    { at: 3, ty: 'tool', x: 'calculate(…)', r: 'CAGR' },
+    { at: 4, ty: 'skill' },
+    { at: 4, ty: 'tool', x: 'count_characters(…)', r: '交付稿长度核对' },
+  ],
+  NOTE: {
+    p1: '<b>writing 从未自己检索或计算</b>，却能引用准确的销量数字和增长率——这正是<b>共享上下文</b>的证据',
+    p2: '静态前缀不因角色变化而重写，Skill 内容成为末尾轨迹；工具仍然全部可见，<b>硬权限由 Harness 中的规则保证</b>',
+  },
+  init(s) {
+    const roles = s.querySelector('.e1-roles');
+    roles.insertAdjacentHTML('beforeend', this.R.map((r, i) => `<div class="k10-ag e1-r" data-i="${i}" style="--c:${r.c}"><span class="k10-av"><svg class="ic"><use href="#i-${r.ic}"/></svg></span><b>${r.k}</b><small>${r.d}</small><span class="e1-sk">SKILL.md</span></div>`).join(''));
+    roles.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-i]');
+      if (!b) return;
+      this.auto = false;
+      this.tk = (this.tk || 0) + 1;
+      const i = +b.dataset.i;
+      if (this.m === 'p2') this.loaded.add(i);
+      this.focus(s, i);
+      this.tools(s, i);
+    });
+    this.loaded = new Set();
+    this.set = U.seg(s.querySelector('.e1-seg'), (v) => { this.auto = false; this.play(s, v); });
+  },
+  focus(s, i) {
+    const nodes = [...s.querySelectorAll('.e1-r')];
+    nodes.forEach((n, j) => {
+      if (this.m === 'p2') { const ld = this.loaded.has(j); n.classList.toggle('ld', ld); n.classList.toggle('on', j === i && ld); n.classList.toggle('dim', !ld); }
+      else { n.classList.remove('ld'); n.classList.toggle('on', j === i); n.classList.toggle('dim', j !== i); }
+    });
+    const n = nodes[i], av = n.querySelector('.k10-av');
+    s.querySelector('.e1-bt').style.left = n.offsetLeft + av.offsetLeft - 9 + 'px';
+  },
+  tools(s, i, deny) {
+    const R = this.R;
+    if (this.m === 'p1') {
+      s.querySelector('.e1-tll').textContent = '本轮可见：';
+      const ts = i === 0 ? R[0].t : [...R[i].t, 'transfer_to_agent'];
+      s.querySelector('.e1-tlc').innerHTML = ts.map((t) => `<span class="e1-tc ok">${t}</span>`).join('') + '<span class="e1-tn">其余工具在 schema 层不可见</span>';
+    } else {
+      s.querySelector('.e1-tll').textContent = '固定全集：';
+      // Harness 策略门只放行当前 Skill 授权的工具
+      const okSet = new Set(['load_skill', ...(this.loaded.has(i) ? R[i].t.filter((t) => t !== 'transfer_to_agent') : [])]);
+      s.querySelector('.e1-tlc').innerHTML = this.ALL.map((t) => `<span class="e1-tc ${deny && t === 'web_search' ? 'no' : okSet.has(t) ? 'ok' : 'dim'}">${t}</span>`).join('');
+    }
+  },
+  line(e) {
+    const R = this.R, who = (i) => `<span class="e1-who" style="--c:${R[i].c}">${R[i].k}</span>`;
+    if (e.ty === 'hand') return `<div class="e1-ln">${who(e.at)}<span class="e1-op">transfer_to_agent → </span>${who(e.to)}<span class="e1-rs">reason：${e.x}</span></div>`;
+    if (e.ty === 'tool') return `<div class="e1-ln">${who(e.at)}<code>${e.x}</code><span class="e1-res">→ ${e.r}</span></div>`;
+    if (e.ty === 'fin') return `<div class="e1-ln fin">${who(0)}<b>最终成果</b>${e.x}</div>`;
+    if (e.ty === 'skill') return `<div class="e1-ln skill"><code>load_skill("${R[e.at].k}")</code><span class="e1-res">→ SKILL.md 作为 tool result 追加到共享轨迹</span></div>`;
+    return `<div class="e1-ln deny"><code>${e.x}</code><span class="e1-res">✗ Harness 策略门：当前 Skill（triage）未授权该工具，拒绝调用</span></div>`;
+  },
+  async play(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    s.dataset.m = m;
+    this.set(m);
+    const L = s.querySelector('.e1-lines'), seq = m === 'p1' ? this.P1 : this.P2;
+    L.innerHTML = '';
+    s.querySelector('.e1-wt').textContent = m === 'p1' ? '路径一 · 共享历史 + 换 system prompt / 工具集' : '路径二 · 固定前缀 + load_skill 追加';
+    s.querySelector('.e1-tag').innerHTML = m === 'p1' ? '配套仓库 README 的输出形态示例' : '<span class="k10-sim">示意 · 路径二的机制</span>';
+    const note = s.querySelector('.e1-note');
+    note.classList.remove('on');
+    note.innerHTML = this.NOTE[m];
+    this.loaded = new Set();
+    this.focus(s, 0);
+    this.tools(s, 0);
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    for (const e of seq) {
+      await U.wait(ctx, 1350);
+      if (!ok()) return;
+      if (e.ty === 'skill') this.loaded.add(e.at);
+      const at = e.ty === 'hand' ? e.to : e.at;
+      this.focus(s, at);
+      this.tools(s, at, e.ty === 'deny');
+      L.insertAdjacentHTML('beforeend', this.line(e));
+    }
+    await U.wait(ctx, 700);
+    if (!ok()) return;
+    note.classList.add('on');
+    await U.wait(ctx, 4200);
+    if (ok() && this.auto) this.play(s, m === 'p1' ? 'p2' : 'p1');
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.play(s, 'p1');
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.m = '';
+    s.querySelector('.e1-lines').innerHTML = '';
+    s.querySelector('.e1-note').classList.remove('on');
+    s.querySelectorAll('.e1-r').forEach((n) => n.classList.remove('on', 'dim', 'ld'));
+  },
+};
+</script>
+
+<section class="slide" id="c10-exp1r" data-part="3" data-dur="16000" data-title="实验 10-1 结果：有边界的架构对照" data-notes="正式 v2 对照使用 qwen/qwen3.5-flash-02-23（经 OpenRouter），固定 30 个成对任务、温度 0、每单元最多 8 轮，保留 60 条主轨迹和 12 条边界轨迹、289 份模型原始回执、31 份 Tavily 回执和 60 次盲评回执，并由独立校验脚本复核 12/12 证据门禁。<br><b>结果</b>：Skill 通过 15/30 个确定性任务门禁，Transfer 通过 2/30（50.0% vs 6.7%）；声明的能力序列完成率 90.0% vs 40.0%（Skill 路径 30/30 次至少加载了 triage）；两条路径的边界用例都是 6/6——边界可靠性与端到端成功率分开报告。异源 Gemini 2.5 Flash Lite 以交换顺序评审 30 对、共 60 次：Skill 32、Transfer 20、平局 8。<br><b>代价</b>：Skill 相对 Transfer 的配对中位差为多 6,855 个未缓存输入 token、多 4.368 秒、按价格重算多 $0.00044304。服务商报告的缓存输入全程为零，所以这次运行<b>没有证明模型前缀缓存的收益</b>；Skill 文档缓存每次新会话都未命中。load_skill 本身也会增加一次工具往返和轨迹 token，对很短的单角色任务，这项开销可能大于缓存收益。<br><b>边界</b>：Skill 路径为保持前缀稳定，固定暴露全部工具 schema，Harness 策略门拒绝未加载 Skill 或当前 Skill 未授权的工具调用，因此“看得到工具”不会被误当成“已经加载规程”。这是架构路径对比而不是纯消融——路径一硬隔离工具，路径二固定工具全集；若要单独估计提示词载体的因果效应，还应加入“固定工具全集 + 动态 system prompt”的第三臂。结论是<b>有边界的架构对照结果</b>，不应外推为与模型无关的优胜。<br>右侧四项指标会自动轮流高亮，左下方显示它的口径；也可以点击某一项。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 10-1 结果：<em>有边界的架构对照</em></h2>
+  <p class="lead fx fx-up" style="--d:2">Skill 路径的确定性验收显著更高，代价是更多未缓存输入、延迟与成本</p></header>
+  <div class="r1-body">
+    <div class="r1-left fx fx-left" style="--d:3">
+      <div class="r1-set"><b class="r1-h"><svg class="ic"><use href="#i-flask"/></svg>正式 v2 对照设置</b>
+        <dl>
+          <div><dt>模型</dt><dd class="r1-mono">qwen/qwen3.5-flash-02-23 · OpenRouter</dd></div>
+          <div><dt>任务</dt><dd>30 个成对任务 · 温度 0 · 每单元最多 8 轮</dd></div>
+          <div><dt>轨迹</dt><dd>60 条主轨迹 + 12 条边界轨迹</dd></div>
+          <div><dt>回执</dt><dd>289 份模型回执 · 31 份 Tavily 回执</dd></div>
+          <div><dt>盲评</dt><dd>异源 Gemini 2.5 Flash Lite · 60 次交换顺序</dd></div>
+          <div><dt>复核</dt><dd>独立复核 12/12 证据门禁</dd></div>
+        </dl></div>
+      <div class="r1-info"><span class="r1-ik">指标口径</span><b class="r1-in"></b><p class="r1-ip"></p></div>
+    </div>
+    <div class="r1-right">
+      <div class="r1-mets fx fx-up" style="--d:4">
+        <div class="r1-m" data-i="0"><div class="r1-ml"><b>确定性任务门禁全部通过</b><small>可观察事实的确定性检查</small></div>
+          <div class="r1-bars"><div class="r1-b s"><span>Skill</span><div class="r1-tr"><i style="--w:50%"></i></div><em><span data-count="15">0</span>/30</em></div>
+            <div class="r1-b t"><span>Transfer</span><div class="r1-tr"><i style="--w:6.67%"></i></div><em><span data-count="2">0</span>/30</em></div></div></div>
+        <div class="r1-m" data-i="1"><div class="r1-ml"><b>声明的能力序列完成</b><small>如检索 → 分析 → 写作</small></div>
+          <div class="r1-bars"><div class="r1-b s"><span>Skill</span><div class="r1-tr"><i style="--w:90%"></i></div><em><span data-count="90" data-dec="1" data-suffix="%">0</span></em></div>
+            <div class="r1-b t"><span>Transfer</span><div class="r1-tr"><i style="--w:40%"></i></div><em><span data-count="40" data-dec="1" data-suffix="%">0</span></em></div></div></div>
+        <div class="r1-m" data-i="2"><div class="r1-ml"><b>边界用例</b><small>冻结“首个错误之前”的轨迹前缀</small></div>
+          <div class="r1-bars"><div class="r1-b s"><span>Skill</span><div class="r1-tr"><i style="--w:100%"></i></div><em><span data-count="6">0</span>/6</em></div>
+            <div class="r1-b t"><span>Transfer</span><div class="r1-tr"><i style="--w:100%"></i></div><em><span data-count="6">0</span>/6</em></div></div></div>
+        <div class="r1-m" data-i="3"><div class="r1-ml"><b>异源盲评偏好</b><small>30 对 × 交换顺序 = 60 次</small></div>
+          <div class="r1-stk"><i class="s" style="--w:53.33%">Skill 32</i><i class="e" style="--w:13.34%">平局 8</i><i class="t" style="--w:33.33%">Transfer 20</i></div></div>
+      </div>
+      <div class="r1-cost fx fx-up" style="--d:6">
+        <div class="r1-ch">代价 · Skill − Transfer 的配对中位差</div>
+        <div class="r1-tiles">
+          <div><b>+<span data-count="6855" data-sep>0</span></b><small>未缓存输入 token</small></div>
+          <div><b>+<span data-count="4.368" data-dec="3">0</span> 秒</b><small>延迟</small></div>
+          <div><b>+$<span data-count="0.00044304" data-dec="8">0</span></b><small>按价格重算的成本</small></div>
+        </div>
+        <p class="r1-cn"><svg class="ic"><use href="#i-alert"/></svg><span>服务商报告的缓存输入全程为 0：本次运行<b>没有证明</b>模型前缀缓存的收益</span></p>
+      </div>
+    </div>
+  </div>
+  <p class="tagline r1-tag fx fx-up" style="--d:8">在这一模型与配置下 Skill 更优，但这是<b>有边界的架构对照结果</b>，不应外推为与模型无关的优胜</p>
+  <div class="src">第十章 · 实验 10-1 · 数据：配套仓库 chapter10/multi-role-transfer 正式 v2 对照（exp10-1-qwen35flash-20260809-v2，REPORT.md）</div>
+</section>
+<style>
+.r1-body{display:grid;grid-template-columns:540px 1fr;gap:30px}
+.r1-left{display:flex;flex-direction:column;gap:16px}
+.r1-set,.r1-info{padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.r1-h{display:flex;align-items:center;gap:10px;font-size:20px;color:var(--acc)}
+.r1-set dl{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+.r1-set dl div{display:grid;grid-template-columns:52px 1fr;gap:10px;font-size:17px;line-height:1.45}
+.r1-set dt{color:var(--text3)}
+.r1-set dd{color:var(--text)}
+.r1-set dd.r1-mono{font-family:var(--mono);font-size:16px}
+.r1-info{min-height:204px;border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+.r1-ik{font-size:15px;letter-spacing:.14em;color:var(--text3)}
+.r1-in{display:block;margin-top:4px;font-size:20px;color:var(--acc)}
+.r1-ip{margin-top:6px;font-size:17px;line-height:1.62;color:var(--text)}
+.r1-info.sw .r1-in,.r1-info.sw .r1-ip{animation:swIn .45s var(--ease) both}
+.r1-right{display:flex;flex-direction:column;gap:16px}
+.r1-mets{display:flex;flex-direction:column;gap:10px}
+.r1-m{display:grid;grid-template-columns:290px 1fr;gap:20px;align-items:center;padding:10px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:border-color .35s,background .35s}
+.r1-m.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.r1-ml b{display:block;font-size:19px}
+.r1-ml small{display:block;margin-top:2px;font-size:15px;color:var(--text3)}
+.r1-bars{display:flex;flex-direction:column;gap:6px}
+.r1-b{display:grid;grid-template-columns:86px 1fr 100px;gap:12px;align-items:center}
+.r1-b>span{font-size:16px;color:var(--text2)}
+.r1-tr{height:22px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden}
+.r1-tr i{display:block;width:0;height:100%;border-radius:7px;transition:width 1.3s var(--ease)}
+.r1-b.s .r1-tr i{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.r1-b.t .r1-tr i{background:linear-gradient(90deg,#94a3b8,#cbd5e1)}
+.r1-mets.go .r1-tr i{width:var(--w)}
+.r1-b em{font:700 20px var(--num);font-style:normal;text-align:right;color:var(--text2)}
+.r1-b.s em{color:var(--acc)}
+.r1-stk{display:flex;height:42px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.06)}
+.r1-stk i{display:grid;place-items:center;width:0;overflow:hidden;white-space:nowrap;font-style:normal;font-size:16px;font-weight:700;color:#06101f;transition:width 1.3s var(--ease)}
+.r1-stk i.s{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.r1-stk i.e{background:#64748b;color:var(--text)}
+.r1-stk i.t{background:#cbd5e1}
+.r1-mets.go .r1-stk i{width:var(--w)}
+.r1-cost{padding:16px 22px;border-radius:18px;background:rgba(251,146,60,.06);border:1px solid rgba(251,146,60,.3)}
+.r1-ch{font-size:17px;letter-spacing:.04em;color:var(--warn)}
+.r1-tiles{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:14px;margin-top:10px}
+.r1-tiles div{padding:10px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.r1-tiles b{display:block;font:800 30px var(--num);color:var(--warn)}
+.r1-tiles small{display:block;margin-top:2px;font-size:15px;color:var(--text3)}
+.r1-cn{display:flex;align-items:center;gap:10px;margin-top:12px;font-size:17px;color:var(--text2)}
+.r1-cn .ic{flex:none;color:var(--warn)}
+.r1-cn b{color:var(--warn)}
+.r1-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c10-exp1r'] = {
+  // 各项指标的口径：配套仓库 multi-role-transfer README 与正式 v2 REPORT
+  INFO: [
+    ['确定性任务门禁', '先用确定性门禁检查可观察的事实：工具调用、调用顺序、来源 URL、禁止动作、不确定性表述和交付稿边界；数值正确性与实际可用性另由盲测评审。Skill 15/30（50.0%），Transfer 2/30（6.7%）。'],
+    ['声明的能力序列', 'Skill 路径 30/30 次至少加载了 triage，90.0% 的运行走完了任务声明的能力序列，Transfer 为 40.0%。修复“首步跳过 Skill”的 Harness 策略门后，Skill 路径遵循了渐进式披露的状态机。'],
+    ['边界指令遵循', '冻结“首个错误之前”的轨迹前缀，检查当前用户指令覆盖、检索内容中的提示注入、证据缺失和角色 / Skill 循环，只评分可观察的下一步动作。两条路径都是 6/6，与端到端成功率分开报告。'],
+    ['成对盲评', '异源 Gemini 2.5 Flash Lite 对 30 对结果做成对评审，每对交换 A/B 展示顺序再评一次，以控制位置偏差：Skill 32 次、Transfer 20 次、平局 8 次。'],
+  ],
+  init(s) {
+    s.querySelectorAll('.r1-m').forEach((m) => m.addEventListener('click', () => { this.auto = false; this.show(s, +m.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.r1-m').forEach((m) => m.classList.toggle('on', +m.dataset.i === i));
+    s.querySelector('.r1-in').textContent = this.INFO[i][0];
+    s.querySelector('.r1-ip').textContent = this.INFO[i][1];
+    U.restart(s.querySelector('.r1-info'), 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => s.querySelector('.r1-mets').classList.add('go'), 600);
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.INFO.length); }, 3800);
+  },
+  reset(s) {
+    s.querySelector('.r1-mets').classList.remove('go');
+    s.querySelectorAll('.r1-m').forEach((m) => m.classList.remove('on'));
+  },
+};
+</script>

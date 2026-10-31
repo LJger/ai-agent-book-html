@@ -1,0 +1,642 @@
+<!-- 第八章补充共用件（第 2 部分起使用） -->
+<style>
+.c8-card{--c:var(--acc);position:relative;padding:16px 20px;border-radius:18px;background:rgba(12,18,40,.78);border:1px solid var(--line)}
+.c8-star{color:var(--tool);letter-spacing:-.04em;font-weight:700}
+</style>
+<script>
+// 自动轮播：不点击时每 ms 毫秒切到下一项；show(i) 负责设置 self.i。点击后由页面把 self.auto 设为 false
+C8.auto = function (self, ctx, n, ms, show, first = 800) {
+  self.auto = true;
+  ctx.later(() => { if (self.auto) show(0); }, first);
+  ctx.every(() => { if (self.auto) show(((self.i == null ? -1 : self.i) + 1) % n); }, ms);
+};
+// 创建 SVG 元素
+window.C7S = function (tag, attrs, parent) { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+</script>
+
+<!-- ================= 第 2 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d2" data-part="2" data-title="PART 02 · 经典 RL 到现代 Agent（选读）" data-notes="「从经典 RL Agent 到现代 Agent」，原书标注为可选阅读。这一部分先用经典强化学习的语言讲清 Agent 与环境的交互（图8-1）、五个核心要素与表8-3；再用 MDP、贝尔曼方程和表格 Q-learning 做基础示例（图8-2、图8-3、图8-4），配合实验 8-1 看无先验知识的试错学习有多慢；最后看预训练 LLM 策略带来的变化：思考 token 作为动作、先验分布、经典 RL 与 LLM Agent 的对比（图8-5）、OpenAI 训练范式的三次演进（图8-6），以及实验 8-2 同一寻宝游戏里 Q-learning 与 Kimi K3 的对照（图8-7）。">
+  <div class="ch-k fx fx-up">PART 02 · 选读</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:92px">经典 RL 到现代 Agent</h1>
+  <div class="ch-s fx fx-up" style="--d:3">从蒙眼试错一万局，到第一局就通关：差别在先验</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">不是算法 &gt; 环境 &gt; 先验，而是先验 &gt; 环境 &gt; 算法。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<!-- ================= 图8-1 交互循环 ================= -->
+<section class="slide" id="c08-loop" data-part="2" data-trans="zoom" data-dur="24000" data-title="图8-1 强化学习的 Agent–环境循环" data-notes="<b>强化学习（Reinforcement Learning, RL）</b>的核心在于学习如何根据当前情境选择动作，以获得最大的<b>累积奖励（Cumulative Reward）</b>。想象一个学下棋的 AI：每走一步就是一个动作，赢棋得到正奖励、输棋得到负奖励，累积奖励就是整盘棋的总收益。Agent 和环境持续交互：每一步，Agent 观察当前状态，选择一个动作，环境产生新状态并给出奖励。<br>交互产生<b>轨迹</b>——即“状态→动作→奖励→新状态→动作→奖励……”的完整记录，策略的优劣最终体现在轨迹质量上。<b>价值函数（Value Function）</b>回答的是：如果我现在处于这个状态，按照当前策略一直行动下去，最终总共能获得多少奖励？就像经验丰富的棋手看到一个局面，不需要算到最后一步，凭直觉就能估计出胜率。Agent 与环境的边界遵循一个简洁的原则：<b>凡是 Agent 无法任意改变的，都属于环境</b>。<br>图8-1 的例子：探险者在 5 个房间的迷宫里，ε-贪婪策略 90% 选最优、10% 随机；轨迹为 入口大厅 →东→ 储藏室（0）→ 拿钥匙（+5）→ 向北到守卫室（0）→ 合成银剑（+10）→ 攻击（+50）；目标是最大化 G = R(1) + γR(2) + γ²R(3) + …，γ = 0.99。右下角的 G 按这个公式实时累加。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-1 观察状态 → 选择动作 → <em>新状态 + 奖励</em></h2></header>
+  <div class="c8lp-st fx fx-up" style="--d:2">
+    <div class="c8lp-ag"><svg class="ic"><use href="#i-robot"/></svg><b>Agent（探险者）</b><span>策略 π：观察状态 → 选择动作</span><span>ε-贪婪：90% 最优，10% 随机</span></div>
+    <div class="c8lp-mid"><div class="c8lp-a">动作 A(t) = <b class="c8lp-av">—</b></div><svg class="c8lp-svg" viewBox="0 0 560 200"><path id="c8lp-p1" d="M20 60 C200 0 360 0 540 60"/><path id="c8lp-p2" d="M540 140 C360 200 200 200 20 140"/></svg><div class="c8lp-s">状态 S(t+1) + 奖励 R(t+1) = <b class="c8lp-sv">—</b></div></div>
+    <div class="c8lp-env"><svg class="ic"><use href="#i-map"/></svg><b>环境（迷宫世界）</b><span>5 个房间 · 钥匙 / 门 / 守卫</span><span>R(击败守卫) = +50，R(移动) = 0</span></div>
+  </div>
+  <div class="c8lp-tr fx fx-up" style="--d:3"><span class="lbl">轨迹</span><div class="c8lp-cells"></div></div>
+  <div class="c8lp-g fx fx-up" style="--d:4"><span>G = R(1) + γR(2) + γ²R(3) + …（γ = 0.99）</span><b class="c8lp-gv">0.00</b><em>凡是 Agent 无法任意改变的，都属于环境</em></div>
+  <div class="src">第八章 ·「从经典 RL Agent 到现代 Agent [可选阅读]」「Agent 与环境的交互」· 图8-1</div>
+</section>
+<style>
+.c8lp-st{display:grid;grid-template-columns:330px 1fr 330px;gap:20px;align-items:center}
+.c8lp-ag,.c8lp-env{display:flex;flex-direction:column;gap:6px;padding:20px;border-radius:20px;border:1px solid var(--line);background:rgba(12,18,40,.8)}
+.c8lp-ag{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}.c8lp-env{border-color:rgba(52,211,153,.5)}
+.c8lp-ag .ic,.c8lp-env .ic{width:36px;height:36px;color:var(--acc)}.c8lp-env .ic{color:var(--env)}
+.c8lp-ag b,.c8lp-env b{font-size:21px}
+.c8lp-ag span,.c8lp-env span{font-size:15px;color:var(--text2)}
+.c8lp-mid{position:relative;height:250px}
+.c8lp-svg{position:absolute;inset:24px 0;width:100%;height:200px}
+.c8lp-svg path{fill:none;stroke:var(--line2);stroke-width:2;stroke-dasharray:6 6}
+.c8lp-svg circle{filter:drop-shadow(0 0 8px currentColor)}
+.c8lp-a,.c8lp-s{position:absolute;left:0;right:0;text-align:center;font-size:17px;color:var(--text2)}
+.c8lp-a{top:0}.c8lp-s{bottom:0}
+.c8lp-a b{color:var(--tool)}.c8lp-s b{color:var(--env)}
+.c8lp-tr{display:flex;align-items:center;gap:14px;margin-top:22px}
+.c8lp-cells{display:flex;gap:6px;flex-wrap:wrap}
+.c8lp-cells span{font-size:15px;padding:6px 10px;border-radius:9px;border:1px solid var(--line2);animation:c8lpIn .35s var(--ease)}
+.c8lp-cells .s{color:#93c5fd}.c8lp-cells .a{color:#fde68a}.c8lp-cells .r{color:#6ee7b7;font-family:var(--num)}
+@keyframes c8lpIn{from{opacity:0;translate:0 8px}}
+.c8lp-g{display:flex;align-items:center;gap:18px;margin-top:22px;font-size:18px;color:var(--text2)}
+.c8lp-g b{font:800 40px var(--num);color:var(--acc)}
+.c8lp-g em{margin-left:auto;font-style:normal;font-size:17px;padding-left:14px;border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c08-loop'] = {
+  // 图8-1 的轨迹：[状态, 动作, 奖励]
+  T: [['入口大厅', '向东', 0], ['储藏室', '拿钥匙', 5], ['储藏室', '向北', 0], ['守卫室', '合成银剑', 10], ['守卫室', '攻击', 50]],
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const svg = s.querySelector('.c8lp-svg'), p1 = svg.querySelector('#c8lp-p1'), p2 = svg.querySelector('#c8lp-p2'), cells = s.querySelector('.c8lp-cells');
+    while (ok()) {
+      cells.innerHTML = ''; let G = 0;
+      s.querySelector('.c8lp-gv').textContent = '0.00';
+      cells.insertAdjacentHTML('beforeend', `<span class="s">S(0) ${this.T[0][0]}</span>`);
+      for (let t = 0; t < this.T.length; t++) {
+        const [, a, r] = this.T[t];
+        s.querySelector('.c8lp-av').textContent = `“${a}”`;
+        const d1 = C7S('circle', { r: 9, fill: '#fbbf24', color: '#fbbf24' }, svg);
+        await U.fly(d1, p1, 800, { ctx, alive: ok }); d1.remove(); if (!ok()) return;
+        cells.insertAdjacentHTML('beforeend', `<span class="a">A(${t}) ${a}</span>`);
+        const nx = t + 1 < this.T.length ? this.T[t + 1][0] : '宝藏到手';
+        s.querySelector('.c8lp-sv').textContent = `${nx} · ${r >= 0 ? '+' : ''}${r}`;
+        const d2 = C7S('circle', { r: 9, fill: '#34d399', color: '#34d399' }, svg);
+        await U.fly(d2, p2, 800, { ctx, alive: ok }); d2.remove(); if (!ok()) return;
+        G += Math.pow(0.99, t) * r;
+        s.querySelector('.c8lp-gv').textContent = G.toFixed(2);
+        cells.insertAdjacentHTML('beforeend', `<span class="r">R(${t + 1}) ${r >= 0 ? '+' : ''}${r}</span><span class="s">S(${t + 1}) ${nx}</span>`);
+      }
+      await U.wait(ctx, 3500);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.c8lp-cells').innerHTML = ''; s.querySelectorAll('.c8lp-svg circle').forEach((c) => c.remove()); },
+};
+</script>
+
+<!-- ================= 五要素 ================= -->
+<section class="slide" id="c08-elements" data-part="2" data-trans="flip" data-dur="24000" data-title="试错、延迟奖励与五个核心要素" data-notes="强化学习区别于监督学习（需要标注正确答案）和无监督学习（发现数据中的隐藏模式）的两个特征是<b>试错搜索</b>（Agent 必须自己摸索哪些动作好，没有老师直接告诉正确答案）和<b>延迟奖励</b>（动作的影响可能在多步之后才显现，比如一步好棋的价值要到终局才看得出来）。由此还带来了独特的<b>探索与利用权衡（Exploration-Exploitation Tradeoff）</b>：一直走熟悉的路，学不到新东西；一直乱试，永远到不了终点。<br>强化学习系统包含五个核心要素：<b>动作空间</b>，Agent 可以采取的所有行动集合，可以是离散的（棋类“走哪一步”）或连续的（机器人“关节转多少度”）；<b>策略</b>，Agent 的行为准则，可以是一张查找表，也可以是深度神经网络；<b>奖励信号</b>，环境给出的即时反馈，但 Agent 的目标是最大化长期而非即时奖励——就像投资不能只看今天涨跌；<b>价值函数</b>，估计从某个状态出发未来总共能获得多少累积奖励，过去六十年 RL 研究最重要的认识之一就是价值估计的核心地位；<b>环境模型</b>（可选），预测环境对动作的响应——有环境模型的称为<b>基于模型的方法</b>，没有的称为<b>无模型方法</b>。<br>左侧是一个示意的多臂老虎机：五台机器的真实中奖率对 Agent 隐藏，拖动 ε 看探索与利用的权衡——ε = 0 时容易困在第一台“还不错”的机器上，ε 太大则一直乱试。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">试错、延迟奖励，与<em>探索—利用</em>的权衡</h2></header>
+  <div class="c8el-body">
+    <div class="c8el-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span>
+      <div class="c8el-h"><b>多臂老虎机 · ε-贪婪</b><label>ε <input type="range" class="rng c8el-e" min="0" max="100" step="1" value="10"><b class="c8el-ev">0.10</b></label></div>
+      <div class="c8el-arms"></div>
+      <div class="c8el-st"><div><span>已拉动</span><b class="c8el-n">0</b></div><div><span>平均奖励</span><b class="c8el-avg">—</b></div><div><span>最优臂占比</span><b class="c8el-opt">—</b></div></div>
+      <p class="c8el-nt">柱 = Agent 当前的估计；虚线 = 隐藏的真实中奖率</p>
+    </div>
+    <div class="c8el-r fx fx-right" style="--d:3">
+      <div class="c8el-ft"><span><b>试错搜索</b>没有老师直接告诉正确答案</span><span><b>延迟奖励</b>一步好棋的价值，终局才看得出</span></div>
+      <div class="c8el-cards"></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「Agent 与环境的交互」</div>
+</section>
+<style>
+.c8el-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;flex:1;min-height:0}
+.c8el-l{position:relative;padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.c8el-h{display:flex;justify-content:space-between;align-items:center;padding-right:70px}
+.c8el-h>b{font-size:18px}
+.c8el-h label{display:flex;align-items:center;gap:10px;font-size:17px}
+.c8el-h input{width:200px}.c8el-h label b{font:800 20px var(--num);min-width:50px}
+.c8el-arms{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:18px;align-items:end;border-bottom:1px solid var(--line2);min-height:0}
+.c8el-arm{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px}
+.c8el-arm i{width:70%;border-radius:8px 8px 0 0;background:color-mix(in srgb,var(--acc) 60%,transparent);transition:height .25s}
+.c8el-arm em{position:absolute;left:8%;right:8%;border-top:2px dashed var(--warn);font-style:normal}
+.c8el-arm small{font:15px var(--num);color:var(--text3)}
+.c8el-arm.hit i{background:var(--env)}
+.c8el-st{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c8el-st div{display:flex;flex-direction:column;padding:8px 12px;border-radius:12px;border:1px solid var(--line)}
+.c8el-st span{font-size:15px;color:var(--text3)}.c8el-st b{font:800 24px var(--num)}
+.c8el-nt{font-size:15px;color:var(--text3)}
+.c8el-r{display:flex;flex-direction:column;gap:12px}
+.c8el-ft{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8el-ft span{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);font-size:15px;color:var(--text2)}
+.c8el-ft b{font-size:18px;color:var(--text)}
+.c8el-cards{display:flex;flex-direction:column;gap:7px}
+.c8el-c{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);cursor:pointer;text-align:left;transition:border-color .35s,background .35s}
+.c8el-c em{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.c8el-c b{font-size:17px}
+.c8el-c p{grid-column:2;font-size:15px;line-height:1.5;color:var(--text2);max-height:0;overflow:hidden;transition:max-height .4s}
+.c8el-c.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.85))}
+.c8el-c.on p{max-height:90px}
+</style>
+<script>
+HOOKS['c08-elements'] = {
+  P: [0.35, 0.55, 0.42, 0.78, 0.2],
+  E: [['动作空间', '所有行动的集合：离散（棋类走哪一步）或连续（关节转多少度）'], ['策略', '给定状态下怎么做：一张查找表，或一个深度神经网络'], ['奖励信号', '即时反馈；但目标是最大化长期而非即时奖励——投资不能只看今天涨跌'], ['价值函数', '从某个状态出发未来总共能拿多少奖励；六十年 RL 研究最重要的认识之一是价值估计的核心地位'], ['环境模型（可选）', '预测环境对动作的响应：基于模型的方法先学会预测再规划，无模型方法直接从经验中学习']],
+  init(s) {
+    s.querySelector('.c8el-arms').innerHTML = this.P.map((p, i) => `<div class="c8el-arm"><em style="bottom:calc(${p * 100}% * .82 + 26px)"></em><i style="height:0"></i><small>臂 ${i + 1}</small></div>`).join('');
+    s.querySelector('.c8el-cards').innerHTML = this.E.map(([b, p], i) => `<button class="c8el-c" data-i="${i}"><em>0${i + 1}</em><b>${b}</b><p>${p}</p></button>`).join('');
+    s.querySelectorAll('.c8el-c').forEach((c) => c.addEventListener('click', () => { this.auto = false; this.pick(s, +c.dataset.i); }));
+    s.querySelector('.c8el-e').addEventListener('input', () => { this.rs(s); });
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c8el-c').forEach((c, j) => c.classList.toggle('on', j === i)); },
+  rs(s) { this.Q = [0, 0, 0, 0, 0]; this.N = [0, 0, 0, 0, 0]; this.tot = 0; this.n = 0; this.opt = 0; s.querySelector('.c8el-ev').textContent = (+s.querySelector('.c8el-e').value / 100).toFixed(2); },
+  pull(s) {
+    const e = +s.querySelector('.c8el-e').value / 100, r = this.rnd;
+    let a = r() < e ? Math.floor(r() * 5) : this.Q.indexOf(Math.max(...this.Q));
+    const rew = r() < this.P[a] ? 1 : 0;
+    this.N[a]++; this.Q[a] += (rew - this.Q[a]) / this.N[a]; this.n++; this.tot += rew; if (a === 3) this.opt++;
+    const H = s.querySelector('.c8el-arms').clientHeight - 30;
+    s.querySelectorAll('.c8el-arm').forEach((m, j) => { m.querySelector('i').style.height = this.Q[j] * H * 0.82 + 'px'; m.classList.toggle('hit', j === a); });
+    s.querySelector('.c8el-n').textContent = this.n;
+    s.querySelector('.c8el-avg').textContent = (this.tot / this.n).toFixed(2);
+    s.querySelector('.c8el-opt').textContent = Math.round((this.opt / this.n) * 100) + '%';
+    if (this.n >= 400) this.rs(s);
+  },
+  enter(s, ctx) {
+    this.rnd = U.rand(9); this.rs(s);
+    ctx.every(() => this.pull(s), 120);
+    C8.auto(this, ctx, 5, 3000, (i) => this.pick(s, i), 600);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c8el-c').forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 表8-3 ================= -->
+<section class="slide" id="c08-t83" data-part="2" data-trans="rise" data-dur="22000" data-title="表8-3 不同 Agent 系统的关键要素对比" data-notes="表8-3 对比了各种 Agent 系统的关键组成要素，揭示了 Agent 概念的普遍性，也帮助看到传统 RL Agent 与现代 LLM Agent 在动作空间上的差异：<br>新生小羚羊——环境是地形、重力、身体姿态，动作空间连续高维（各肌肉群收缩），奖励是平衡（+）、跌倒（−）。<br>扫地机器人——房间布局、电量；离散（方向、吸尘、充电）；清洁面积（+）、电量耗尽（−）。<br>国际象棋大师——棋盘状态、时间限制；离散有限（合法走法）；赢棋 +1、输棋 −1。<br>客户服务 Agent——对话历史、知识库；变长组合式（思考、说话、API 调用）；问题解决（+）、处理时间（−）。<br>代码助手 Agent——需求文档、代码库；变长组合式（思考、搜索、编辑、执行）；测试通过（+）、引入 bug（−）。<br>表格揭示了一个重要现象：棋类、Atari 等典型环境使用预定义的有限离散原始动作，机器人控制则使用维度和物理边界确定的连续动作。基于 LLM 的客户服务与代码 Agent 用有限的 token 和工具调用组合出变长动作序列，因此<b>很难一次性枚举所有可能序列，并且可以利用“内部思考”提升能力</b>。<br>右侧的小动画示意每种动作空间的“形状”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表8-3 同一个 Agent 概念，<em>动作空间</em>形态各异</h2></header>
+  <div class="c8t3-body">
+    <div class="c8-tb c8t3-tb fx fx-left" style="--d:2">
+      <div class="c8-tr c8-th"><span>Agent 类型</span><span>环境</span><span>动作空间</span><span>奖励信号</span></div>
+    </div>
+    <div class="c8t3-r panel fx fx-right" style="--d:3"><span class="c8-sx">示意</span><b class="c8t3-k">—</b><canvas class="c8t3-cv"></canvas><p class="c8t3-d"></p></div>
+  </div>
+  <p class="c8t3-nt fx fx-up" style="--d:4">LLM Agent 用有限的 token 和工具调用<b>组合出变长动作序列</b>：很难一次性枚举所有可能序列，并且可以利用<b>“内部思考”</b>提升能力</p>
+  <div class="src">第八章 ·「Agent 与环境的交互」· 表8-3 不同 Agent 系统的关键要素对比（Agent 类型 / 环境 / 动作空间 / 奖励信号）</div>
+</section>
+<style>
+.c8t3-body{display:grid;grid-template-columns:1.6fr 1fr;gap:22px}
+.c8t3-tb .c8-tr{grid-template-columns:160px 1fr 1.2fr 1fr;font-size:16px;cursor:pointer}
+.c8t3-tb .c8-tr b{font-size:17px}
+.c8t3-r{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8t3-k{font-size:19px;color:var(--acc)}
+.c8t3-d{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8t3-nt{margin-top:18px;font-size:18px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8t3-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-t83'] = {
+  R: [['新生小羚羊', '地形、重力、身体姿态', '连续高维（各肌肉群收缩）', '平衡（+）、跌倒（−）', 'c'], ['扫地机器人', '房间布局、电量', '离散（方向、吸尘、充电）', '清洁面积（+）、电量耗尽（−）', 'd'], ['国际象棋大师', '棋盘状态、时间限制', '离散有限（合法走法）', '赢棋（+1）、输棋（−1）', 'f'], ['客户服务 Agent', '对话历史、知识库', '变长组合式（思考、说话、API 调用）', '问题解决（+）、处理时间（−）', 'v'], ['代码助手 Agent', '需求文档、代码库', '变长组合式（思考、搜索、编辑、执行）', '测试通过（+）、引入 bug（−）', 'v']],
+  D: { c: '连续空间：每个维度一个实数，向量在空间里任意取值', d: '离散：几个按钮，每次按一个', f: '离散有限：合法走法可以全部枚举', v: '变长组合式：token 与工具调用拼成长度不定的序列，无法一次性枚举' },
+  init(s) {
+    const tb = s.querySelector('.c8t3-tb');
+    this.R.forEach(([a, b, c, d], i) => tb.insertAdjacentHTML('beforeend', `<div class="c8-tr" data-i="${i}"><b>${a}</b><span>${b}</span><span>${c}</span><span>${d}</span></div>`));
+    tb.querySelectorAll('.c8-tr[data-i]').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.pick(s, +r.dataset.i); }));
+    this.g = C8.cv(s.querySelector('.c8t3-cv'), 520, 300);
+  },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c8t3-tb .c8-tr[data-i]').forEach((r, j) => { r.classList.toggle('on', j === i); r.classList.toggle('dim', j !== i); });
+    s.querySelector('.c8t3-k').textContent = this.R[i][0] + ' · ' + this.R[i][2];
+    s.querySelector('.c8t3-d').textContent = this.D[this.R[i][4]];
+    this.t0 = performance.now();
+  },
+  draw(now) {
+    const g = this.g, W = 520, H = 300, k = this.i == null ? null : this.R[this.i][4], t = (now - (this.t0 || 0)) / 1000;
+    g.clearRect(0, 0, W, H);
+    if (!k) return;
+    g.fillStyle = 'rgba(129,140,248,.85)'; g.strokeStyle = 'rgba(129,140,248,.6)'; g.font = '600 15px sans-serif';
+    if (k === 'c') { for (let j = 0; j < 12; j++) { const x = 40 + j * 38, v = Math.sin(t * 2 + j * 0.7) * 0.5 + 0.5; g.fillRect(x, H - 30 - v * 220, 24, v * 220); } }
+    if (k === 'd') { ['↑', '↓', '←', '→', '吸尘', '充电'].forEach((l, j) => { const on = Math.floor(t * 2) % 6 === j; g.fillStyle = on ? '#34d399' : 'rgba(255,255,255,.1)'; g.fillRect(30 + j * 80, 120, 66, 60); g.fillStyle = '#fff'; g.fillText(l, 46 + j * 80, 156); }); }
+    if (k === 'f') { for (let r = 0; r < 8; r++) for (let c = 0; c < 8; c++) { g.fillStyle = (r + c) % 2 ? 'rgba(255,255,255,.08)' : 'rgba(255,255,255,.02)'; g.fillRect(140 + c * 30, 30 + r * 30, 30, 30); } const n = Math.floor(t * 3) % 20; for (let j = 0; j < n; j++) { g.fillStyle = 'rgba(52,211,153,.7)'; g.beginPath(); g.arc(155 + ((j * 37) % 8) * 30, 45 + ((j * 53) % 8) * 30, 7, 0, 7); g.fill(); } }
+    if (k === 'v') { const toks = ['思考', '…', 'search(', 'q', ')', '读结果', '思考', 'edit(', 'f', ')', 'run', '回答']; let x = 20, y = 50; const n = Math.floor(t * 4) % (toks.length + 4); toks.slice(0, n).forEach((tk, j) => { const w = g.measureText(tk).width + 18; if (x + w > W - 20) { x = 20; y += 50; } g.fillStyle = /\(|\)|run/.test(tk) ? 'rgba(251,191,36,.3)' : 'rgba(129,140,248,.3)'; g.fillRect(x, y, w, 34); g.fillStyle = '#fff'; g.fillText(tk, x + 9, y + 23); x += w + 6; }); }
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 5, 3600, (i) => this.pick(s, i), 500); ctx.raf((n) => { this.draw(n); return true; }); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8t3-tb .c8-tr').forEach((r) => r.classList.remove('on', 'dim')); },
+};
+</script>
+
+<!-- ================= 图8-2 MDP ================= -->
+<section class="slide" id="c08-mdp" data-part="2" data-trans="iris" data-dur="22000" data-title="图8-2 MDP 与马尔可夫性质" data-notes="这里比较的两类设置，最显眼的差异在于动作的表示方式。MDP 本身可以表示有限、无限、离散或连续的动作空间。本节的棋类与 Atari 示例使用有限离散的原始动作，机器人控制使用有界连续动作；LLM 策略则用有限 token 词表和工具 schema 构造变长序列。这种组合式表示会显著影响算法设计、样本效率和泛化方式。<br><b>基础示例：MDP 与表格 Q-learning。</b>MDP（Markov Decision Process，马尔可夫决策过程）是强化学习的数学框架，定义了状态、动作、奖励等核心要素。它的核心假设是<b>马尔可夫性质</b>：未来只取决于当前状态，而当前状态必须包含决策所需的全部历史信息。以国际象棋为例，状态不仅包括棋子位置，还应包括轮到哪方、王车易位权、吃过路兵权，以及五十步规则和重复局面判定所需的信息。状态定义充分时，无需每次重读完整棋谱；若观测没有包含必要历史，则应把历史纳入状态，或使用部分可观测模型。<br>本节讨论的典型 RL 环境使用<b>预先定义的动作空间</b>。围棋 361 个落子位置虽大但有限，国际象棋动作仍可枚举，Atari 游戏通常只有几个到十几个离散原始动作。<b>机器人 Agent</b> 使用连续但有界的动作空间：关节角度、速度、抓取力度是连续值，但有明确物理边界，维度由机器人自由度决定。有限离散动作便于逐一评估候选；状态与动作数足够小时，表格 Q-learning 可以直接存储价值，更大的 Atari 或棋类状态空间则需要把函数近似与搜索结合起来。连续动作 MDP 不能枚举所有动作，通常使用策略梯度或 actor-critic 等方法。本节经典示例与 LLM 策略的另一个差异，是它没有预训练知识，只从试错开始学习。<br>图8-2：五个状态（入口大厅、储藏室、北部走廊、守卫房间、宝藏室），A = {东, 西, 南, 北, 拿, 攻击, 合成}，P 为确定性，γ = 0.99，宝藏室 R = +100。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-2 MDP：<em>未来只取决于当前状态</em></h2></header>
+  <div class="c8md-body">
+    <div class="c8md-g panel fx fx-left" style="--d:2">
+      <svg class="c8md-svg" viewBox="0 0 860 470"></svg>
+      <div class="c8md-5"><code>MDP 五元组 (S, A, P, R, γ)</code><span>S = 5 个状态</span><span>A = {东, 西, 南, 北, 拿, 攻击, 合成}</span><span>P(s′|s, a) 确定性</span><span>γ = 0.99</span></div>
+    </div>
+    <div class="c8md-r fx fx-right" style="--d:3">
+      <div class="c8-card"><b class="c8md-k">国际象棋的“状态”要包含什么</b><div class="c8md-ck"></div><p>状态定义充分时，无需每次重读完整棋谱；否则把历史纳入状态，或用部分可观测模型</p></div>
+      <div class="c8md-sp"><span><b>围棋</b>361 个落子位置：大但有限</span><span><b>Atari</b>几个到十几个离散动作</span><span><b>机器人</b>连续但有界：关节角度、速度、抓取力度</span><span><b>LLM</b>token 词表 + 工具 schema → 变长序列</span></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 图8-2 马尔可夫决策过程（MDP）示意图</div>
+</section>
+<style>
+.c8md-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c8md-g{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.c8md-svg{width:100%;height:470px}
+.c8md-svg .ed{fill:none;stroke:var(--line2);stroke-width:2}
+.c8md-svg .ed.on{stroke:var(--acc);stroke-width:4}
+.c8md-svg text{fill:var(--text2);font-size:16px}
+.c8md-svg .nd rect{fill:rgba(12,18,40,.9);stroke:var(--line2);stroke-width:2;transition:stroke .3s,fill .3s}
+.c8md-svg .nd.on rect{stroke:var(--acc);fill:rgba(129,140,248,.18)}
+.c8md-svg .nd text{fill:var(--text);font-size:19px;font-weight:700}
+.c8md-5{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.c8md-5 code{font:700 17px var(--num);color:var(--acc)}
+.c8md-5 span{font-size:15px;padding:3px 10px;border-radius:8px;border:1px solid var(--line2)}
+.c8md-r{display:flex;flex-direction:column;gap:12px}
+.c8md-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c8md-ck{display:flex;flex-direction:column;gap:5px}
+.c8md-ck span{font-size:16px;padding:6px 12px;border-radius:9px;background:rgba(255,255,255,.03);opacity:.35;transition:opacity .4s,background .4s}
+.c8md-ck span.on{opacity:1;background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.c8md-r .c8-card p{font-size:15px;color:var(--text2);margin-top:8px;line-height:1.5}
+.c8md-sp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c8md-sp span{display:flex;flex-direction:column;font-size:15px;line-height:1.4;color:var(--text2);padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.c8md-sp b{font-size:17px;color:var(--text)}
+</style>
+<script>
+HOOKS['c08-mdp'] = {
+  N: [['入口大厅', 110, 380], ['储藏室', 430, 380], ['北部走廊', 110, 170], ['守卫房间', 430, 170], ['宝藏室', 750, 170]],
+  E: [[0, 1, '东'], [1, 1, '拿钥匙'], [0, 2, '北（有钥匙）'], [2, 3, '东'], [3, 4, '攻击（银剑）· R = +100']],
+  CK: ['棋子位置', '轮到哪方', '王车易位权', '吃过路兵权', '五十步规则与重复局面所需信息'],
+  init(s) {
+    const svg = s.querySelector('.c8md-svg'), S = C7S;
+    this.E.forEach(([a, b, l], i) => {
+      const [, x1, y1] = this.N[a], [, x2, y2] = this.N[b];
+      const d = a === b ? `M${x1 + 40} ${y1 - 34} C${x1 + 150} ${y1 - 120} ${x1 + 170} ${y1 + 40} ${x1 + 90} ${y1 + 10}` : `M${x1} ${y1} L${x2} ${y2}`;
+      S('path', { d, class: 'ed', 'data-i': i }, svg);
+      const t = S('text', { x: a === b ? x1 + 140 : (x1 + x2) / 2 + 10, y: a === b ? y1 - 70 : (y1 + y2) / 2 - 12 }, svg); t.textContent = l;
+    });
+    this.N.forEach(([l, x, y], i) => { const g = S('g', { class: 'nd', 'data-i': i }, svg); S('rect', { x: x - 90, y: y - 34, width: 180, height: 68, rx: 16 }, g); const t = S('text', { x, y: y + 7, 'text-anchor': 'middle' }, g); t.textContent = l; });
+    this.dot = S('circle', { r: 12, fill: '#fbbf24' }, svg);
+    s.querySelector('.c8md-ck').innerHTML = this.CK.map((c) => `<span>${c}</span>`).join('');
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, path = [[0, 0], [1, 1], [1, 0], [0, 2], [2, 3], [3, 4]];
+    const nds = s.querySelectorAll('.c8md-svg .nd'), eds = s.querySelectorAll('.c8md-svg .ed'), cks = s.querySelectorAll('.c8md-ck span');
+    while (ok()) {
+      cks.forEach((c) => c.classList.remove('on'));
+      for (let k = 0; k < this.N.length + 1 && ok(); k++) {
+        const [n, e] = [[0, -1], [1, 0], [1, 1], [2, 2], [3, 3], [4, 4]][k];
+        nds.forEach((x, j) => x.classList.toggle('on', j === n)); eds.forEach((x, j) => x.classList.toggle('on', j === e));
+        this.dot.setAttribute('cx', this.N[n][1]); this.dot.setAttribute('cy', this.N[n][2] - 50);
+        if (cks[k]) cks[k].classList.add('on');
+        await U.wait(ctx, 1300);
+      }
+      await U.wait(ctx, 2200);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 贝尔曼与 TD（图8-4） ================= -->
+<section class="slide" id="c08-bellman" data-part="2" data-steps="3" data-trans="zoom" data-title="图8-4 贝尔曼方程与时序差分" data-notes="在这个框架下，最基础也最重要的算法之一是 <b>Q-learning</b>。它为每个“状态-动作”组合维护一个价值估计：在状态 s 下采取动作 a，之后一直按最优策略行动，总共能拿到多少奖励？直觉上，一个动作好不好，取决于它带来的即时回报，再加上“它把你带到的下一个状态有多好”。<br>把这个直觉写成等式，就是<b>贝尔曼方程</b>（Bellman equation）的核心递归关系：<b>一个动作的真实价值 = 这一步拿到的即时奖励 + 到达下一个状态后能拿到的最大未来价值</b>：Q*(s, a) = r + γ max Q*(s′, a′)。其中 r 是即时奖励，s′ 是执行动作后到达的下一个状态（这里为直觉起见写成确定性形式，随机环境下需对 s′ 取期望），γ ∈ [0, 1) 是<b>折扣因子</b>——γ 越接近 1 越重视长期回报，越接近 0 越只顾眼前。“累积奖励”正是各步奖励按 γ 逐步折扣后的总和 Σ γ^t r_t。算法每次行动后，把旧的估计值往“实际发生的结果”方向微调一点——这种“用一步实际结果修正旧估计”的范式叫<b>时序差分学习</b>（Temporal-Difference Learning, TD learning），经过成千上万次试错，估计值逐渐逼近真实值。<br>图8-4 的具体例子：Agent 在储藏室拿起红钥匙，r = +5，新状态的 max Q = 0.63（向北开门）。Q(储藏室, 拿钥匙) ← 0.25 + 0.2 × [5 + 0.99 × 0.63 − 0.25] = 0.25 + 0.2 × [5.624 − 0.25] = 0.25 + 1.075 = 1.325，TD 误差 5.374，正向更新，奖励向前传播。按 → 逐项代入。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-4 用一步<em>实际结果</em>修正旧估计</h2></header>
+  <div class="c8bm-eq fx fx-up" style="--d:2"><span class="c8-m"><i>Q</i>*(<i>s</i>, <i>a</i>) = <b class="r">r</b> + <b class="g">γ</b> <b class="m">max<sub><i>a′</i></sub> <i>Q</i>*(<i>s′</i>, <i>a′</i>)</b></span><div class="c8bm-lb"><span class="r">即时奖励</span><span class="g">折扣因子</span><span class="m">下一状态的最大价值</span></div></div>
+  <div class="c8bm-upd fx fx-up" style="--d:3"><span class="c8-m"><i>Q</i>(<i>s</i>,<i>a</i>) ← <i>Q</i>(<i>s</i>,<i>a</i>) + <i>α</i> [ <u>r + γ max <i>Q</i>(<i>s′</i>,<i>a′</i>)</u> − <i>Q</i>(<i>s</i>,<i>a</i>) ]</span><small>下划线 = TD 目标；减去当前估计 = TD 误差</small></div>
+  <div class="c8bm-ex">
+    <div class="c8bm-fact fx fx-up" data-step="1"><span>状态 s：储藏室（持有：空）</span><span>动作 a：拿红钥匙</span><span>奖励 r：+5</span><span>s′：储藏室（持有：红钥匙）</span><span>max Q(s′, a′) = 0.63（向北开门）</span><span>α = 0.2 · γ = 0.99 · 旧 Q = 0.25</span></div>
+    <div class="c8bm-calc fx fx-up" data-step="2"><span class="c8-m">0.25 + 0.2 × [5 + 0.99 × 0.63 − 0.25]</span><span class="c8-m">= 0.25 + 0.2 × [5.624 − 0.25]</span><span class="c8-m">= 0.25 + 1.075 = <b>1.325</b></span></div>
+    <div class="c8bm-res fx fx-up" data-step="3"><b>TD 误差 = 5.374 → 正向更新，Q 值大幅上升</b><span>奖励向前传播：下次走到“拿钥匙”之前的状态，它的价值也会跟着上升</span><label>γ <input type="range" class="rng c8bm-g" min="0" max="99" value="99"><em class="c8bm-gv">0.99</em></label><div class="c8bm-disc"></div></div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 图8-4 Q 值更新可视化</div>
+</section>
+<style>
+.c8bm-eq{display:flex;align-items:center;gap:30px;padding:16px 24px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.c8bm-eq .c8-m{font-size:38px}
+.c8bm-eq .r{color:#6ee7b7}.c8bm-eq .g{color:#fde68a}.c8bm-eq .m{color:#a5b4fc}
+.c8bm-lb{display:flex;gap:10px}.c8bm-lb span{font-size:16px;padding:4px 12px;border-radius:9px;background:rgba(255,255,255,.04)}
+.c8bm-lb .r{color:#6ee7b7}.c8bm-lb .g{color:#fde68a}.c8bm-lb .m{color:#a5b4fc}
+.c8bm-upd{display:flex;align-items:baseline;gap:20px;margin-top:14px}
+.c8bm-upd .c8-m{font-size:28px}.c8bm-upd small{font-size:15px;color:var(--text3)}
+.c8bm-ex{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:20px}
+.c8bm-ex>div{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c8bm-fact span{font-size:16px;color:var(--text2)}
+.c8bm-calc .c8-m{font-size:24px}.c8bm-calc b{color:var(--acc);font-size:30px}
+.c8bm-res b{font-size:18px;color:#6ee7b7}.c8bm-res>span{font-size:15px;color:var(--text2);line-height:1.5}
+.c8bm-res label{display:flex;align-items:center;gap:10px;font-size:16px}.c8bm-res input{flex:1}.c8bm-res em{font:700 17px var(--num);font-style:normal}
+.c8bm-disc{display:flex;gap:4px;align-items:flex-end;height:60px}
+.c8bm-disc i{flex:1;background:var(--acc);border-radius:3px 3px 0 0;opacity:.7}
+</style>
+<script>
+HOOKS['c08-bellman'] = {
+  init(s) { s.querySelector('.c8bm-g').addEventListener('input', () => this.disc(s)); this.disc(s); },
+  disc(s) { const g = +s.querySelector('.c8bm-g').value / 100; s.querySelector('.c8bm-gv').textContent = g.toFixed(2); s.querySelector('.c8bm-disc').innerHTML = Array.from({ length: 20 }, (_, t) => `<i style="height:${Math.pow(g, t) * 100}%"></i>`).join(''); },
+};
+</script>
+
+<!-- ================= 图8-3 网格世界 ================= -->
+<section class="slide" id="c08-grid" data-part="2" data-trans="flip" data-dur="26000" data-title="图8-3 Q-learning 网格世界" data-notes="图8-3 展示 Q-learning 在网格世界中的探索过程：5×5 网格，右下角是宝藏（V = 1.00），中间有墙；参数 α = 0.2（学习率）、γ = 0.99（折扣因子）、ε 从 1.0 衰减到 0.1。颜色越深价值越高，箭头是当前的贪婪动作。原图的训练进度标注：0–1K episode 盲目探索，1–5K 发现路径，7–8K 胜率升到 96%，10K 找到 11 步最优解。<br>Q-learning 属于一种<b>离轨策略</b>（Off-Policy）方法——它可以用不同于目标策略的探索策略所生成的数据来学习最优策略，但仍要求充分覆盖相关状态—动作对，并满足适当的学习率与收敛条件；<b>它并不是对任意数据分布都能自动收敛</b>。在轨 / 离轨策略的严格定义与在 LLM 后训练中的对应关系，见后文“RL 算法”一节。<br>左侧画布是同样布局的网格上实时运行的表格 Q-learning（每格奖励 0，到达宝藏 +1，参数同原图；运行本身是示意），可以看到价值从宝藏一格格向起点传播。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-3 价值从宝藏<em>一格格向回传播</em></h2></header>
+  <div class="c8gw-body">
+    <div class="c8gw-l panel fx fx-left" style="--d:2"><span class="c8-sx">实时运行 · 示意</span><canvas class="c8gw-cv"></canvas></div>
+    <div class="c8gw-r fx fx-right" style="--d:3">
+      <div class="c8gw-st"><div><span>episode</span><b class="c8gw-ep">0</b></div><div><span>ε</span><b class="c8gw-e">1.00</b></div><div><span>最近 50 局平均步数</span><b class="c8gw-s">—</b></div></div>
+      <div class="c8gw-ctl"><button class="btn c8gw-fast"><svg class="ic"><use href="#i-zap"/></svg><span>加速 ×10</span></button><button class="btn c8gw-rs"><svg class="ic"><use href="#i-refresh"/></svg>重置</button></div>
+      <div class="c8-card c8gw-p"><b>参数（同原图）</b><span>α = 0.2 学习率</span><span>γ = 0.99 折扣因子</span><span>ε：1.0 → 0.1 探索率</span></div>
+      <div class="c8-card c8gw-off"><b>离轨策略（Off-Policy）</b><p>可以用探索策略的数据学习最优策略，但要求充分覆盖状态—动作对、满足学习率与收敛条件——<b>不是对任意数据分布都能自动收敛</b></p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 图8-3 Q-learning 网格世界</div>
+</section>
+<style>
+.c8gw-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8gw-l{position:relative;padding:14px;display:grid;place-items:center}
+.c8gw-r{display:flex;flex-direction:column;gap:12px}
+.c8gw-st{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c8gw-st div{display:flex;flex-direction:column;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.c8gw-st span{font-size:15px;color:var(--text3)}.c8gw-st b{font:800 28px var(--num)}
+.c8gw-ctl{display:flex;gap:10px}.c8gw-ctl .btn{font-size:16px}
+.c8gw-ctl .btn.on{border-color:var(--acc);color:var(--acc)}
+.c8gw-p{display:flex;flex-direction:column;gap:4px}.c8gw-p b,.c8gw-off b{font-size:17px;color:var(--acc)}
+.c8gw-p span{font:16px var(--num);color:var(--text2)}
+.c8gw-off p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c8gw-off p b{color:var(--text);font-size:15px}
+</style>
+<script>
+HOOKS['c08-grid'] = {
+  WALL: [[1, 1], [1, 3]], N: 5,
+  init(s) {
+    this.g = C8.cv(s.querySelector('.c8gw-cv'), 560, 560);
+    s.querySelector('.c8gw-fast').addEventListener('click', (e) => { this.fast = !this.fast; e.currentTarget.classList.toggle('on', this.fast); });
+    s.querySelector('.c8gw-rs').addEventListener('click', () => this.rs());
+    this.rs();
+  },
+  rs() { this.Q = {}; this.ep = 0; this.eps = 1; this.lens = []; this.pos = [0, 0]; this.len = 0; this.rnd = U.rand(4); },
+  q(x, y) { const k = x + ',' + y; return this.Q[k] || (this.Q[k] = [0, 0, 0, 0]); },
+  wall(x, y) { return this.WALL.some(([a, b]) => a === x && b === y); },
+  step() {
+    const [x, y] = this.pos, D = [[0, -1], [0, 1], [-1, 0], [1, 0]], r = this.rnd;
+    const qs = this.q(x, y), a = r() < this.eps ? Math.floor(r() * 4) : qs.indexOf(Math.max(...qs));
+    let nx = x + D[a][0], ny = y + D[a][1];
+    if (nx < 0 || ny < 0 || nx >= 5 || ny >= 5 || this.wall(nx, ny)) { nx = x; ny = y; }
+    const done = nx === 4 && ny === 4, rew = done ? 1 : 0;
+    qs[a] += 0.2 * (rew + (done ? 0 : 0.99 * Math.max(...this.q(nx, ny))) - qs[a]);
+    this.pos = [nx, ny]; this.len++;
+    if (done || this.len > 80) { this.lens.push(this.len); if (this.lens.length > 50) this.lens.shift(); this.ep++; this.eps = Math.max(0.1, this.eps * 0.97); this.pos = [0, 0]; this.len = 0; }
+  },
+  draw(s) {
+    const g = this.g, c = 100, o = 30;
+    g.clearRect(0, 0, 560, 560);
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) {
+      if (this.wall(x, y)) { g.fillStyle = '#0b0f1e'; g.fillRect(o + x * c, o + y * c, c - 4, c - 4); g.fillStyle = 'rgba(255,255,255,.35)'; g.font = '16px sans-serif'; g.fillText('墙', o + x * c + 38, o + y * c + 54); continue; }
+      const v = x === 4 && y === 4 ? 1 : Math.max(...this.q(x, y));
+      g.fillStyle = `rgba(129,140,248,${0.06 + Math.min(1, v) * 0.8})`; g.fillRect(o + x * c, o + y * c, c - 4, c - 4);
+      g.fillStyle = '#fff'; g.font = '700 15px sans-serif';
+      if (x === 4 && y === 4) { g.fillText('宝藏', o + x * c + 32, o + y * c + 44); g.fillText('V=1.00', o + x * c + 24, o + y * c + 66); continue; }
+      g.fillText(v.toFixed(2), o + x * c + 30, o + y * c + 78);
+      if (v > 0.001) { const a = this.q(x, y).indexOf(v); g.font = '700 28px sans-serif'; g.fillText(['↑', '↓', '←', '→'][a], o + x * c + 38, o + y * c + 44); }
+    }
+    const [px, py] = this.pos; g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(o + px * c + 48, o + py * c + 48, 13, 0, 7); g.fill();
+    s.querySelector('.c8gw-ep').textContent = this.ep;
+    s.querySelector('.c8gw-e').textContent = this.eps.toFixed(2);
+    s.querySelector('.c8gw-s').textContent = this.lens.length ? (this.lens.reduce((a, b) => a + b, 0) / this.lens.length).toFixed(1) : '—';
+  },
+  enter(s, ctx) {
+    let last = 0;
+    ctx.raf((now) => { if (now - last > 30) { last = now; for (let i = 0; i < (this.fast ? 60 : 6); i++) this.step(); if (this.ep > 400) this.rs(); this.draw(s); } return true; });
+  },
+  reset() { this.rs(); },
+};
+</script>
+
+<!-- ================= 实验 8-1 ================= -->
+<section class="slide" id="c08-exp81" data-part="2" data-trans="rise" data-dur="24000" data-title="实验 8-1 ★：Q-learning 在寻宝游戏中的表现" data-notes="<b>实验 8-1 ★：Q-learning 在寻宝游戏中的表现。</b>为了验证 Q-learning 的特性与局限，设计了一个<b>寻宝游戏环境</b>，包含几个关键挑战：<b>隐藏机制</b>要求 Agent 自行发现钥匙和门的对应关系、武器效果和物品合成规则；<b>多步依赖</b>意味着完成任务需要正确的动作序列（最优解 11 步）；<b>稀疏奖励</b>意味着只有关键动作和最终胜利才有显著奖励，中间大部分步骤得不到任何反馈。Q-learning Agent 使用标准参数配置，采用 ε-贪婪探索策略。<br>原书记录的学习曲线：前 1000 episodes 0% 胜率，Q 表仅 124 个状态，Agent 在盲目探索；前 5000 episodes 依然没有稳定胜利，Q 表 133 个状态；7000–8000 episodes 胜率从 34% 逐步升至 96%；10000 episodes 100% 胜率，Q 表 145 个状态，找到 11 步最优解。整个训练仅需不到 10 秒，但需要将近 10000 次完整尝试。这展示了<b>无先验知识、采用 ε-贪心探索的表格 Q-learning</b> 的特征：需要大量随机探索才能偶然走通完整路径，价值信号的传播很慢，必须反复强化。<br>在游戏模拟器中，10000 轮试错只需 10 秒，代价微乎其微。但在真实世界的 Agent 场景中——每次打电话有成本、每次操作浏览器有延迟、每次错误决策可能造成不可逆后果——10000 次试错是完全不可接受的。使用预训练 LLM 策略的一个原因，正是可以利用已有知识，在更少的环境交互中做出有效决策。<br>这个<b>无先验知识的表格 Q-learning 实验</b>有三项局限：简单任务也需要大量交互，样本效率低；一个环境中的表格值难以直接迁移到另一个环境；每个新任务都要重新探索。<b>这些不是 MDP 数学框架本身的限制。</b>函数近似、迁移学习和基于模型的 RL 可以处理更复杂的状态和知识迁移，不过与预训练 LLM 相比仍可能需要大量环境交互。<br>配套仓库 2026-07-30 的验收运行：10000 局训练约 2.1 秒，6000 局时胜率 55.9%、7000 局 97.0%，Q 表 123 → 142 个状态，100 局贪婪评估胜率 100%、平均 12 步（不是原书的 11 步，仓库已注明）。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-1 <span class="c8-star">★</span>：近一万局试错，<em>才偶然走通</em></h2></div>
+    <div class="c8e1-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="b">原书记录</button><button data-v="r">配套仓库验收</button></div></header>
+  <div class="c8e1-body">
+    <div class="c8e1-ch panel fx fx-left" style="--d:3"><svg class="c8e1-svg" viewBox="0 0 860 420"></svg><p class="c8e1-nt"></p></div>
+    <div class="c8e1-r fx fx-right" style="--d:4">
+      <div class="c8e1-ch3"><span><b>隐藏机制</b>钥匙与门、武器效果、合成规则要自己发现</span><span><b>多步依赖</b>正确的动作序列（最优解 11 步）</span><span><b>稀疏奖励</b>只有关键动作和最终胜利才有反馈</span></div>
+      <div class="c8e1-cost"><div><b>10 秒</b><span>模拟器里一万局</span></div><svg class="ic"><use href="#i-arrow"/></svg><div class="bad"><b>不可接受</b><span>真实世界：打电话有成本、浏览器有延迟、错误可能不可逆</span></div></div>
+      <div class="c8-card c8e1-lim"><b>三项局限（不是 MDP 框架本身的限制）</b><span>样本效率低</span><span>表格值难以迁移</span><span>每个新任务重新探索</span></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 实验 8-1 · 配套数据：chapter1/learning-from-experience/validation/20260730_011704</div>
+</section>
+<style>
+.c8e1-seg button{font-size:16px}
+.c8e1-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e1-ch{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.c8e1-svg{width:100%;height:420px}
+.c8e1-svg .ax{stroke:var(--line2)}.c8e1-svg text{fill:var(--text3);font-size:15px}
+.c8e1-svg .ln{fill:none;stroke:var(--acc);stroke-width:4;stroke-linecap:round;transition:d .8s}
+.c8e1-svg .pt{fill:var(--acc)}.c8e1-svg .pl{fill:var(--text);font-size:15px;font-weight:700}
+.c8e1-nt{font-size:16px;line-height:1.55;color:var(--text2)}.c8e1-nt b{color:var(--text)}
+.c8e1-r{display:flex;flex-direction:column;gap:12px}
+.c8e1-ch3{display:flex;flex-direction:column;gap:8px}
+.c8e1-ch3 span{display:flex;flex-direction:column;font-size:15px;color:var(--text2);padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.c8e1-ch3 b{font-size:17px;color:var(--text)}
+.c8e1-cost{display:grid;grid-template-columns:1fr 36px 1fr;gap:8px;align-items:center}
+.c8e1-cost div{display:flex;flex-direction:column;padding:12px;border-radius:12px;background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.4)}
+.c8e1-cost div.bad{background:rgba(251,113,133,.08);border-color:rgba(251,113,133,.45)}
+.c8e1-cost b{font-size:22px}.c8e1-cost span{font-size:15px;color:var(--text2);line-height:1.45}
+.c8e1-cost .ic{width:30px;height:30px;color:var(--acc)}
+.c8e1-lim{display:flex;flex-wrap:wrap;gap:8px}.c8e1-lim b{width:100%;font-size:16px;color:var(--acc)}
+.c8e1-lim span{font-size:15px;padding:4px 10px;border-radius:8px;border:1px solid var(--line2)}
+</style>
+<script>
+HOOKS['c08-exp81'] = {
+  D: {
+    b: { pts: [[1000, 0], [5000, 0], [7000, 0.34], [8000, 0.96], [10000, 1]], q: [124, 133, null, null, 145], nt: '原书：前 1000 局 0%（Q 表 124 个状态）→ 5000 局仍无稳定胜利（133）→ 7000–8000 局 <b>34% → 96%</b> → 10000 局 100%、Q 表 145、<b>11 步最优解</b>；训练不到 10 秒' },
+    r: { pts: [[1000, 0.003], [2000, 0], [3000, 0.001], [4000, 0.001], [5000, 0.001], [6000, 0.559], [7000, 0.97], [8000, 0.996], [9000, 0.998], [10000, 0.981]], q: [123, 123, 126, 127, 128, 137, 138, 138, 139, 142], nt: '配套仓库 2026-07-30：10000 局训练 <b>2.1 秒</b>；6000 局 55.9%、7000 局 97.0%；Q 表 123 → 142；100 局贪婪评估胜率 100%，<b>平均 12 步</b>（不是原书的 11 步，仓库已注明）' },
+  },
+  init(s) {
+    const svg = s.querySelector('.c8e1-svg'), S = C7S;
+    S('line', { x1: 60, y1: 370, x2: 840, y2: 370, class: 'ax' }, svg); S('line', { x1: 60, y1: 370, x2: 60, y2: 20, class: 'ax' }, svg);
+    [0, 2500, 5000, 7500, 10000].forEach((e) => { const t = S('text', { x: 60 + (e / 10000) * 780 - 18, y: 396 }, svg); t.textContent = e; });
+    [0, 50, 100].forEach((v) => { const t = S('text', { x: 10, y: 375 - v * 3.4 }, svg); t.textContent = v + '%'; });
+    const xl = S('text', { x: 760, y: 414 }, svg); xl.textContent = 'episode';
+    this.ln = S('path', { class: 'ln' }, svg); this.g = S('g', {}, svg);
+    this.seg = U.seg(s.querySelector('.c8e1-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) {
+    const { pts, q, nt } = this.D[v], X = (e) => 60 + (e / 10000) * 780, Y = (p) => 370 - p * 340;
+    this.ln.setAttribute('d', 'M60 370 ' + pts.map(([e, p]) => `L${X(e)} ${Y(p)}`).join(' '));
+    this.g.innerHTML = '';
+    pts.forEach(([e, p], i) => { C7S('circle', { cx: X(e), cy: Y(p), r: 6, class: 'pt' }, this.g); if (q[i]) { const t = C7S('text', { x: X(e) - 14, y: Y(p) - 14, class: 'pl' }, this.g); t.textContent = q[i]; } });
+    s.querySelector('.c8e1-nt').innerHTML = nt + ' · 点旁数字为 Q 表状态数';
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 2, 6000, (i) => { this.i = i; const v = i ? 'r' : 'b'; this.seg(v); this.show(s, v); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 思考 token 与先验 ================= -->
+<section class="slide" id="c08-prior" data-part="2" data-trans="zoom" data-dur="22000" data-title="基于预训练 LLM 策略的 Agent：思考 token 与先验分布" data-notes="<b>基于预训练 LLM 策略的 Agent。</b>大语言模型在 Agent 的动作表示与初始化方式上带来了重要的实用变化。经典 RL 也可以把内部计算或信息收集建模为状态与动作。LLM 的实用变化不是第一次允许“思考”，而是预训练语言策略能够用变长 token 序列表示内部计算，并与外部行动由同一策略生成。思考 token 不直接改变外部世界，却可以提高最终行动质量。于是 Agent 的动作表示不仅包括“做什么”，还包括“想多久、想什么”。<br>最关键的实用创新，是<b>把思考 token 作为特殊动作纳入策略输出空间</b>。在 LLM Agent 中，<b>内部思考成为学习到的语言动作空间的核心组成部分</b>。它不直接改变外部环境，也不立即获得环境奖励，但能在 token 成本和上下文上限内表达多种计算路径。<br>这种变长组合式动作比原始动作拥有大得多的搜索空间，因此很难在没有先验知识时从零学习。从零开始的 Agent 就像蒙着眼睛在沙漠里找宝藏。LLM 则从海量文本预训练中学到了人类留下的问题解决模式——数学问题常按“识别条件→回忆公式→逐步计算”，编程任务常按“理解需求→设计结构→实现细节”展开。预训练策略给结构化路径更高先验概率，显著压缩搜索空间。因此即使没有额外 RL，预训练 LLM 也能生成基本的思维链（Chain of Thought, CoT）。<br>RL 后训练再用外部奖励教会 LLM 在特定任务中更有效地利用这些模式。语言结构不是单独的“内部奖励”，而是预训练策略的<b>先验分布（prior）</b>：“因为要把外币换算成美元，所以先查汇率”可能具有较高初始生成概率，而“因为要换算货币，所以先查天气”这类无关路径的概率较低。RL 在这个初始分布上用真实任务奖励重新调整各条路径的概率。<br>画面中路径粗细代表概率（示意）：先显示预训练先验，再显示 RL 按任务奖励调整之后。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考 token 是动作，<em>先验</em>压缩了搜索空间</h2></div>
+    <div class="c8pr-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">零先验</button><button data-v="1">预训练先验</button><button data-v="2">RL 之后</button></div></header>
+  <div class="c8pr-body">
+    <div class="c8pr-l panel fx fx-left" style="--d:3"><span class="c8-sx">路径粗细 = 概率 · 示意</span><svg class="c8pr-svg" viewBox="0 0 900 470"></svg></div>
+    <div class="c8pr-r fx fx-right" style="--d:4">
+      <div class="c8-card"><b class="c8pr-k">思考 token：特殊的动作</b><p>不直接改变外部世界、不立即得到奖励，却能提高最终行动质量。动作表示不仅是“做什么”，还有<b>“想多久、想什么”</b></p></div>
+      <div class="c8-card"><b class="c8pr-k">预训练学到的问题解决模式</b><div class="c8pr-pt"><span>数学：识别条件 → 回忆公式 → 逐步计算</span><span>编程：理解需求 → 设计结构 → 实现细节</span></div><p>所以即使没有额外 RL，预训练 LLM 也能生成基本的思维链</p></div>
+      <p class="c8pr-nt">语言结构不是单独的“内部奖励”，而是策略的<b>先验分布</b>；RL 在它之上用真实任务奖励<b>重新调整</b>各条路径的概率</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」（基于预训练 LLM 策略的 Agent）</div>
+</section>
+<style>
+.c8pr-seg button{font-size:16px}
+.c8pr-body{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;flex:1;min-height:0}
+.c8pr-l{position:relative;padding:12px}
+.c8pr-svg{width:100%;height:100%}
+.c8pr-svg path{fill:none;stroke:var(--acc);stroke-linecap:round;transition:stroke-width .8s,opacity .8s}
+.c8pr-svg rect{fill:rgba(12,18,40,.92);stroke:var(--line2)}
+.c8pr-svg text{fill:var(--text);font-size:16px}
+.c8pr-svg .ok rect{stroke:#34d399}.c8pr-svg .bad rect{stroke:rgba(251,113,133,.55)}
+.c8pr-r{display:flex;flex-direction:column;gap:12px}
+.c8pr-k{display:block;font-size:17px;color:var(--acc);margin-bottom:6px}
+.c8pr-r p{font-size:15px;line-height:1.55;color:var(--text2)}.c8pr-r p b{color:var(--text)}
+.c8pr-pt{display:flex;flex-direction:column;gap:5px;margin-bottom:6px}
+.c8pr-pt span{font-size:15px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.04)}
+.c8pr-nt{font-size:16px!important;padding-left:14px;border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c08-prior'] = {
+  // [文本, 类别, 三种状态下的概率]
+  B: [['因为要把外币换算成美元，所以先查汇率', 'ok', [0.2, 0.55, 0.85]], ['直接凭印象给出一个汇率', 'bad', [0.2, 0.25, 0.08]], ['先把金额抄一遍再想', 'mid', [0.2, 0.12, 0.05]], ['因为要换算货币，所以先查天气', 'bad', [0.2, 0.05, 0.01]], ['随机调用一个工具', 'bad', [0.2, 0.03, 0.01]]],
+  init(s) {
+    const svg = s.querySelector('.c8pr-svg'), S = C7S;
+    const rt = S('g', {}, svg); S('rect', { x: 20, y: 205, width: 190, height: 60, rx: 14 }, rt); const t0 = S('text', { x: 38, y: 241 }, rt); t0.textContent = '任务：换算 100 欧元';
+    this.P = this.B.map(([l, c], i) => {
+      const y = 40 + i * 92;
+      const p = S('path', { d: `M210 235 C380 235 380 ${y + 30} 520 ${y + 30}` }, svg);
+      const g = S('g', { class: c }, svg); S('rect', { x: 520, y, width: 360, height: 60, rx: 14 }, g); const t = S('text', { x: 536, y: y + 36 }, g); t.textContent = l;
+      return p;
+    });
+    this.seg = U.seg(s.querySelector('.c8pr-seg'), (v) => { this.auto = false; this.show(+v); });
+  },
+  show(k) { this.P.forEach((p, i) => { const v = this.B[i][2][k]; p.style.strokeWidth = 2 + v * 34; p.style.opacity = 0.25 + v; }); },
+  enter(s, ctx) { C8.auto(this, ctx, 3, 3800, (i) => { this.i = i; this.seg(String(i)); this.show(i); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 图8-5 对比 ================= -->
+<section class="slide" id="c08-vs" data-part="2" data-trans="flip" data-dur="26000" data-title="图8-5 经典 RL 与现代 LLM Agent 对比" data-notes="图8-5 从七个维度对比经典 RL Agent 与 LLM Agent：动作空间（封闭有限 {东, 西, 南, 北, 拿, 攻击} vs 开放无限：自然语言 + 工具调用）；先验知识（零先验，从随机策略开始 vs 海量预训练知识 + 语言游戏规则）；状态表示（哈希编码 state_id = 0x3A7F vs 语义理解“储藏室里有红钥匙”）；学习信号（标量奖励 R ∈ {−1, 0, +5, +50} vs 奖励 + 语言反馈 + 自我反思）；思考能力（无内部思考，纯反应式 vs 思考作为特殊动作 CoT）；泛化能力（单环境，规则变化需重训 vs 跨任务零样本 / 少样本迁移）；样本效率（约 10000 episodes / 10 秒 vs 约 1 episode / 2 分钟）。<br>预训练语言策略使 LLM Agent 能够理解未见过的指令（<b>零样本泛化</b>），并用少量示范适应新任务（<b>少样本适应</b>），这与无先验知识的表格 Q-learning 形成鲜明对比。从预定义原始动作扩展到变长组合式动作，是 AI Agent 范式的重要转变。LLM 的动作仍由有限 token 词表和工具 schema 定义，但内部思考、自然语言查询、程序代码、复杂 JSON 与多模态内容可以组合成数量爆炸的变长序列。代码解释器和搜索工具把这种表示连接到现实环境中的广泛任务与信息。这带来新的机会与挑战：Agent 可以组合基础工具处理未见任务，但也需要在巨大的组合空间里定义奖励并高效探索。<br>以 Kimi K3 这类面向工具调用和长链思考优化的模型为例，可以看到 LLM+RL 范式的典型方向：在大规模语言预训练基础上，通过后训练强化问题分解、工具调用和自我纠错能力。<b>OpenVLA</b>（详见第六章）展示了 LLM 时代的 VLA 架构范式：视觉编码器处理环境观察、语言模型理解指令并推理、动作解码器生成控制信号。需要澄清的是，<b>OpenVLA 本身是在近百万条机器人演示轨迹上通过模仿学习（行为克隆）训练的，属于 SFT 性质而非 RL</b>；真正把 RL 引入机器人、在这类 VLA 架构之上用奖励进一步优化的代表，是本章后面实验 8-13 的 SimpleVLA-RL。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-5 经典 RL Agent vs <em>LLM Agent</em></h2></header>
+  <div class="c8vs-tb fx fx-up" style="--d:2"><div class="c8vs-h"><span></span><span>经典 RL Agent</span><span>LLM Agent</span></div><div class="c8vs-rows"></div></div>
+  <div class="c8vs-ft fx fx-up" style="--d:3"><div><b>Kimi K3 一类</b><span>在语言预训练之上，用后训练强化问题分解、工具调用和自我纠错</span></div><div><b>OpenVLA 是 SFT 性质</b><span>近百万条演示轨迹上做行为克隆；把 RL 引入 VLA 的代表是实验 8-13 的 SimpleVLA-RL</span></div></div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 图8-5 经典 RL 与现代 LLM Agent 对比</div>
+</section>
+<style>
+.c8vs-tb{display:flex;flex-direction:column;gap:5px}
+.c8vs-h,.c8vs-r{display:grid;grid-template-columns:160px 1fr 1fr;gap:14px;align-items:center}
+.c8vs-h span{font-size:16px;font-weight:700;color:var(--text3);padding:0 14px}
+.c8vs-r>b{font-size:17px;color:var(--acc)}
+.c8vs-r>span{font-size:16px;padding:9px 14px;border-radius:12px;border:1px solid var(--line);transition:opacity .4s,translate .4s,border-color .4s}
+.c8vs-r>span:nth-child(2){color:#93c5fd}
+.c8vs-r>span:nth-child(3){color:var(--text);opacity:0;translate:20px 0}
+.c8vs-r.on>span:nth-child(3){opacity:1;translate:0 0;border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.c8vs-ft{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px}
+.c8vs-ft div{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.03)}
+.c8vs-ft b{font-size:17px}.c8vs-ft span{font-size:15px;color:var(--text2);line-height:1.5}
+</style>
+<script>
+HOOKS['c08-vs'] = {
+  R: [['动作空间', '封闭有限：{东, 西, 南, 北, 拿, 攻击}', '开放无限：自然语言 + 工具调用'], ['先验知识', '零先验，从随机策略开始', '海量预训练知识 + 语言游戏规则'], ['状态表示', '哈希编码：state_id = 0x3A7F', '语义理解：“储藏室里有红钥匙”'], ['学习信号', '标量奖励：R ∈ {−1, 0, +5, +50}', '奖励 + 语言反馈 + 自我反思'], ['思考能力', '无内部思考（纯反应式）', '思考作为特殊动作（CoT）'], ['泛化能力', '单环境，规则变化需重训', '跨任务零样本 / 少样本迁移'], ['样本效率', '约 10000 episodes / 10 秒', '约 1 episode / 2 分钟']],
+  init(s) { s.querySelector('.c8vs-rows').innerHTML = this.R.map(([a, b, c]) => `<div class="c8vs-r"><b>${a}</b><span>${b}</span><span>${c}</span></div>`).join(''); },
+  enter(s, ctx) { s.querySelectorAll('.c8vs-r').forEach((r, i) => ctx.later(() => r.classList.add('on'), 800 + i * 900)); },
+  reset(s) { s.querySelectorAll('.c8vs-r').forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 图8-6 范式演进 ================= -->
+<section class="slide" id="c08-second" data-part="2" data-steps="3" data-trans="rise" data-title="图8-6 OpenAI 训练范式演进" data-notes="姚顺雨在博客《The Second Half》中回顾了 OpenAI 探索之路的认知演变。<b>第一阶段（2015–2016）算法中心主义</b>：相信更好的算法才是关键，在 Atari 等标准环境取得进展，但换一个新环境就得从头训练。<b>第二阶段（2016–2018）环境的重要性</b>：Gym 标准化了各类任务，Universe 和 World of Bits 试图把整个互联网变成 RL 的训练环境，Dota 2 在特定复杂环境中追求超人表现。思路很清晰，但通用计算机使用和网页导航始终无法突破。<br><b>第三阶段（2018 至今）先验的觉醒</b>：GPT-2/GPT-3 展示了语言预训练的强大力量，WebGPT、ChatGPT 证明这些先验知识可以转化为实用 Agent。最重要的发现是：<b>先验知识可以通过与 RL 完全无关的方式获得</b>。这是一个反直觉的真相：几十年来 RL 研究者的优先级可能完全颠倒了——<b>不是算法 &gt; 环境 &gt; 先验，而是先验 &gt; 环境 &gt; 算法</b>。按 → 逐个阶段展开，最后一步看优先级翻转。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-6 优先级<em>完全颠倒</em>了</h2></header>
+  <div class="c8sc-tl">
+    <div class="c8sc-s fx fx-up" style="--d:2"><em>2015–2016</em><b>算法中心主义</b><span>DQN · Atari</span><p>更好算法 = 关键；新环境需从头训练</p></div>
+    <div class="c8sc-s fx fx-up" data-step="1"><em>2016–2018</em><b>环境的重要性</b><span>Gym · Universe · World of Bits · Dota 2</span><p>Dota 2 超人表现；通用计算机使用与网页导航始终无法突破</p></div>
+    <div class="c8sc-s fx fx-up" data-step="2"><em>2018 至今</em><b>先验的觉醒</b><span>GPT-2/3 · WebGPT · ChatGPT · Agent</span><p>先验知识可以通过<b>与 RL 完全无关</b>的方式获得（语言预训练）</p></div>
+  </div>
+  <div class="c8sc-flip fx fx-up" data-step="3"><div class="c8sc-ord"><i>算法</i><u>&gt;</u><i>环境</i><u>&gt;</u><i>先验</i></div><svg class="ic"><use href="#i-swap"/></svg><div class="c8sc-ord n"><i>先验</i><u>&gt;</u><i>环境</i><u>&gt;</u><i>算法</i></div></div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 图8-6 OpenAI 训练范式演进（《The Second Half》）</div>
+</section>
+<style>
+.c8sc-tl{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:6px}
+.c8sc-s{display:flex;flex-direction:column;gap:8px;padding:20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8sc-s em{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.c8sc-s b{font-size:24px}.c8sc-s span{font-size:15px;color:var(--text3)}
+.c8sc-s p{font-size:16px;line-height:1.55;color:var(--text2)}.c8sc-s p b{font-size:16px;color:var(--text)}
+.c8sc-flip{display:flex;align-items:center;justify-content:center;gap:40px;margin-top:40px}
+.c8sc-flip .ic{width:44px;height:44px;color:var(--acc)}
+.c8sc-ord{display:flex;align-items:center;gap:12px}
+.c8sc-ord i{font-style:normal;font-size:30px;font-weight:800;padding:10px 22px;border-radius:14px;border:1px solid var(--line2);color:var(--text3)}
+.c8sc-ord u{text-decoration:none;font-size:28px;color:var(--text3)}
+.c8sc-ord.n i{color:var(--text);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.c8sc-ord:not(.n){text-decoration:line-through;opacity:.55}
+</style>
+
+<!-- ================= 实验 8-2 ================= -->
+<section class="slide" id="c08-exp82" data-part="2" data-trans="zoom" data-dur="40000" data-title="实验 8-2 ★★：传统 RL 与 LLM Agent 的对比研究 · 图8-7" data-notes="<b>实验 8-2 ★★：传统 RL 与 LLM Agent 的对比研究。</b>在同一个寻宝游戏中对比 Q-learning 与 LLM Agent（Kimi K3，维护最多 50 条经验的缓冲区）。结果令人震撼：<b>LLM Agent 第一局就在 18 步内通关</b>。<br><b>前期（有目的的探索）</b>：拿起生锈的剑（“武器总比空手好”），系统探索地图，发现北门被锁后推理“需要找钥匙”，转而探索储藏室，先后取得红钥匙与魔法水晶。<b>中期（机制理解与主动合成）</b>：理解“钥匙自动使用”规则，并预判生锈的剑不足以对付守卫，于是在第 8 步主动合成银剑。<b>后期（执行与纠错）</b>：持银剑向北，第 13 步击败强守卫，其间夹杂一两步无效尝试（重复挥剑 / 回退），最终在第 18 步取得巨龙宝藏。<br>这展现了<b>语义理解与符号映射之间的根本差异</b>。LLM Agent 理解了游戏的概念结构，每一步都有目的和逻辑支撑；对 Q-learning 来说，“门”“钥匙”“剑”只是无意义的符号组合。<br>计算成本形成了一个有趣的悖论：Q-learning 跑 10000 局只需 10 秒，LLM Agent 一局却要 1–2 分钟。但在现实任务中，每次交互的时间、金钱和风险成本远超纯计算成本。更关键的洞察是：<b>LLM Agent 的成功不是因为拥有更好的“学习算法”，而是因为携带了海量先验知识</b>。规则变化时，Q-learning 需要完全重新训练，LLM Agent 却能通过推理直接适应。实用的设计原则：在仿真成本低、可大量重复的场景中，传统 RL 仍然有价值；在交互成本高、需快速适应的现实场景中，LLM Agent 的样本效率更为实际。<br>图8-7 对比两者架构：Q-learning 用哈希编码状态、查 145 × 7 = 1015 条 Q 表、ε-贪婪选择整数动作；LLM Agent 用自然语言描述状态、推理加经验缓冲、输出结构化指令。<br>差异说明：正文写 Kimi K3、18 步；图8-7 写 Kimi K2、17 步；配套仓库 2026-07-30 的验收运行是 Kimi K3、17 步（17 次 API 调用、28,242 tokens）。左侧回放的是配套仓库这 17 步的真实动作序列。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-2 <span class="c8-star">★★</span>：LLM Agent <em>第一局就通关</em></h2></header>
+  <div class="c8e2-body">
+    <div class="c8e2-l panel fx fx-left" style="--d:2">
+      <div class="c8e2-h"><b>Kimi K3 第一局 · 配套仓库真实动作</b><span class="c8e2-pos">0 / 17</span></div>
+      <div class="c8e2-acts"></div>
+      <div class="c8e2-ph"><span data-p="0">前期：有目的的探索</span><span data-p="1">中期：机制理解与主动合成</span><span data-p="2">后期：执行与纠错</span></div>
+      <p class="c8-data">配套仓库 chapter1/learning-from-experience 2026-07-30：Kimi K3，17 步通关，17 次 API 调用，28,242 tokens；正文写 18 步、图8-7 写 Kimi K2 / 17 步</p>
+    </div>
+    <div class="c8e2-r fx fx-right" style="--d:3">
+      <div class="c8e2-arch"><div class="q"><b>Q-learning</b><span>状态：哈希编码 0x3A7F</span><span>Q 表 145 状态 × 7 动作 = 1015 条目</span><span>ε = 0.1 → 90% 最优 / 10% 随机</span><span>动作：整数 ID，a = 3 →“向北”</span></div><div class="l"><b>LLM Agent</b><span>状态：“储藏室有红钥匙，北门被锁”</span><span>推理 + 经验缓冲（最多 50 条）</span><span>“门被锁 → 需要钥匙 → 拿钥匙”</span><span>动作：{"action":"pick_up","target":"red_key"}</span></div></div>
+      <div class="c8e2-cmp"><div><span>首次通关</span><b>约 7000 局</b><b class="g">第 1 局</b></div><div><span>计算成本</span><b>10 秒 / 1 万局</b><b class="g">1–2 分钟 / 局</b></div></div>
+      <p class="c8e2-nt">成功不是因为“更好的学习算法”，而是因为<b>携带了海量先验知识</b>：仿真便宜时传统 RL 仍有价值；交互昂贵、需快速适应时，LLM Agent 更实际</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「两种动作表示：经典 RL 设置与 LLM 的变长策略」· 实验 8-2 · 图8-7 Q-learning 与 LLM Agent 在寻宝游戏中的架构对比</div>
+</section>
+<style>
+.c8e2-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e2-l{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.c8e2-h{display:flex;justify-content:space-between;align-items:center}.c8e2-h b{font-size:18px}
+.c8e2-pos{font:700 18px var(--num);color:var(--acc)}
+.c8e2-acts{display:grid;grid-template-columns:1fr 1fr;gap:5px;flex:1;align-content:start}
+.c8e2-acts span{display:flex;gap:10px;font:15px var(--mono);padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.03);opacity:.15;transition:opacity .3s,background .3s}
+.c8e2-acts span em{font-style:normal;color:var(--text3);min-width:24px}
+.c8e2-acts span.on{opacity:1}
+.c8e2-acts span.cur{background:color-mix(in srgb,var(--acc) 20%,transparent)}
+.c8e2-acts span.key{color:#fde68a}
+.c8e2-ph{display:flex;gap:6px}
+.c8e2-ph span{flex:1;font-size:15px;text-align:center;padding:6px;border-radius:9px;border:1px solid var(--line);opacity:.4;transition:all .3s}
+.c8e2-ph span.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.c8e2-r{display:flex;flex-direction:column;gap:12px}
+.c8e2-arch{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8e2-arch div{display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:14px;border:1px solid var(--line)}
+.c8e2-arch .l{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.c8e2-arch b{font-size:18px}.c8e2-arch span{font-size:15px;color:var(--text2);line-height:1.4}
+.c8e2-cmp{display:flex;flex-direction:column;gap:6px}
+.c8e2-cmp div{display:grid;grid-template-columns:110px 1fr 1fr;gap:10px;align-items:center;font-size:16px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.03)}
+.c8e2-cmp span{color:var(--text3);font-size:15px}.c8e2-cmp b.g{color:#6ee7b7}
+.c8e2-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8e2-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp82'] = {
+  A: ['take rusty sword', 'go north', 'look around', 'use rusty sword', 'go south', 'go east', 'take red key', 'take magic crystal', 'try crafting', 'go west', 'go north', 'use red key', 'go north', 'attack with silver sword', 'use silver sword', 'go east', "take dragon's treasure"],
+  KEY: [6, 8, 13, 16],
+  init(s) { s.querySelector('.c8e2-acts').innerHTML = this.A.map((a, i) => `<span class="${this.KEY.includes(i) ? 'key' : ''}"><em>${i + 1}</em>${a}</span>`).join(''); },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, as = s.querySelectorAll('.c8e2-acts span'), ph = s.querySelectorAll('.c8e2-ph span');
+    while (ok()) {
+      as.forEach((a) => a.classList.remove('on', 'cur'));
+      for (let i = 0; i < as.length; i++) {
+        await U.wait(ctx, this.KEY.includes(i) ? 1500 : 800); if (!ok()) return;
+        as.forEach((a) => a.classList.remove('cur')); as[i].classList.add('on', 'cur');
+        s.querySelector('.c8e2-pos').textContent = `${i + 1} / 17`;
+        const p = i < 8 ? 0 : i < 12 ? 1 : 2; ph.forEach((x, j) => x.classList.toggle('on', j === p));
+      }
+      await U.wait(ctx, 4000);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>

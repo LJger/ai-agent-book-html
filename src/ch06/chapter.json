@@ -1,0 +1,15 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#f472b6", "acc2": "#c084fc" },
+    { "n": "异步：世界主动找上门", "k": "PART 01", "short": "事件", "acc": "#fb7185", "acc2": "#f472b6" },
+    { "n": "事件处理机制", "k": "PART 02", "short": "处理", "acc": "#f472b6", "acc2": "#818cf8" },
+    { "n": "语音：级联与流式", "k": "PART 03", "short": "级联", "acc": "#e879f9", "acc2": "#22d3ee" },
+    { "n": "语音：全双工与快慢思考", "k": "PART 04", "short": "全双工", "acc": "#c084fc", "acc2": "#f472b6" },
+    { "n": "Computer Use", "k": "PART 05", "short": "屏幕", "acc": "#38bdf8", "acc2": "#f472b6" },
+    { "n": "机器人：闭环与分层", "k": "PART 06", "short": "机器人", "acc": "#fb923c", "acc2": "#f472b6" },
+    { "n": "VLA、世界模型与 Sim2Real", "k": "PART 07", "short": "VLA", "acc": "#2dd4bf", "acc2": "#a78bfa" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#f472b6", "acc2": "#c084fc" }
+  ]
+}

@@ -1,0 +1,810 @@
+<!-- ================= PART 07 文件系统与知识更新 ================= -->
+<section class="slide chapter" id="c03-d7" data-part="7" data-title="PART 07 · 文件系统与知识更新" data-notes="RAPTOR 和 GraphRAG 代表了学术界对知识组织的探索；这一部分先看第三种哲学——OpenViking 的文件系统范式：把记忆、资源、技能映射为虚拟文件系统里的目录和文件，用 L0/L1/L2 三层上下文按需加载，用 Markdown 纯文本加上文件之间的链接与索引来组织知识。然后回答一个上线系统绕不开的问题：知识应该如何更新？完整的更新机制必须同时包含两条路径——事件触发的增量更新（把每次知识变更当成一个 PR，由 Proposer 与 Reviewer 两个 Agent 对照原始证据迭代审核）和周期触发的全量整理（回到原始数据去重、核查、限定场景）；最后是失效内容的下线，以及多用户共享时的权限与租户隔离。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">文件系统<br>与知识更新</h1>
+  <div class="ch-s fx fx-up" style="--d:3">目录范式 · 每次变更一个 PR · 定期回到原始数据整理</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">把知识库当成代码库，把每次知识变更当成一个 Pull Request。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<!-- ================= 文件系统范式：用目录结构组织知识 ================= -->
+<section class="slide" id="c03-viking" data-part="7" data-dur="20000" data-title="文件系统范式：OpenViking" data-notes="RAPTOR 和 GraphRAG 代表了学术界对知识组织的探索，而字节跳动火山引擎开源的 OpenViking 则提出了第三种哲学：<b>文件系统范式</b>。它不将上下文视为扁平的向量碎片或图谱节点，而是将所有上下文——记忆、资源、技能——映射为虚拟文件系统中的目录和文件，每个条目拥有唯一 URI：resources/ 放外部知识（文档、代码库、网页），user/memories/ 放用户记忆（偏好、习惯），agent/ 下的 skills/ 与 memories/ 放 Agent 自身的技能与经验。这里的 viking:// 是一种<b>虚拟 URI</b>——形式上类似 http:// 或 file://，但它并不指向某个具体的物理位置。Agent 通过该地址访问知识，框架在背后决定从内存、磁盘还是远程加载；L0/L1/L2 三层也由框架根据访问频率和检索深度自动分配，Agent 只需用统一的路径与 URI 引用即可。<br>核心设计是 <b>L0/L1/L2 三层上下文按需加载</b>。资源写入时，系统自动将原始内容提炼为三个抽象层次：<b>L0（摘要）</b>约 100 tokens 的一句话概述，用于快速判断目录相关性；<b>L1（概览）</b>约 2,000 tokens 的核心信息与使用场景，供 Agent 规划决策；<b>L2（全文）</b>为完整原始内容，仅在需要深入时按需加载。每个目录下自动生成 .abstract（L0）和 .overview（L1）文件，形成从根到叶的层次化摘要结构。若在 L0 层即判定无关，则无需加载 L1 和 L2——大部分查询加载到 L1 即可完成决策，Token 消耗因此大幅降低。这套“摘要常驻、按需取全文”的思路，与第二章介绍的 Skills 渐进式披露（progressive disclosure）如出一辙——都是先让 Agent 只看到轻量的元信息，确有需要时再逐层拉取完整内容，把 Token 花在刀刃上。<br>右侧演示三条查询怎样逐层加载；各目录的摘要内容、全文长度与 Token 合计均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第三种哲学：<em>文件系统范式</em></h2></header>
+  <div class="w7b-body">
+    <div class="w7b-l panel fx fx-left" style="--d:2">
+      <div class="w7b-h"><b>OpenViking</b><span>字节跳动火山引擎开源</span></div>
+      <div class="w7b-tree">
+        <div>viking://</div>
+        <div data-d="0">├── <b>resources/</b>       <i># 外部知识：文档、代码库、网页</i></div>
+        <div data-d="1">├── <b>user/memories/</b>   <i># 用户记忆：偏好、习惯</i></div>
+        <div>└── <b>agent/</b>           <i># Agent 自身：技能、经验</i></div>
+        <div data-d="2">    ├── <b>skills/</b></div>
+        <div data-d="3">    └── <b>memories/</b></div>
+      </div>
+      <p class="w7b-cap">不是扁平的向量碎片，也不是图谱节点：记忆、资源、技能都映射为<b>目录和文件</b>，每个条目拥有唯一 URI</p>
+      <div class="w7b-uri"><b>viking:// 是虚拟 URI</b><span>形式像 http:// 或 file://，却不指向具体的物理位置：框架在背后决定从内存、磁盘还是远程加载；L0/L1/L2 也由框架按访问频率和检索深度自动分配</span></div>
+      <div class="w7b-auto">每个目录下自动生成 <code>.abstract</code>（L0）和 <code>.overview</code>（L1），形成从根到叶的层次化摘要</div>
+    </div>
+    <div class="w7b-r fx fx-right" style="--d:3">
+      <div class="w7b-lv">
+        <div style="--c:#fbbf24"><em>L0</em><b>摘要</b><span>≈ 100 tokens 一句话概述<br>快速判断目录相关性</span></div>
+        <div style="--c:#34d399"><em>L1</em><b>概览</b><span>≈ 2,000 tokens 核心信息与使用场景<br>供 Agent 规划决策</span></div>
+        <div style="--c:#60a5fa"><em>L2</em><b>全文</b><span>完整原始内容<br>仅在需要深入时按需加载</span></div>
+      </div>
+      <div class="w7b-demo panel">
+        <div class="w7b-q"><span class="lbl">查询</span><b></b><span class="c3-shi">示意</span></div>
+        <div class="w7b-ds"></div>
+        <div class="w7b-why"></div>
+        <div class="w7b-tok">
+          <div class="w7b-m"><span>按需加载</span><i><b class="w7b-m1"></b></i><em>0</em></div>
+          <div class="w7b-m w7b-mx"><span>全文都塞进上下文</span><i><b></b></i><em>60,000</em></div>
+        </div>
+        <p class="w7b-nt">与第二章 Skills 的<b>渐进式披露</b>如出一辙：先看轻量元信息，确有需要再逐层拉取完整内容</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「文件系统范式：用目录结构组织知识」· OpenViking · L0/L1/L2 三层上下文按需加载</div>
+</section>
+<style>
+.w7b-body{display:grid;grid-template-columns:.8fr 1.2fr;gap:24px;flex:1;min-height:0}
+.w7b-l{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.w7b-h b{font-size:22px}
+.w7b-h span{margin-left:12px;font-size:15px;color:var(--text3)}
+.w7b-tree{font:18px/1.75 var(--mono);color:var(--text3);padding:12px 14px;border-radius:14px;background:rgba(5,9,22,.7);border:1px solid var(--line)}
+.w7b-tree div{white-space:pre;border-radius:8px;padding:0 8px;transition:background .3s}
+.w7b-tree b{color:var(--text);font-weight:600;transition:color .3s}
+.w7b-tree i{font:15px var(--font);font-style:normal;color:#6b7896}
+.w7b-tree div.on{background:color-mix(in srgb,var(--acc) 16%,transparent)}
+.w7b-tree div.on b{color:var(--acc)}
+.w7b-cap{font-size:16px;line-height:1.6;color:var(--text2)}
+.w7b-cap b{color:var(--text)}
+.w7b-uri{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.w7b-uri b{font-size:18px;color:var(--acc)}
+.w7b-uri span{font-size:16px;line-height:1.6;color:var(--text2)}
+.w7b-auto{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2)}
+.w7b-auto code{font:600 16px var(--mono);color:var(--text);padding:1px 8px;border-radius:6px;background:rgba(255,255,255,.07)}
+.w7b-r{display:flex;flex-direction:column;gap:14px;min-height:0}
+.w7b-lv{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.w7b-lv div{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;align-items:baseline;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 8%,rgba(12,18,40,.8))}
+.w7b-lv em{grid-row:span 2;font:800 30px var(--num);font-style:normal;color:var(--c)}
+.w7b-lv b{font-size:19px}
+.w7b-lv span{font-size:15px;line-height:1.5;color:var(--text2)}
+.w7b-demo{flex:1;min-height:0;padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.w7b-q{display:flex;align-items:center;gap:12px}
+.w7b-q b{font-size:20px;flex:1}
+.w7b-ds{display:flex;flex-direction:column;gap:8px}
+.w7b-d{display:grid;grid-template-columns:160px 1fr 150px 168px;gap:12px;align-items:center;padding:9px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:opacity .35s,border-color .35s,background .35s}
+.w7b-d code{font:600 16px var(--mono);color:var(--text)}
+.w7b-d .ab{font-size:15px;color:var(--text3)}
+.w7b-d .pl{display:flex;gap:6px}
+.w7b-d .pl i{flex:1;text-align:center;padding:3px 0;border-radius:8px;font:700 15px var(--num);font-style:normal;color:var(--text3);border:1px solid var(--line2);transition:all .3s}
+.w7b-d .pl i.on:nth-child(1){color:#06101f;background:#fbbf24;border-color:#fbbf24}
+.w7b-d .pl i.on:nth-child(2){color:#06101f;background:#34d399;border-color:#34d399}
+.w7b-d .pl i.on:nth-child(3){color:#06101f;background:#60a5fa;border-color:#60a5fa}
+.w7b-d .st{font-size:15px;font-style:normal;color:var(--text2)}
+.w7b-d.no{opacity:.42}
+.w7b-d.yes{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.w7b-why{min-height:28px;font-size:17px;color:var(--acc)}
+.w7b-tok{display:flex;flex-direction:column;gap:8px}
+.w7b-m{display:grid;grid-template-columns:150px 1fr 90px;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+.w7b-m i{position:relative;height:12px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.w7b-m i b{position:absolute;left:0;top:0;bottom:0;width:var(--v,0%);border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .5s var(--ease)}
+.w7b-mx i b{width:100%;background:rgba(251,113,133,.55)}
+.w7b-m em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w7b-nt{margin-top:auto;font-size:15px;color:var(--text3)}
+.w7b-nt b{color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-viking'] = {
+  // [目录, L0 摘要, L2 全文长度（示意）]
+  D: [['resources/', '产品文档、退款政策与订单接口代码', 16000], ['user/memories/', '这位用户的出行、饮食偏好与常用地址', 9000], ['agent/skills/', '订票、写周报、查快递等技能说明', 12000], ['agent/memories/', '过往任务的操作记录', 23000]],
+  // lv：0 停在 L0，1 加载到 L1，2 加载到 L2
+  Q: [
+    { q: '“按我的偏好，订周五去上海的高铁”', lv: [0, 1, 1, 0], why: '偏好和订票流程在两份 L1 概览里就够了，没有打开任何全文' },
+    { q: '“退款接口的 refund_reason 字段怎么传？”', lv: [2, 0, 0, 0], why: '要看接口原文：只有 resources/ 一路加载到 L2 全文' },
+    { q: '“这位用户平时爱吃什么？”', lv: [0, 1, 0, 0], why: '一份 L1 概览就能回答，其余目录都停在 L0' },
+  ],
+  init(s) {
+    s.querySelector('.w7b-ds').innerHTML = this.D.map(([d, a]) => `<div class="w7b-d"><code>${d}</code><span class="ab">L0：${a}</span><div class="pl"><i>L0</i><i>L1</i><i>L2</i></div><em class="st"></em></div>`).join('');
+  },
+  tok(s, t) {
+    s.querySelector('.w7b-m em').textContent = t.toLocaleString('en-US');
+    s.querySelector('.w7b-m1').style.setProperty('--v', Math.min(100, (t / 60000) * 100) + '%');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const rows = [...s.querySelectorAll('.w7b-d')], tree = [...s.querySelectorAll('.w7b-tree [data-d]')];
+    const qb = s.querySelector('.w7b-q b'), why = s.querySelector('.w7b-why');
+    let n = 0;
+    while (ok()) {
+      const Q = this.Q[n++ % this.Q.length];
+      rows.forEach((r) => { r.className = 'w7b-d'; r.querySelectorAll('.pl i').forEach((i) => i.classList.remove('on')); r.querySelector('.st').textContent = ''; });
+      tree.forEach((t) => t.classList.remove('on'));
+      qb.textContent = Q.q; why.textContent = '';
+      let t = 0; this.tok(s, 0);
+      for (let i = 0; i < rows.length; i++) {
+        await U.wait(ctx, 420); if (!ok()) return;
+        rows[i].querySelector('.pl i').classList.add('on'); rows[i].querySelector('.st').textContent = '读 L0 摘要';
+        t += 100; this.tok(s, t);
+      }
+      await U.wait(ctx, 600); if (!ok()) return;
+      rows.forEach((r, i) => { if (!Q.lv[i]) { r.classList.add('no'); r.querySelector('.st').textContent = 'L0 判定无关 · 停止'; } });
+      for (let i = 0; i < rows.length; i++) {
+        if (!Q.lv[i]) continue;
+        await U.wait(ctx, 700); if (!ok()) return;
+        const pl = rows[i].querySelectorAll('.pl i');
+        rows[i].classList.add('yes'); tree[i].classList.add('on'); pl[1].classList.add('on');
+        rows[i].querySelector('.st').textContent = '加载 L1 概览'; t += 2000; this.tok(s, t);
+        if (Q.lv[i] > 1) {
+          await U.wait(ctx, 800); if (!ok()) return;
+          pl[2].classList.add('on'); rows[i].querySelector('.st').textContent = '深入：加载 L2 全文'; t += this.D[i][2]; this.tok(s, t);
+        }
+      }
+      await U.wait(ctx, 400); if (!ok()) return;
+      why.textContent = Q.why;
+      await U.wait(ctx, 3000);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-mdlinks" data-part="7" data-trans="zoom" data-dur="18000" data-title="Markdown 纯文本与链接索引" data-notes="<b>选择 Markdown 纯文本而非专用数据库作为知识的底层表达</b>，是一个看似反直觉但深思熟虑的工程决策。纯文本意味着用户可直接阅读、编辑和修正 Agent 的知识；可通过 Git 版本控制和回滚；更重要的是，Agent 拥有 write_file 能力后可在工作分支上自主记录和组织知识，再通过后文的审核流程合入主库。会话结束时，系统可以提议把用户偏好更新写入 user/memories/，把操作记录写入 agent/memories/。前者仍属于本章的用户知识管理；后者只有经过结果评价、跨轨迹归纳和后续验证，才会成为第九章所说的经验学习，而不是把任意一次操作直接当成可靠经验。<br>不过，采用这种纯文本、文件系统式的组织方式，有一个极易被忽视却直接决定检索成败的前提：<b>文件之间必须建立起链接与索引</b>。.abstract/.overview 解决的是纵向的层次摘要，这里强调的是横向的关联——如果只是把知识拆成一堆各自独立的文本文件平铺在目录里、彼此之间没有任何交叉引用，那么除了逐个全文扫描或向量检索之外，Agent 几乎无从在相关条目间导航；知识越多，这堆零散文件反而越难检索。正确的做法是把知识库组织得像 Wikipedia：每个条目在提及其他条目时都以链接指向它，再辅以入口页与索引页，让 Agent 能顺着链接从一个概念走到相关概念——这相当于用轻量的文件链接，实现了 GraphRAG 实体关系图谱的一部分导航能力。<br>这里还有一个实践中的关键差异：<b>不同模型主动建立这类链接的意愿与能力并不相同</b>。能力强的模型在写入新知识时会自发地回指已有条目、顺手维护索引；而不少模型并不会主动这样做，只是孤立地追加文件。因此在负责写入知识的提示词里必须把要求写明确——每新增一个条目，都要先检索并链接到相关的已有条目，并更新所在目录的索引页，形成双向可达的引用网络，而不是任由知识退化成互不相连的孤岛。<br>右侧切换两种组织方式，看 Agent 要读几个文件才能凑齐答案；知识库与读取次数为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Markdown 纯文本，前提是<em>链接与索引</em></h2></div>
+    <div class="w7c-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="i">孤立文件平铺</button><button data-v="l">像 Wikipedia 一样链接</button></div></header>
+  <div class="w7c-body">
+    <div class="w7c-l fx fx-left" style="--d:3">
+      <div class="w7c-k"><b>选择 Markdown 纯文本，而非专用数据库</b><div class="w7c-ch"><span>用户可直接阅读、编辑、修正</span><span>Git 版本控制与回滚</span><span>Agent 用 write_file 在工作分支上自主记录，经审核合入主库</span></div></div>
+      <div class="w7c-k"><b>会话结束时，系统可以提议写入</b>
+        <div class="w7c-w"><code>user/memories/</code><span>用户偏好更新 → 仍属本章的用户知识管理</span></div>
+        <div class="w7c-w"><code>agent/memories/</code><span>操作记录 → 经过结果评价、跨轨迹归纳和后续验证，才成为第九章的经验学习</span></div></div>
+      <div class="w7c-k hot"><b>不同模型主动建立链接的意愿与能力并不相同</b><p>所以负责写入知识的提示词里要写明：每新增一个条目——</p>
+        <ol><li>先检索并链接到相关的已有条目</li><li>更新所在目录的索引页</li><li>形成双向可达的引用网络，而不是孤岛</li></ol></div>
+    </div>
+    <div class="w7c-r panel fx fx-right" style="--d:4">
+      <div class="w7c-q"><span class="lbl">Agent 要回答</span><b>“会员退款能退回原支付渠道吗？”</b><span class="c3-shi">示意</span></div>
+      <svg class="w7c-svg" viewBox="0 0 760 420"></svg>
+      <div class="w7c-ft"><div class="w7c-cnt">已读取<b>0</b>个文件</div><p class="w7c-res"></p></div>
+      <p class="w7c-nt">纵向：<code>.abstract</code> / <code>.overview</code> 层次摘要；横向：链接 + 入口页 + 索引页 ≈ 用轻量的文件链接实现 GraphRAG 的一部分导航能力</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「文件系统范式：用目录结构组织知识」· Markdown 纯文本 · 文件之间的链接与索引</div>
+</section>
+<style>
+#c03-mdlinks .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-mdlinks .seg button{padding:8px 16px;font-size:17px}
+.w7c-body{display:grid;grid-template-columns:.92fr 1.08fr;gap:24px;flex:1;min-height:0}
+.w7c-l{display:flex;flex-direction:column;gap:12px}
+.w7c-k{display:flex;flex-direction:column;gap:8px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.w7c-k b{font-size:19px}
+.w7c-k.hot{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.w7c-k.hot>b{color:var(--acc)}
+.w7c-k p{font-size:16px;color:var(--text2)}
+.w7c-k ol{margin:0;padding-left:26px;display:flex;flex-direction:column;gap:4px;font-size:17px;color:var(--text)}
+.w7c-ch{display:flex;flex-wrap:wrap;gap:8px}
+.w7c-ch span{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2)}
+.w7c-w{display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:baseline}
+.w7c-w code{font:600 16px var(--mono);color:var(--text)}
+.w7c-w span{font-size:16px;line-height:1.5;color:var(--text2)}
+.w7c-r{padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.w7c-q{display:flex;align-items:center;gap:12px}
+.w7c-q b{font-size:20px;flex:1}
+.w7c-svg{width:100%;flex:1;min-height:0}
+.w7c-e{stroke:rgba(255,255,255,.2);stroke-width:2;opacity:0;transition:opacity .4s,stroke .3s,stroke-width .3s}
+.w7c-svg.lnk .w7c-e{opacity:1}
+.w7c-e.on{stroke:var(--acc);stroke-width:4}
+.w7c-n{transition:opacity .4s}
+.w7c-n rect{fill:rgba(12,18,40,.95);stroke:rgba(255,255,255,.25);stroke-width:1.5;transition:fill .35s,stroke .35s}
+.w7c-n text{font-size:16px;font-weight:600;fill:var(--text2);text-anchor:middle;dominant-baseline:central}
+.w7c-n.idx rect{stroke:var(--acc);stroke-dasharray:5 4}
+.w7c-svg:not(.lnk) .w7c-n.idx{opacity:.15}
+.w7c-n.rd rect{stroke:#fbbf24;fill:rgba(251,191,36,.15)}
+.w7c-n.hit rect{stroke:#34d399;stroke-width:2.5;fill:rgba(52,211,153,.2)}
+.w7c-n.rd text,.w7c-n.hit text{fill:var(--text)}
+.w7c-ft{display:flex;align-items:center;gap:18px;min-height:54px}
+.w7c-cnt{flex:none;font-size:18px;color:var(--text2)}
+.w7c-cnt b{font:800 30px var(--num);color:var(--acc);margin:0 6px}
+.w7c-res{font-size:16px;line-height:1.5;color:var(--text2)}
+.w7c-res.bad{color:#fda4af}
+.w7c-res.ok{color:#6ee7b7}
+.w7c-nt{font-size:15px;line-height:1.55;color:var(--text3)}
+.w7c-nt code{font:15px var(--mono);color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-mdlinks'] = {
+  N: { x: ['索引页 index.md', 380, 44], r: ['退款政策.md', 130, 150], o: ['订单系统.md', 380, 150], l: ['物流时效.md', 630, 150], p: ['支付渠道.md', 130, 262], m: ['会员等级.md', 380, 262], f: ['发票规则.md', 630, 262], c: ['优惠券.md', 130, 374], a: ['售后流程.md', 380, 374], t: ['用户协议.md', 630, 374] },
+  E: [['x', 'r'], ['x', 'o'], ['x', 'm'], ['x', 'a'], ['r', 'p'], ['r', 'm'], ['r', 'a'], ['o', 'l'], ['o', 'f'], ['m', 'c']],
+  HIT: ['r', 'p', 'm'],
+  ISL: ['t', 'l', 'f', 'c', 'o', 'r', 'a', 'm', 'p'],
+  LNK: [['x', null], ['r', 0], ['p', 4], ['m', 5]],
+  init(s) {
+    const N = this.N, sv = s.querySelector('.w7c-svg');
+    let h = this.E.map(([a, b], i) => `<line class="w7c-e" data-e="${i}" x1="${N[a][1]}" y1="${N[a][2]}" x2="${N[b][1]}" y2="${N[b][2]}"/>`).join('');
+    h += Object.entries(N).map(([k, [t, x, y]]) => { const w = k === 'x' ? 200 : 156; return `<g class="w7c-n${k === 'x' ? ' idx' : ''}" data-n="${k}"><rect x="${x - w / 2}" y="${y - 24}" width="${w}" height="48" rx="12"/><text x="${x}" y="${y}">${t}</text></g>`; }).join('');
+    sv.innerHTML = h;
+    this.set = U.seg(s.querySelector('.w7c-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  async show(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const sv = s.querySelector('.w7c-svg'), cnt = s.querySelector('.w7c-cnt b'), res = s.querySelector('.w7c-res');
+    const node = (k) => sv.querySelector(`.w7c-n[data-n="${k}"]`), mark = (k) => node(k).classList.add(this.HIT.includes(k) ? 'hit' : 'rd');
+    sv.classList.toggle('lnk', v === 'l');
+    sv.querySelectorAll('.w7c-n').forEach((n) => n.classList.remove('rd', 'hit'));
+    sv.querySelectorAll('.w7c-e').forEach((e) => e.classList.remove('on'));
+    cnt.textContent = '0'; res.textContent = ''; res.className = 'w7c-res';
+    await U.wait(ctx, 600); if (!ok()) return;
+    let c = 0;
+    if (v === 'i') {
+      for (const k of this.ISL) { mark(k); cnt.textContent = ++c; await U.wait(ctx, 520); if (!ok()) return; }
+      res.textContent = '9 个文件全部读完才凑齐答案：彼此没有交叉引用，只能逐个全文扫描，或靠向量检索碰运气'; res.classList.add('bad');
+    } else {
+      for (const [k, e] of this.LNK) {
+        if (e != null) sv.querySelector(`.w7c-e[data-e="${e}"]`).classList.add('on');
+        mark(k); cnt.textContent = ++c; await U.wait(ctx, 760); if (!ok()) return;
+      }
+      res.textContent = '索引页 → 退款政策，再顺着条目里的链接走到支付渠道、会员等级：只读 4 个文件'; res.classList.add('ok');
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 'i'); ctx.every(() => { if (this.auto) this.show(s, this.v === 'i' ? 'l' : 'i'); }, 8000); },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 知识应该如何更新 ================= -->
+<section class="slide" id="c03-twopath" data-part="7" data-trans="rise" data-dur="20000" data-title="知识应该如何更新：两条路径" data-notes="前面几节解决的是“知识怎样表示、组织和检索”，但一个上线运行的用户记忆或共享知识库还会持续收到新信息。只更新不整理，内容会越积越乱；只做定期重写，新信息又无法及时生效。因此，完整的更新机制必须同时包含两条路径：<b>事件触发的增量更新</b>，以及<b>周期触发的全量整理</b>。前者处理“刚刚出现了一条新证据，应该对当前知识作什么局部修改”，及时，但每次只看到一个局部；后者在周期性窗口里从全局视角重新审视整个知识体系，把多次局部修改累积出的全局问题清理掉。<br>左侧切换三种做法，看两条曲线的走势：上方是还没生效的新信息，下方是重复、新旧说法并存造成的混乱度。曲线与事件时间都是示意，只表达趋势。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">知识应该如何更新：<em>两条路径</em>缺一不可</h2></div>
+    <div class="w7d-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="inc">只做增量更新</button><button data-v="per">只做定期重写</button><button data-v="both">两者结合</button></div></header>
+  <div class="w7d-body">
+    <div class="w7d-ch panel fx fx-left" style="--d:3"><div class="w7d-h"><b class="w7d-t"></b><span class="c3-shi">趋势示意</span></div><svg class="w7d-svg" viewBox="0 0 900 440"></svg><p class="w7d-d"></p></div>
+    <div class="w7d-r fx fx-right" style="--d:4">
+      <div class="w7d-p" data-k="inc"><em>路径一</em><b>事件触发的增量更新</b><p>刚刚出现了一条新证据 → 应该对当前知识作什么<b>局部修改</b></p><span>及时 · 但每次只看到一个局部</span></div>
+      <div class="w7d-p" data-k="per"><em>路径二</em><b>周期触发的全量整理</b><p>在周期性窗口里，从<b>全局视角</b>重新审视整个知识体系</p><span>整齐 · 但新信息要等下一个周期</span></div>
+      <blockquote class="w7d-qt">只更新不整理，内容会越积越乱；只做定期重写，新信息又无法及时生效——完整的更新机制必须<b>同时包含两条路径</b></blockquote>
+    </div>
+  </div>
+  <div class="src">第三章 ·「知识应该如何更新」· 事件触发的增量更新 + 周期触发的全量整理</div>
+</section>
+<style>
+#c03-twopath .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-twopath .seg button{padding:8px 16px;font-size:17px}
+.w7d-body{display:grid;grid-template-columns:1.45fr 1fr;gap:24px;flex:1;min-height:0}
+.w7d-ch{padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.w7d-h{display:flex;align-items:center;justify-content:space-between}
+.w7d-h b{font-size:20px}
+.w7d-svg{width:100%;flex:1;min-height:0}
+.w7d-ax{stroke:rgba(255,255,255,.18);stroke-width:1.5}
+.w7d-lb{font-size:15px;fill:var(--text3)}
+.w7d-wk{font-size:15px;fill:var(--text3);text-anchor:middle}
+.w7d-ev{fill:#fbbf24;filter:drop-shadow(0 0 5px #fbbf24)}
+.w7d-tk{stroke:#2dd4bf;stroke-width:3;stroke-linecap:round;transition:opacity .4s}
+.w7d-cs{stroke:#34d399;stroke-width:2;stroke-dasharray:6 6;transition:opacity .4s}
+.w7d-cl{font-size:15px;font-weight:700;fill:#34d399;transition:opacity .4s}
+.w7d-svg[data-m="per"] .w7d-tk,.w7d-svg[data-m="inc"] .w7d-cs,.w7d-svg[data-m="inc"] .w7d-cl{opacity:0}
+.w7d-a,.w7d-b{fill:none;stroke-width:4;stroke-linejoin:round}
+.w7d-a{stroke:#fbbf24;filter:drop-shadow(0 0 6px rgba(251,191,36,.6))}
+.w7d-b{stroke:#fb7185;filter:drop-shadow(0 0 6px rgba(251,113,133,.6))}
+.w7d-d{min-height:56px;font-size:17px;line-height:1.6;color:var(--text2)}
+.w7d-r{display:flex;flex-direction:column;gap:14px}
+.w7d-p{display:flex;flex-direction:column;gap:6px;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .4s,background .4s,box-shadow .4s}
+.w7d-p em{font-style:normal;font-size:15px;letter-spacing:.14em;color:var(--text3)}
+.w7d-p>b{font-size:21px}
+.w7d-p p{font-size:17px;line-height:1.6;color:var(--text2)}
+.w7d-p p b{color:var(--text)}
+.w7d-p span{font-size:15px;color:var(--text3)}
+.w7d-p.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8));box-shadow:0 0 26px color-mix(in srgb,var(--acc) 18%,transparent)}
+.w7d-p.on>b{color:var(--acc)}
+.w7d-qt{margin-top:auto;font-size:18px;line-height:1.7;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.w7d-qt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-twopath'] = {
+  EV: [0.4, 1.1, 1.7, 2.3, 2.9, 3.6, 4.5, 5.2, 5.8, 6.6, 7.3, 7.9, 8.6, 9.4, 10.1, 10.8, 11.5],
+  M: {
+    inc: ['只做增量更新', '新证据一到就做局部修改：上方曲线始终贴着 0，新信息及时生效；但每次只看到一个局部，重复和新旧并存越积越多'],
+    per: ['只做定期重写', '每次重写后都很整齐；但两次整理之间的新信息只能排队等待，上方曲线一路攒高，直到下一次重写'],
+    both: ['两者结合', '增量更新保证新信息及时生效，定期整理把累积的局部问题清掉：两条曲线都压在低位'],
+  },
+  X: (w) => 120 + w * 64,
+  init(s) {
+    const sv = s.querySelector('.w7d-svg'), X = this.X;
+    let h = '<text class="w7d-lb" x="8" y="31">新证据</text><line class="w7d-ax" x1="120" y1="26" x2="888" y2="26"/>';
+    h += this.EV.map((t) => `<line class="w7d-tk" x1="${X(t)}" y1="36" x2="${X(t)}" y2="50"/><circle class="w7d-ev" cx="${X(t)}" cy="26" r="6"/>`).join('');
+    [4, 8, 12].forEach((w) => (h += `<line class="w7d-cs" x1="${X(w)}" y1="44" x2="${X(w)}" y2="412"/><text class="w7d-cl" x="${X(w) - 8}" y="66" text-anchor="end">全量整理</text>`));
+    h += '<text class="w7d-lb" x="8" y="96">尚未生效的</text><text class="w7d-lb" x="8" y="118">新信息</text><line class="w7d-ax" x1="120" y1="222" x2="888" y2="222"/>';
+    h += '<text class="w7d-lb" x="8" y="286">混乱度</text><text class="w7d-lb" x="8" y="308">重复 · 新旧</text><text class="w7d-lb" x="8" y="330">说法并存</text><line class="w7d-ax" x1="120" y1="412" x2="888" y2="412"/>';
+    [2, 4, 6, 8, 10, 12].forEach((w) => (h += `<text class="w7d-wk" x="${X(w)}" y="434"${w === 12 ? ' text-anchor="end"' : ''}>第 ${w} 周</text>`));
+    h += '<path class="w7d-a"/><path class="w7d-b"/>';
+    sv.innerHTML = h;
+    this.set = U.seg(s.querySelector('.w7d-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  series(v) {
+    const ev = this.EV, A = [], B = [];
+    for (let i = 0; i <= 240; i++) {
+      const t = i / 20, seen = ev.filter((e) => e <= t).length, last = Math.floor(t / 4) * 4, since = ev.filter((e) => e > last && e <= t).length;
+      const pend = v === 'per' ? since : 0;
+      const mess = v === 'inc' ? 0.1 + 0.05 * seen : v === 'per' ? 0.1 : 0.1 + 0.05 * since;
+      A.push([this.X(t), 222 - Math.min(1, pend / 7) * 130]);
+      B.push([this.X(t), 412 - Math.min(1, mess) * 130]);
+    }
+    return [A, B].map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L'));
+  },
+  show(s, v) {
+    this.v = v; this.set(v);
+    const [a, b] = this.series(v), sv = s.querySelector('.w7d-svg');
+    sv.dataset.m = v;
+    s.querySelector('.w7d-t').textContent = this.M[v][0];
+    s.querySelector('.w7d-d').textContent = this.M[v][1];
+    s.querySelectorAll('.w7d-p').forEach((p) => p.classList.toggle('on', v === 'both' || p.dataset.k === v));
+    [[sv.querySelector('.w7d-a'), a], [sv.querySelector('.w7d-b'), b]].forEach(([p, d]) => {
+      p.setAttribute('d', d);
+      const L = p.getTotalLength();
+      p.style.transition = 'none'; p.style.strokeDasharray = L; p.style.strokeDashoffset = L;
+      void p.getBoundingClientRect();
+      p.style.transition = 'stroke-dashoffset 2.4s cubic-bezier(.4,0,.2,1)'; p.style.strokeDashoffset = 0;
+    });
+  },
+  enter(s, ctx) {
+    this.auto = true; this.show(s, 'inc');
+    const seq = ['inc', 'per', 'both']; let n = 0;
+    ctx.every(() => { if (this.auto) this.show(s, seq[++n % 3]); }, 6000);
+  },
+  reset(s) { s.querySelectorAll('.w7d-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 用户记忆和知识库的增量更新 ================= -->
+<section class="slide" id="c03-pr" data-part="7" data-steps="4" data-dur="9000" data-title="增量更新：每次知识变更都是一个 PR" data-notes="增量更新处理的是“刚刚出现了一条新证据，应该对当前知识作什么局部修改”。最稳妥的工程答案是：<b>把知识库当成代码库，把每次知识变更当成一个 Pull Request（PR）</b>。这不只适用于 User as Code 这类 Python 形式的可执行记忆；Markdown 知识库、用户记忆文件和规则文档同样应当进入 Git，获得差异审查、版本历史、责任追溯和一键回滚能力。生产环境不应让任何一个模型绕过审核，直接改主分支或线上向量库。<br>具体可以沿用第一章命名的<b>提议者—审核者</b>模式，把知识更新做成一个有外部证据的迭代闭环。1. <b>Proposer Agent 提交 PR。</b>它从原始证据中发现新事实、冲突或过期内容，在工作分支上提出尽可能小而完整的 diff；它不是把最新一次对话粗暴追加到文件末尾，而是先检索相关的已有知识，再增、删、改对应条目，同步维护链接、索引、时间元数据和证据引用。2. <b>Reviewer Agent 独立审核。</b>它拿到变更前的知识、diff 和原始证据（如 execution trajectory、原始对话、业务文档或工具执行结果），独立检查每个新断言是否能被证据支持、是否遗漏限定条件、是否与其他文件冲突，以及删除或改写是否过度。审核不通过时，它应返回指向具体证据和行号的可执行意见，而不是模糊地说“还需要改进”。3. <b>双方迭代至收敛。</b>Proposer 根据拒绝理由修改 diff，Reviewer 再次回到原始证据复核；只有 Reviewer 明确批准，PR 才可合入。同时要设置最大迭代次数或成本预算；超出上限仍未收敛时转人工审核，不能默认放行。4. <b>合入后再发布。</b>CI 先检查格式、链接、元数据、权限标签；若知识以代码表示，还要运行类型检查和测试。通过后才从已合入的版本增量重建受影响的分块、摘要和向量索引。因此，索引是可重建的派生物，Git 中已审核的知识才是真正的来源。<br>按 → 逐步看一次 PR 的完整过程（左侧步骤卡片也可以点击）；右侧的文件、证据编号与审核意见为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">增量更新：把每次知识变更当成<em>一个 PR</em></h2></header>
+  <div class="w7e-body">
+    <div class="w7e-l fx fx-left" style="--d:2">
+      <div class="w7e-pr"><b>把知识库当成代码库</b><span>Markdown 知识库、用户记忆文件、规则文档都进入 Git：差异审查 · 版本历史 · 责任追溯 · 一键回滚</span><span class="w7e-no">生产环境不应让任何一个模型绕过审核，直接改主分支或线上向量库</span></div>
+      <div class="w7e-st" data-k="1"><em>1</em><div><b>Proposer Agent 提交 PR</b><p>先检索相关的已有知识，提出尽可能小而完整的 diff；同步维护链接、索引、时间元数据和证据引用</p></div></div>
+      <div class="w7e-st" data-k="2"><em>2</em><div><b>Reviewer Agent 独立审核</b><p>拿变更前的知识、diff 和原始证据逐条核对；退回时给出指向具体证据和行号的可执行意见</p></div></div>
+      <div class="w7e-st" data-k="3"><em>3</em><div><b>双方迭代至收敛</b><p>只有 Reviewer 明确批准才可合入；设最大迭代次数或成本预算，超限转人工，不能默认放行</p></div></div>
+      <div class="w7e-st" data-k="4"><em>4</em><div><b>合入后再发布</b><p>CI 检查格式、链接、元数据、权限标签（代码形式还要类型检查和测试），再增量重建受影响的分块、摘要和向量</p></div></div>
+    </div>
+    <div class="w7e-win win fx fx-right" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>PR #128 · 更新 user/memories/travel.md</span><em class="w7e-badge"></em></div>
+      <div class="w7e-wb">
+        <div class="w7e-ev"><span class="lbl">新证据</span><p>conv/2024-12-03 第 12 轮：“护照明年 2 月就到期了，<b>下周我去办加急换发</b>。”</p><span class="c3-shi">示意</span></div>
+        <div class="w7e-diff"></div>
+        <div class="w7e-th"></div>
+        <div class="w7e-ci"></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「用户记忆和知识库的增量更新」· 提议者—审核者模式 · 四个步骤</div>
+</section>
+<style>
+.w7e-body{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;flex:1;min-height:0}
+.w7e-l{display:flex;flex-direction:column;gap:10px}
+.w7e-pr{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.w7e-pr b{font-size:20px;color:var(--acc)}
+.w7e-pr span{font-size:16px;line-height:1.55;color:var(--text2)}
+.w7e-pr .w7e-no{color:#fda4af}
+.w7e-st{display:grid;grid-template-columns:44px 1fr;gap:14px;align-items:start;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);cursor:pointer;transition:border-color .4s,background .4s,opacity .4s}
+.w7e-st em{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font:800 18px var(--num);font-style:normal;color:var(--text3);border:1px solid var(--line2);transition:all .4s}
+.w7e-st b{font-size:18px}
+.w7e-st p{margin-top:4px;font-size:15px;line-height:1.55;color:var(--text2)}
+.w7e-st.done{opacity:.6}
+.w7e-st.done em{color:#06101f;background:var(--env);border-color:var(--env)}
+.w7e-st.cur{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.8));box-shadow:0 0 24px color-mix(in srgb,var(--acc) 18%,transparent)}
+.w7e-st.cur em{color:#06101f;background:var(--acc);border-color:var(--acc)}
+.w7e-win{display:flex;flex-direction:column;min-height:0}
+.w7e-win .win-bar em{margin-left:auto;padding:3px 12px;border-radius:999px;font:700 15px var(--num);font-style:normal;color:#06101f;background:var(--c,#94a3b8);transition:background .4s}
+.w7e-wb{flex:1;min-height:0;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.w7e-ev{display:flex;align-items:baseline;gap:12px;padding:10px 14px;border-radius:12px;background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.35)}
+.w7e-ev p{flex:1;font-size:16px;line-height:1.55;color:var(--text2)}
+.w7e-ev p b{color:var(--text)}
+.w7e-diff{display:flex;flex-direction:column;gap:2px;font:16px/1.65 var(--mono);color:var(--text2)}
+.w7e-diff .lbl{font-family:var(--font);margin-bottom:4px}
+.w7e-ln{display:grid;grid-template-columns:22px 1fr;padding:1px 10px;border-radius:6px;animation:upIn .4s var(--ease) both;animation-delay:calc(var(--i) * 90ms);transition:background .3s}
+.w7e-ln i{font-style:normal;color:var(--text3)}
+.w7e-ln.add{background:rgba(52,211,153,.1);color:#bbf7d0}
+.w7e-ln.add i{color:#34d399}
+.w7e-ln.del{background:rgba(251,113,133,.1);color:#fecdd3;text-decoration:line-through;text-decoration-color:rgba(251,113,133,.6)}
+.w7e-ln.del i{color:#fb7185}
+.w7e-ln.hd{color:#7dd3fc}
+.w7e-ln.bad{box-shadow:inset 0 0 0 2px #fb7185;background:rgba(251,113,133,.16)}
+.w7e-ln.fix{box-shadow:inset 0 0 0 2px #34d399;background:rgba(52,211,153,.18)}
+.w7e-th{display:flex;flex-direction:column;gap:8px}
+.w7e-m{display:grid;grid-template-columns:92px 1fr;gap:10px;align-items:baseline;padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.55;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 8%,transparent);animation:upIn .45s var(--ease) both;animation-delay:calc(var(--i) * 120ms + 200ms)}
+.w7e-m b{font-size:15px;color:var(--c)}
+.w7e-m span{color:var(--text2)}
+.w7e-m.p{--c:#fbbf24}.w7e-m.r{--c:#fb7185}.w7e-m.a{--c:#34d399}
+.w7e-ci{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.w7e-cks{display:flex;gap:8px;flex-wrap:wrap}
+.w7e-cks span{padding:4px 12px;border-radius:999px;font-size:15px;color:#6ee7b7;border:1px solid rgba(52,211,153,.5);animation:upIn .35s var(--ease) both;animation-delay:calc(var(--i) * 160ms)}
+.w7e-rb{display:grid;grid-template-columns:auto auto 1fr;gap:12px;align-items:center;font-size:16px;animation:upIn .4s var(--ease) both;animation-delay:.8s}
+.w7e-rb b{color:#c084fc}
+.w7e-rb span{color:var(--text2)}
+.w7e-rb i{position:relative;height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}
+.w7e-rb i b{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background:linear-gradient(90deg,#c084fc,#60a5fa);animation:w7eBar 1.6s var(--ease) 1s forwards}
+@keyframes w7eBar{to{width:100%}}
+.w7e-src{font-size:15px;color:var(--text3);animation:upIn .4s var(--ease) both;animation-delay:1.4s}
+.w7e-src b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-pr'] = {
+  OLD: [['h', '## 证件'], ['', '护照：有效期至 2025-02-18'], ['h', '## 关联'], ['', '东京出差 2025-01']],
+  D1: [['h', '@@ ## 证件 @@'], ['-', '护照：有效期至 2025-02-18'], ['+', '护照：已办理加急换发；旧照有效期至 2025-02-18', 'x'], ['+', '  证据：conv/2024-12-03#r12'], ['h', '@@ ## 关联 @@'], ['-', '东京出差 2025-01'], ['+', '东京出差 2025-01 → [[trips/tokyo-2025-01]]（已回链）']],
+  FIX: '护照：计划下周办理加急换发（2024-12-03 提及）；旧照有效期至 2025-02-18',
+  B: [['草稿', '#94a3b8'], ['OPEN · 等待审核', '#fbbf24'], ['CHANGES REQUESTED · 第 1 轮', '#fb7185'], ['APPROVED · 第 2 轮 / 上限 3 轮', '#34d399'], ['MERGED · kb@v43', '#c084fc']],
+  init(s) { s.querySelectorAll('.w7e-st').forEach((c) => c.addEventListener('click', () => DECK.go(DECK.cur, +c.dataset.k))); },
+  render(s, k) {
+    const esc = C3.esc, bd = s.querySelector('.w7e-badge');
+    s.querySelectorAll('.w7e-st').forEach((c) => { const n = +c.dataset.k; c.classList.toggle('cur', n === k); c.classList.toggle('done', n < k); });
+    bd.textContent = this.B[k][0]; bd.style.setProperty('--c', this.B[k][1]);
+    const lines = k === 0 ? this.OLD : this.D1.map((l) => (k >= 3 && l[2] === 'x' ? ['+', this.FIX, 'f'] : l));
+    const head = k === 0 ? '当前知识 · user/memories/travel.md（主分支）' : 'diff · 工作分支 kb/passport-update';
+    s.querySelector('.w7e-diff').innerHTML = `<span class="lbl">${head}</span>` + lines.map(([m, t, f], i) => {
+      const cls = m === '+' ? 'add' : m === '-' ? 'del' : m === 'h' ? 'hd' : '';
+      return `<div class="w7e-ln ${cls}${f === 'x' && k === 2 ? ' bad' : ''}${f === 'f' ? ' fix' : ''}" style="--i:${i}"><i>${m === '+' || m === '-' ? m : ''}</i><span>${esc(t)}</span></div>`;
+    }).join('');
+    const msg = [];
+    if (k >= 1) msg.push(['p', 'Proposer', '先检索了 trips/tokyo-2025-01.md 与 index.md：同步更新反向链接、更新时间和证据引用']);
+    if (k >= 2) msg.push(['r', 'Reviewer', '第 3 行与证据不符：conv/2024-12-03#r12 原话是“下周我去办”，还没有办理。请改为“计划办理”，并保留旧照到期日']);
+    if (k >= 3) msg.push(['p', 'Proposer', '已按意见修改第 3 行'], ['a', 'Reviewer', '已回到 conv/2024-12-03#r12 复核：表述与证据一致，链接与元数据齐全 → 批准']);
+    s.querySelector('.w7e-th').innerHTML = msg.map(([c, who, t], i) => `<div class="w7e-m ${c}" style="--i:${i}"><b>${who}</b><span>${esc(t)}</span></div>`).join('');
+    s.querySelector('.w7e-ci').innerHTML = k >= 4 ? `<div class="w7e-cks">${['格式', '链接', '元数据', '权限标签'].map((t, i) => `<span style="--i:${i}">CI · ${t} ✓</span>`).join('')}</div><div class="w7e-rb"><b>合入 kb@v43 → 增量重建</b><span>2 个分块 · 1 条摘要 · 2 个向量</span><i><b></b></i></div><p class="w7e-src">索引是可重建的派生物，<b>Git 中已审核的知识才是真正的来源</b></p>` : '';
+  },
+  enter(s, ctx, k) { this.render(s, k); },
+  step(s, ctx, k) { this.render(s, k); },
+};
+</script>
+
+<section class="slide" id="c03-tiers" data-part="7" data-trans="flip" data-dur="18000" data-title="三层分离：证据、知识、服务" data-notes="这条流水线应当明确分开三层：<b>原始证据层</b>保存只增不改的对话、轨迹和原始文档；<b>知识层</b>保存经过提炼、可持续修订的 Markdown 或代码；<b>服务层</b>保存从特定已合入版本生成的检索索引。PR 需要记录证据标识、知识库版本、审核意见和最终决定，使线上的每条知识都能回答“从哪条证据而来、谁在什么时候批准”。服务层只是从已合入版本生成的派生物：索引坏了、换了嵌入模型，都可以从某个已审核的版本重新构建，知识本身不会丢——这正是上一页“索引是可重建的派生物，Git 中已审核的知识才是真正的来源”的含义。<br>左侧演示：选中知识层的一条知识，向下追溯到它的原始证据、向上找到它所在的索引版本；右侧逐项填出这条知识的 PR 记录。文件名、编号与时间均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三层分离：<em>证据 · 知识 · 服务</em></h2></header>
+  <div class="w7f-body">
+    <div class="w7f-st fx fx-left" style="--d:2">
+      <div class="w7f-L" data-l="2" style="--c:#60a5fa"><div class="w7f-lh"><em>服务层</em><b>从特定已合入版本生成的检索索引</b><span>可重建的派生物</span></div><div class="w7f-it"><span data-x="v43">index@kb-v43 · 分块 / 摘要 / 向量</span></div></div>
+      <div class="w7f-ar">↑ 从已合入的版本构建</div>
+      <div class="w7f-L" data-l="1" style="--c:#fbbf24"><div class="w7f-lh"><em>知识层</em><b>经过提炼、可持续修订的 Markdown 或代码</b><span>真正的来源</span></div><div class="w7f-it"><span data-x="k1">user/memories/travel.md：护照计划下周加急换发</span><span data-x="k2">rules/refund.md：签收后 15 天内可退</span></div></div>
+      <div class="w7f-ar">↑ 经 PR 提炼、审核后合入</div>
+      <div class="w7f-L" data-l="0" style="--c:#34d399"><div class="w7f-lh"><em>原始证据层</em><b>只增不改的对话、轨迹和原始文档</b><span>append-only</span></div><div class="w7f-it"><span data-x="e1">conv/2024-12-03#r12</span><span data-x="e2">traj/run-7781</span><span data-x="e3">doc/refund-policy-2025.pdf</span></div></div>
+    </div>
+    <div class="w7f-r fx fx-right" style="--d:3">
+      <div class="w7f-rec panel"><div class="w7f-rh"><b>PR 记录</b><span class="c3-shi">示意</span></div>
+        <div class="w7f-f"><em>证据标识</em><span>—</span></div>
+        <div class="w7f-f"><em>知识库版本</em><span>—</span></div>
+        <div class="w7f-f"><em>审核意见</em><span>—</span></div>
+        <div class="w7f-f"><em>最终决定</em><span>—</span></div>
+      </div>
+      <p class="w7f-q">线上的每条知识都能回答：<b>从哪条证据而来、谁在什么时候批准</b></p>
+      <div class="w7f-rb"><b>索引坏了，或者换了嵌入模型？</b><span class="w7f-rbs">从 kb@v43 重新构建即可，知识本身不丢</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「用户记忆和知识库的增量更新」· 原始证据层 / 知识层 / 服务层 · PR 记录</div>
+</section>
+<style>
+.w7f-body{display:grid;grid-template-columns:1.15fr 1fr;gap:26px;flex:1;min-height:0}
+.w7f-st{display:flex;flex-direction:column;gap:6px}
+.w7f-L{display:flex;flex-direction:column;gap:10px;padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.82));transition:opacity .5s,filter .5s}
+.w7f-lh{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.w7f-lh em{font-style:normal;font-size:20px;font-weight:800;color:var(--c)}
+.w7f-lh b{font-size:17px}
+.w7f-lh span{margin-left:auto;font-size:15px;color:var(--text3)}
+.w7f-it{display:flex;flex-wrap:wrap;gap:8px}
+.w7f-it span{padding:6px 12px;border-radius:10px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line2);background:rgba(5,9,22,.6);transition:all .35s}
+.w7f-it span.on{color:#06101f;background:var(--c);border-color:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 50%,transparent)}
+.w7f-L.down{opacity:.3;filter:grayscale(1)}
+.w7f-L.down .w7f-it span{opacity:0}
+.w7f-L.up .w7f-it span{animation:upIn .5s var(--ease) both}
+.w7f-ar{align-self:center;font-size:15px;color:var(--text3);transition:color .3s}
+.w7f-ar.on{color:var(--acc)}
+.w7f-r{display:flex;flex-direction:column;gap:16px}
+.w7f-rec{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.w7f-rh{display:flex;align-items:center;justify-content:space-between}
+.w7f-rh b{font-size:20px}
+.w7f-f{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:baseline;padding:8px 12px;border-radius:10px;border:1px solid var(--line);transition:border-color .35s,background .35s}
+.w7f-f em{font-style:normal;font-size:15px;color:var(--text3)}
+.w7f-f span{font:15px var(--mono);color:var(--text2)}
+.w7f-f.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.w7f-f.on span{color:var(--text)}
+.w7f-q{font-size:19px;line-height:1.6;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.w7f-q b{color:var(--text)}
+.w7f-rb{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:14px;border:1px dashed var(--line2);transition:border-color .4s,background .4s}
+.w7f-rb b{font-size:18px}
+.w7f-rb span{font-size:16px;color:var(--text2)}
+.w7f-rb.on{border:1px solid #60a5fa;background:rgba(96,165,250,.08)}
+.w7f-rb.on span{color:#93c5fd}
+</style>
+<script>
+HOOKS['c03-tiers'] = {
+  R: [
+    { k: 'k1', e: 'e1', f: ['conv/2024-12-03#r12', 'kb@v42 → kb@v43', 'Reviewer（异源模型）：第 1 轮退回，第 2 轮批准', '2024-12-03 18:20 合入'] },
+    { k: 'k2', e: 'e3', f: ['doc/refund-policy-2025.pdf 第 2 节', 'kb@v40 → kb@v41', 'Reviewer（异源模型）：第 1 轮批准', '2024-12-20 09:05 合入'] },
+  ],
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const X = (k) => s.querySelector(`[data-x="${k}"]`), F = [...s.querySelectorAll('.w7f-f')], ars = [...s.querySelectorAll('.w7f-ar')];
+    const svc = s.querySelector('.w7f-L[data-l="2"]'), rb = s.querySelector('.w7f-rb'), rbs = s.querySelector('.w7f-rbs');
+    let n = 0;
+    while (ok()) {
+      const R = this.R[n++ % 2];
+      s.querySelectorAll('[data-x]').forEach((x) => x.classList.remove('on'));
+      F.forEach((f) => f.classList.remove('on')); ars.forEach((a) => a.classList.remove('on'));
+      await U.wait(ctx, 500); if (!ok()) return;
+      X(R.k).classList.add('on'); await U.wait(ctx, 800); if (!ok()) return;
+      ars[1].classList.add('on'); X(R.e).classList.add('on'); await U.wait(ctx, 800); if (!ok()) return;
+      for (let i = 0; i < 4; i++) { F[i].querySelector('span').textContent = R.f[i]; F[i].classList.add('on'); await U.wait(ctx, 600); if (!ok()) return; }
+      ars[0].classList.add('on'); X('v43').classList.add('on'); await U.wait(ctx, 1600); if (!ok()) return;
+      if (n % 2 === 0) {
+        svc.classList.add('down'); rb.classList.add('on'); rbs.textContent = '索引被删除……从 kb@v43 重新构建'; await U.wait(ctx, 1500); if (!ok()) return;
+        svc.classList.remove('down'); svc.classList.add('up'); rbs.textContent = '重建完成：分块、摘要、向量全部恢复，知识一条没丢'; await U.wait(ctx, 1800); if (!ok()) return;
+        svc.classList.remove('up'); rb.classList.remove('on'); rbs.textContent = '从 kb@v43 重新构建即可，知识本身不丢';
+      }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('[data-x],.w7f-f,.w7f-ar,.w7f-rb').forEach((x) => x.classList.remove('on'));
+    s.querySelectorAll('.w7f-L').forEach((x) => x.classList.remove('down', 'up'));
+    s.querySelectorAll('.w7f-f span').forEach((x) => (x.textContent = '—'));
+  },
+};
+</script>
+
+<section class="slide" id="c03-agents" data-part="7" data-dur="20000" data-title="Proposer 与 Reviewer：必须是 Agent，最好异源" data-notes="<b>Proposer 和 Reviewer 都必须是 Agent，而不是两次固定的 LLM API 调用。</b>知识更新不是只对一段预先挑好的文本做摘要：Proposer 往往要主动搜索其他相关的用户记忆文档和规则，Reviewer 也要追溯证据、对比多份文档、运行检查，并在发现新线索时继续查询。这需要它们拥有文件搜索、版本比较、测试执行和证据检索工具，现成的 Coding Agent 通常就能胜任。两个 Agent 都应能按需查询<b>完整的知识库和原始证据库</b>，而不是只接收上游挑选的几个片段；当然，“完整”指其被授权的租户或用户范围，不能因审核而突破隐私边界。为了保证可追溯性，它们的工作轨迹、工具输出引用和审核反馈也应以文本归档。<br><b>两个 Agent 应优先使用能力相近但来自不同家族的模型。</b>例如 Proposer 用 Claude，Reviewer 用 GPT；或者 Proposer 用 DeepSeek，Reviewer 用 Kimi。不同的训练数据、偏好和推理习惯可降低两者在同一处犯同类错误的概率；能力则不宜悬殊，否则 Reviewer 可能根本跟不上 Proposer 对复杂证据的处理。这种“异源互审”能增加独立性，但不能替代原始证据：Reviewer 应主要核对证据和 diff，而不是沿着 Proposer 的结论再讲一遍。权限上也应强制分工：Proposer 只能写工作分支，Reviewer 只读证据并提交审核结果，只有合并流程可以更新主分支和线上索引。<br>中间三个开关各对应一条要求；关掉任意一个，下方显示可能因此被合入的错误（与思考题 9 的参考答案一致）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Proposer 与 Reviewer：<em>必须是 Agent，最好异源</em></h2></header>
+  <div class="w7g-top fx fx-up" style="--d:2">
+    <div class="w7g-a" data-r="p"><div class="w7g-ah"><svg class="ic"><use href="#i-edit"/></svg><b>Proposer Agent</b><span class="w7g-m">Claude</span></div><div class="w7g-tools"><span>文件搜索</span><span>版本比较</span><span>证据检索</span></div><div class="w7g-perm">权限：只能写<b>工作分支</b></div></div>
+    <div class="w7g-mid"><div class="w7g-why"><b>不是两次固定的 LLM API 调用</b><span>要主动搜索相关记忆与规则、追溯证据、对比多份文档、运行检查，发现新线索还要继续查——现成的 Coding Agent 通常就能胜任</span></div><div class="w7g-mg"><svg class="ic"><use href="#i-merge"/></svg><span>只有<b>合并流程</b>可以更新主分支和线上索引</span></div></div>
+    <div class="w7g-a" data-r="r"><div class="w7g-ah"><svg class="ic"><use href="#i-eye"/></svg><b>Reviewer Agent</b><span class="w7g-m">GPT</span></div><div class="w7g-tools"><span>证据检索</span><span>版本比较</span><span>测试执行</span></div><div class="w7g-perm">权限：只读证据，<b>提交审核结果</b></div></div>
+  </div>
+  <div class="w7g-tg fx fx-up" style="--d:3">
+    <button class="tgl on"><i></i>按需查询完整的知识库与原始证据（授权范围内）</button>
+    <button class="tgl on"><i></i>能力相近、来自不同家族的模型</button>
+    <button class="tgl on"><i></i>权限强制分工</button>
+  </div>
+  <div class="w7g-out fx fx-up" style="--d:4"><b class="w7g-ot"></b><div class="w7g-ol"></div></div>
+  <div class="src">第三章 ·「用户记忆和知识库的增量更新」· 两个 Agent · 异源互审 · 权限分工</div>
+</section>
+<style>
+.w7g-top{display:grid;grid-template-columns:1fr 1.1fr 1fr;gap:20px;align-items:stretch}
+.w7g-a{display:flex;flex-direction:column;gap:12px;padding:16px 20px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.82);transition:border-color .4s,box-shadow .4s}
+.w7g-ah{display:flex;align-items:center;gap:10px}
+.w7g-ah .ic{font-size:26px;color:var(--acc)}
+.w7g-ah b{font-size:21px}
+.w7g-m{margin-left:auto;padding:4px 12px;border-radius:999px;font-size:15px;font-weight:700;color:#06101f;background:var(--acc2);transition:background .4s}
+.w7g-a[data-r="r"] .w7g-m{background:#60a5fa}
+.w7g-a.same .w7g-m{background:#94a3b8}
+.w7g-tools{display:flex;flex-wrap:wrap;gap:8px}
+.w7g-tools span{padding:4px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2);transition:opacity .3s}
+.w7g-a.blind .w7g-tools span:first-child{opacity:.35;text-decoration:line-through}
+.w7g-perm{font-size:16px;color:var(--text2)}
+.w7g-perm b{color:var(--text)}
+.w7g-a.blind,.w7g-a.root{border-color:rgba(251,113,133,.6);box-shadow:0 0 24px rgba(251,113,133,.15)}
+.w7g-a.blind .w7g-perm b,.w7g-a.root .w7g-perm b{color:#fda4af}
+.w7g-mid{display:flex;flex-direction:column;gap:12px}
+.w7g-why{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.w7g-why b{font-size:18px;color:var(--acc)}
+.w7g-why span{font-size:15px;line-height:1.6;color:var(--text2)}
+.w7g-mg{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:14px;border:1px solid var(--line);font-size:16px;color:var(--text2)}
+.w7g-mg .ic{font-size:22px;color:#c084fc}
+.w7g-mg b{color:var(--text)}
+.w7g-tg{display:flex;gap:14px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.w7g-tg .tgl{font-size:17px}
+.w7g-out{flex:1;min-height:0;margin-top:18px;display:flex;flex-direction:column;gap:10px;padding:16px 22px;border-radius:18px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.05);transition:border-color .4s,background .4s}
+.w7g-out.bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.05)}
+.w7g-ot{font-size:20px;color:#6ee7b7}
+.w7g-out.bad .w7g-ot{color:#fda4af}
+.w7g-ol{display:flex;flex-direction:column;gap:8px}
+.w7g-li{display:flex;gap:14px;align-items:baseline;font-size:17px;line-height:1.6;color:var(--text2);animation:upIn .4s var(--ease) both}
+.w7g-li b{flex:none;min-width:96px;font-size:17px;color:#fda4af}
+</style>
+<script>
+HOOKS['c03-agents'] = {
+  BAD: [['证据覆盖', 'Reviewer 只看到 Proposer 挑选的几段：断章取义、被丢弃的否定词与前置条件、与其他文件的冲突都无从暴露'], ['模型独立性', '同源模型共享训练先验与盲点：Reviewer 容易顺着 Proposer 的结论再讲一遍，同一处误读不会被发现'], ['工具权限', 'Proposer 能直接写主分支或线上索引：审核形同虚设']],
+  OK: ['异源互审增加独立性，但不能替代原始证据：Reviewer 主要核对证据和 diff，而不是沿着 Proposer 的结论再讲一遍', '能力不宜悬殊，否则 Reviewer 可能跟不上 Proposer 对复杂证据的处理', '工作轨迹、工具输出引用和审核反馈都以文本归档，保证可追溯'],
+  init(s) {
+    this.t = [...s.querySelectorAll('.w7g-tg .tgl')];
+    this.t.forEach((b) => b.addEventListener('click', () => { this.auto = false; b.classList.toggle('on'); this.apply(s); }));
+  },
+  apply(s) {
+    const on = this.t.map((b) => b.classList.contains('on')), P = s.querySelector('.w7g-a[data-r="p"]'), R = s.querySelector('.w7g-a[data-r="r"]');
+    [P, R].forEach((a) => a.classList.toggle('same', !on[1]));
+    P.querySelector('.w7g-m').textContent = on[1] ? 'Claude' : '模型 X';
+    R.querySelector('.w7g-m').textContent = on[1] ? 'GPT' : '同一个模型 X';
+    R.classList.toggle('blind', !on[0]);
+    P.classList.toggle('root', !on[2]);
+    P.querySelector('.w7g-perm').innerHTML = on[2] ? '权限：只能写<b>工作分支</b>' : '权限：<b>可直接写主分支与线上索引</b>';
+    R.querySelector('.w7g-perm').innerHTML = on[0] ? '权限：只读证据，<b>提交审核结果</b>' : '只收到 Proposer <b>挑选的几段对话</b>';
+    const bad = this.BAD.filter((_, i) => !on[i]), out = s.querySelector('.w7g-out');
+    out.classList.toggle('bad', bad.length > 0);
+    s.querySelector('.w7g-ot').textContent = bad.length ? `可能被合入的错误（关掉了 ${bad.length} 项要求）` : '三项要求都满足：仍以原始证据为准';
+    s.querySelector('.w7g-ol').innerHTML = (bad.length ? bad.map(([h, t]) => `<div class="w7g-li"><b>${h}</b><span>${t}</span></div>`) : this.OK.map((t) => `<div class="w7g-li"><span>${t}</span></div>`)).join('');
+  },
+  enter(s, ctx) {
+    this.auto = true; this.t.forEach((b) => b.classList.add('on')); this.apply(s);
+    const seq = [[1, 1, 1], [0, 1, 1], [1, 1, 1], [1, 0, 1], [1, 1, 1], [1, 1, 0]]; let n = 0;
+    ctx.every(() => { if (!this.auto) return; n = (n + 1) % seq.length; this.t.forEach((b, i) => b.classList.toggle('on', !!seq[n][i])); this.apply(s); }, 3000);
+  },
+  reset(s) { this.t.forEach((b) => b.classList.add('on')); },
+};
+</script>
+
+<!-- ================= 用户记忆和知识库的定期整理 ================= -->
+<section class="slide" id="c03-consolidate" data-part="7" data-steps="3" data-trans="zoom" data-dur="10000" data-title="定期整理：回到原始数据的全量整理" data-notes="增量更新的优点是及时，但它每次只看到一个局部。长期运行后，多次局部正确的修改仍可能累积出全局问题：同一事实散落在多个文件中，新旧说法同时存在，摘要逐渐偏离原始证据，目录结构也不再适合当前的知识规模。因此系统还需要定期进行一次<b>全量整理</b>。可以把它理解为第九章“睡眠学习”在知识管理中的具体实现：前台交互期间不断累积新证据和局部更新，后台则在周期性窗口里从全局视角重新审视整个知识体系。这也呼应了 Claude Code 自动记忆在索引接近容量上限时，主动合并或移出细节的做法。<br>这个过程至少包含三项核心工作。1. <b>去重、去旧与合并。</b>全量扫描当前知识，识别语义重复、已被取代、过度碎片化或只有表述差异的条目，将其删除、归并或重写；同时重新建立文件间的链接、入口页和索引页，必要时拆分过大文件、合并过小文件或调整目录层次。这里删除的是可服务的知识表达，不是下层只增不改的原始证据。2. <b>回到原始数据核查。</b>不能只在已有摘要之间相互改写，否则早期的遗漏和误读会一代代传下去。整理 Agent 需要逐段对照原始对话、execution trajectory、业务文档和工具输出，检查旧摘要是否遗漏关键事实、丢失否定词或时间条件，以及是否把推测错当成了事实。对大型知识库可按目录、时间或主题分批扫描，但必须保留覆盖清单，确保分批处理最终覆盖全量，而不是随机抽样。3. <b>冲突解决与场景限定（qualification）。</b>遇到互相矛盾的说法时，不应简单地“保留最新一条”或让模型猜哪一条正确，而要追溯各自的原始信息源，检查它们是否分别在不同时间、对象、地域、任务或前置条件下成立。如果两者都有效，就不是删除其中一条，而是把各自的适用场景明确写入知识；如果证据仍不足，则应保留冲突和待确认状态，不得强行收敛成一个确定结论。<br>定期整理虽然是全量过程，产物仍然不应直接覆盖主库：它同样由 Proposer Agent 在分支上提交重组 diff，再由异源 Reviewer Agent 结合原始证据审核。由于全量重组的 diff 往往较大，实践中可以按目录或主题拆成多个 PR，但应共享同一份整理计划和覆盖清单。全部 PR 通过后，除了重建全量派生索引，还应回放一组典型检索与问答用例，确认新结构没有让原本可找到的知识变得不可见。整理周期可以按时间（如每周或每月）触发，也可以在新增条目数、冲突数或检索质量下降超过阈值时触发。<br>按 → 依次看三项工作（三列也可以点击）；三个例子为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">定期整理：<em>回到原始数据</em>的全量整理</h2></header>
+  <div class="w7h-why fx fx-up" style="--d:2"><b>多次局部正确的修改，会累积出全局问题</b><span>同一事实散落在多个文件</span><span>新旧说法同时存在</span><span>摘要逐渐偏离原始证据</span><span>目录结构不再适合当前规模</span><i>≈ 第九章“睡眠学习”在知识管理中的实现</i></div>
+  <div class="w7h-cols">
+    <div class="w7h-c fx fx-up" style="--d:3" data-c="1"><div class="w7h-ch"><em>1</em><b>去重、去旧与合并</b><span class="c3-shi">示意</span></div><div class="w7h-v w7h-v1"></div><p>删除、归并或重写重复与过时条目，重建链接、入口页和索引页；删的是可服务的知识表达，<b>不是原始证据</b></p></div>
+    <div class="w7h-c fx fx-up" style="--d:4" data-c="2"><div class="w7h-ch"><em>2</em><b>回到原始数据核查</b><span class="c3-shi">示意</span></div><div class="w7h-v w7h-v2"></div><p>不在摘要之间相互改写，逐段对照原始对话、轨迹与文档；分批扫描也要保留<b>覆盖清单</b>，而不是随机抽样</p></div>
+    <div class="w7h-c fx fx-up" style="--d:5" data-c="3"><div class="w7h-ch"><em>3</em><b>冲突解决与场景限定</b><span class="c3-shi">示意</span></div><div class="w7h-v w7h-v3"></div><p>不“保留最新一条”、不让模型猜：追溯来源，两者都成立就写明<b>适用场景</b>，证据不足就保留待确认</p></div>
+  </div>
+  <div class="w7h-bot fx fx-up" style="--d:6"><span><b>仍走 PR</b>Proposer 提交重组 diff，异源 Reviewer 结合原始证据审核</span><span><b>大 diff 拆分</b>按目录或主题拆成多个 PR，共享同一份整理计划和覆盖清单</span><span><b>回放验收</b>重建全量索引后回放典型检索与问答用例</span><span><b>触发条件</b>每周 / 每月，或新增条目数、冲突数、检索质量下降超过阈值</span></div>
+  <div class="src">第三章 ·「用户记忆和知识库的定期整理」· 去重合并 · 回到原始数据核查 · 冲突解决与场景限定</div>
+</section>
+<style>
+.w7h-why{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .4s,background .4s}
+.w7h-why b{font-size:18px;margin-right:6px}
+.w7h-why span{padding:4px 12px;border-radius:999px;font-size:15px;color:#fda4af;border:1px solid rgba(251,113,133,.45)}
+.w7h-why i{margin-left:auto;font-style:normal;font-size:15px;color:var(--text3)}
+.w7h-why.cur{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.w7h-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:16px;flex:1;min-height:0}
+.w7h-c{display:flex;flex-direction:column;gap:12px;padding:14px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);cursor:pointer;transition:border-color .4s,background .4s,opacity .4s}
+.w7h-ch{display:flex;align-items:center;gap:10px}
+.w7h-ch em{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:800 17px var(--num);font-style:normal;color:var(--text3);border:1px solid var(--line2);transition:all .4s}
+.w7h-ch b{font-size:19px}
+.w7h-ch .c3-shi{margin-left:auto}
+.w7h-c.cur{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8));box-shadow:0 0 26px color-mix(in srgb,var(--acc) 16%,transparent)}
+.w7h-c.cur .w7h-ch em,.w7h-c.done .w7h-ch em{color:#06101f;background:var(--acc);border-color:var(--acc)}
+.w7h-c>p{margin-top:auto;font-size:15px;line-height:1.6;color:var(--text2)}
+.w7h-c>p b{color:var(--text)}
+.w7h-v{position:relative;height:214px}
+.w7h-cd{position:absolute;left:0;right:0;top:calc(var(--i) * 54px);padding:10px 14px;border-radius:12px;font-size:16px;color:var(--text2);border:1px solid rgba(251,191,36,.45);background:rgba(251,191,36,.07);transition:top .7s var(--ease),opacity .7s;transition-delay:calc(var(--i) * .12s)}
+.w7h-v1.run .w7h-cd{top:54px;opacity:0}
+.w7h-mg{position:absolute;left:0;right:0;top:44px;display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;font-size:18px;font-weight:700;border:2px solid #34d399;background:rgba(52,211,153,.12);opacity:0;scale:.92;transition:opacity .5s .7s,scale .5s .7s}
+.w7h-mg small{font-size:15px;font-weight:400;color:var(--text2)}
+.w7h-v1.run .w7h-mg{opacity:1;scale:1}
+.w7h-v2,.w7h-v3{display:flex;flex-direction:column;gap:10px}
+.w7h-sm,.w7h-raw,.w7h-fx,.w7h-ql{display:flex;flex-direction:column;gap:2px;padding:9px 14px;border-radius:12px;border:1px solid var(--line2)}
+.w7h-sm b,.w7h-raw b,.w7h-fx b{font-size:16px;font-weight:600}
+.w7h-sm b{transition:color .4s,text-decoration-color .4s;text-decoration:line-through;text-decoration-color:transparent}
+.w7h-v2.run .w7h-sm b{color:var(--text3);text-decoration-color:#fb7185}
+.w7h-raw{border-color:rgba(52,211,153,.4)}
+.w7h-raw u{text-decoration:none;border-radius:4px;transition:background .5s .4s,color .5s .4s}
+.w7h-v2.run .w7h-raw u{background:rgba(251,191,36,.35);color:#fff}
+.w7h-fx,.w7h-ql{border-color:#34d399;background:rgba(52,211,153,.1);opacity:0;translate:0 10px;transition:opacity .5s 1s,translate .5s 1s}
+.w7h-fx small,.w7h-ql small{font-size:15px;color:var(--text2)}
+.w7h-v2.run .w7h-fx,.w7h-v3.run .w7h-ql{opacity:1;translate:0 0}
+.w7h-cf{display:flex;align-items:center;gap:8px}
+.w7h-cf span{flex:1;text-align:center;padding:9px 6px;border-radius:12px;font-size:16px;font-weight:600;border:1px solid rgba(251,113,133,.5);background:rgba(251,113,133,.07)}
+.w7h-cf i{font-style:normal;font-size:15px;color:var(--text3)}
+.w7h-src{display:flex;gap:8px;opacity:0;transition:opacity .5s .4s}
+.w7h-src span{flex:1;text-align:center;padding:6px;border-radius:10px;font-size:15px;color:var(--text2);border:1px dashed var(--line2)}
+.w7h-v3.run .w7h-src{opacity:1}
+.w7h-ql b{font-size:17px}
+.w7h-bot{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.w7h-bot span{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:14px;font-size:15px;line-height:1.5;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w7h-bot b{font-size:16px;color:var(--acc)}
+</style>
+<script>
+HOOKS['c03-consolidate'] = {
+  init(s) {
+    s.querySelector('.w7h-v1').innerHTML = ['常住上海 · 2024-03', '住在上海浦东 · 2024-06', '家庭住址：上海浦东 XX 路 · 2024-09'].map((t, i) => `<div class="w7h-cd" style="--i:${i}">${t}</div>`).join('') + '<div class="w7h-mg">家庭住址：上海浦东 XX 路<small>3 条合并为 1 条 · 原始证据不动 · 链接与索引页重建</small></div>';
+    s.querySelector('.w7h-v2').innerHTML = '<div class="w7h-sm"><span class="lbl">旧摘要</span><b>用户周末可以加班</b></div><div class="w7h-raw"><span class="lbl">原始对话</span><b>“周末我一般<u>不</u>加班，<u>除非项目上线</u>。”</b></div><div class="w7h-fx"><span class="lbl">核查后</span><b>周末一般不加班；项目上线时例外</b><small>找回丢失的否定词与条件</small></div>';
+    s.querySelector('.w7h-v3').innerHTML = '<div class="w7h-cf"><span>偏好靠窗座位</span><i>vs</i><span>偏好过道座位</span></div><div class="w7h-src"><span>来源：长途航班的对话</span><span>来源：高铁通勤的对话</span></div><div class="w7h-ql"><b>长途航班选靠窗；高铁通勤选过道</b><small>两者都成立 → 写明适用场景；证据不足 → 保留冲突，标记待确认</small></div>';
+    s.querySelectorAll('.w7h-c').forEach((c) => c.addEventListener('click', () => DECK.go(DECK.cur, +c.dataset.c)));
+  },
+  show(s, k) {
+    s.querySelectorAll('.w7h-c').forEach((c) => { const n = +c.dataset.c; c.classList.toggle('cur', n === k); c.classList.toggle('done', n < k); c.querySelector('.w7h-v').classList.toggle('run', n <= k); });
+    s.querySelector('.w7h-why').classList.toggle('cur', k === 0);
+  },
+  enter(s, ctx, k) { this.show(s, k); },
+  step(s, ctx, k) { this.show(s, k); },
+  reset(s) { this.show(s, -1); },
+};
+</script>
+
+<section class="slide" id="c03-expire" data-part="7" data-trans="iris" data-dur="20000" data-title="失效下线与权限隔离" data-notes="<b>失效内容的检测与下线。</b>一篇被新版取代的旧政策若仍留在库中，检索时可能与新版一起被召回，让模型给出自相矛盾甚至过时的答案。生产系统通常给每个分块附加版本号、生效/失效时间等元数据，在检索阶段就过滤掉已失效的内容，或在提炼摘要时显式标注“此条已于某日废止”。这与前文用户记忆里的版本化冲突检测是同一思路，只是搬到了共享知识库的尺度上。<br><b>多用户共享的权限与租户隔离。</b>知识库面向所有用户共享，但“所有用户”不等于“所有内容对所有人可见”：不同部门、不同租户、不同权限等级的用户，能看到的文档范围往往不同。关键原则是<b>检索必须按调用者的权限过滤</b>，绝不能让越权文档进入某个用户的上下文。把权限过滤下推到检索层尤其重要：一旦敏感内容进入了 LLM 的上下文，就很难保证它不以某种形式泄露到最终回答里。多租户系统还需保证租户之间的向量索引和元数据相互隔离，避免一个租户的查询“串味”检索到另一个租户的私有知识。<br>左右两个演示中的政策、文档与权限标签均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失效内容要下线，<em>检索要按权限过滤</em></h2></header>
+  <div class="w7i-body">
+    <div class="w7i-p panel fx fx-left" style="--d:2">
+      <div class="w7i-h"><b>失效内容的检测与下线</b><button class="tgl w7i-tg"><i></i>按版本与生效时间过滤</button></div>
+      <div class="w7i-q"><span class="lbl">用户</span><b>“退货期限是多少天？”</b><span class="c3-shi">示意</span></div>
+      <div class="w7i-docs"><div class="w7i-dc old"><code>refund-policy · v2023</code><span>签收后 7 天内可退</span><i>失效：2025-01-01</i></div><div class="w7i-dc new"><code>refund-policy · v2025</code><span>签收后 15 天内可退</span><i>生效：2025-01-01</i></div></div>
+      <div class="w7i-a"></div>
+      <p class="w7i-nt">或在提炼摘要时显式标注“此条已于 2025-01-01 废止”；与用户记忆里的<b>版本化冲突检测</b>是同一思路，搬到共享知识库的尺度上</p>
+    </div>
+    <div class="w7i-p panel fx fx-right" style="--d:3">
+      <div class="w7i-h"><b>多用户共享的权限与租户隔离</b><div class="w7i-seg seg"><i class="knob"></i><button data-v="s">销售部员工</button><button data-v="h">人事部员工</button><button data-v="b">租户 B 用户</button></div></div>
+      <div class="w7i-acl"></div>
+      <div class="w7i-ctx"><span class="lbl">允许进入 LLM 上下文的文档</span><div class="w7i-in"></div></div>
+      <p class="w7i-nt"><b>检索必须按调用者的权限过滤</b>，而且要下推到检索层：敏感内容一旦进入上下文，就很难保证不以某种形式泄露到回答里；租户之间的向量索引与元数据相互隔离，避免“串味”</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「用户记忆和知识库的定期整理」· 失效内容的检测与下线 · 多用户共享的权限与租户隔离</div>
+</section>
+<style>
+.w7i-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1;min-height:0}
+.w7i-p{padding:16px 20px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.w7i-h{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.w7i-h>b{font-size:21px}
+.w7i-h .tgl{font-size:16px}
+.w7i-seg button{padding:7px 14px;font-size:16px}
+.w7i-q{display:flex;align-items:center;gap:12px}
+.w7i-q b{font-size:21px;flex:1}
+.w7i-docs{display:flex;flex-direction:column;gap:10px}
+.w7i-dc{display:grid;grid-template-columns:200px 1fr auto;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.w7i-dc code{font:600 15px var(--mono);color:var(--text)}
+.w7i-dc span{font-size:17px;color:var(--text2)}
+.w7i-dc i{font-style:normal;font-size:15px;color:var(--text3)}
+.w7i-dc.hit{border-color:#fbbf24;background:rgba(251,191,36,.08)}
+.w7i-dc.new.hit{border-color:#34d399;background:rgba(52,211,153,.08)}
+.w7i-dc.cut{opacity:.35;text-decoration:line-through;text-decoration-color:#fb7185}
+.w7i-a{min-height:82px;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.6;border:1px dashed var(--line2);color:var(--text3)}
+.w7i-a.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.06)}
+.w7i-a.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.06)}
+.w7i-nt{margin-top:auto;font-size:15px;line-height:1.6;color:var(--text3)}
+.w7i-nt b{color:var(--text2)}
+.w7i-acl{display:flex;flex-direction:column;gap:8px}
+.w7i-d{display:grid;grid-template-columns:1fr 80px 140px 160px;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.w7i-d b{font-size:17px}
+.w7i-d .tn,.w7i-d .ac{font-size:15px;color:var(--text3)}
+.w7i-d em{font-style:normal;font-size:15px;font-weight:700;text-align:right}
+.w7i-d.ok{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.07)}
+.w7i-d.ok em{color:#6ee7b7}
+.w7i-d.no{opacity:.55}
+.w7i-d.no em{color:#fda4af}
+.w7i-d.no b{text-decoration:line-through;text-decoration-color:#fb7185}
+.w7i-ctx{display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 6%,transparent)}
+.w7i-in{display:flex;gap:8px;min-height:34px;flex-wrap:wrap}
+.w7i-in span{padding:4px 12px;border-radius:999px;font-size:15px;color:#e9d5ff;border:1px solid color-mix(in srgb,var(--llm) 55%,transparent);animation:upIn .4s var(--ease) both}
+</style>
+<script>
+HOOKS['c03-expire'] = {
+  // [文档, 所属租户, 权限标签, 允许的部门（* = 本租户全员）]
+  DOC: [['员工手册', 'A', '全员可见', '*'], ['销售提成规则', 'A', '仅销售部', '销售部'], ['薪资调整方案', 'A', '仅人事部 · 机密', '人事部'], ['产品报价单', 'B', '租户 B 全员可见', '*']],
+  WHO: { s: ['A', '销售部'], h: ['A', '人事部'], b: ['B', ''] },
+  init(s) {
+    s.querySelector('.w7i-acl').innerHTML = this.DOC.map(([t, ten, acl]) => `<div class="w7i-d"><b>${t}</b><span class="tn">租户 ${ten}</span><span class="ac">${acl}</span><em></em></div>`).join('');
+    this.tg = s.querySelector('.w7i-tg');
+    this.tg.addEventListener('click', () => { this.autoL = false; this.tg.classList.toggle('on'); this.runL(s); });
+    this.set = U.seg(s.querySelector('.w7i-seg'), (v) => { this.autoR = false; this.runR(s, v); });
+  },
+  pass(d, who) { const [wt, wd] = this.WHO[who]; if (d[1] !== wt) return [0, '其他租户 · 索引隔离']; return d[3] === '*' || d[3] === wd ? [1, '通过'] : [0, '权限不足 · 检索层拦下']; },
+  async runL(s) {
+    const ctx = this.ctx; if (!ctx) return;
+    const lk = (this.lk = (this.lk || 0) + 1), ok = () => ctx.alive && lk === this.lk;
+    const on = this.tg.classList.contains('on'), old = s.querySelector('.w7i-dc.old'), nw = s.querySelector('.w7i-dc.new'), a = s.querySelector('.w7i-a');
+    old.className = 'w7i-dc old'; nw.className = 'w7i-dc new'; a.className = 'w7i-a'; a.textContent = '检索中……';
+    await U.wait(ctx, 600); if (!ok()) return;
+    nw.classList.add('hit'); old.classList.add(on ? 'cut' : 'hit');
+    await U.wait(ctx, 800); if (!ok()) return;
+    if (on) { a.classList.add('ok'); a.textContent = '签收后 15 天内可退（v2025，2025-01-01 起生效）——失效的 v2023 在检索阶段就被过滤掉了'; }
+    else { a.classList.add('bad'); a.textContent = '“签收后 7 天内可退……另有资料写 15 天”——新旧两版被一起召回，答案自相矛盾'; }
+  },
+  async runR(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.vR = v; this.set(v);
+    const rows = [...s.querySelectorAll('.w7i-d')], inn = s.querySelector('.w7i-in');
+    rows.forEach((r) => { r.className = 'w7i-d'; r.querySelector('em').textContent = ''; });
+    inn.innerHTML = '';
+    for (let i = 0; i < rows.length; i++) {
+      await U.wait(ctx, 450); if (!ok()) return;
+      const [p, why] = this.pass(this.DOC[i], v);
+      rows[i].classList.add(p ? 'ok' : 'no'); rows[i].querySelector('em').textContent = why;
+      if (p) inn.insertAdjacentHTML('beforeend', `<span>${this.DOC[i][0]}</span>`);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.autoL = this.autoR = true; this.tg.classList.remove('on');
+    this.runL(s); this.runR(s, 's');
+    ctx.every(() => { if (this.autoL) { this.tg.classList.toggle('on'); this.runL(s); } }, 5000);
+    const seq = ['s', 'h', 'b']; let n = 0;
+    ctx.every(() => { if (this.autoR) this.runR(s, seq[++n % 3]); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; this.lk = (this.lk || 0) + 1; this.tg.classList.remove('on'); },
+};
+</script>

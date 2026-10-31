@@ -1,0 +1,142 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c02-summary" data-part="10" data-trans="zoom" data-dur="16000" data-title="本章小结" data-notes="上下文工程的主线是<b>显式管理信息</b>：API 消息结构定义骨架；稳定前缀提高 KV Cache 命中；Prompt、Skills 和状态栏分别承载规则、按需知识与当前状态；压缩则在保留决策、约束、失败和来源的前提下，提高历史信息密度。<br>本章处理<b>一次任务之内</b>的状态更新与上下文腐化。下一章把同一思路扩展到跨任务的用户记忆和共享知识库。<br>右侧的一次请求解剖图会逐段点亮，对应本章的四条主线；点击任一段可跳回对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：上下文工程就是<em>显式管理信息</em></h2></header>
+  <div class="sm-req fx fx-scale" style="--d:2"></div>
+  <div class="sm-ls fx fx-up" style="--d:3"></div>
+  <p class="tagline sm-tag fx fx-up" style="--d:5">本章处理<b>一次任务之内</b>的状态更新与上下文腐化；下一章把同一思路扩展到<b>跨任务</b>的用户记忆和共享知识库</p>
+  <div class="src">第二章 ·「本章小结」</div>
+</section>
+<style>
+#c02-summary .sm-req{display:flex;height:110px;border-radius:18px;overflow:hidden;border:1px solid var(--line2)}
+#c02-summary .sm-seg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:17px;color:var(--text2);border-right:1px solid rgba(0,0,0,.35);cursor:pointer;background:color-mix(in srgb,var(--c) 10%,transparent);transition:all .4s}
+#c02-summary .sm-seg small{font-size:15px;color:var(--text3)}
+#c02-summary .sm-seg.on{color:#06101f;font-weight:700;background:var(--c)}
+#c02-summary .sm-seg.on small{color:#06101f}
+#c02-summary .sm-ls{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:22px}
+#c02-summary .sm-l{padding:16px 20px;border-radius:16px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.72);min-height:300px;transition:all .4s}
+#c02-summary .sm-l.on{border-color:var(--c);box-shadow:0 0 28px color-mix(in srgb,var(--c) 28%,transparent);translate:0 -4px}
+#c02-summary .sm-l em{font-style:normal;font:800 36px var(--num);color:var(--c)}
+#c02-summary .sm-l b{display:block;font-size:22px;color:var(--c);margin-top:4px}
+#c02-summary .sm-l p{margin-top:8px;font-size:17px;line-height:1.6;color:var(--text2)}
+#c02-summary .sm-l small{display:block;margin-top:10px;font-size:15px;color:var(--text3)}
+#c02-summary .sm-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c02-summary'] = {
+  SEG: [['system', '规则', 2, 0.9, '#fbbf24'], ['tools', '工具定义', 1, 0.9, '#fbbf24'], ['Skills 目录', '按需知识', 2, 0.7, '#34d399'], ['对话历史 · 工具结果', '压缩提高密度', 3, 3.2, '#38bdf8'], ['状态栏', '当前状态', 2, 0.9, '#f472b6']],
+  L: [['骨架', 'API 消息结构', '四种角色、核心循环——消息结构定义了上下文的骨架', 'PART 02', '#60a5fa', 2, [0, 1, 2, 3, 4]], ['缓存', '稳定前缀', '只追加、不改写：稳定前缀提高 KV Cache 命中，缓存是前置约束', 'PART 03–05', '#a78bfa', 3, [0, 1]], ['规则 · 按需知识 · 状态', 'Prompt · Skills · 状态栏', '分别承载规则、按需加载的知识与当前状态', 'PART 06–08', '#fbbf24', 6, [0, 2, 4]], ['压缩', '提高信息密度', '保留决策、约束、失败和来源的前提下，提高历史信息密度；能隔离就先隔离', 'PART 09', '#38bdf8', 9, [3]]],
+  init(s) {
+    s.querySelector('.sm-req').innerHTML = this.SEG.map(([n, d, , f, c], i) => `<div class="sm-seg" data-i="${i}" style="flex:${f};--c:${c}">${n}<small>${d}</small></div>`).join('');
+    s.querySelector('.sm-ls').innerHTML = this.L.map(([e, b, p, k, c], i) => `<div class="sm-l" data-i="${i}" style="--c:${c}"><em>${e}</em><b>${b}</b><p>${p}</p><small>${k}</small></div>`).join('');
+    this.segs = [...s.querySelectorAll('.sm-seg')]; this.ls = [...s.querySelectorAll('.sm-l')];
+    this.ls.forEach((l, i) => l.addEventListener('click', () => C02.part(this.L[i][5])));
+    this.segs.forEach((g, i) => g.addEventListener('click', () => C02.part(this.SEG[i][2] === 1 ? 6 : [6, 6, 7, 9, 8][i])));
+  },
+  hl(i) { this.ls.forEach((l, j) => l.classList.toggle('on', j === i)); this.segs.forEach((g, j) => g.classList.toggle('on', this.L[i][6].includes(j))); },
+  enter(s, ctx) { let i = 0; this.hl(0); ctx.every(() => { i = (i + 1) % 4; this.hl(i); }, 2600); },
+  reset() { this.ls.forEach((l) => l.classList.remove('on')); this.segs.forEach((g) => g.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-qa1" data-part="10" data-trans="rise" data-dur="18000" data-title="思考题（1–5）" data-notes="思考题 1–5：第 1 题在不破坏 KV Cache 前缀的前提下兼顾信息不丢失与长度可控；第 2 题讨论 Qwen3 的思维链保留机制，以及 DeepSeek R1 剥离历史思考与 V4 强制回传的反转；第 3 题问极端压缩是否有不可逆信息损失；第 4 题是状态栏本身出错时的“元信息可靠性”；第 5 题问如何防止系统提示词的“熵增”。题目保留原书难度星级。点击题目展开参考答案提纲（取自原书附录），不点击时会自动依次展开；每条答案下方可以跳回相关页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>1–5</em></h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c02qa-list fx fx-up" style="--d:3" data-qs="0" data-n="5"></div>
+  <div class="src">第二章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c02-qa2" data-part="10" data-trans="flip" data-dur="18000" data-title="思考题（6–9）" data-notes="思考题 6–9：第 6 题从“上下文学习是检索而非推理”出发，问如何突破这一局限；第 7 题是 Skills 渐进式披露的“元认知”问题；第 8 题问动态读取的 Skill 指令能否被正确遵从、不同模型的支持有何区别；第 9 题问工具集频繁变动时如何设计上下文布局来最大化缓存命中率。题目保留原书难度星级。点击题目展开参考答案提纲（取自原书附录），不点击时会自动依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>6–9</em></h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c02qa-list fx fx-up" style="--d:3" data-qs="5" data-n="4"></div>
+  <div class="src">第二章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c02-qa1 .c02qa-list,#c02-qa2 .c02qa-list{margin-top:-4px}
+#c02-qa1 .qa-q,#c02-qa2 .qa-q{font-size:18px;padding:12px 18px}
+#c02-qa1 .qa-a>div,#c02-qa2 .qa-a>div{font-size:17px;visibility:hidden;transition:visibility 0s linear .5s}
+#c02-qa1 .qa-it.open .qa-a>div,#c02-qa2 .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+#c02-qa1 .c02qa-tag,#c02-qa2 .c02qa-tag{display:inline-block;margin:2px 0 6px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+#c02-qa1 .c02qa-a p,#c02-qa2 .c02qa-a p{margin-top:4px}
+#c02-qa1 .c02qa-go,#c02-qa2 .c02qa-go{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:5px 12px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+</style>
+<script>
+HOOKS['c02-qa1'] = {
+  ALL: [
+    { st: '★★★', go: ['c02-exp3', '实验 2-3'], q: '实验 2-3 发现，滑动窗口对话历史会导致 Agent 反复执行相同的工具调用。但完整保留历史又会让上下文不断膨胀。设计一种策略，既能避免信息丢失，又能控制上下文长度，且不破坏 KV Cache 前缀。', a: ['①用压缩代替丢弃：消息只追加不删改，接近阈值（如窗口 80%）时批量压缩旧 tool results。②分层机制：大输出落盘留摘要、噪声直删、归档式摘要保留脉络。③子 Agent 隔离，让中间状态不进主上下文。'] },
+    { st: '★★', go: ['c02-cot', '历史思维链'], q: 'Qwen3 的 Chat Template 思维链保留机制只保留“最后一个真实用户消息之后”的思考。如果一个 ReAct 循环跨越了上百轮工具调用，累积的思考内容可能消耗大量上下文。你会如何修改这个机制来应对超长循环？DeepSeek R1 曾要求剥离全部历史思考，而 DeepSeek V4 反转为强制回传全部 reasoning_content——对比这两种相反的策略，各有什么利弊？这个反转说明了什么？', a: ['修改方向：滑窗保留——完整保留最近若干轮思考，在窗口外按 token 预算（而非固定轮数）触发滚动压缩，产出结构化状态栏（当前目标、已确认事实、已排除路径、待办）；压缩只发生一次且位置固定，缓存重建代价是一次性的。', 'R1 剥离：节省 token、前缀稳定、有利于缓存，并与训练分布一致；但每轮都要从零推理，会丢失长程计划，也容易重复犯错。V4 强制回传：思路连贯，长程 Agent 任务表现更好；但 token 成本高、每轮前缀膨胀，且无法从非思考模式无缝切换。', '这个反转说明：对纯对话而言，思考是废料；对 Agent 任务而言，思考则是状态——行业实践已转向后者。'] },
+    { st: '★★', go: ['c02-exp10b', '六种策略的处理流程'], q: '上下文感知压缩实验中，从约 148K 个字符压缩到约 2,000 个字符，这种极端的压缩是否存在“不可逆信息损失”的风险？如何解决？', a: ['有风险，压缩是一种有损投影；问题涉及未保留的信息就无法得到可靠答案。解法是“有损压缩＋无损索引”：每条事实附来源 URL 以便回溯；原始输出存入磁盘、平时只看摘要预览；明确保留优先级——架构决策、语义完整所需信息（时间、公司名）、验证状态、UUID/hash 等标识符原样保留；用自适应窗口化推迟压缩时机。'] },
+    { st: '★★', go: ['c02-sbmaint', '状态栏的维护'], q: 'Agent 状态栏将隐式状态显式化。但如果状态栏本身包含了错误信息（比如工具计数器出了 bug），Agent 可能基于错误的信息做出有害的决策。这种“元信息可靠性”问题如何缓解？', a: ['模型几乎会无条件相信状态栏，其中的错误也会原样传导。①用确定性代码维护，绝不让 LLM 批量统计很长的历史（即便用 LLM，也只逐条抽取、由代码汇总）；②把状态栏准确率作为一线生产指标持续监控；③只采用来自真实世界可靠观测的信息，防止状态栏遭到投毒。'] },
+    { st: '★★', go: ['c02-exp4', '实验 2-4'], q: '提示工程消融实验表明，信息组织的混乱导致成功率下降 30% 以上。但在实际开发中，系统提示词往往由多人在不同时间维护。你会用什么工程实践来防止系统提示词的“熵增”？', a: ['①把提示词当代码：版本控制、评审，产品经理定业务规则、工程师负责编码；②用 Tau-Bench 类基准做回归测试，改动前后跑消融实验定位影响；③强制结构化：SOP 流程驱动而非规则堆砌，XML/Markdown 分层；④片段按“可缓存 / 破坏缓存”分类命名，动态内容归到缓存边界后；⑤膨胀内容拆成 Skills 按需加载。'] },
+    { st: '★★★', go: ['c02-cmpicl', '检索而非推理'], q: '本章提出“上下文学习本质上是检索而非推理”。如果这个论断成立，当前所有基于“把更多信息塞进上下文”的优化方向都需要重新审视。你认为应该如何突破这一局限？', a: ['为“只有一半的检索引擎”补上提炼层：①上下文蒸馏或状态栏，用代码提前算好结论供直接检索；②主动压缩，把原始记录转成高密度结构化知识；③子 Agent 隔离，避免噪声进入主上下文；④把交互作为第三条路径，将外部仪器观测到、模型无法自行推导的新信息写回上下文；⑤探索可编辑、可组合的 KV Cache“笔记”和跨会话记忆沉淀。'] },
+    { st: '★★★', go: ['c02-skdesc', 'description 是路由条件'], q: 'Skills 的渐进式披露只在 Agent 判断需要时才加载完整内容。但这个判断本身依赖模型的能力——如果模型不知道自己不知道什么，就无法正确触发 Skill 的加载。这个“元认知”问题如何解决？', a: ['①Skill 的元数据（名字、描述）常驻上下文，让模型始终“知道自己拥有什么”；②description 写成路由条件而非功能介绍：“Use when / Don\'t use when”，避免宽泛描述。'] },
+    { st: '★★', go: ['c02-skpos', 'Skills 在上下文中的位置'], q: 'Skills 机制中，Agent 从 SKILL 文件中动态读取提示词之后，后续的操作能否正确遵从这些指令？不同的模型对 Skills 模式的支持有什么区别？', a: ['取决于 Skill 的注入方式：注入 system prompt 遵循最强但破坏 KV Cache；作为普通文件读到上下文中间，指令遵循可能较差；注入到上下文末尾，指令遵循较好，但每次工具调用都需要重新计算 skill 部分的 KV，成本较高。'] },
+    { st: '★★★', go: ['c02-sktools', 'Skills 与工具的关系'], q: '本章强调动态信息（如系统时间戳、工具列表顺序）的变化会破坏 KV Cache 前缀命中。在一个拥有大量工具且工具集频繁变动的生产系统中，你会如何设计上下文布局来最大化缓存命中率？', a: ['①少量稳定核心工具（如七个）＋通用执行器，具体能力走 Skills 渐进披露，工具定义冻结在静态前缀、固定顺序；②子 Agent 与父 Agent 前缀保持相同。'] },
+  ],
+  build(s) {
+    const host = s.querySelector('.c02qa-list'), base = +host.dataset.qs, list = HOOKS['c02-qa1'].ALL.slice(base, base + +host.dataset.n);
+    this.n = list.length;
+    host.innerHTML = list.map((x, i) => `<div class="qa-it"><button class="qa-q"><em>${base + i + 1}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div class="c02qa-a"><span class="c02qa-tag">参考答案提纲 · 原书附录</span>${x.a.map((p) => `<p>${p}</p>`).join('')}<button class="c02qa-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    this.open = U.qa(host, { single: true });
+    host.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; }));
+    host.querySelectorAll('.c02qa-go').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); C02.page(b.dataset.go); }));
+  },
+  play(s, ctx) { this.auto = true; let n = 0; ctx.later(() => this.open(0), 800); ctx.every(() => { if (this.auto) { n = (n + 1) % this.n; this.open(n); } }, 6000); },
+  init(s) { this.build(s); },
+  enter(s, ctx) { this.play(s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c02-qa2'] = {
+  init(s) { HOOKS['c02-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c02-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<section class="slide" id="c02-end" data-part="10" data-trans="iris" data-title="第二章 · 完" data-notes="第二章到这里结束。回顾三条核心结论：其一，上下文决定 Agent 的能力上限——上下文工程就是显式管理信息；其二，缓存经济性是前置约束——动态信息追加末尾、静态信息保持不动，只追加、不改写；其三，模型擅长检索、不擅长提炼——用状态栏、压缩与子 Agent 隔离，主动为模型提供提炼过的结构化知识。<br>本章处理的是一次任务之内的上下文。下一章《用户记忆和知识库》把同一思路扩展到跨任务的用户记忆和共享知识库。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <div class="en2-orbit fx fx-scale" style="--d:3"></div>
+  <div class="en2-text">
+    <div class="en2-tag fx fx-up"><i></i>第二章 · 完</div>
+    <h1 class="en2-title"><span class="split" data-grad="#38bdf8,#818cf8,#34d399">显式管理信息</span></h1>
+    <div class="en2-pts">
+      <p class="fx fx-up" style="--d:8"><em>1</em>上下文决定 Agent 的<b>能力上限</b></p>
+      <p class="fx fx-up" style="--d:9"><em>2</em>缓存经济性是<b>前置约束</b>：只追加、不改写</p>
+      <p class="fx fx-up" style="--d:10"><em>3</em>模型擅长检索、不擅长提炼：<b>状态栏、压缩、隔离</b></p>
+    </div>
+    <p class="en2-sub fx fx-up" style="--d:11">下一章把同一思路扩展到<b>跨任务</b>：用户记忆和共享知识库</p>
+    <div class="end-nav fx fx-up" style="--d:12">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+</section>
+<style>
+#c02-end{justify-content:center;padding-left:150px}
+#c02-end .en2-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c02-end .en2-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c02-end .en2-title{margin-top:26px;font-size:104px;line-height:1.15;font-weight:800}
+#c02-end .en2-pts{margin-top:26px;display:flex;flex-direction:column;gap:12px}
+#c02-end .en2-pts p{display:flex;align-items:center;gap:14px;font-size:24px;color:var(--text2)}
+#c02-end .en2-pts em{font-style:normal;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;font:800 18px var(--num);color:#06101f;background:var(--acc)}
+#c02-end .en2-pts b{color:var(--text)}
+#c02-end .en2-sub{margin-top:22px;font-size:22px;color:var(--text2)}
+#c02-end .en2-sub b{color:var(--acc)}
+#c02-end .end-nav{margin-top:34px}
+#c02-end .en2-orbit{position:absolute;right:110px;top:50%;width:620px;height:620px;margin-top:-320px}
+</style>
+<script>
+HOOKS['c02-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.en2-orbit'), {
+      size: 620, core: 'Context', outer: 'CONTEXT WINDOW · 上下文窗口 · CONTEXT WINDOW',
+      sats: [
+        { label: '提示词', color: '#fbbf24', rx: 0.36, ry: 0.15, tilt: -24, dur: 12, phase: 0 },
+        { label: 'Skills', color: '#34d399', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.3 },
+        { label: '状态栏', color: '#f472b6', rx: 0.3, ry: 0.2, tilt: 88, dur: 10, phase: 0.6 },
+        { label: '压缩', color: '#38bdf8', rx: 0.4, ry: 0.18, tilt: 150, dur: 18, phase: 0.8 },
+      ],
+    });
+  },
+};
+</script>

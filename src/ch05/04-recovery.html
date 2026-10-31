@@ -1,0 +1,936 @@
+<!-- ================= PART 04 · 故障与错误恢复 ================= -->
+<section class="slide chapter" id="c05-d4" data-part="4" data-title="PART 04 · 故障与错误恢复" data-notes="上一节给出了 Harness 工程的原则与组件，本节深入其中最能拉开工程差距的一块——<b>故障与错误恢复</b>。第一章的消融实验已经展示过问题的严重性：仅仅缺失一条工具结果反馈，就足以让 Agent 陷入无限循环；而真实生产环境中的故障远比实验里多样。<br>本节系统地回答三个问题：生产级 Harness 会遇到哪些故障？如何检测与恢复？又在什么时候必须终止？顺序是：分类（四层故障）→ 检测（先分类再计数、活性与完整性监控）→ 恢复（分级升级、把工具错误变成模型的输入）→ 接管（跨厂商、中立轨迹格式，实验 5-1、5-2）→ 终止（熔断上限、死亡螺旋、全局终止条件）。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">故障与<br>错误恢复</h1>
+  <div class="ch-s fx fx-up" style="--d:3">分类 · 检测 · 恢复 · 接管 · 终止</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">错误处理的边界不是单次请求，而是整个恢复循环。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c05-layers" data-part="4" data-dur="14000" data-title="故障分类学：四层故障" data-notes="<b>故障分类学：四层故障。</b>系统应对的第一步是分类。按故障发生的位置，可以分为四层：<br><b>API 层</b>：限流（HTTP 429）、服务过载、请求超时、连接中断、输出触顶被截断。这类故障与任务内容无关，是基础设施的噪声。<br><b>工具层</b>：幻觉调用（调用了不存在的工具）、参数畸形（不符合工具的输入约束）、执行抛异常，以及最危险的一种——工具反复返回同一个错误，而模型不加改变地反复重试。<br><b>上下文层</b>：上下文窗口溢出、压缩失败、轨迹结构损坏（如工具调用缺少配对的结果消息）。<br><b>控制流层</b>：死循环（反复执行相同操作却毫无进展）与死亡螺旋（错误触发的恢复逻辑自身又调用 LLM、再次出错、连锁反应）。<br>原书脚注说明：本节的故障分类与机制分析基于对 Claude Code 等生产级 Agent 实现的源码研究；具体实现随版本快速演进，本节只提炼其中稳定的工程原则。左侧的故障火花随机落入各层（示意），点击任一层查看说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第一步是分类：故障发生在<em>哪一层</em>？</h2>
+  <p class="lead fx fx-up" style="--d:2">第一章的消融实验里，仅仅缺失一条工具结果反馈，就足以让 Agent 陷入无限循环</p></header>
+  <div class="p4b-body">
+    <div class="p4b-stack fx fx-left" style="--d:3"></div>
+    <div class="p4b-side fx fx-right" style="--d:4">
+      <div class="p4b-det panel"><span class="lbl p4b-dl"></span><b class="p4b-dt"></b><p class="p4b-dp"></p></div>
+      <p class="p4b-fn">原书脚注：分类与机制分析基于对 Claude Code 等生产级 Agent 实现的源码研究；实现随版本快速演进，这里只提炼稳定的工程原则。</p>
+      <span class="c5-tag demo">火花落点为示意</span>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」·「故障分类学：四层故障。」</div>
+</section>
+<style>
+.p4b-body{display:grid;grid-template-columns:1080px 1fr;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.p4b-stack{display:flex;flex-direction:column;gap:12px}
+.p4b-ly{--c:var(--acc);position:relative;flex:1;display:grid;grid-template-columns:190px 1fr;align-items:center;gap:16px;padding:0 20px;border-radius:18px;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 6%,rgba(12,18,40,.85));transition:all .4s}
+.p4b-ly>b{font-size:23px;color:var(--c)}
+.p4b-ly>b small{display:block;font-size:15px;font-weight:400;color:var(--text3);margin-top:2px}
+.p4b-ly.on{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 30%,transparent);translate:8px 0}
+.p4b-ch{display:flex;flex-wrap:wrap;gap:8px}
+.p4b-ch span{padding:6px 12px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(5,9,22,.6);transition:all .3s}
+.p4b-ch span.hit{color:#fff;border-color:var(--c);background:color-mix(in srgb,var(--c) 30%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--c) 55%,transparent);scale:1.06}
+.p4b-ch span.dg{border-style:dashed;border-color:color-mix(in srgb,var(--c) 60%,transparent)}
+.p4b-side{display:flex;flex-direction:column;gap:16px;min-width:0}
+.p4b-det{padding:18px 22px;min-height:300px}
+.p4b-dt{display:block;font-size:24px;color:var(--acc);margin-top:6px}
+.p4b-dp{font-size:18px;line-height:1.7;color:var(--text2);margin-top:8px}
+.p4b-fn{font-size:16px;line-height:1.6;color:var(--text3);padding:12px 14px;border-left:3px solid var(--line2)}
+</style>
+<script>
+HOOKS['c05-layers'] = {
+  L: [
+    { n: 'API 层', s: '基础设施的噪声', c: '#60a5fa', ch: ['限流 HTTP 429', '服务过载', '请求超时', '连接中断', '输出触顶被截断'], d: '与任务内容无关，是基础设施的噪声。可重试的错误（限流、过载、网络抖动）重试才有意义。' },
+    { n: '工具层', s: '调用与执行出错', c: '#fbbf24', ch: ['幻觉调用（工具不存在）', '参数畸形', '执行抛异常', '反复返回同一个错误'], dg: 3, d: '幻觉调用、参数畸形、执行抛异常；最危险的一种是工具反复返回同一个错误，而模型不加改变地反复重试。' },
+    { n: '上下文层', s: '上下文本身坏了', c: '#22d3ee', ch: ['上下文窗口溢出', '压缩失败', '轨迹结构损坏（工具调用缺少配对结果）'], d: '上下文窗口溢出、压缩失败、轨迹结构损坏——例如工具调用缺少配对的结果消息。' },
+    { n: '控制流层', s: '循环本身失控', c: '#fb7185', ch: ['死循环：重复相同操作却毫无进展', '死亡螺旋：恢复逻辑又调用 LLM、再次出错'], d: '死循环：反复执行相同操作却毫无进展；死亡螺旋：错误触发的恢复逻辑自身又调用 LLM、再次出错、连锁反应。' },
+  ],
+  init(s) {
+    s.querySelector('.p4b-stack').innerHTML = this.L.map((l, i) => `<div class="p4b-ly" data-i="${i}" style="--c:${l.c}"><b>${l.n}<small>${l.s}</small></b><div class="p4b-ch">${l.ch.map((c, j) => `<span class="${j === l.dg ? 'dg' : ''}">${c}</span>`).join('')}</div></div>`).join('');
+    s.querySelector('.p4b-stack').addEventListener('click', (e) => { const l = e.target.closest('[data-i]'); if (l) { this.auto = false; this.show(s, +l.dataset.i); } });
+  },
+  show(s, i) {
+    this.i = i;
+    const l = this.L[i];
+    s.querySelectorAll('.p4b-ly').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    s.querySelector('.p4b-dl').textContent = `第 ${i + 1} 层`;
+    s.querySelector('.p4b-dt').textContent = l.n;
+    s.querySelector('.p4b-dp').textContent = l.d;
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    const R = U.rand(11);
+    this.show(s, 0);
+    // 故障火花：随机落在某一层的某个故障类型上
+    ctx.every(() => {
+      const ls = s.querySelectorAll('.p4b-ly'), li = (R() * 4) | 0, chips = ls[li].querySelectorAll('.p4b-ch span'), c = chips[(R() * chips.length) | 0];
+      c.classList.add('hit');
+      ctx.later(() => c.classList.remove('hit'), 900);
+    }, 520);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 3400);
+  },
+  reset(s) { s.querySelectorAll('.hit,.on').forEach((x) => x.classList.remove('hit', 'on')); },
+};
+</script>
+
+<section class="slide" id="c05-detect" data-part="4" data-trans="zoom" data-dur="16000" data-title="检测：先分类，再计数" data-notes="<b>检测：先分类，再计数。</b>捕获故障后的第一个判断不是“要不要重试”，而是“值不值得重试”。可重试的错误（限流、过载、网络抖动）重试才有意义；不可重试的错误（参数不合法、权限不足、工具不存在）原样重试多少次都是同样的结果，必须改变输入或策略。生产级 Harness 维护一张错误到恢复策略的映射表，而不是笼统地“出错就重试”。<br>单次错误之外，还要检测<b>模式</b>。一是重复调用指纹：对“工具名 + 参数”计算指纹，相同指纹反复出现就是无进展循环的明确信号——第一章消融实验中 Agent 反复调用同一工具，正是这种模式。二是连续失败计数：每条恢复路径维护独立的计数器，为后文的熔断提供依据。<br>左边的映射表可以点击；右边的调用流里，指纹相同的调用会被标记，同一指纹第 3 次出现时报警（阈值与哈希值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先问“<em>值不值得重试</em>”，再数“<em>是不是在原地打转</em>”</h2></header>
+  <div class="p4c-body">
+    <div class="p4c-map panel fx fx-left" style="--d:2">
+      <div class="p4c-hd"><b>错误 → 恢复策略映射表</b><small>而不是笼统地“出错就重试”</small></div>
+      <div class="p4c-rows"></div>
+    </div>
+    <div class="p4c-pat fx fx-right" style="--d:3">
+      <div class="p4c-fp panel"><div class="p4c-hd"><b>模式一：重复调用指纹</b><span class="c5-tag demo">示意</span></div><div class="p4c-calls"></div><div class="p4c-al">同一指纹第 3 次出现 → 无进展循环</div></div>
+      <div class="p4c-cn panel"><div class="p4c-hd"><b>模式二：连续失败计数</b><small>每条恢复路径独立计数 → 为熔断提供依据</small></div><div class="p4c-ctr"></div></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」·「检测：先分类，再计数。」</div>
+</section>
+<style>
+.p4c-body{display:grid;grid-template-columns:860px 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p4c-map{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.p4c-hd{display:flex;align-items:baseline;gap:12px}
+.p4c-hd b{font-size:21px}
+.p4c-hd small{font-size:15px;color:var(--text3)}
+.p4c-hd .c5-tag{margin-left:auto}
+.p4c-rows{display:flex;flex-direction:column;gap:8px}
+.p4c-r{display:grid;grid-template-columns:230px 110px 1fr;align-items:center;gap:14px;padding:11px 14px;border-radius:12px;cursor:pointer;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.025);transition:all .35s}
+.p4c-r b{font-size:18px}
+.p4c-r em{font-style:normal;text-align:center;padding:3px 0;border-radius:8px;font-size:15px;font-weight:700}
+.p4c-r em.y{color:#6ee7b7;background:rgba(52,211,153,.12)}
+.p4c-r em.n{color:#fda4af;background:rgba(251,113,133,.12)}
+.p4c-r span{font-size:16px;color:var(--text2)}
+.p4c-r.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);translate:6px 0}
+.p4c-pat{display:flex;flex-direction:column;gap:16px;min-width:0}
+.p4c-fp,.p4c-cn{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.p4c-fp{flex:1;min-height:0}
+.p4c-calls{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.p4c-cl{display:flex;align-items:center;gap:12px;padding:6px 12px;border-radius:10px;font:16px var(--mono);border:1px solid var(--line);background:rgba(5,9,22,.6);animation:upIn .35s var(--spring) both}
+.p4c-cl code{margin-left:auto;padding:1px 8px;border-radius:6px;font-size:15px;color:var(--text3);border:1px solid var(--line2)}
+.p4c-cl.rep{border-color:rgba(251,146,60,.6)}
+.p4c-cl.rep code{color:#fdba74;border-color:rgba(251,146,60,.6)}
+.p4c-cl.loop{border-color:var(--bad);background:rgba(251,113,133,.12)}
+.p4c-cl.loop code{color:#fda4af;border-color:var(--bad)}
+.p4c-al{padding:8px 14px;border-radius:10px;font-size:17px;color:var(--text3);border:1px dashed var(--line2);transition:all .3s}
+.p4c-al.on{color:#fff;border-style:solid;border-color:var(--bad);background:rgba(251,113,133,.2)}
+.p4c-ctr{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.p4c-k{padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(5,9,22,.55)}
+.p4c-k b{display:block;font-size:16px}
+.p4c-k span{font:800 28px var(--num);color:var(--acc)}
+.p4c-k i{font-style:normal;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c05-detect'] = {
+  M: [
+    ['限流 HTTP 429', 1, '指数退避 + 随机抖动，尊重等待时长提示'],
+    ['服务过载', 1, '重试；持续过载则降级到备用模型'],
+    ['网络抖动 · 超时', 1, '静默重试'],
+    ['参数不合法', 0, '把带约束提示的错误喂回模型，改变输入'],
+    ['权限不足', 0, '改变策略：换路径或请求授权'],
+    ['工具不存在', 0, '返回结构化错误，让模型改用可用工具'],
+  ],
+  CALLS: [['Read("src/api.py")', '7c1e'], ['Grep("timeout", "src/")', 'a93b'], ['Bash("pytest tests/test_api.py")', '3fa1'], ['Edit("src/api.py", …)', 'd20c'], ['Bash("pytest tests/test_api.py")', '3fa1'], ['Bash("pytest tests/test_api.py")', '3fa1']],
+  init(s) {
+    s.querySelector('.p4c-rows').innerHTML = this.M.map(([e, y, st], i) => `<button class="p4c-r" data-i="${i}"><b>${e}</b><em class="${y ? 'y' : 'n'}">${y ? '可重试' : '不可重试'}</em><span>${st}</span></button>`).join('');
+    s.querySelector('.p4c-ctr').innerHTML = [['上下文压缩', 'p0'], ['权限分类', 'p1'], ['输出接续', 'p2']].map(([n, k]) => `<div class="p4c-k" data-k="${k}"><b>${n}</b><span>0</span><i> 次连续失败</i></div>`).join('');
+    s.querySelector('.p4c-rows').addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (r) { this.auto = false; this.row(s, +r.dataset.i); } });
+  },
+  row(s, i) { this.ri = i; s.querySelectorAll('.p4c-r').forEach((r) => r.classList.toggle('on', +r.dataset.i === i)); },
+  async calls(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const box = s.querySelector('.p4c-calls'), al = s.querySelector('.p4c-al'), ks = s.querySelectorAll('.p4c-k span');
+    while (ok()) {
+      box.innerHTML = ''; al.classList.remove('on'); ks.forEach((k) => (k.textContent = '0'));
+      const seen = {};
+      for (const [c, h] of this.CALLS) {
+        await U.wait(ctx, 900); if (!ok()) return;
+        seen[h] = (seen[h] || 0) + 1;
+        const cls = seen[h] >= 3 ? 'loop' : seen[h] === 2 ? 'rep' : '';
+        box.insertAdjacentHTML('beforeend', `<div class="p4c-cl ${cls}">${C5.esc(c)}<code>#${h} ×${seen[h]}</code></div>`);
+        if (seen[h] >= 3) al.classList.add('on');
+        if (c.startsWith('Bash')) ks[2].textContent = Math.min(3, +ks[2].textContent + (seen[h] > 1 ? 1 : 0));
+      }
+      ks[0].textContent = '1';
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true;
+    this.row(s, 0);
+    ctx.every(() => { if (this.auto) this.row(s, (this.ri + 1) % this.M.length); }, 2000);
+    ctx.later(() => this.calls(s), 600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p4c-calls').innerHTML = ''; s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-watchdog" data-part="4" data-trans="flip" data-dur="16000" data-title="活性与完整性监控" data-notes="还有一类故障不表现为错误，需要专门的<b>活性与完整性监控</b>。流式连接最危险的失败模式不是断开（这会立即报错），而是静默卡死——连接建立成功但数据流停止，像水管通着但不出水；SDK 的超时机制往往只覆盖初始连接而非传输过程，因此生产级 Agent 需要独立的空闲看门狗（watchdog timer，超过设定时间没有新输出就判定为卡死），超时后主动杀死挂起的流并触发重试。可推广为一条原则：<b>每个长连接都需要活性信号，而非仅依赖连接超时</b>。<br>完整性监控则针对轨迹结构：发现工具调用缺少配对的结果消息时，系统会在注入上下文前自动修复配对关系，而不是把结构异常抛给模型或用户。一个值得注意的工程细节是，部分生产级 Agent 同时运行产品模式和训练数据收集模式——产品模式下可以用占位符修补缺失的消息，训练模式下则拒绝修复，因为合成占位符会污染训练数据。“产品模式宽容、训练模式严格”的双重标准，体现了 Harness 与模型训练的深度耦合。<br>看门狗的时长、倒计时都是示意；右侧开关可切换两种模式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不报错的故障：<em>静默卡死</em>与<em>轨迹残缺</em></h2></div>
+    <div class="p4d-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="prod">产品模式</button><button data-v="train">训练模式</button></div></header>
+  <div class="p4d-body">
+    <div class="p4d-live panel fx fx-left" style="--d:3">
+      <div class="p4d-hd"><b>活性：空闲看门狗</b><span class="c5-tag demo">示意</span></div>
+      <div class="p4d-pipe"><div class="p4d-flow"></div><span class="p4d-cap">流式响应</span></div>
+      <div class="p4d-wd"><svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="50" class="p4d-bg"/><circle cx="60" cy="60" r="50" class="p4d-fg"/></svg><div><b class="p4d-st">数据在流动</b><p class="p4d-sp">每收到新输出，看门狗就重新计时</p></div></div>
+      <p class="p4d-note">连接建立成功、数据流却停了——<b>水管通着但不出水</b>。SDK 的超时往往只覆盖初始连接，而不覆盖传输过程</p>
+    </div>
+    <div class="p4d-int panel fx fx-right" style="--d:4">
+      <div class="p4d-hd"><b>完整性：轨迹结构</b><span class="c5-tag demo">示意</span></div>
+      <div class="ml p4d-ml">
+        <div class="mr" data-r="user"><span class="rl">user</span><span class="tx">把超时从 5 秒改成 10 秒</span></div>
+        <div class="mr" data-r="assistant"><span class="rl">assistant</span><span class="tx">tool_call #1 Read("config.py")</span></div>
+        <div class="mr" data-r="tool"><span class="rl">tool #1</span><span class="tx">TIMEOUT = 5</span></div>
+        <div class="mr" data-r="assistant"><span class="rl">assistant</span><span class="tx">tool_call #2 Edit("config.py", …)</span></div>
+        <div class="p4d-hole"><span class="rl">tool #2</span><span class="tx p4d-ht">缺少配对的结果消息</span></div>
+      </div>
+      <div class="p4d-res"></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」· 活性与完整性监控</div>
+</section>
+<style>
+#c05-watchdog .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.p4d-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p4d-live,.p4d-int{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+.p4d-hd{display:flex;align-items:center;justify-content:space-between}
+.p4d-hd b{font-size:21px}
+.p4d-pipe{position:relative;height:64px;border-radius:32px;border:2px solid var(--line2);background:rgba(5,9,22,.6);overflow:hidden}
+.p4d-flow{position:absolute;inset:0;background:radial-gradient(circle,#22d3ee 0 5px,transparent 6px) 0 50%/34px 100% repeat-x;animation:p4dmv .8s linear infinite}
+.p4d-pipe.stall .p4d-flow{animation-play-state:paused;opacity:.25}
+.p4d-pipe.dead{border-color:var(--bad)}
+@keyframes p4dmv{to{background-position:34px 50%}}
+.p4d-cap{position:absolute;right:20px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--text3);background:rgba(5,9,22,.9);padding:0 8px}
+.p4d-wd{display:flex;align-items:center;gap:20px}
+.p4d-bg{fill:none;stroke:rgba(255,255,255,.08);stroke-width:10}
+.p4d-fg{fill:none;stroke:var(--ok);stroke-width:10;stroke-linecap:round;stroke-dasharray:314;stroke-dashoffset:0;transform:rotate(-90deg);transform-origin:60px 60px;transition:stroke .3s}
+.p4d-fg.warn{stroke:var(--warn)}.p4d-fg.bad{stroke:var(--bad)}
+.p4d-st{display:block;font-size:22px}
+.p4d-sp{font-size:17px;color:var(--text2);margin-top:4px;line-height:1.5}
+.p4d-note{margin-top:auto;font-size:17px;line-height:1.65;color:var(--text2)}
+.p4d-note b{color:var(--acc)}
+.p4d-ml{gap:7px}
+.p4d-ml .mr{font-size:16px;padding:7px 14px}
+.p4d-hole{display:flex;gap:12px;padding:8px 14px;border-radius:12px;font-size:16px;border:2px dashed var(--bad);color:#fda4af;transition:all .4s}
+.p4d-hole .rl{flex:none;min-width:86px;font:600 15px/1.9 var(--mono)}
+.p4d-hole.fix{border-style:solid;border-color:var(--ok);color:#6ee7b7;background:rgba(52,211,153,.08)}
+.p4d-hole.rej{border-color:var(--bad);background:rgba(251,113,133,.12)}
+.p4d-res{padding:12px 16px;border-radius:12px;font-size:17px;line-height:1.6;border:1px solid var(--line);background:rgba(255,255,255,.03);min-height:84px}
+.p4d-res b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-watchdog'] = {
+  init(s) { this.set = U.seg(s.querySelector('.p4d-seg'), (v) => { this.auto = false; this.mode(s, v); }); },
+  mode(s, v) {
+    this.v = v; this.set(v);
+    const h = s.querySelector('.p4d-hole'), t = s.querySelector('.p4d-ht'), r = s.querySelector('.p4d-res');
+    h.classList.toggle('fix', v === 'prod'); h.classList.toggle('rej', v === 'train');
+    t.textContent = v === 'prod' ? '[占位] 结果缺失，已在注入上下文前自动补齐配对' : '拒绝修复：这条轨迹不进入训练数据';
+    r.innerHTML = v === 'prod' ? '<b>产品模式宽容</b>：用占位符修补缺失的消息，结构异常不抛给模型或用户' : '<b>训练模式严格</b>：合成占位符会污染训练数据，所以拒绝修复';
+  },
+  // 看门狗：数据流动时满格；静默卡死后倒计时，归零就杀流重试
+  async dog(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const pipe = s.querySelector('.p4d-pipe'), fg = s.querySelector('.p4d-fg'), st = s.querySelector('.p4d-st'), sp = s.querySelector('.p4d-sp');
+    const setT = (v) => { fg.style.strokeDashoffset = (314 * (1 - v)).toFixed(1); fg.classList.toggle('warn', v < 0.5 && v > 0.2); fg.classList.toggle('bad', v <= 0.2); };
+    while (ok()) {
+      pipe.classList.remove('stall', 'dead'); setT(1);
+      st.textContent = '数据在流动'; sp.textContent = '每收到新输出，看门狗就重新计时';
+      await U.wait(ctx, 2600); if (!ok()) return;
+      pipe.classList.add('stall');
+      st.textContent = '静默卡死：连接还在，数据停了'; sp.textContent = '没有报错——只有看门狗在倒计时';
+      for (let i = 20; i >= 0; i--) { setT(i / 20); await U.wait(ctx, 140); if (!ok()) return; }
+      pipe.classList.add('dead');
+      st.textContent = '超时：判定卡死'; sp.textContent = '主动杀死挂起的流，并触发重试';
+      await U.wait(ctx, 1800); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true;
+    this.mode(s, 'prod');
+    ctx.later(() => this.dog(s), 500);
+    ctx.every(() => { if (this.auto) this.mode(s, this.v === 'prod' ? 'train' : 'prod'); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p4d-pipe').classList.remove('stall', 'dead'); },
+};
+</script>
+
+<section class="slide" id="c05-escalate" data-part="4" data-dur="22000" data-title="恢复：分级升级，逐级透明" data-notes="<b>恢复：分级升级，逐级透明。</b>恢复手段按对用户透明的程度分级，能用低级别解决就不升级：<br>1. <b>静默重试</b>：可重试错误的默认动作。两个细节决定成败：指数退避叠加随机抖动，避免大量客户端同步重试造成二次拥塞，并尊重服务端返回的等待时长提示；区分前台与后台调用——主循环的请求失败要重试，标题生成、输入建议这类辅助性后台调用失败则直接放弃，否则后台重试会挤占主链路的配额，形成“重试放大”。<br>2. <b>降级与接续</b>：重试无效时，改变请求本身再试。以输出触顶（生成到一半被长度限制截断）为例：先静默提升输出上限重发，仍不够再在消息末尾追加元指令、让模型从断点接续生成。主模型持续过载时降级到备用模型（需先剥离旧模型私有的格式块，否则新模型无法解析历史消息）；高成本模式被限流时暂时回落到标准模式。<br>3. <b>暴露给用户</b>：所有自动手段用尽后才呈现错误，并附上已经尝试过的恢复动作。<br>左侧的请求在台阶上逐级升级（四个情景轮播）；右上的小图对比同步重试与“指数退避 + 随机抖动”的流量（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">恢复要<em>分级升级</em>：能在低一级解决，就不惊动用户</h2></header>
+  <div class="p4e-body">
+    <div class="p4e-lad panel fx fx-left" style="--d:2">
+      <div class="p4e-sc"><span class="lbl">情景</span><b class="p4e-sn"></b><span class="c5-tag demo">示意</span></div>
+      <div class="p4e-steps">
+        <div class="p4e-s" data-l="3"><em>3</em><div><b>暴露给用户</b><p>自动手段用尽后才呈现错误，并附上已尝试的恢复动作</p></div></div>
+        <div class="p4e-s" data-l="2"><em>2</em><div><b>降级与接续</b><p>改变请求本身：提升输出上限 → 元指令接续；过载换备用模型（先剥离私有格式块）；高成本模式回落标准模式</p></div></div>
+        <div class="p4e-s" data-l="1"><em>1</em><div><b>静默重试</b><p>指数退避 + 随机抖动；尊重服务端的等待时长提示</p></div></div>
+      </div>
+      <div class="p4e-log"></div>
+      <div class="p4e-user"><svg class="ic"><use href="#i-user"/></svg><span class="p4e-ut">用户看到：（什么也没发生）</span></div>
+    </div>
+    <div class="p4e-right fx fx-right" style="--d:3">
+      <div class="p4e-jit panel"><div class="p4e-jh"><b>为什么要加抖动</b><div class="p4e-seg seg"><i class="knob"></i><button data-v="sync">同步重试</button><button data-v="jit">退避 + 抖动</button></div></div><canvas class="p4e-cv" width="560" height="200"></canvas><p class="p4e-jc"></p></div>
+      <div class="p4e-fb panel"><b>区分前台与后台调用</b>
+        <div class="p4e-fr"><span class="fg">主循环请求失败</span><i>→</i><span>重试</span></div>
+        <div class="p4e-fr"><span class="bg">标题生成 · 输入建议失败</span><i>→</i><span>直接放弃</span></div>
+        <p>否则后台重试挤占主链路配额，形成<b>重试放大</b></p></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」·「恢复：分级升级，逐级透明。」</div>
+</section>
+<style>
+.p4e-body{display:grid;grid-template-columns:980px 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p4e-lad{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.p4e-sc{display:flex;align-items:center;gap:12px}
+.p4e-sc b{font-size:20px;color:var(--acc)}
+.p4e-sc .c5-tag{margin-left:auto}
+.p4e-steps{display:flex;flex-direction:column;gap:8px}
+.p4e-s{display:flex;gap:14px;align-items:center;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.025);transition:all .4s}
+.p4e-s[data-l="3"]{margin-left:0}.p4e-s[data-l="2"]{margin-left:60px}.p4e-s[data-l="1"]{margin-left:120px}
+.p4e-s em{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 19px var(--num);font-style:normal;border:2px solid var(--line2);color:var(--text2)}
+.p4e-s b{font-size:19px}
+.p4e-s p{font-size:15px;color:var(--text3);margin-top:2px;line-height:1.5}
+.p4e-s.on{border-color:color-mix(in srgb,var(--acc) 65%,transparent);background:color-mix(in srgb,var(--acc) 11%,transparent)}
+.p4e-s.on em{background:var(--acc);border-color:var(--acc);color:#06101f}
+.p4e-log{flex:1;min-height:0;display:flex;flex-direction:column;gap:5px;padding:10px 14px;border-radius:12px;background:rgba(5,9,22,.6);border:1px solid var(--line);font:15px/1.55 var(--mono);overflow:hidden}
+.p4e-log div{color:var(--text2);animation:upIn .35s var(--spring) both}
+.p4e-log .e{color:#fda4af}.p4e-log .o{color:#6ee7b7}.p4e-log .d{color:var(--text3)}
+.p4e-user{display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;font-size:18px;border:1px solid var(--line2)}
+.p4e-user .ic{font-size:22px;color:var(--tool)}
+.p4e-user.bad{border-color:var(--bad);color:#fda4af}
+.p4e-right{display:flex;flex-direction:column;gap:16px;min-width:0}
+.p4e-jit{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.p4e-jh{display:flex;align-items:center;justify-content:space-between}
+.p4e-jh b{font-size:19px}
+.p4e-jh .seg button{font-size:16px;padding:6px 14px}
+.p4e-cv{width:100%;height:200px;border-radius:10px;background:rgba(5,9,22,.55)}
+.p4e-jc{font-size:16px;color:var(--text2);line-height:1.5}
+.p4e-fb{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.p4e-fb>b{font-size:19px}
+.p4e-fr{display:flex;align-items:center;gap:10px;font-size:17px}
+.p4e-fr span{padding:5px 12px;border-radius:10px;border:1px solid var(--line2)}
+.p4e-fr .fg{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.p4e-fr .bg{color:var(--text3)}
+.p4e-fr i{font-style:normal;color:var(--text3)}
+.p4e-fb p{font-size:16px;color:var(--text2)}
+.p4e-fb p b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c05-escalate'] = {
+  // 四个情景：每行 [台阶, 日志样式, 文字]；最后一项是用户最终看到的内容
+  SC: [
+    { n: '限流 HTTP 429', st: [[1, 'e', '429 Too Many Requests（retry-after: 2s）'], [1, 'd', '静默重试 #1：等待 2.0 s（尊重等待时长提示）'], [1, 'e', '429'], [1, 'd', '静默重试 #2：退避 4 s ± 抖动'], [1, 'o', '200 OK']], u: '（什么也没发生）' },
+    { n: '输出触顶被截断', st: [[1, 'e', 'finish_reason = length：生成到一半被截断'], [2, 'd', '降级与接续：静默提升输出上限，重发'], [2, 'e', '仍被截断'], [2, 'd', '在消息末尾追加元指令：从断点接续生成'], [2, 'o', '续写完成，拼接为完整回复']], u: '（什么也没发生）' },
+    { n: '主模型持续过载', st: [[1, 'e', '503 overloaded'], [1, 'd', '静默重试 ×3，仍然过载'], [2, 'd', '降级到备用模型：先剥离旧模型私有的格式块'], [2, 'o', '备用模型接着完成本轮']], u: '（什么也没发生）' },
+    { n: '所有手段都失败', st: [[1, 'e', '连接中断'], [1, 'd', '静默重试 ×3：失败'], [2, 'd', '换备用模型：同样不可达'], [3, 'e', '自动手段用尽 → 暴露给用户']], u: '服务暂时不可用。已尝试：重试 3 次、切换备用模型。', bad: 1 },
+  ],
+  init(s) {
+    this.g = s.querySelector('.p4e-cv').getContext('2d');
+    this.setJ = U.seg(s.querySelector('.p4e-seg'), (v) => { this.autoJ = false; this.jit(s, v); });
+  },
+  // 60 个客户端同时失败后的重试时刻分布：同步时堆成尖峰，加抖动后被摊平
+  jit(s, v) {
+    this.jv = v; this.setJ(v);
+    const g = this.g, W = 560, H = 200, R = U.rand(3), bins = new Array(40).fill(0);
+    for (let c = 0; c < 60; c++) for (let n = 0; n < 3; n++) {
+      const base = Math.pow(2, n) * 4, t = v === 'jit' ? base * (0.5 + R()) + n * 1.5 : base;
+      const b = Math.min(39, Math.floor(t * 1.2));
+      bins[b]++;
+    }
+    const mx = 60;
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(255,255,255,.15)'; g.beginPath(); g.moveTo(20, H - 24); g.lineTo(W - 10, H - 24); g.stroke();
+    g.setLineDash([5, 5]); g.strokeStyle = 'rgba(251,113,133,.6)'; g.beginPath(); g.moveTo(20, H - 24 - 0.45 * (H - 40)); g.lineTo(W - 10, H - 24 - 0.45 * (H - 40)); g.stroke(); g.setLineDash([]);
+    bins.forEach((n, i) => {
+      const h = (n / mx) * (H - 40), x = 24 + i * 13;
+      g.fillStyle = n > 27 ? '#fb7185' : v === 'jit' ? '#34d399' : '#fbbf24';
+      g.fillRect(x, H - 24 - h, 10, h);
+    });
+    g.fillStyle = 'rgba(165,175,201,.9)'; g.font = '15px sans-serif';
+    g.fillText('时间 →', W - 70, H - 6); g.fillText('服务端承载线', 24, H - 30 - 0.45 * (H - 40));
+    s.querySelector('.p4e-jc').textContent = v === 'jit' ? '退避 + 随机抖动：重试被摊开，峰值低于承载线' : '同步重试：所有客户端同一时刻扑上去，造成二次拥塞';
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const log = s.querySelector('.p4e-log'), user = s.querySelector('.p4e-user'), ut = s.querySelector('.p4e-ut');
+    for (let k = 0; ok(); k++) {
+      const sc = this.SC[k % this.SC.length];
+      s.querySelector('.p4e-sn').textContent = sc.n;
+      log.innerHTML = ''; user.classList.remove('bad'); ut.textContent = '用户看到：……（恢复进行中，错误被扣留）';
+      for (const [l, c, t] of sc.st) {
+        s.querySelectorAll('.p4e-s').forEach((x) => x.classList.toggle('on', +x.dataset.l === l));
+        log.insertAdjacentHTML('beforeend', `<div class="${c}">${C5.esc(t)}</div>`);
+        await U.wait(ctx, 1100); if (!ok()) return;
+      }
+      ut.textContent = '用户看到：' + sc.u;
+      user.classList.toggle('bad', !!sc.bad);
+      await U.wait(ctx, 2600); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.autoJ = true;
+    this.jit(s, 'sync');
+    ctx.every(() => { if (this.autoJ) this.jit(s, this.jv === 'sync' ? 'jit' : 'sync'); }, 3400);
+    ctx.later(() => this.run(s), 600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p4e-log').innerHTML = ''; s.querySelectorAll('.p4e-s').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-toolerr" data-part="4" data-trans="rise" data-dur="20000" data-title="把错误变成模型的输入" data-notes="工具层错误走另一条路：<b>不终止会话，把错误变成模型的输入</b>。幻觉调用会收到“工具不存在”的结构化错误结果；参数校验失败会收到附带输入约束提示的错误；畸形参数（本该是对象却输出了字符串）在执行前先经过程序化修复。这些错误以普通工具结果的身份进入上下文，由模型在下一轮自行纠正——这正是前文“反馈越结构化越好”原则的应用：喂回的错误越具体，模型自我纠正的成功率越高。<br>这一节的核心原则是：<b>错误处理的边界不是单次请求，而是整个恢复循环</b>。在确认无法恢复之前，中间错误不应暴露给消费者——无论是用户还是订阅事件的下游系统：恢复期间扣留错误消息，恢复成功则消费者毫无感知，所有恢复手段均失败后才统一呈现错误。这正是第一章“在确认无法恢复之前，不暴露中间态”这一纠正原则的工程化。<br>左侧终端回放三种工具层错误（工具名与报错内容为示意）；右侧是消费者看到的事件流。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">工具层错误：<em>不终止会话</em>，把错误变成模型的输入</h2></header>
+  <div class="p4f-body">
+    <div class="win p4f-run fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>三种工具层错误 · 结构化喂回</span><span class="c5-tag demo">示意</span></div><div class="c5-term p4f-term"></div></div>
+    <div class="p4f-side fx fx-right" style="--d:3">
+      <div class="p4f-kind"></div>
+      <div class="p4f-cons panel"><div class="p4f-ch"><b>消费者看到的事件流</b><small>用户 · 订阅事件的下游系统</small></div><div class="p4f-ev"></div></div>
+    </div>
+  </div>
+  <p class="tagline p4f-tg fx fx-up" style="--d:5"><b>错误处理的边界不是单次请求，而是整个恢复循环</b>：在确认无法恢复之前，不暴露中间态（第一章的纠正原则）</p>
+  <div class="src">第五章 ·「故障与错误恢复」· 工具层错误与恢复循环</div>
+</section>
+<style>
+.p4f-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:560px}
+.p4f-run{display:flex;flex-direction:column;min-height:0}
+.p4f-run .win-bar span:nth-child(4){flex:1}
+.p4f-term{flex:1;min-height:0;font-size:16px}
+.p4f-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.p4f-kind{display:flex;flex-direction:column;gap:8px}
+.p4f-k{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.p4f-k b{font-size:18px}
+.p4f-k p{font-size:15px;color:var(--text3);margin-top:2px;line-height:1.5}
+.p4f-k.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.8))}
+.p4f-cons{flex:1;min-height:0;padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.p4f-ch b{font-size:19px}
+.p4f-ch small{font-size:15px;color:var(--text3);margin-left:10px}
+.p4f-ev{flex:1;min-height:0;display:flex;flex-direction:column;gap:6px}
+.p4f-e{padding:6px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line);animation:upIn .35s var(--spring) both}
+.p4f-e.hold{color:var(--text3);border-style:dashed}
+.p4f-e.ok{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.p4f-tg{margin-top:18px;font-size:21px}
+</style>
+<script>
+HOOKS['c05-toolerr'] = {
+  K: [['幻觉调用', '返回“工具不存在”的结构化错误，列出可用工具'], ['参数校验失败', '返回附带输入约束提示的错误'], ['畸形参数', '本该是对象却输出了字符串：执行前先程序化修复']],
+  RUN: [
+    { k: 0, c: 'call', t: 'search_code("retry_count")' },
+    { k: 0, c: 'err', t: '{"error":"tool_not_found","message":"工具 search_code 不存在","available":["Grep","Glob","Read"]}' },
+    { k: 0, c: 'ag', t: '没有 search_code，改用 Grep。' },
+    { k: 0, c: 'call', t: 'Grep("retry_count", path="src/")' }, { k: 0, c: 'res', t: 'src/client.py:31: retry_count = 3' },
+    { k: 1, c: 'call', t: 'Read(path=31)' },
+    { k: 1, c: 'err', t: '{"error":"invalid_params","message":"path 应为文件路径字符串，例如 \\"src/client.py\\"；行号请用 offset"}' },
+    { k: 1, c: 'call', t: 'Read(path="src/client.py", offset=25, limit=15)' }, { k: 1, c: 'res', t: '25 │ class Client: …' },
+    { k: 2, c: 'call', t: 'Edit(\'{"path": "src/client.py", "old": "retry_count = 3", "new": "retry_count = 5"}\')' },
+    { k: 2, c: 'sys', t: '[Harness] 参数是字符串而非对象 → 执行前程序化修复为 JSON 对象' },
+    { k: 2, c: 'res', t: '已修改 1 处' },
+    { k: 2, c: 'say', t: '已把重试次数改为 5。' },
+  ],
+  init(s) {
+    this.T = C5.term(s.querySelector('.p4f-term'), { max: 16 });
+    s.querySelector('.p4f-kind').innerHTML = this.K.map(([b, p], i) => `<div class="p4f-k" data-k="${i}"><b>${b}</b><p>${p}</p></div>`).join('');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const ev = s.querySelector('.p4f-ev');
+    while (ok()) {
+      this.T.clear(); ev.innerHTML = '';
+      ev.insertAdjacentHTML('beforeend', '<div class="p4f-e hold">task.started</div>');
+      const lines = this.RUN.map((L) => ({ ...L, w: L.c === 'ag' ? 700 : 520, fn: () => {
+        s.querySelectorAll('.p4f-k').forEach((x) => x.classList.toggle('on', +x.dataset.k === L.k));
+        if (L.c === 'err') ev.insertAdjacentHTML('beforeend', '<div class="p4f-e hold">（中间错误被扣留，不向外暴露）</div>');
+      } }));
+      if (!(await C5.play(this.T, lines, ctx, ok, { speed: 18 }))) return;
+      ev.insertAdjacentHTML('beforeend', '<div class="p4f-e ok">task.completed：已把重试次数改为 5</div>');
+      ev.insertAdjacentHTML('beforeend', '<div class="p4f-e ok">消费者对中间的两次错误毫无感知</div>');
+      await U.wait(ctx, 4200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; ctx.later(() => this.run(s), 600); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.T.clear(); s.querySelector('.p4f-ev').innerHTML = ''; s.querySelectorAll('.p4f-k').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-takeover" data-part="4" data-steps="2" data-trans="zoom" data-dur="14000" data-title="接管：带走文字，带不走凭证" data-notes="<b>接管：把没跑完的轨迹交给另一家模型。</b>主模型持续不可用时，需要换一家把这条轨迹接着跑完。真正的障碍不是接口地址不同，而是轨迹里有一部分东西只属于原厂商。工具调用与工具结果各家结构不同但语义一致，重新渲染即可；难办的是模型的思考。思考通常由两部分构成，一部分是可读的文字，另一部分是厂商附在其上的凭证，用来证明这段思考确实出自它自己。文字换一家模型仍然读得懂，凭证换一家就失效——<b>跨厂商接管能带走的是文字，带不走的是凭证</b>。<br>按 → 第二步：各家对凭证的要求并不一致。宽松的一端根本不做校验，严格的一端则拒绝一切不由自己签发的凭证；凭证也未必附在思考上，还可能附在工具调用上。于是“把思考删干净就安全了”这条看似稳妥的策略，在某些厂商那里反而通不过。接管方案只能按最严格的一端来设计，并为满足不了要求的情形准备退路：把历史工具调用改写成文字叙述，模型不再把它当作真正调用过的工具，但至少能接着往下跑。表里三家的具体位置来自配套仓库 2026-08-24 的实测快照，接口约定变化很快。<br>第三步：设计原则——轨迹不该按任何一家的接口格式存储，而应保存为一份中立格式。每段思考拆成可移植的文字与不可移植的凭证两部分，工具调用只记录名称与参数，标识符在渲染成具体请求时按目标厂商重新生成。切换时凭证一律丢弃，文字以普通内容的身份带入，而不是塞回目标厂商放思考的位置。厂商返回的思考摘要本就是为这种场合准备的可移植副本，保留即可，不必另外调用模型再压缩一遍。中立轨迹的价值也不限于故障切换：第七章的评估重放、第八章的训练样本构造、第九章的经验提取，依赖的都是同一份产物。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">接管：跨厂商能带走的是<em>文字</em>，带不走的是<em>凭证</em></h2></header>
+  <div class="p4g-wrap">
+    <div class="p4g-st" data-s="0">
+      <div class="p4g-row fx fx-up" style="--d:2">
+        <div class="p4g-v"><b>厂商 A</b><small>持续不可用</small></div>
+        <div class="p4g-trace">
+          <div class="p4g-blk th"><span class="p4g-tx">思考：可读的文字</span><span class="p4g-cr"><svg class="ic"><use href="#i-key"/></svg>凭证</span></div>
+          <div class="p4g-blk tc">工具调用：名称 + 参数</div>
+          <div class="p4g-blk tr">工具结果</div>
+        </div>
+        <div class="p4g-arr"><svg class="ic"><use href="#i-arrow"/></svg></div>
+        <div class="p4g-v b"><b>厂商 B</b><small>接着跑完</small></div>
+      </div>
+      <div class="p4g-cap fx fx-up" style="--d:4"><span><b class="c-ok">重新渲染即可</b>：工具调用与结果——各家结构不同，语义一致</span><span><b class="c-ok">读得懂</b>：思考里的文字</span><span><b class="c-bad">换一家就失效</b>：证明“这段思考出自我”的凭证</span></div>
+    </div>
+    <div class="p4g-st" data-s="1">
+      <div class="p4g-spec"><span>宽松：根本不校验</span><i></i><span>严格：拒绝一切不由自己签发的凭证</span></div>
+      <table class="p4g-tb"><thead><tr><th>厂商（2026-08-24 实测）</th><th>思考放在哪</th><th>凭证</th><th>凭证挂在哪</th></tr></thead>
+        <tbody><tr><td>Moonshot（kimi-k3）</td><td>reasoning_content，明文</td><td>无</td><td>—</td></tr><tr><td>Anthropic（claude-haiku-4-5）</td><td>thinking 块，明文</td><td>signature</td><td>思考本身</td></tr><tr class="hot"><td>Google（gemini-3.5-flash）</td><td>thought 部分，摘要</td><td>thoughtSignature</td><td><b>工具调用上</b></td></tr></tbody></table>
+      <div class="p4g-warn"><b>“把思考删干净就安全了”？</b><span>凭证若挂在工具调用上，删掉思考反而通不过 → 按<b>最严格的一端</b>设计；满足不了时的退路：把历史工具调用改写成文字叙述</span><span class="c5-tag real">配套仓库实测快照</span></div>
+    </div>
+    <div class="p4g-st" data-s="2">
+      <div class="p4g-neu">
+        <div class="p4g-nt"><span class="lbl">中立轨迹格式</span>
+          <div class="p4g-nb"><b>思考</b><span>可移植的文字 ｜ <s>不可移植的凭证</s></span></div>
+          <div class="p4g-nb"><b>工具调用</b><span>只记名称与参数</span></div>
+          <div class="p4g-nb"><b>标识符</b><span>渲染时按目标厂商重新生成</span></div>
+          <div class="p4g-nb"><b>思考摘要</b><span>厂商给的可移植副本：保留即可</span></div>
+        </div>
+        <svg class="p4g-fan" viewBox="0 0 120 300" width="120" height="300"><path d="M0 150 C 60 150, 60 40, 120 40"/><path d="M0 150 H120"/><path d="M0 150 C 60 150, 60 260, 120 260"/></svg>
+        <div class="p4g-rs">
+          <div class="p4g-r"><b>→ Moonshot</b><code>{"role":"assistant","content":"〈文字〉","tool_calls":[{"id":"call_7f…"}]}</code></div>
+          <div class="p4g-r"><b>→ Anthropic</b><code>{"type":"text","text":"〈文字〉"} + {"type":"tool_use","id":"toolu_2c…"}</code></div>
+          <div class="p4g-r"><b>→ Google</b><code>{"text":"〈文字〉"} + {"functionCall":{"name":…,"args":…}}</code></div>
+        </div>
+      </div>
+      <div class="p4g-use"><span>同一份产物还服务于：</span><b>第七章 评估重放</b><b>第八章 训练样本构造</b><b>第九章 经验提取</b><span class="c5-tag demo">请求片段为示意</span></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」·「接管：把没跑完的轨迹交给另一家模型。」· 数据：配套仓库 chapter5/provider-failover</div>
+</section>
+<style>
+.p4g-wrap{position:relative;flex:1;min-height:0}
+.p4g-st{position:absolute;inset:0;opacity:0;pointer-events:none;translate:0 24px;transition:opacity .6s var(--ease),translate .6s var(--ease);display:flex;flex-direction:column;gap:24px}
+#c05-takeover[data-k="0"] .p4g-st[data-s="0"],#c05-takeover[data-k="1"] .p4g-st[data-s="1"],#c05-takeover[data-k="2"] .p4g-st[data-s="2"]{opacity:1;pointer-events:auto;translate:0 0}
+.p4g-row{display:flex;align-items:center;gap:22px;margin-top:20px}
+.p4g-v{width:200px;height:200px;border-radius:24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border:2px solid rgba(251,113,133,.5);background:rgba(251,113,133,.07)}
+.p4g-v b{font-size:28px}
+.p4g-v small{font-size:16px;color:var(--text3)}
+.p4g-v.b{border-color:rgba(52,211,153,.55);background:rgba(52,211,153,.07)}
+.p4g-trace{flex:1;display:flex;flex-direction:column;gap:10px;transition:translate 1.2s var(--ease)}
+.p4g-blk{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:14px;font-size:19px;border:1px solid var(--line2);background:rgba(12,18,40,.88)}
+.p4g-blk.th{border-color:rgba(167,139,250,.55)}
+.p4g-tx{color:#c4b5fd}
+.p4g-cr{display:inline-flex;align-items:center;gap:6px;margin-left:auto;padding:4px 12px;border-radius:9px;font-size:16px;color:#fde68a;border:1px solid rgba(251,191,36,.55);transition:all .6s}
+.p4g-blk.tc{border-color:rgba(251,191,36,.45)}.p4g-blk.tr{border-color:rgba(52,211,153,.45)}
+.p4g-trace.go{translate:120px 0}
+.p4g-trace.go .p4g-cr{opacity:0;scale:.3;filter:blur(4px)}
+.p4g-arr{font-size:40px;color:var(--text3)}
+.p4g-cap{display:flex;gap:16px}
+.p4g-cap span{flex:1;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p4g-spec{display:flex;align-items:center;gap:16px;font-size:18px;color:var(--text2);margin-top:10px}
+.p4g-spec i{flex:1;height:8px;border-radius:8px;background:linear-gradient(90deg,#34d399,#fbbf24,#fb7185)}
+.p4g-tb{width:100%;border-collapse:separate;border-spacing:0 8px;font-size:19px}
+.p4g-tb th{text-align:left;font-size:16px;font-weight:400;color:var(--text3);padding:0 18px}
+.p4g-tb td{padding:12px 18px;background:rgba(12,18,40,.8);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.p4g-tb td:first-child{border-left:1px solid var(--line);border-radius:12px 0 0 12px}
+.p4g-tb td:last-child{border-right:1px solid var(--line);border-radius:0 12px 12px 0}
+.p4g-tb tr.hot td{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.45)}
+.p4g-tb tr.hot b{color:var(--tool)}
+.p4g-warn{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;border-radius:14px;font-size:17px;line-height:1.6;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.07)}
+.p4g-warn b{color:var(--warn)}
+.p4g-neu{display:flex;align-items:center;gap:0;margin-top:10px}
+.p4g-nt{width:500px;padding:16px 18px;border-radius:18px;border:2px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 6%,rgba(12,18,40,.9));display:flex;flex-direction:column;gap:8px}
+.p4g-nb{display:grid;grid-template-columns:100px 1fr;gap:10px;font-size:17px;padding:6px 0;border-bottom:1px dashed var(--line)}
+.p4g-nb b{color:var(--acc)}
+.p4g-nb s{color:var(--text3)}
+.p4g-fan{flex:none}
+.p4g-fan path{fill:none;stroke:var(--acc);stroke-width:2.5;stroke-dasharray:6 7;animation:flow 1s linear infinite}
+.p4g-rs{flex:1;display:flex;flex-direction:column;gap:30px;min-width:0}
+.p4g-r{padding:10px 14px;border-radius:12px;border:1px solid var(--line2);background:rgba(5,9,22,.7)}
+.p4g-r b{display:block;font-size:17px;margin-bottom:4px}
+.p4g-r code{font:15px/1.5 var(--mono);color:#86efac;word-break:break-all}
+.p4g-use{display:flex;align-items:center;gap:12px;font-size:18px;color:var(--text2)}
+.p4g-use b{padding:6px 14px;border-radius:10px;border:1px solid var(--line2);color:var(--text)}
+.p4g-use .c5-tag{margin-left:auto}
+</style>
+<script>
+HOOKS['c05-takeover'] = {
+  apply(s, k) {
+    s.dataset.k = k;
+    const tr = s.querySelector('.p4g-trace');
+    tr.classList.remove('go');
+    if (k === 0 && this.ctx) {
+      const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1);
+      const cyc = () => { if (tk !== this.tk || !ctx.alive) return; tr.classList.add('go'); ctx.later(() => tk === this.tk && tr.classList.remove('go'), 2600); ctx.later(cyc, 4200); };
+      ctx.later(cyc, 900);
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, k); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.k = 0; s.querySelector('.p4g-trace').classList.remove('go'); },
+};
+</script>
+
+<section class="slide" id="c05-exp51" data-part="4" data-trans="flip" data-dur="18000" data-title="实验 5-1 ★★★：跨厂商的轨迹接管" data-notes="<b>实验 5-1 ★★★：跨厂商的轨迹接管</b>。<b>实验目标</b>：验证一份中立的轨迹格式能否让跑到一半的 Agent 轨迹换一家模型接着跑完，并量化“原样直传”与“一刀切剥光”两种做法的代价。<b>技术方案</b>：任务需要多轮工具调用，跑到中途对当前厂商注入连续的限流与过载响应，熔断后切换到另一家继续。三种做法对照：<b>直传</b>把原厂商返回的消息原样搬进新厂商的结构；<b>剥离</b>删掉全部思考与凭证；<b>中立</b>丢弃凭证，把文字或厂商给出的思考摘要以普通内容的身份带入，标识符按目标厂商重新生成，遇到强制要求凭证的接收端则把历史调用改写为文字叙述。选三家线上格式互不相同的厂商，两两切换。<b>验收标准</b>：切换后的首个请求都要留下原始响应，直传的失败必须是厂商真实返回的错误，不得以模拟错误代替；要求中立做法在全部厂商组合上都不出现接口错误，另外两种在哪些组合上失败、报什么错，如实记录；对比任务完成率、切换后重复调用同一工具的次数（按“工具名 + 参数”指纹计），以及额外轮数与 token。<br>配套仓库实测（2026-08-24，kimi-k3 / claude-haiku-4-5 / gemini-3.5-flash）：任务是四次工具调用（机票、住宿、餐费、汇率）算人民币总额，第二次调用后注入连续 429/503 触发熔断（注入的标记为 injected: true），切换后的 4xx 是厂商真实报错。中立 6/6 切换成功且总额全对，直传 3/6，剥离 4/6。最值得看的是 anthropic → gemini：直传过了，剥离反而 400——Gemini 只检查 thoughtSignature 这一格在不在，不检查是谁签的。重复调用三臂都是 0：这是负结果，因为这个任务的状态全落在工具结果里。带思考要付钱：两种三臂都通的组合上，切换后输入 token 中立 4,183、剥离 2,760（多 52%），轮数相同。点击红色格子查看真实报错原文。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-1 <span class="c5-stars">★★★</span>：<em>跨厂商的轨迹接管</em></h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>中立轨迹格式能否让跑到一半的轨迹换一家模型跑完；量化“原样直传”与“一刀切剥光”的代价</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>中途注入连续限流 / 过载 → 熔断切换；三臂对照：直传 · 剥离 · 中立；三家格式各异的厂商两两切换</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>中立做法在全部组合上无接口错误；失败须是厂商真实报错；对比完成率、重复调用次数、额外轮数与 token</p></div>
+  </div>
+  <div class="p4h-body">
+    <div class="p4h-grid panel fx fx-left" style="--d:3">
+      <div class="p4h-gh"><span>切换后首个请求的状态码</span><span>直传</span><span>剥离</span><span>中立</span></div>
+      <div class="p4h-rows"></div>
+      <div class="p4h-sum"><span>通过</span><b class="bad">3/6</b><b class="mid">4/6</b><b class="ok">6/6</b></div>
+    </div>
+    <div class="p4h-side fx fx-right" style="--d:4">
+      <div class="p4h-err panel"><span class="lbl">选中的单元</span><b class="p4h-et"></b><code class="p4h-ec"></code><p class="p4h-ep"></p></div>
+      <div class="p4h-kp"><div class="c5-kpi"><b>0</b><span>切换后重复调用（三臂都是）<br><span class="c5-tag neg">负结果</span></span></div><div class="c5-kpi"><b>+52%</b><span>输入 token：中立 4,183<br>vs 剥离 2,760 · 轮数相同</span></div></div>
+    </div>
+  </div>
+  <div class="c5-rec-h p4h-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/provider-failover 验收记录，2026-08-24，kimi-k3 / claude-haiku-4-5 / gemini-3.5-flash · 故障注入是模拟的（injected: true），格式报错是真实的</div>
+  <div class="src">第五章 ·「故障与错误恢复」· 实验 5-1</div>
+</section>
+<style>
+#c05-exp51 .c5-xp{margin-bottom:16px}
+.p4h-body{display:grid;grid-template-columns:900px 1fr;gap:24px;height:470px}
+.p4h-grid{padding:14px 20px;display:flex;flex-direction:column;gap:6px}
+.p4h-gh,.p4h-row,.p4h-sum{display:grid;grid-template-columns:300px 1fr 1fr 1fr;gap:10px;align-items:center}
+.p4h-gh span{font-size:16px;color:var(--text3);text-align:center}
+.p4h-gh span:first-child{text-align:left}
+.p4h-row>span{font:17px var(--mono);color:var(--text2)}
+.p4h-c{height:44px;border-radius:10px;font:800 19px var(--num);border:1px solid var(--line);transition:all .35s}
+.p4h-c.s200{color:#6ee7b7;background:rgba(52,211,153,.1);border-color:rgba(52,211,153,.35)}
+.p4h-c.s400{color:#fda4af;background:rgba(251,113,133,.13);border-color:rgba(251,113,133,.5)}
+.p4h-c.on{box-shadow:0 0 0 3px #fff inset,0 0 20px rgba(255,255,255,.35)}
+.p4h-row.hot>span{color:var(--tool);font-weight:700}
+.p4h-sum{margin-top:6px;padding-top:8px;border-top:1px solid var(--line)}
+.p4h-sum span{font-size:17px;color:var(--text2)}
+.p4h-sum b{text-align:center;font:800 26px var(--num)}
+.p4h-sum b.bad{color:#fda4af}.p4h-sum b.mid{color:#fdba74}.p4h-sum b.ok{color:#6ee7b7}
+.p4h-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.p4h-err{flex:1;min-height:0;padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.p4h-et{font-size:20px}
+.p4h-ec{font:16px/1.5 var(--mono);color:#fda4af;padding:8px 12px;border-radius:10px;background:rgba(5,9,22,.7);border:1px solid var(--line2);word-break:break-all;min-height:48px}
+.p4h-ec.ok{color:#6ee7b7}
+.p4h-ep{font-size:16px;line-height:1.6;color:var(--text2)}
+.p4h-kp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.p4h-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp51'] = {
+  ROWS: [
+    ['kimi → anthropic', [400, 200, 200]], ['kimi → gemini', [400, 400, 200]], ['anthropic → kimi', [200, 200, 200]],
+    ['anthropic → gemini', [200, 400, 200]], ['gemini → kimi', [200, 200, 200]], ['gemini → anthropic', [400, 200, 200]],
+  ],
+  ARM: ['直传', '剥离', '中立'],
+  // 失败单元的真实报错与解释（来自配套仓库 README）
+  ERR: {
+    '0-0': ['messages.1.content.0.thinking.signature: Field required', '把 Kimi 的明文思考塞进 Claude 的 thinking 槽位，没有签名。'],
+    '5-0': ['messages.1.content.0: Invalid signature in thinking block', '把 Gemini 的 thoughtSignature 当作 Claude 的签名。'],
+    '1-0': ['Function call is missing a thought_signature in functionCall parts', 'Gemini 收到没有凭证的工具调用。'],
+    '1-1': ['Function call is missing a thought_signature in functionCall parts', '剥离臂删掉了全部凭证，Gemini 要求工具调用上必须有 thoughtSignature。'],
+    '3-1': ['Function call is missing a thought_signature in functionCall parts', '最反直觉的一格：老老实实剥干净反而 400；同一行的直传把 Claude 的签名原样贴过去，Gemini 只查“有没有”不查“谁签的”，照样收下。直传能过不代表它对，只代表接收端没校验。'],
+  },
+  init(s) {
+    s.querySelector('.p4h-rows').innerHTML = this.ROWS.map(([n, c], i) => `<div class="p4h-row${i === 3 ? ' hot' : ''}"><span>${n}</span>${c.map((v, j) => `<button class="p4h-c s${v}" data-i="${i}-${j}">${v}</button>`).join('')}</div>`).join('');
+    s.querySelector('.p4h-rows').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.pick(s, b.dataset.i); } });
+  },
+  pick(s, id) {
+    this.id = id;
+    const [r, a] = id.split('-').map(Number), v = this.ROWS[r][1][a], e = this.ERR[id];
+    s.querySelectorAll('.p4h-c').forEach((b) => b.classList.toggle('on', b.dataset.i === id));
+    s.querySelector('.p4h-et').textContent = `${this.ROWS[r][0]} · ${this.ARM[a]} · HTTP ${v}`;
+    const ec = s.querySelector('.p4h-ec');
+    ec.classList.toggle('ok', v === 200);
+    ec.textContent = v === 200 ? '200 OK：切换成功，任务继续' : e[0];
+    s.querySelector('.p4h-ep').textContent = v === 200 ? (a === 2 ? '中立臂：凭证丢弃、文字以普通内容带入、标识符按目标厂商重铸；六种组合全部切换成功，人民币总额都算对了。' : '这一组合下接收端接受了这种写法。') : e[1];
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    const seq = ['3-1', '0-0', '1-1', '5-0', '1-0', '3-0', '2-2'];
+    let k = 0;
+    this.pick(s, seq[0]);
+    ctx.every(() => { if (this.auto) this.pick(s, seq[++k % seq.length]); }, 3000);
+  },
+  reset(s) { s.querySelectorAll('.p4h-c').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-exp52" data-part="4" data-trans="rise" data-dur="18000" data-title="实验 5-2 ★★：输出到一半断掉之后的接续" data-notes="<b>实验 5-2 ★★：输出到一半断掉之后的接续</b>。实验目标：比较“整轮重发”与“以半截输出为前缀续写”两种恢复方式在成本、正确性与副作用上的差异。技术方案：在流式响应上取三个断点——思考中途、正文中途、工具调用参数中途——切断连接。三种恢复方式：丢弃半截整轮重发；把半截内容作为末尾的 assistant 消息要求模型接着写（有的厂商原生支持，有的要求显式标注这是一条待续写的消息，没有这条接口的则退回下一种）；追加一条元指令说明从断点继续。半截的工具调用无法以原生结构回传，需先转成文字再让模型补完，拼接后重新解析校验；若半截输出里已有工具因流式提前执行，续写前按调用指纹去重，避免重复副作用。验收标准：报告每种方式的恢复成功率、相对整轮重发节省的输出 token、补完后参数的合法率与语义正确率（拼接处容易多出空白或重复字符，合法不等于正确），以及重复副作用次数；同时记录哪些断点在某些厂商上无法复现，以及降级路径是否可用。<br>配套仓库实测（2026-08-24，三家 × 三断点 × 三次重复，按固定字符偏移切断）：续写只在被截断的正文足够长时明显更省（Moonshot 省 43.1%、Anthropic 15.1%、Google 66.3%）；元指令在每一个单元上都比整轮重发更贵，最多贵到三倍以上。参数被截断时排序反转：Moonshot 续写省 76.3%，但三次里两次拼出合法 JSON、没有一次语义正确——在断点 {&quot;city&quot;:&quot;东 后面直接补了 &quot;}，东京变成了“东”；同断点整轮重发与元指令都是 3/3 正确。两个断点当天不可复现：思考中途 9 次只有 1 次真的切在思考上；Gemini 的流式接口把工具调用整块吐出，没有“半截参数”。Anthropic 拒绝以空白结尾的 assistant 前缀，切在空格上的那一格因此 400。重复副作用全部为 0。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-2 <span class="c5-stars">★★</span>：<em>输出到一半断掉之后的接续</em></h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>“整轮重发” vs “以半截输出为前缀续写”：成本、正确性与副作用</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>思考中途 / 正文中途 / 工具参数中途切断；三种恢复：整轮重发 · 前缀续写 · 追加元指令</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>恢复成功率、节省的输出 token、参数合法率与语义正确率（合法 ≠ 正确）、重复副作用次数</p></div>
+  </div>
+  <div class="p4i-body">
+    <div class="p4i-cut panel fx fx-left" style="--d:3">
+      <div class="p4i-h"><b>参数断点特写</b><span class="c5-tag real">实测</span></div>
+      <div class="p4i-stream"><span class="p4i-ok"></span><span class="p4i-sc"><svg class="ic"><use href="#i-scissors"/></svg></span></div>
+      <div class="p4i-br" data-b="0"><b>前缀续写</b><code>{"city":"东"}</code><span class="bad">JSON 合法，城市却从“东京”变成了“东”</span></div>
+      <div class="p4i-br" data-b="1"><b>整轮重发 / 元指令</b><code>{"city":"东京"}</code><span class="ok">同断点 3/3 正确</span></div>
+      <p class="p4i-n">Moonshot 参数续写：3 次里 2 次合法，0 次语义正确；Anthropic 续写 3/3 正确，却比整轮重发还贵 8.5%</p>
+    </div>
+    <div class="p4i-chart panel fx fx-right" style="--d:4">
+      <div class="p4i-h"><b>输出 token 均值</b><span class="p4i-lg"><i class="a"></i>整轮重发<i class="b"></i>前缀续写<i class="c"></i>元指令</span></div>
+      <div class="p4i-rows"></div>
+      <p class="p4i-n">元指令在<b>每一个单元</b>上都比整轮重发更贵；续写真正划算的是被截断的正文足够长时</p>
+    </div>
+  </div>
+  <div class="c5-rec-h p4i-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/provider-failover 验收记录，2026-08-24 · 不可复现：思考断点 9 次中 8 次无可见思考；Gemini 不产生半截参数 · Anthropic 拒绝以空白结尾的前缀（400）· 重复副作用 0</div>
+  <div class="src">第五章 ·「故障与错误恢复」· 实验 5-2</div>
+</section>
+<style>
+#c05-exp52 .c5-xp{margin-bottom:16px}
+.p4i-body{display:grid;grid-template-columns:700px 1fr;gap:24px;height:470px}
+.p4i-cut,.p4i-chart{padding:14px 20px;display:flex;flex-direction:column;gap:12px}
+.p4i-h{display:flex;align-items:center;gap:12px}
+.p4i-h b{font-size:20px}
+.p4i-stream{position:relative;display:flex;align-items:center;gap:6px;height:56px;padding:0 16px;border-radius:12px;font:22px var(--mono);background:rgba(5,9,22,.7);border:1px solid var(--line2)}
+.p4i-ok{color:#86efac;white-space:pre}
+.p4i-sc{font-size:26px;color:var(--bad);opacity:0;transition:opacity .3s}
+.p4i-sc.on{opacity:1;animation:shake .5s}
+.p4i-br{display:grid;grid-template-columns:170px auto 1fr;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);opacity:.3;transition:all .45s}
+.p4i-br.on{opacity:1}
+.p4i-br b{font-size:17px}
+.p4i-br code{font:19px var(--mono);color:var(--text)}
+.p4i-br span{font-size:15px}
+.p4i-br .bad{color:#fda4af}.p4i-br .ok{color:#6ee7b7}
+.p4i-br[data-b="0"].on{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.08)}
+.p4i-br[data-b="1"].on{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.08)}
+.p4i-n{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2)}
+.p4i-n b{color:var(--acc)}
+.p4i-lg{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.p4i-lg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-left:10px}
+.p4i-lg i.a,.p4i-bar i.a{background:#60a5fa}.p4i-lg i.b,.p4i-bar i.b{background:#34d399}.p4i-lg i.c,.p4i-bar i.c{background:#fb7185}
+.p4i-rows{display:flex;flex-direction:column;gap:9px}
+.p4i-r{display:grid;grid-template-columns:170px 1fr 90px;gap:12px;align-items:center}
+.p4i-r>span{font-size:16px;color:var(--text2)}
+.p4i-r>em{font-style:normal;text-align:right;font:700 17px var(--num)}
+.p4i-r>em.neg{color:#fda4af}.p4i-r>em.pos{color:#6ee7b7}
+.p4i-bar{display:flex;flex-direction:column;gap:3px}
+.p4i-bar div{display:flex;align-items:center;gap:8px;font:15px var(--num);color:var(--text3)}
+.p4i-bar i{display:block;height:10px;border-radius:5px;width:0;transition:width 1.1s var(--ease)}
+.p4i-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp52'] = {
+  D: [['Moonshot · 正文', 347.0, 197.3, 547.0, '43.1%'], ['Anthropic · 正文', 257.3, 218.5, 529.0, '15.1%'], ['Google · 正文', 627.7, 211.3, 1465.0, '66.3%'], ['Moonshot · 参数', 117.0, 27.7, 300.0, '76.3%'], ['Anthropic · 参数', 135.7, 147.3, 277.7, '−8.5%']],
+  init(s) {
+    s.querySelector('.p4i-rows').innerHTML = this.D.map(([n, a, b, c, sv]) => `<div class="p4i-r"><span>${n}</span><div class="p4i-bar">${[['a', a], ['b', b], ['c', c]].map(([k, v]) => `<div><i class="${k}" data-v="${v}"></i>${v.toFixed(1)}</div>`).join('')}</div><em class="${sv.startsWith('−') ? 'neg' : 'pos'}" title="续写相对整轮重发省下">${sv}</em></div>`).join('');
+  },
+  async cut(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const el = s.querySelector('.p4i-ok'), sc = s.querySelector('.p4i-sc'), br = s.querySelectorAll('.p4i-br');
+    const txt = '{"city":"东';
+    while (ok()) {
+      el.textContent = ''; sc.classList.remove('on'); br.forEach((b) => b.classList.remove('on'));
+      for (let i = 1; i <= txt.length; i++) { el.textContent = txt.slice(0, i); await U.wait(ctx, 140); if (!ok()) return; }
+      sc.classList.add('on');
+      await U.wait(ctx, 1200); if (!ok()) return;
+      br[0].classList.add('on');
+      await U.wait(ctx, 1600); if (!ok()) return;
+      br[1].classList.add('on');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1;
+    const mx = 1465;
+    ctx.later(() => s.querySelectorAll('.p4i-bar i').forEach((i) => (i.style.width = (+i.dataset.v / mx) * 100 + '%')), 600);
+    ctx.later(() => this.cut(s), 500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p4i-bar i').forEach((i) => (i.style.width = '0')); s.querySelectorAll('.p4i-br').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-breaker" data-part="4" data-dur="16000" data-title="终止：每条恢复路径都要有上限" data-notes="<b>终止：每条恢复路径都要有上限。</b>恢复机制本身也可能失效，因此每条恢复路径都必须有明确的熔断上限：上下文压缩连续失败若干次就放弃压缩，权限分类连续失败就回退到人工询问，输出接续最多尝试固定轮数。<br>阈值从哪来？答案是生产数据而非拍脑袋。以 Claude Code 的压缩熔断为例，“连续 3 次”的阈值来自真实会话统计——曾有一个会话在这条恢复路径上连续失败三千余次，仅这类无效重试每天就在全球造成约 25 万次 API 调用的浪费；逾千个会话出现过 50 次以上的连续失败。3 次正是“绝大多数故障在此之前已恢复”与“继续重试基本无望”之间的经验拐点。<br>左边三条恢复路径各自计数、到上限就熔断（计数过程为示意）；右边的数字来自原书，曲线只是示意“拐点”的含义，拖动滑块可以看阈值太低或太高的代价。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">恢复机制本身也会失效：<em>每条恢复路径都要有上限</em></h2></header>
+  <div class="p4j-body">
+    <div class="p4j-paths fx fx-left" style="--d:2">
+      <div class="p4j-p" data-p="0"><div><b>上下文压缩</b><span>连续失败若干次 → 放弃压缩</span></div><div class="p4j-ct"></div><em class="p4j-sw">闭合</em></div>
+      <div class="p4j-p" data-p="1"><div><b>权限分类</b><span>连续失败 → 回退到人工询问</span></div><div class="p4j-ct"></div><em class="p4j-sw">闭合</em></div>
+      <div class="p4j-p" data-p="2"><div><b>输出接续</b><span>最多尝试固定轮数</span></div><div class="p4j-ct"></div><em class="p4j-sw">闭合</em></div>
+      <span class="c5-tag demo">计数过程为示意</span>
+    </div>
+    <div class="p4j-data panel fx fx-right" style="--d:3">
+      <div class="p4j-h"><b>阈值从哪来？</b><span>生产数据，而不是拍脑袋 · Claude Code 的压缩熔断</span></div>
+      <div class="p4j-kp">
+        <div class="c5-kpi"><b data-count="3">0</b><span>“连续 3 次”的熔断阈值</span></div>
+        <div class="c5-kpi"><b data-count="3000" data-sep data-suffix="+" data-dur="1800">0</b><span>一个会话在这条路径上连续失败三千余次</span></div>
+        <div class="c5-kpi"><b data-count="250000" data-sep data-prefix="约 " data-dur="2000">0</b><span>每天在全球浪费的 API 调用</span></div>
+        <div class="c5-kpi"><b data-count="1000" data-sep data-suffix="+" data-dur="1800">0</b><span>出现过 50 次以上连续失败的会话</span></div>
+      </div>
+      <div class="p4j-cv"><svg viewBox="0 0 640 210" width="640" height="210"><path class="p4j-ax" d="M50 180 H620 M50 20 V180"/><path class="p4j-c" d="M50 175 C 120 60, 170 42, 230 36 S 520 28, 620 26"/><line class="p4j-t" x1="230" y1="18" x2="230" y2="180"/><text x="56" y="200">连续失败次数 →</text><text x="58" y="16">已恢复的比例</text><text class="p4j-tl" x="238" y="60">3</text></svg><span class="c5-tag demo">曲线为示意</span></div>
+      <div class="p4j-sl"><span>阈值</span><input type="range" class="rng p4j-r" min="1" max="10" value="3"><b class="p4j-v">3 次</b></div>
+      <p class="p4j-say">3 次正是“绝大多数故障在此之前已恢复”与“继续重试基本无望”之间的经验拐点</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」·「终止：每条恢复路径都要有上限。」</div>
+</section>
+<style>
+.p4j-body{display:grid;grid-template-columns:720px 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p4j-paths{display:flex;flex-direction:column;gap:14px}
+.p4j-p{display:grid;grid-template-columns:1fr 200px 90px;align-items:center;gap:14px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:all .4s}
+.p4j-p b{display:block;font-size:21px}
+.p4j-p span{display:block;font-size:16px;color:var(--text3);margin-top:3px}
+.p4j-ct{display:flex;gap:6px}
+.p4j-ct i{flex:1;height:22px;border-radius:6px;border:1px solid var(--line2);transition:all .3s}
+.p4j-ct i.f{background:rgba(251,113,133,.55);border-color:var(--bad)}
+.p4j-sw{font-style:normal;text-align:center;padding:5px 0;border-radius:9px;font-size:16px;font-weight:700;color:#6ee7b7;border:1px solid rgba(52,211,153,.5)}
+.p4j-p.open{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.08)}
+.p4j-p.open .p4j-sw{color:#06101f;background:var(--bad);border-color:var(--bad)}
+.p4j-data{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.p4j-h b{font-size:21px}
+.p4j-h span{font-size:16px;color:var(--text3);margin-left:12px}
+.p4j-kp{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.p4j-kp .c5-kpi b{font-size:28px}
+.p4j-cv{position:relative}
+.p4j-cv svg{display:block;width:100%;height:auto}
+.p4j-cv .c5-tag{position:absolute;right:6px;top:4px}
+.p4j-ax{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2}
+.p4j-c{fill:none;stroke:var(--acc);stroke-width:3.5;stroke-dasharray:900;stroke-dashoffset:900}
+.active .p4j-c{animation:arcDraw 1.6s var(--ease) .4s forwards}
+.p4j-t{stroke:#fff;stroke-width:2;stroke-dasharray:4 4;transition:all .4s}
+.p4j-cv text{font-size:15px;fill:var(--text3)}
+.p4j-cv .p4j-tl{font:800 20px var(--num);fill:#fff}
+.p4j-sl{display:flex;align-items:center;gap:14px;font-size:17px;color:var(--text2)}
+.p4j-sl input{flex:1}
+.p4j-sl b{min-width:60px;font-size:19px;color:var(--acc)}
+.p4j-say{font-size:17px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c05-breaker'] = {
+  LIM: [3, 3, 4],
+  init(s) {
+    s.querySelectorAll('.p4j-ct').forEach((c, i) => (c.innerHTML = '<i></i>'.repeat(this.LIM[i])));
+    const r = s.querySelector('.p4j-r');
+    r.addEventListener('input', () => { this.manual = true; this.thr(s, +r.value); });
+  },
+  // 阈值线在曲线上移动：太低放弃可恢复的故障，太高白白重试
+  thr(s, v) {
+    const r = s.querySelector('.p4j-r'), x = 50 + (v - 1) * 63.3;
+    r.value = v; r.style.setProperty('--p', ((v - 1) / 9) * 100 + '%');
+    s.querySelector('.p4j-t').setAttribute('x1', x); s.querySelector('.p4j-t').setAttribute('x2', x);
+    const tl = s.querySelector('.p4j-tl'); tl.setAttribute('x', x + 8); tl.textContent = v;
+    s.querySelector('.p4j-v').textContent = v + ' 次';
+    s.querySelector('.p4j-say').textContent = v < 3 ? '阈值太低：不少本可以恢复的故障被过早放弃' : v > 3 ? '阈值太高：继续重试基本无望，只是在浪费 API 调用' : '3 次正是“绝大多数故障在此之前已恢复”与“继续重试基本无望”之间的经验拐点';
+  },
+  async fill(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const ps = s.querySelectorAll('.p4j-p');
+    while (ok()) {
+      ps.forEach((p) => { p.classList.remove('open'); p.querySelector('.p4j-sw').textContent = '闭合'; p.querySelectorAll('i').forEach((i) => i.classList.remove('f')); });
+      for (let n = 0; n < 4; n++) {
+        await U.wait(ctx, 700); if (!ok()) return;
+        ps.forEach((p, i) => {
+          const is = p.querySelectorAll('i');
+          if (n < is.length) is[n].classList.add('f');
+          if (n === is.length - 1) { p.classList.add('open'); p.querySelector('.p4j-sw').textContent = '熔断'; }
+        });
+      }
+      await U.wait(ctx, 3000);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.manual = false;
+    this.thr(s, 3);
+    ctx.later(() => this.fill(s), 500);
+    let k = 0;
+    const seq = [3, 1, 2, 3, 6, 9, 3];
+    ctx.every(() => { if (!this.manual) this.thr(s, seq[++k % seq.length]); }, 2200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.thr(s, 3); s.querySelectorAll('.p4j-p').forEach((p) => p.classList.remove('open')); },
+};
+</script>
+
+<section class="slide" id="c05-spiral" data-part="4" data-trans="iris" data-dur="16000" data-title="死亡螺旋与全局终止" data-notes="比单点熔断更隐蔽的是<b>死亡螺旋</b>：错误处理路径中的逻辑本身又调用 LLM，再次出错，引发连锁反应。一种真实发生过的连锁故障是：Agent 因上下文溢出而停止，触发“结束时自动提交代码”的停止钩子（Agent 结束时自动执行的清理逻辑），钩子调用 LLM 生成 commit message，再次发生上下文溢出，又一次触发钩子。<br>防护靠两条：在错误路径上禁用一切会再次调用模型的副作用逻辑（宁可丢掉一次辅助功能，如自动记忆提取），以及用递归深度计数器检测并打断残余的连锁。<br>最后，在所有自动化机制之上还需要全局的终止与升级条件：最大迭代轮数、会话预算上限，以及连续失败超过阈值时升级到人工干预。<br>螺旋会一圈圈加深；打开右侧两道防护中的任意一道，看连锁在哪里被打断（深度上限为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">死亡螺旋：<em>恢复逻辑自己又出错</em></h2></header>
+  <div class="p4k-body">
+    <div class="p4k-st fx fx-scale" style="--d:2">
+      <svg class="p4k-svg" viewBox="0 0 760 560" width="760" height="560"><path class="p4k-sp" d=""/><circle class="pk p4k-pk" r="10"/></svg>
+      <div class="p4k-n" data-n="0" style="left:380px;top:58px">上下文溢出</div>
+      <div class="p4k-n" data-n="1" style="left:640px;top:250px">Agent 停止</div>
+      <div class="p4k-n" data-n="2" style="left:380px;top:470px">停止钩子：结束时自动提交代码</div>
+      <div class="p4k-n" data-n="3" style="left:120px;top:250px">钩子调用 LLM 写 commit message</div>
+      <div class="p4k-dp"><span>递归深度</span><b>0</b></div>
+      <div class="p4k-x"></div>
+    </div>
+    <div class="p4k-side fx fx-right" style="--d:3">
+      <span class="lbl">两条防护</span>
+      <button class="tgl p4k-t" data-t="0" style="--tc:#34d399"><i></i><span>错误路径上禁用会调用模型的副作用<small>宁可丢掉一次辅助功能，如自动记忆提取</small></span></button>
+      <button class="tgl p4k-t" data-t="1" style="--tc:#60a5fa"><i></i><span>递归深度计数器<small>检测并打断残余的连锁</small></span></button>
+      <div class="p4k-g panel"><span class="lbl">在所有自动化机制之上：全局终止与升级条件</span>
+        <div><svg class="ic"><use href="#i-repeat"/></svg>最大迭代轮数</div>
+        <div><svg class="ic"><use href="#i-coin"/></svg>会话预算上限</div>
+        <div><svg class="ic"><use href="#i-user"/></svg>连续失败超过阈值 → 升级到人工干预</div>
+      </div>
+      <span class="c5-tag demo">深度上限为示意</span>
+    </div>
+  </div>
+  <div class="src">第五章 ·「故障与错误恢复」· 死亡螺旋与全局终止条件</div>
+</section>
+<style>
+.p4k-body{display:grid;grid-template-columns:760px 1fr;gap:30px;flex:1;min-height:0;margin-bottom:24px}
+.p4k-st{position:relative;width:760px;height:560px}
+.p4k-svg{position:absolute;inset:0;overflow:visible}
+.p4k-sp{fill:none;stroke:rgba(251,113,133,.5);stroke-width:3;stroke-dasharray:7 7;animation:flow 1s linear infinite}
+.p4k-pk{fill:#fb7185;filter:drop-shadow(0 0 10px #fb7185)}
+.p4k-n{position:absolute;transform:translate(-50%,-50%);max-width:260px;text-align:center;padding:10px 16px;border-radius:14px;font-size:18px;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:all .35s}
+.p4k-n.on{border-color:var(--bad);color:#fff;background:rgba(251,113,133,.2);box-shadow:0 0 24px rgba(251,113,133,.45)}
+.p4k-n.cut{opacity:.35;text-decoration:line-through}
+.p4k-dp{position:absolute;left:380px;top:250px;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center}
+.p4k-dp span{font-size:16px;color:var(--text3)}
+.p4k-dp b{font:800 64px var(--num);color:var(--bad)}
+.p4k-x{position:absolute;left:380px;top:340px;transform:translateX(-50%);font-size:18px;font-weight:700;white-space:nowrap}
+.p4k-x.ok{color:var(--ok)}.p4k-x.bad{color:var(--bad)}
+.p4k-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.p4k-t{align-items:flex-start;text-align:left;padding:14px 16px}
+.p4k-t span{display:flex;flex-direction:column;gap:3px;font-size:19px}
+.p4k-t small{font-size:15px;color:var(--text3)}
+.p4k-g{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.p4k-g div{display:flex;align-items:center;gap:12px;font-size:18px}
+.p4k-g .ic{font-size:22px;color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-spiral'] = {
+  init(s) {
+    // 一圈圈收紧的螺旋路径，经过四个节点
+    let d = '', C = [380, 270];
+    for (let i = 0; i <= 12; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 2, r = 215 - i * 12, x = C[0] + Math.cos(a) * r * 1.22, y = C[1] + Math.sin(a) * r;
+      d += (i ? ' L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+    }
+    s.querySelector('.p4k-sp').setAttribute('d', d);
+    s.querySelectorAll('.p4k-t').forEach((b) => b.addEventListener('click', () => { this.manual = true; b.classList.toggle('on'); this.run(s); }));
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    const ns = s.querySelectorAll('.p4k-n'), dp = s.querySelector('.p4k-dp b'), x = s.querySelector('.p4k-x');
+    const g0 = s.querySelector('.p4k-t[data-t="0"]').classList.contains('on'), g1 = s.querySelector('.p4k-t[data-t="1"]').classList.contains('on');
+    ns.forEach((n) => n.classList.remove('on', 'cut')); x.textContent = ''; x.className = 'p4k-x'; dp.textContent = '0';
+    const pk = s.querySelector('.p4k-pk'), sp = s.querySelector('.p4k-sp'), L = sp.getTotalLength();
+    for (let depth = 1; ok(); depth++) {
+      for (let n = 0; n < 4; n++) {
+        ns.forEach((e, j) => e.classList.toggle('on', j === n));
+        const seg = (((depth - 1) * 4 + n) % 12) / 12, p = sp.getPointAtLength(seg * L);
+        pk.setAttribute('cx', p.x); pk.setAttribute('cy', p.y); pk.style.opacity = 1;
+        if (n === 3 && g0) { ns[3].classList.add('cut'); x.className = 'p4k-x ok'; x.textContent = '错误路径不再调用模型：连锁在第一圈就断了'; return; }
+        await U.wait(ctx, 650); if (!ok()) return;
+      }
+      dp.textContent = depth;
+      if (g1 && depth >= 3) { x.className = 'p4k-x ok'; x.textContent = '递归深度达到上限：计数器打断连锁'; return; }
+      if (depth >= 6) { x.className = 'p4k-x bad'; x.textContent = '没有防护：螺旋一圈圈加深……'; await U.wait(ctx, 2200); if (ok() && !this.manual) this.auto(s); return; }
+    }
+  },
+  auto(s) {
+    const ts = s.querySelectorAll('.p4k-t');
+    this.k = ((this.k || 0) + 1) % 3;
+    ts[0].classList.toggle('on', this.k === 1); ts[1].classList.toggle('on', this.k === 2);
+    this.run(s);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.manual = false; this.k = 0;
+    s.querySelectorAll('.p4k-t').forEach((b) => b.classList.remove('on'));
+    ctx.later(() => this.run(s), 600);
+    ctx.every(() => { if (!this.manual && s.querySelector('.p4k-x').classList.contains('ok')) this.auto(s); }, 3500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p4k-n').forEach((n) => n.classList.remove('on', 'cut')); },
+};
+</script>

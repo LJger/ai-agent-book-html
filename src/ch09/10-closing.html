@@ -1,0 +1,119 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c09-sum" data-part="10" data-steps="2" data-trans="zoom" data-dur="16000" data-title="本章小结" data-notes="持续进化正在成为 Agent 最重要的能力之一，但今天的模型还无法自行完成可靠的持续学习。推理时的上下文适应不会自动持久化，未经验证的在线参数更新又会放大噪声、攻击和能力漂移。因此，现阶段更可行的路径，是在模型外围建立可验证的学习系统。<br>就全书的结构而言，本章构建的是第一章发现循环中的<b>实验与反馈</b>环节：提案已经有了，问题变成怎样通过一次以真实观测为基础的实验，判断它到底有没有让系统变好，以及怎样把结果送回下一轮。<br>按 → Agent 从与环境的交互和评价中获得学习信号，再根据能力的表示性质更新知识、Prompt、Skill、程序或模型参数。系统也可以进一步优化管理和生成这些产物的方法，但应优先采用可归因、可验证、可回滚的局部修改。遇到问题时，先判断它更适合由外部规则、程序流程、Skill 还是模型参数处理，再用独立的边界任务和原有任务检查修改是否真正有效。历史不仅能被提炼为静态经验，还能在支持域内组成回放环境，低成本筛选探索策略，使持续进化可以进一步作用于“如何组织探索”。<br>按 → 持续进化需要把在线执行与离线学习分开：在线记录证据，离线生成并验证更新提案，再逐步发布、整理或回滚。这个闭环在结果可自动验证的任务上最可靠；对于目标模糊、反馈延迟的开放任务，人仍需参与问题定义和评价标准的制定。右侧部分列表可以点击跳回。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：在模型外围建立<em>可验证的学习系统</em></h2></header>
+  <div class="g0a-body">
+    <div class="g0a-l">
+      <div class="g0a-r fx fx-up" style="--d:2"><em>为什么</em><div><b>模型还无法自行完成可靠的持续学习</b><p>推理时的上下文适应不会自动持久化；未经验证的在线参数更新会放大噪声、攻击和能力漂移</p></div></div>
+      <div class="g0a-r hot fx fx-up" style="--d:3"><em>定位</em><div><b>第一章发现循环中的“实验与反馈”环节</b><p>提案已经有了：怎样通过以真实观测为基础的实验判断它有没有让系统变好，并把结果送回下一轮</p></div></div>
+      <div class="g0a-r fx fx-up" data-step="1"><em>怎么做</em><div><b>按表示性质选载体，优先局部修改</b><p>学习信号 → 知识 / Prompt / Skill / 程序 / 参数；可归因、可验证、可回滚；用独立的边界任务和原有任务检查；历史还能在支持域内组成回放环境，筛选探索策略</p></div></div>
+      <div class="g0a-r fx fx-up" data-step="2"><em>闭环</em><div><b>在线记录证据，离线生成并验证提案</b><p>再逐步发布、整理或回滚；在可自动验证的任务上最可靠，开放任务仍需人参与问题定义和评价标准</p></div></div>
+    </div>
+    <div class="g0a-nav fx fx-right" style="--d:4"></div>
+  </div>
+  <div class="src">第九章 ·「本章小结」</div>
+</section>
+<style>
+.g0a-body{display:grid;grid-template-columns:1fr 440px;gap:26px;flex:1;min-height:0}
+.g0a-l{display:flex;flex-direction:column;gap:12px}
+.g0a-r{display:grid;grid-template-columns:100px 1fr;gap:18px;align-items:center;padding:14px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g0a-r em{font-style:normal;font-size:22px;font-weight:800;color:var(--acc);text-align:center}
+.g0a-r b{font-size:21px}
+.g0a-r p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+.g0a-r.hot{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8));box-shadow:0 0 26px color-mix(in srgb,var(--acc) 18%,transparent)}
+.g0a-nav{display:flex;flex-direction:column;gap:7px}
+.g0a-p{display:grid;grid-template-columns:42px 1fr;gap:10px;align-items:center;padding:9px 14px;border-radius:12px;text-align:left;font-size:16px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .3s}
+.g0a-p em{font:700 15px var(--num);font-style:normal;color:var(--acc)}
+.g0a-p:hover,.g0a-p.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+</style>
+<script>
+HOOKS['c09-sum'] = {
+  P: ['学习信号：三层验证', '四种更新载体', '经验沉淀为知识', '经验写成指令', '经验写成程序', '参数与更新“更新方法”', '可长期运行的进化闭环', '边界与安全', '睡眠学习'],
+  init(s) {
+    const host = s.querySelector('.g0a-nav');
+    host.innerHTML = '<span class="lbl">回看各部分</span>' + this.P.map((t, i) => `<button class="g0a-p" data-i="${i}"><em>${String(i + 1).padStart(2, '0')}</em><span>${t}</span></button>`).join('');
+    host.querySelectorAll('.g0a-p').forEach((b) => b.addEventListener('click', () => C9.goPart(+b.dataset.i + 1)));
+  },
+  enter(s, ctx) {
+    const ps = [...s.querySelectorAll('.g0a-p')]; let k = 0;
+    const tick = () => { ps.forEach((p, j) => p.classList.toggle('on', j === k % ps.length)); k++; };
+    tick(); ctx.every(tick, 1300);
+  },
+  reset(s) { s.querySelectorAll('.g0a-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-qa" data-part="10" data-trans="flip" data-dur="24000" data-title="思考题" data-notes="第九章共 7 道思考题：第 1 题（★★）问一条经验被三次成功、一次新 API 版本上的失败支持时，是经验被推翻还是适用条件变了；第 2 题（★★）问为什么不能把满意度作为单一学习信号、怎样设计护栏指标；第 3 题（★★★）问“虚假承诺”该在 Prompt、Harness 检查还是参数训练里修；第 4 题（★★★）问怎样划分可修改的工具、验证器与不可修改的可信根；第 5 题（★★）问经验库的版本、时效和淘汰机制；第 6 题（★★★）问医疗客服里参数、知识、Skill 和代码约束怎样协同；第 7 题（★★★）问在旧发现树上得分最高的探索策略为什么会在线退化、怎样划分回放世界并设计发布门槛。点击题目展开参考答案提纲（取自原书附录），不点击时会自动依次展开；“回看”按钮跳到相关页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa g0b-list fx fx-up" style="--d:3"></div>
+  <div class="src">第九章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c09-qa .qa{gap:7px}
+#c09-qa .qa-q{font-size:17px;padding:10px 16px;line-height:1.5}
+#c09-qa .qa-a>div{font-size:16px;line-height:1.65;visibility:hidden;transition:visibility 0s linear .5s}
+#c09-qa .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+.g0b-tag{display:inline-block;margin:2px 0 6px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.g0b-go{display:inline-flex;align-items:center;gap:8px;margin-top:6px;padding:4px 12px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+</style>
+<script>
+HOOKS['c09-qa'] = {
+  Q: [
+    { st: '★★', go: ['c09-pipe5', '知识提炼的五步管道'], q: '一条经验文档由三次成功轨迹和一次失败轨迹支持。失败发生在较新的 API 版本上。系统应如何判断这是经验被推翻，还是适用条件发生了变化？', a: '先按 API 版本、任务条件和环境状态对四条证据分层，而不是按数量投票。若旧策略只在旧版本成功、新版本稳定失败，应把经验的适用范围收窄并生成新版本候选；若在相同版本和前置条件下也失败，则应降低置信度或撤销。' },
+    { st: '★★', go: ['c09-dims', '表9-1 七个评价维度'], q: '客服 Agent 的用户满意度上升，但规则违规率也上升。为什么不能把满意度作为单一学习信号？你会怎样设计护栏指标？', a: '满意度可能奖励违规退款、泄露信息或过度承诺，因此它只能是质量指标，不能覆盖安全底线。护栏至少包括规则违规、隐私泄露、无证据陈述、承诺—行动不一致和越权操作；这些指标应设置不可被平均分抵消的硬阈值，再在合规候选中比较解决率、合规变通、简洁性和满意度。' },
+    { st: '★★★', go: ['c09-four', '能力的表示性质决定更新位置'], q: '同一个“虚假承诺”问题可以通过 Prompt、Harness 检查或参数训练缓解。你会依据哪些证据选择修改位置？', a: '先定位根因。若模型知道工具未执行却仍使用完成式措辞，可用最小 Prompt 规则纠正；若承诺可以由回复文本与工具状态确定性比较，Harness 检查更可靠，也应作为高风险场景的最后防线；若问题横跨大量表达方式，反映的是广泛的语言—行动对齐能力，再考虑参数训练。应优先选择最小、最易验证和回滚的修改，同时在失败集与旧任务保留集上比较。' },
+    { st: '★★★', go: ['c09-guard3', '三道安全边界'], q: 'Agent 能修改工具和验证器，却不应修改批准自身更新的可信根。你会如何划分这两部分的权限和代码边界？', a: '把可进化的代码放在低权限的沙盒中，只允许它生成补丁和测试；权限系统、API key、发布控制配置和更新验证器属于安全机制，沙盒内的 Agent 无读写权限。Agent 生成的代码修改必须由安全机制在隔离环境中复现、回归后才能发布。' },
+    { st: '★★', go: ['c09-prune', '长时间尺度上的上下文腐化'], q: '经验知识库不断增长后，检索错误和知识冲突会抵消学习收益。如何设计版本、时效和淘汰机制？', a: '每条经验保存来源轨迹、适用条件、环境版本、验证时间和置信度；冲突条目不要静默覆盖，而应按条件分支或标记。周期性“睡眠学习”合并重复条目。' },
+    { st: '★★★', go: ['c09-param', '将经验写入参数'], q: '参数学习擅长自然语言风格，却难以保证硬性业务规则。请为医疗客服设计一套参数、知识、Skill 和代码约束协同的持续进化方案。', a: '参数（后训练模型）负责医学语言理解、自然且有同理心的表达和复杂意图识别；知识库保存最新版指南、药品说明与机构政策，并要求回答引用来源；Skill 描述问诊信息收集、风险分级、转人工和随访流程；服务端代码强制身份验证、隐私最小化、禁忌校验、紧急风险升级和权限边界。生产轨迹先按医疗安全、事实可靠性、承诺—行动一致性和表达质量评价，再分别生成四类候选更新；任何参数或流程改动都必须通过医疗安全保留集与人工复核后灰度发布。' },
+    { st: '★★★', go: ['c09-dream', 'Dream-RSI：发现树与回放模拟器'], q: '历史回放中的某个探索策略在所有旧发现树上得分最高，却在下一轮在线探索中退化。哪些支持域偏差、随机性和评价过拟合可能造成这种结果？你会怎样划分回放世界并设计发布门槛？', a: '旧发现树只覆盖旧策略访问过的状态和分支，无法证明新策略在未探索区域也有效；在线任务、工具或环境的变化还会造成分布偏移。随机种子、模型采样和工具噪声可能改变排名，反复在同一批树上挑选策略也会对评估集过拟合。应按任务族、时间和独立发现树划分开发集、验证集与封存测试集，同一棵树及其衍生轨迹不可跨集合泄漏；固定模型、工具版本与计算预算，用多个种子与基线配对比较，报告收益、不确定性、成本和违规率；预先设定质量改进及安全、成本门槛，离线通过后再做小规模在线对照，只有在线收益得到支持且护栏无退化才逐步发布，并保留回滚条件。' },
+  ],
+  init(s) {
+    const host = s.querySelector('.g0b-list');
+    host.innerHTML = this.Q.map((x, i) => `<div class="qa-it"><button class="qa-q"><em>${i + 1}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div><span class="g0b-tag">参考答案提纲 · 原书附录</span><p>${x.a}</p><button class="g0b-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    this.open = U.qa(host, { single: true });
+    host.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; }));
+    host.querySelectorAll('.g0b-go').forEach((b) => b.addEventListener('click', (e) => { e.stopPropagation(); const i = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === b.dataset.go); if (i >= 0) DECK.go(i, 0); }));
+  },
+  enter(s, ctx) { this.auto = true; let n = 0; ctx.later(() => this.open(0), 800); ctx.every(() => { if (this.auto) { n = (n + 1) % this.Q.length; this.open(n); } }, 6500); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<section class="slide" id="c09-end" data-part="10" data-trans="iris" data-title="第九章 · 完" data-notes="第九章到这里结束。本章把“学习”构建成模型外围的一套自主系统：从运行轨迹中获得带证据的学习信号，按能力的表示性质把经验写成知识、指令、程序或参数，所有修改先成为待验证版本，经过边界集、保留集与安全检查后才灰度发布，并能回滚；再加上睡眠学习式的周期整理。下一章《多 Agent 协作》讨论多个 Agent 如何分工、共享和隔离上下文。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <div class="g0c-orbit fx fx-scale" style="--d:3"></div>
+  <div class="g0c-text">
+    <div class="g0c-tag fx fx-up"><i></i>第九章 · 完</div>
+    <h1 class="g0c-title"><span class="split" data-grad="#e9d5ff,#c084fc,#818cf8">让每一次更新都可验证、可回滚</span></h1>
+    <p class="g0c-sub fx fx-up" style="--d:10">下一章：<b>多 Agent 协作</b>——多个 Agent 如何分工、共享与隔离上下文</p>
+    <div class="end-nav fx fx-up" style="--d:12">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+</section>
+<style>
+#c09-end{justify-content:center;padding-left:150px}
+#c09-end .g0c-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c09-end .g0c-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c09-end .g0c-title{margin-top:26px;font-size:84px;line-height:1.15;font-weight:800;max-width:980px}
+#c09-end .g0c-sub{margin-top:26px;font-size:26px;line-height:1.5;color:var(--text2)}
+#c09-end .g0c-sub b{color:var(--acc)}
+#c09-end .end-nav{margin-top:40px}
+#c09-end .g0c-orbit{position:absolute;right:110px;top:50%;width:600px;height:600px;margin-top:-310px}
+</style>
+<script>
+HOOKS['c09-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.g0c-orbit'), {
+      size: 600, core: 'Agent', coreColor: '#c084fc', outer: '验证 · 灰度 · 回滚 · VERIFY · CANARY · ROLLBACK',
+      sats: [
+        { label: '知识', color: '#2dd4bf', rx: 0.36, ry: 0.15, tilt: -24, dur: 13, phase: 0 },
+        { label: '指令', color: '#fbbf24', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.3 },
+        { label: '程序', color: '#60a5fa', rx: 0.3, ry: 0.2, tilt: 88, dur: 11, phase: 0.62 },
+        { label: '参数', color: '#a78bfa', rx: 0.38, ry: 0.11, tilt: 8, dur: 18, phase: 0.85 },
+      ],
+    });
+  },
+};
+</script>

@@ -1,0 +1,291 @@
+<!-- ================= 开篇 ================= -->
+<script>
+/* 第二章共用的小工具：各页脚本在 init / enter 里可以直接调用 */
+window.C02 = {
+  esc: (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+  // 跳到第 p 部分的第一页 / 跳到指定 id 的页面
+  part(p) { const i = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === p); if (i >= 0) DECK.go(i, 0); },
+  page(id) { const i = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === id); if (i >= 0) DECK.go(i, 0); },
+  // 消息行（沿用引擎的 .mr 样式）：r 角色，tx 内容（HTML），o.cls 额外类，o.rl 角色标签文字，o.mono 等宽
+  mr: (r, tx, o = {}) => `<div class="mr${o.cls ? ' ' + o.cls : ''}" data-r="${r}"${o.attr || ''}><span class="rl">${o.rl || r}</span><span class="tx${o.mono ? ' mono' : ''}">${tx}</span></div>`,
+  // 元素相对某个祖先的位置（逐级累加 offsetLeft/Top，不受缩放和 transform 影响）
+  rel(el, root) {
+    let x = 0, y = 0, n = el;
+    while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+    return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+  },
+};
+</script>
+
+<section class="slide" id="c02-cover" data-part="0" data-title="封面" data-notes="第一章把上下文比作 Agent 的“眼睛”——Agent 只能基于它看到的信息做决策。上下文的设计和管理称为<b>上下文工程（Context Engineering）</b>。<br>所谓上下文，就是每次你和 AI 对话时，AI 实际“看到”的全部信息。它不仅包含你们之前聊了什么（对话历史），还包含开发者预先写好的行为规则（系统指令）、AI 可以使用的外部功能说明（工具描述）等各类信息。<br>从第一章引入的 Harness 工程视角来看，上下文工程是 Harness 中“上下文与工具”层面的核心实现，它决定了 Agent 在每个决策点<b>能看到什么信息、以什么样的结构看到这些信息</b>。一个设计精良的上下文就是一套高效的信息供给系统，让 Agent 的通用思考能力得以在具体任务中充分发挥。<br>右侧轨道图：中心是模型，环绕它的是本章要逐一拆解的上下文组成——系统提示词、工具定义、对话轨迹、按需加载的 Skills 和末尾注入的状态栏；外圈是模型能看到的全部范围：上下文窗口。">
+  <div class="cv2-orbit fx fx-scale" style="--d:4"></div>
+  <div class="cv2-text">
+    <div class="cv2-tag fx fx-up"><i></i>深入理解 AI Agent · 第二章</div>
+    <h1 class="cv2-title"><span class="split" data-grad="#38bdf8,#818cf8,#c084fc">上下文工程</span></h1>
+    <p class="cv2-en fx fx-up" style="--d:8">Context Engineering</p>
+    <p class="cv2-sub fx fx-up" style="--d:10">决定 Agent 在每个决策点<b>能看到什么信息</b>，<br>以及以<b>什么样的结构</b>看到这些信息</p>
+    <div class="cv2-meta fx fx-up" style="--d:12"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="cv2-hint fx fx-up" style="--d:16"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c02-cover{justify-content:center;padding-left:150px}
+/* 本章所有页面：上下标不小于 15px */
+[id^="c02-"] sub,[id^="c02-"] sup{font-size:max(15px,.72em)}
+.cv2-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.cv2-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.cv2-title{margin-top:30px;font-size:150px;line-height:1.1;font-weight:800;letter-spacing:.04em}
+.cv2-en{margin-top:14px;font:600 34px var(--num);letter-spacing:.32em;color:var(--text3);text-transform:uppercase}
+.cv2-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.cv2-sub b{color:var(--text);font-weight:600}
+.cv2-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.cv2-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.cv2-orbit{position:absolute;right:100px;top:50%;width:740px;height:740px;margin-top:-382px}
+#c02-cover .orbit-svg .ob-outer{stroke:color-mix(in srgb,var(--acc) 45%,transparent)}
+#c02-cover .orbit-svg .ob-outer-t{fill:color-mix(in srgb,var(--acc) 80%,#fff)}
+#c02-cover .orbit-svg .ob-lab{font-size:22px}
+.cv2-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.cv2-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c02-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.cv2-orbit'), {
+      size: 740, core: 'LLM', coreColor: '#38bdf8', outer: 'CONTEXT WINDOW · 上下文窗口 · CONTEXT WINDOW · 上下文窗口',
+      sats: [
+        { label: '系统提示词', color: '#cbd5e1', rx: 0.40, ry: 0.13, tilt: -18, dur: 16, phase: 0 },
+        { label: '工具定义', color: '#60a5fa', rx: 0.36, ry: 0.16, tilt: 30, dur: 13, phase: 0.3 },
+        { label: '对话轨迹', color: '#22d3ee', rx: 0.31, ry: 0.19, tilt: 82, dur: 11, phase: 0.62 },
+        { label: 'Skills', color: '#34d399', rx: 0.25, ry: 0.11, tilt: -58, dur: 9, phase: 0.15 },
+        { label: '状态栏', color: '#f472b6', rx: 0.21, ry: 0.15, tilt: 12, dur: 8, phase: 0.8 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c02-window" data-part="0" data-dur="15000" data-title="上下文窗口的构成" data-notes="<b>图2-1</b> 是一次调用时上下文窗口的构成概览，从上到下依次是：<b>系统提示词</b>（开发者预先写好的行为规则，如“You MUST answer concisely”）、<b>工具定义</b>（AI 可以使用的外部功能说明，如 web_search 的名称、描述和参数）、<b>对话历史</b>（用户问“北京今天天气怎么样？”、模型发出 get_weather 调用、工具返回 23°C 晴）、<b>本轮思考</b>（模型在回答前的推理），最后是<b>当前生成位置</b>——LLM 正在生成的回复紧接在这一切之后。<br>所有内容都会被<b>序列化为一条 token 流</b>，交给 Transformer 的注意力机制处理；窗口有大小上限（图中列举：Qwen3 = 32K tokens，Claude = 200K，Gemini = 2M）。<br>上下文就是每次你和 AI 对话时，AI 实际“看到”的全部信息——不仅包含之前聊了什么，还包含开发者写好的规则、工具描述等各类信息。左侧各层会依次点亮，右侧的 token 流里同色的部分随之高亮；也可以直接点击某一层。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">上下文：AI 每次<em>实际“看到”</em>的全部信息</h2>
+  <p class="lead fx fx-up" style="--d:2">不只是聊过什么，还有开发者写好的规则、可用工具的说明——全部序列化成一条 token 流</p></header>
+  <div class="wn-body">
+    <div class="wn-win panel fx fx-left" style="--d:3">
+      <div class="wn-cap"><svg class="ic"><use href="#i-eye"/></svg>上下文窗口<span>Context Window</span></div>
+      <div class="wn-secs"></div>
+      <div class="wn-size"><svg class="ic"><use href="#i-gauge"/></svg>窗口大小：Qwen3 = 32K tokens ｜ Claude = 200K ｜ Gemini = 2M</div>
+    </div>
+    <div class="wn-side">
+      <div class="wn-card glass fx fx-right" style="--d:4">
+        <div class="wn-ch"><span class="wn-ic"><svg class="ic"><use href="#i-file"/></svg></span><div><b class="wn-cn">系统提示词</b><small class="wn-ce mono">System Prompt</small></div></div>
+        <p class="wn-cd"></p>
+        <div class="runbar wn-bar"><i></i></div>
+      </div>
+      <div class="wn-flow fx fx-right" style="--d:5">
+        <div class="wn-lb">序列化为 token 流</div>
+        <div class="wn-row">
+          <div class="wn-strip" data-clip-ok data-ok-overflow><div class="wn-tk"></div></div>
+          <svg class="ic wn-ar"><use href="#i-arrow"/></svg>
+          <div class="wn-tf"><svg class="ic"><use href="#i-cpu"/></svg><b>Transformer</b><small>注意力机制处理</small></div>
+        </div>
+      </div>
+      <p class="wn-tag fx fx-up" style="--d:6">上下文工程：决定 Agent 在每个决策点<b>看到什么</b>、以<b>什么结构</b>看到——一套高效的<b>信息供给系统</b></p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「上下文工程」章首 · 图2-1</div>
+</section>
+<style>
+.wn-body{display:flex;gap:40px;flex:1;min-height:0;margin-bottom:26px}
+.wn-win{width:900px;flex:none;padding:18px 24px 16px;display:flex;flex-direction:column;gap:10px}
+.wn-cap{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700;color:var(--acc)}
+.wn-cap span{font:500 15px var(--mono);color:var(--text3);margin-left:4px}
+.wn-secs{display:flex;flex-direction:column;gap:9px}
+.wn-sec{--c:var(--text3);position:relative;padding:10px 16px 10px 22px;border-radius:14px;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 30%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(10,16,36,.9));transition:border-color .45s,background .45s,box-shadow .45s,translate .45s var(--ease),opacity .45s}
+.wn-sec::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:4px;background:var(--c)}
+.wn-sh{display:flex;align-items:baseline;gap:10px}
+.wn-sh b{font-size:19px;color:var(--c)}
+.wn-sh small{font:15px var(--mono);color:var(--text3)}
+.wn-sh em{margin-left:auto;font-style:normal;font-size:15px;color:var(--c);opacity:0;transition:opacity .4s}
+.wn-sx{margin-top:4px;font:16px/1.55 var(--mono);color:#cbd5f5;white-space:pre-wrap}
+.wn-sec.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,rgba(10,16,36,.92));box-shadow:0 0 30px color-mix(in srgb,var(--c) 30%,transparent);translate:8px 0}
+.wn-sec.on .wn-sh em{opacity:1}
+.wn-sec.gen .wn-sx{color:var(--text)}
+.wn-gen{color:#fde68a}
+.wn-size{margin-top:auto;display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text3);padding-top:8px;border-top:1px dashed var(--line2)}
+.wn-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.wn-card{--c:var(--acc);padding:22px 26px 18px;display:flex;flex-direction:column;gap:12px;border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.wn-ch{display:flex;align-items:center;gap:16px}
+.wn-ic{width:62px;height:62px;border-radius:18px;display:grid;place-items:center;font-size:32px;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.wn-cn{display:block;font-size:30px;color:var(--c)}
+.wn-ce{display:block;font-size:16px;color:var(--text3);margin-top:2px}
+.wn-cd{font-size:21px;line-height:1.65;min-height:104px}
+.wn-card.sw .wn-ch,.wn-card.sw .wn-cd{animation:swIn .5s var(--ease) both}
+.wn-flow{display:flex;flex-direction:column;gap:10px}
+.wn-lb{font-size:16px;letter-spacing:.14em;color:var(--text3)}
+.wn-row{display:flex;align-items:center;gap:14px}
+.wn-strip{position:relative;flex:1;min-width:0;height:58px;border-radius:14px;overflow:hidden;border:1px solid var(--line);background:rgba(5,9,22,.7);-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.wn-tk{position:absolute;left:0;top:10px;display:flex;gap:6px;white-space:nowrap;animation:wnScroll 26s linear infinite}
+@keyframes wnScroll{to{transform:translateX(-50%)}}
+.wn-c{--c:var(--text3);padding:6px 10px;border-radius:8px;font:15px var(--mono);color:color-mix(in srgb,var(--c) 75%,#fff);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent);opacity:.45;transition:opacity .4s,background .4s}
+.wn-strip[data-on="0"] .wn-c[data-s="0"],.wn-strip[data-on="1"] .wn-c[data-s="1"],.wn-strip[data-on="2"] .wn-c[data-s="2"],.wn-strip[data-on="3"] .wn-c[data-s="3"],.wn-strip[data-on="4"] .wn-c[data-s="4"]{opacity:1;background:color-mix(in srgb,var(--c) 26%,transparent)}
+.wn-ar{font-size:30px;color:var(--acc);flex:none}
+.wn-tf{flex:none;width:170px;padding:12px 10px;border-radius:16px;text-align:center;border:1px solid color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 12%,rgba(10,16,36,.9));animation:glowPulse 2.6s ease-in-out infinite;--c:var(--llm)}
+.wn-tf .ic{font-size:30px;color:var(--llm)}
+.wn-tf b{display:block;font:700 19px var(--num);margin-top:2px}
+.wn-tf small{font-size:15px;color:var(--text3)}
+.wn-tag{font-size:23px;line-height:1.65;color:var(--text);padding:18px 24px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 16%,transparent),transparent);border-left:4px solid var(--acc);margin-top:auto}
+.wn-tag b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-window'] = {
+  S: [
+    { n: '系统提示词', e: 'System Prompt', c: '#cbd5e1', ic: 'file', x: '"You are a helpful assistant. You MUST answer concisely."\n"Use tools when the user asks for real-time information."', d: '开发者预先写好的<b>行为规则</b>（系统指令）：定义 Agent 的身份、规则与约束。', tk: ['You', 'are', 'a', 'helpful', 'assistant', 'MUST', 'answer', 'concisely', 'Use', 'tools'] },
+    { n: '工具定义', e: 'Tool Definitions', c: '#60a5fa', ic: 'wrench', x: '{"name": "web_search", "description": "Search the web",\n "parameters": {"query": {"type": "string"}}}', d: 'AI 可以使用的<b>外部功能说明</b>（工具描述）：名称、用途和参数格式。', tk: ['web_search', 'Search', 'the', 'web', 'query', 'string'] },
+    { n: '对话历史', e: 'Conversation History', c: '#22d3ee', ic: 'chat', x: 'user: "北京今天天气怎么样？"\nassistant: [tool_call] → get_weather("北京")\ntool: {"temp": "23°C", "conditions": "晴"}', d: '<b>之前聊了什么</b>：用户消息、模型发出的工具调用、工具返回的结果交替累积。', tk: ['北京', '今天', '天气', '怎么样', 'get_weather', '23°C', '晴'] },
+    { n: '本轮思考', e: 'Reasoning', c: '#a78bfa', ic: 'brain', x: '<think>用户问天气，我已经获得了工具结果，\n可以直接汇总回答，无需再调用工具。</think>', d: '模型在回答之前的<b>思考</b>，同样写在上下文里，供后续生成参考。', tk: ['<think>', '用户', '问', '天气', '已获得', '结果', '</think>'] },
+    { n: '当前生成位置', e: 'Generation →', c: '#fbbf24', ic: 'edit', x: '', d: '<b>LLM 正在生成</b>的新 token，紧接在全部上下文之后；它能依据的，只有上面这些内容。', tk: ['北京', '今天', '晴', '，', '气温', '23°C'] },
+  ],
+  init(s) {
+    const E = C02.esc;
+    s.querySelector('.wn-secs').innerHTML = this.S.map((p, i) => `
+      <div class="wn-sec${i === 4 ? ' gen' : ''}" data-i="${i}" style="--c:${p.c}">
+        <div class="wn-sh"><b>${p.n}</b><small>${p.e}</small><em>${i === 4 ? '← LLM 正在生成' : '正在看'}</em></div>
+        <div class="wn-sx">${i === 4 ? 'assistant: "<span class="wn-gen">北京今天晴，气温 23°C...</span>"' : E(p.x)}</div>
+      </div>`).join('');
+    // token 流：各层的 token 依次排开，复制一份做无缝滚动
+    const one = this.S.map((p, i) => p.tk.map((t) => `<span class="wn-c" data-s="${i}" style="--c:${p.c}">${E(t)}</span>`).join('')).join('');
+    s.querySelector('.wn-tk').innerHTML = one + one;
+    s.querySelector('.wn-secs').addEventListener('click', (e) => { const it = e.target.closest('[data-i]'); if (it) { this.auto = false; this.show(s, +it.dataset.i); } });
+  },
+  show(s, i) {
+    const p = this.S[i];
+    this.i = i;
+    s.querySelectorAll('.wn-sec').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    s.querySelector('.wn-strip').dataset.on = i;
+    const c = s.querySelector('.wn-card');
+    c.style.setProperty('--c', p.c);
+    c.querySelector('.wn-ic use').setAttribute('href', '#i-' + p.ic);
+    c.querySelector('.wn-cn').textContent = p.n;
+    c.querySelector('.wn-ce').textContent = p.e;
+    c.querySelector('.wn-cd').innerHTML = p.d;
+    U.restart(c, 'sw');
+    const bar = c.querySelector('.wn-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) { bar.style.setProperty('--dur', '2.8s'); bar.classList.add('run'); }
+    if (i === 4 && this.ctx) U.type(s.querySelector('.wn-gen'), { ctx: this.ctx, speed: 90 });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.S.length); }, 2900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    s.querySelectorAll('.wn-sec').forEach((x) => x.classList.remove('on'));
+    s.querySelector('.wn-strip').dataset.on = '';
+    const g = s.querySelector('.wn-gen');
+    if (g.dataset.orig) g.textContent = g.dataset.orig;
+    g.classList.remove('typing');
+  },
+};
+</script>
+
+<section class="slide" id="c02-map" data-part="0" data-trans="zoom" data-dur="16000" data-title="本章导览：一条请求的解剖图" data-notes="本章围绕“每次调用模型时送进去的那一份上下文”展开。把一次请求摊开，就能看到各部分在它身上各管哪一段：<br><b>PART 01</b> 先讲为什么——上下文的质量决定 Agent 能力的上限；<b>PART 02</b> 拆解 API 的消息结构，它是上下文的骨架；<b>PART 03–05</b> 讲 KV Cache：为什么前缀必须稳定、动态信息只能追加到末尾，以及缓存如何反过来成为架构约束；<b>PART 06</b> 讲系统提示词和工具定义该怎么写，以及外部内容如何通过提示注入劫持上下文；<b>PART 07</b> 讲 Agent Skills——少量目录常驻、完整正文按需追加；<b>PART 08</b> 讲在末尾注入的 Agent 状态栏；<b>PART 09</b> 讲如何为上下文做减法：压缩与子 Agent 隔离。<br>标签会自动依次高亮，点击任一标签可直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：把<em>一次请求</em>摊开来看</h2>
+  <p class="lead fx fx-up" style="--d:2">每个部分各管这份上下文的一段——点击标签直接跳转</p></header>
+  <div class="mp2-stage fx fx-scale" style="--d:3">
+    <div class="mp2-bar"></div>
+    <div class="mp2-brs"></div>
+    <div class="mp2-edge l">← 静态前缀</div><div class="mp2-edge r">轨迹不断增长 →</div>
+  </div>
+  <div class="mp2-cap fx fx-up" style="--d:6"><span class="mp2-k"></span><span class="mp2-t"></span></div>
+  <div class="src">第二章 · 全章结构 ·「本章小结」</div>
+</section>
+<style>
+.mp2-stage{position:relative;height:560px;margin-top:-6px}
+.mp2-bar{position:absolute;left:0;right:0;top:236px;height:92px}
+.mp2-b{--c:var(--text3);position:absolute;top:0;height:92px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 13%,rgba(10,16,36,.92));transition:box-shadow .45s,background .45s,opacity .45s,translate .45s var(--ease)}
+.mp2-b b{font:700 17px var(--mono);color:var(--c)}
+.mp2-b small{font-size:15px;color:var(--text2)}
+.mp2-b.hit{background:color-mix(in srgb,var(--c) 30%,rgba(10,16,36,.92));box-shadow:0 0 30px color-mix(in srgb,var(--c) 45%,transparent);translate:0 -4px}
+.mp2-b.dim{opacity:.35}
+.mp2-br{--c:var(--acc);position:absolute;height:20px;border:2px solid var(--c);opacity:.55;transition:opacity .4s,box-shadow .4s;cursor:pointer;padding:0;background:none}
+.mp2-br.up{border-bottom:0;border-radius:10px 10px 0 0}
+.mp2-br.dn{border-top:0;border-radius:0 0 10px 10px}
+.mp2-br .mp2-l{position:absolute;left:50%;translate:-50% 0;white-space:nowrap;display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:17px;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 14%,#0a1024);transition:background .4s,color .4s}
+.mp2-br.up .mp2-l{bottom:16px}
+.mp2-br.dn .mp2-l{top:16px}
+.mp2-br .mp2-l em{font:700 14px var(--num);font-style:normal;color:var(--c);letter-spacing:.06em}
+.mp2-br.hit{opacity:1;box-shadow:0 0 18px color-mix(in srgb,var(--c) 40%,transparent)}
+.mp2-br.hit .mp2-l{background:var(--c);color:#06101f}
+.mp2-br.hit .mp2-l em{color:#06101f}
+.mp2-br:hover{opacity:1}
+.mp2-edge{position:absolute;top:338px;font-size:15px;color:var(--text3);letter-spacing:.08em}
+.mp2-edge.l{left:60px}.mp2-edge.r{right:60px}
+.mp2-cap{display:flex;align-items:center;gap:18px;padding:16px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-height:76px}
+.mp2-k{flex:none;font:800 20px var(--num);color:var(--acc);letter-spacing:.08em}
+.mp2-t{font-size:22px;line-height:1.55}
+.mp2-cap.sw .mp2-t,.mp2-cap.sw .mp2-k{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c02-map'] = {
+  // 一次请求里的各段（宽度单位 px）
+  B: [
+    { t: 'system', s: '系统提示词', c: '#cbd5e1', w: 230 },
+    { t: 'tools', s: '工具定义', c: '#60a5fa', w: 200 },
+    { t: 'user', s: '用户请求', c: '#fbbf24', w: 120 },
+    { t: 'assistant', s: '工具调用', c: '#a78bfa', w: 120 },
+    { t: 'tool', s: '工具结果', c: '#34d399', w: 190 },
+    { t: 'skill', s: 'Skill 正文', c: '#2dd4bf', w: 180 },
+    { t: 'assistant', s: '工具调用', c: '#a78bfa', w: 120 },
+    { t: 'tool', s: '工具结果', c: '#34d399', w: 150 },
+    { t: 'status', s: '状态栏', c: '#f472b6', w: 170 },
+  ],
+  // 各部分作用于哪几段：a..b 段，dir 在上方 / 下方，row 第几层
+  P: [
+    { p: 1, k: 'PART 01', n: '上下文：能力上限的关键', c: '#22d3ee', a: 0, b: 8, dir: 'dn', row: 1, d: '上下文的质量才是 Agent 能力的真正关键：怎样以更低成本，向模型提供一个信息充分的 c<sub>t</sub>？' },
+    { p: 2, k: 'PART 02', n: 'API 的上下文结构', c: '#60a5fa', a: 0, b: 8, dir: 'up', row: 2, d: '四种消息角色 + tools 字段构成骨架；Agent 框架的核心工作，就是管理这个 messages 列表。' },
+    { p: 3, k: 'PART 03–05', n: 'KV Cache 与缓存约束', c: '#a78bfa', a: 0, b: 8, dir: 'up', row: 1, d: '稳定前缀提高 KV Cache 命中：系统提示词和工具定义不要改，动态信息只追加到末尾——缓存因此成了架构约束。' },
+    { p: 6, k: 'PART 06', n: '提示工程', c: '#fbbf24', a: 0, b: 1, dir: 'up', row: 0, d: '系统提示词与工具定义该写什么、怎么组织：语气、结构、流程、业务规则、示例与工具描述。' },
+    { p: 6, k: 'PART 06', n: '提示注入', c: '#fb7185', a: 4, b: 4, dir: 'up', row: 0, d: '外部内容（网页、邮件、文档）把伪装成指令的文本混进工具结果，试图劫持 Agent——上下文安全的核心威胁。' },
+    { p: 9, k: 'PART 09', n: '压缩', c: '#38bdf8', a: 4, b: 4, dir: 'dn', row: 0, d: '为上下文做减法：在保留决策、约束、失败和来源的前提下压缩旧工具结果；更彻底的是用子 Agent 隔离。' },
+    { p: 7, k: 'PART 07', n: 'Skills', c: '#34d399', a: 5, b: 5, dir: 'dn', row: 0, d: 'Agent Skills：少量目录常驻，完整正文在需要时才追加进轨迹，不改写已有前缀。' },
+    { p: 8, k: 'PART 08', n: '状态栏', c: '#f472b6', a: 8, b: 8, dir: 'dn', row: 0, d: 'Agent 状态栏：把散落在轨迹里的隐式状态提炼成显式摘要，注入在上下文末尾。' },
+  ],
+  init(s) {
+    const W = 1660, gap = 8, tot = this.B.reduce((a, b) => a + b.w, 0) + gap * (this.B.length - 1);
+    let x = (W - tot) / 2;
+    this.X = this.B.map((b) => { const r = [x, x + b.w]; x += b.w + gap; return r; });
+    s.querySelector('.mp2-bar').innerHTML = this.B.map((b, i) => `<div class="mp2-b" data-b="${i}" style="left:${this.X[i][0]}px;width:${b.w}px;--c:${b.c}"><b>${b.t}</b><small>${b.s}</small></div>`).join('');
+    const yUp = [208, 136, 64], yDn = [342, 420];
+    s.querySelector('.mp2-brs').innerHTML = this.P.map((p, i) => {
+      const l = this.X[p.a][0] + 6, r = this.X[p.b][1] - 6;
+      const top = p.dir === 'up' ? yUp[p.row] : yDn[p.row];
+      return `<button class="mp2-br ${p.dir}" data-i="${i}" style="left:${l}px;width:${r - l}px;top:${top}px;--c:${p.c}"><span class="mp2-l"><em>${p.k}</em>${p.n}</span></button>`;
+    }).join('');
+    s.querySelector('.mp2-brs').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) C02.part(this.P[+b.dataset.i].p); });
+    s.querySelector('.mp2-brs').addEventListener('mouseover', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, i) {
+    const p = this.P[i];
+    this.i = i;
+    s.querySelectorAll('.mp2-br').forEach((b) => b.classList.toggle('hit', +b.dataset.i === i));
+    s.querySelectorAll('.mp2-b').forEach((b) => { const k = +b.dataset.b, on = k >= p.a && k <= p.b; b.classList.toggle('hit', on && p.a === p.b); b.classList.toggle('dim', !on); });
+    const cap = s.querySelector('.mp2-cap');
+    cap.querySelector('.mp2-k').textContent = p.k;
+    cap.querySelector('.mp2-k').style.color = p.c;
+    cap.querySelector('.mp2-t').innerHTML = p.d;
+    U.restart(cap, 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 700);
+    ctx.every(() => { if (this.auto) this.show(s, ((this.i ?? -1) + 1) % this.P.length); }, 2600);
+  },
+  reset(s) {
+    this.i = null;
+    s.querySelectorAll('.mp2-br,.mp2-b').forEach((b) => b.classList.remove('hit', 'dim'));
+    s.querySelector('.mp2-t').innerHTML = '';
+    s.querySelector('.mp2-k').textContent = '';
+  },
+};
+</script>

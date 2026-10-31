@@ -1,0 +1,910 @@
+<!-- ================= PART 02 API 的上下文结构 ================= -->
+<section class="slide chapter" id="c02-d2" data-part="2" data-title="PART 02 · API 的上下文结构" data-notes="这些上下文信息在技术上到底是以什么形式送给大模型的？本部分以 OpenAI 的 Chat Completions API 为例（Anthropic、Google 等厂商的 API 结构大同小异），详细拆解 Agent 每次调用大模型时的完整请求构成。理解这个结构，是掌握后续所有上下文工程技术的基础。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:90px">Agent 如何<br>调用大模型</h1>
+  <div class="ch-s fx fx-up" style="--d:3">理解 API 的上下文结构：后续所有上下文工程技术的基础</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">Agent 框架的核心工作，就是管理这个 messages 列表——在合适的时机往里追加消息，然后把整个列表送给模型。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c02-roles" data-part="2" data-dur="14000" data-title="消息的四种角色与 tools 字段" data-notes="大模型 API 的核心是一个<b>消息列表</b>（messages），列表中的每条消息都有一个<b>角色</b>（role）标识，模型根据角色来理解每条消息的含义和来源：<br><b>system</b>：系统提示词。由开发者编写，定义 Agent 的身份、行为规则、约束条件。模型将其视为最高优先级的指令。整个对话过程中通常只有一条，放在消息列表的最前面。<br><b>user</b>：用户消息。来自终端用户的输入，是 Agent 需要响应的请求。<br><b>assistant</b>：助手消息。模型之前的回复，包括文本回复和工具调用请求。在多轮对话中，之前的 assistant 消息会被放回消息列表，让模型“记住”自己说过什么。<br><b>tool</b>：工具结果。Agent 框架执行工具后，将结果以 tool 角色的消息送回给模型。每条 tool 消息通过 tool_call_id 与对应的工具调用请求关联。<br>此外，<b>工具定义（tools）作为请求的独立字段（而非消息）</b>，告诉模型有哪些工具可以使用、每个工具接受什么参数。<br>这与第一章介绍的“上下文五个组成部分”是同一个 API 请求结构的两种分类方式：四种消息角色分别对应系统提示词、用户消息、模型回复和工具执行结果；剩下的工具定义通过请求顶层的 tools 字段传入，并不是一种消息角色。因此，“四种消息角色 + tools 字段”恰好覆盖第一章所说的五个组成部分。各角色会自动轮流高亮，也可以把鼠标移到任意一项上。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">消息列表里的<em>四种角色</em>，外加一个 tools 字段</h2>
+  <p class="lead fx fx-up" style="--d:2">模型根据角色来理解每条消息的含义和来源</p></header>
+  <div class="rl2-stage fx fx-scale" style="--d:3">
+    <div class="rl2-env win">
+      <div class="win-bar"><i></i><i></i><i></i><span>POST /v1/chat/completions · 一次请求</span></div>
+      <div class="rl2-in">
+        <div class="rl2-k mono">"messages": [</div>
+        <div class="rl2-msgs"></div>
+        <div class="rl2-k mono">],</div>
+        <div class="rl2-tl" data-i="4"><b class="mono">"tools": [ … ]</b><span>请求的独立字段，不是消息</span></div>
+      </div>
+    </div>
+    <svg class="rl2-svg" viewBox="0 0 1660 470" width="1660" height="470"></svg>
+    <div class="rl2-cmp">
+      <div class="rl2-lb lbl">第一章 · 上下文的五个组成部分</div>
+      <div class="rl2-cs"></div>
+    </div>
+  </div>
+  <div class="rl2-card fx fx-up" style="--d:5"><span class="rl2-cr mono"></span><p class="rl2-cd"></p></div>
+  <div class="src">第二章 ·「Agent 如何调用大模型：理解 API 的上下文结构」·「消息的四种角色」</div>
+</section>
+<style>
+.rl2-stage{position:relative;height:470px}
+.rl2-env{position:absolute;left:0;top:0;width:640px}
+.rl2-in{padding:16px 22px 18px}
+.rl2-k{font-size:17px;color:var(--text3);margin:4px 0}
+.rl2-msgs{display:flex;flex-direction:column;gap:10px;padding-left:22px}
+.rl2-m,.rl2-tl{--c:var(--text3);display:flex;align-items:center;gap:16px;height:62px;padding:0 18px;border-radius:14px;cursor:default;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9));transition:background .4s,box-shadow .4s,border-color .4s,translate .4s var(--ease)}
+.rl2-m b{min-width:110px;font:700 19px var(--mono);color:var(--c)}
+.rl2-m span{font-size:17px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rl2-tl{--c:#60a5fa;margin-top:12px;border-style:dashed}
+.rl2-tl b{font-size:18px;color:var(--c)}
+.rl2-tl span{font-size:16px;color:var(--text3)}
+.rl2-m.on,.rl2-tl.on,.rl2-c.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 20%,rgba(10,16,36,.9));box-shadow:0 0 26px color-mix(in srgb,var(--c) 35%,transparent);translate:6px 0}
+.rl2-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.rl2-p{fill:none;stroke:var(--c);stroke-width:2.2;stroke-dasharray:6 8;opacity:.28;transition:opacity .4s}
+.rl2-p.on{opacity:1;stroke-width:3;animation:flow 1s linear infinite;filter:drop-shadow(0 0 6px var(--c))}
+.rl2-cmp{position:absolute;left:1120px;top:20px;width:540px}
+.rl2-lb{margin-bottom:12px}
+.rl2-cs{display:flex;flex-direction:column;gap:12px}
+.rl2-c{--c:var(--text3);display:flex;align-items:center;gap:14px;height:66px;padding:0 20px;border-radius:14px;font-size:21px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 8%,rgba(10,16,36,.9));transition:background .4s,box-shadow .4s,border-color .4s,translate .4s var(--ease)}
+.rl2-c .ic{font-size:26px;color:var(--c)}
+.rl2-c small{margin-left:auto;font-size:15px;color:var(--text3)}
+.rl2-card{display:flex;align-items:center;gap:22px;margin-top:20px;padding:16px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-height:96px}
+.rl2-cr{flex:none;min-width:110px;text-align:center;padding:8px 14px;border-radius:12px;font-size:20px;font-weight:700;color:var(--c,var(--acc));border:1px solid currentColor}
+.rl2-cd{font-size:20px;line-height:1.6}
+.rl2-cd b{color:var(--acc)}
+.rl2-card.sw .rl2-cd{animation:swIn .45s var(--ease) both}
+</style>
+<script>
+HOOKS['c02-roles'] = {
+  R: [
+    { r: 'system', c: '#cbd5e1', ex: '"You are a helpful assistant…"', cmp: '系统提示词', ic: 'file', d: '<b>系统提示词</b>。由开发者编写，定义 Agent 的身份、行为规则、约束条件；模型将其视为<b>最高优先级的指令</b>。整个对话中通常只有一条，放在消息列表的最前面。' },
+    { r: 'user', c: '#fbbf24', ex: '"What\'s the current time and weather…"', cmp: '用户消息', ic: 'user', d: '<b>用户消息</b>。来自终端用户的输入，是 Agent 需要响应的请求。' },
+    { r: 'assistant', c: '#a78bfa', ex: 'content / tool_calls', cmp: '模型回复', ic: 'brain', d: '<b>助手消息</b>。模型之前的回复，包括文本回复和工具调用请求。多轮对话中被<b>放回消息列表</b>，让模型“记住”自己说过什么。' },
+    { r: 'tool', c: '#34d399', ex: 'tool_call_id: "call_abc123"', cmp: '工具执行结果', ic: 'server', d: '<b>工具结果</b>。Agent 框架执行工具后，以 tool 角色送回模型；每条 tool 消息通过 <b>tool_call_id</b> 与对应的工具调用请求关联。' },
+    { r: 'tools', c: '#60a5fa', ex: '', cmp: '工具定义', ic: 'wrench', d: '<b>工具定义</b>是请求顶层的<b>独立字段（而非消息）</b>，告诉模型有哪些工具可用、每个工具接受什么参数。“四种消息角色 + tools 字段”恰好覆盖第一章的五个组成部分。' },
+  ],
+  init(s) {
+    s.querySelector('.rl2-msgs').innerHTML = this.R.slice(0, 4).map((p, i) => `<div class="rl2-m" data-i="${i}" style="--c:${p.c}"><b>"${p.r}"</b><span class="mono">${C02.esc(p.ex)}</span></div>`).join('');
+    s.querySelector('.rl2-cs').innerHTML = this.R.map((p, i) => `<div class="rl2-c" data-i="${i}" style="--c:${p.c}"><svg class="ic"><use href="#i-${p.ic}"/></svg>${p.cmp}<small>${i < 4 ? p.r + ' 消息' : 'tools 字段'}</small></div>`).join('');
+    const st = s.querySelector('.rl2-stage'), svg = s.querySelector('.rl2-svg');
+    const L = [...s.querySelectorAll('.rl2-m'), s.querySelector('.rl2-tl')], C = [...s.querySelectorAll('.rl2-c')];
+    svg.innerHTML = L.map((el, i) => {
+      const a = C02.rel(el, st), b = C02.rel(C[i], st), x1 = a.x + a.w + 8, y1 = a.y + a.h / 2, x2 = b.x - 8, y2 = b.y + b.h / 2;
+      return `<path class="rl2-p" data-i="${i}" style="--c:${this.R[i].c}" d="M${x1} ${y1} C ${x1 + 200} ${y1}, ${x2 - 200} ${y2}, ${x2} ${y2}"/>`;
+    }).join('');
+    st.addEventListener('mouseover', (e) => { const b = e.target.closest('[data-i]'); if (b && !b.closest('svg')) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.rl2-m,.rl2-tl,.rl2-c,.rl2-p').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    const card = s.querySelector('.rl2-card'), p = this.R[i];
+    const cr = card.querySelector('.rl2-cr');
+    cr.textContent = p.r;
+    cr.style.setProperty('--c', p.c);
+    card.querySelector('.rl2-cd').innerHTML = p.d;
+    U.restart(card, 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.R.length); }, 2600);
+  },
+  reset(s) { s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-single" data-part="2" data-steps="2" data-trans="rise" data-dur="8000" data-title="单轮对话：最简单的 API 调用" data-notes="先看一个不涉及工具调用的最简单场景：用户问“Hello, who are you?”（这里用本地部署的 Qwen3-0.6B 小模型作为示例）。<br>这个请求只包含两条消息：一条 system（开发者写的规则）和一条 user（用户的输入）。模型返回一条 assistant 消息作为回复。这就是大模型 API 最基本的交互模式——<b>每次调用都是无状态的，所有模型需要的信息必须在请求的消息列表中完整提供</b>。<br>按 → 依次看：请求 → 响应 → 下一次调用时模型什么也不记得，一切都要重新带上。这一页对应<b>图2-2</b>。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">单轮对话：最简单的一次 <em>API 调用</em></h2></header>
+  <div class="sg-stage">
+    <div class="sg-w fx fx-left" style="--d:2"><div class="sg-req win">
+      <div class="win-bar"><i></i><i></i><i></i><span>Request · Agent 框架构造</span></div>
+<pre class="code sg-code"><span class="ln">{</span><span class="ln">  <span class="t-p">"model"</span>: <span class="t-s">"Qwen3-0.6B"</span>,</span><span class="ln">  <span class="t-p">"messages"</span>: [</span><span class="ln">    { <span class="t-p">"role"</span>: <span class="t-s">"system"</span>,  <span class="t-c">← 开发者编写</span></span><span class="ln">      <span class="t-p">"content"</span>: <span class="t-s">"You are a helpful coding assistant.</span></span><span class="ln"><span class="t-s">                  Follow user instructions."</span> },</span><span class="ln">    { <span class="t-p">"role"</span>: <span class="t-s">"user"</span>,  <span class="t-c">← 用户输入</span></span><span class="ln">      <span class="t-p">"content"</span>: <span class="t-s">"Hello, who are you?"</span> }</span><span class="ln">  ]</span><span class="ln">}</span></pre>
+    </div></div>
+    <div class="sg-mid">
+      <svg class="sg-svg" viewBox="0 0 320 460" width="320" height="460">
+        <path class="sg-p a" d="M0 150 H320"/><path class="sg-p b" d="M0 310 H320"/>
+        <circle class="pk sg-k1" r="10" style="fill:#fbbf24"/><circle class="pk sg-k2" r="10" style="fill:#a78bfa"/>
+      </svg>
+      <div class="sg-model"><svg class="ic"><use href="#i-cpu"/></svg><b>Qwen3-0.6B</b><div class="sg-mem"><span class="lbl">模型的“记忆”</span><em>空</em></div></div>
+      <span class="sg-tl a">调用 →</span><span class="sg-tl b">→ 返回</span>
+    </div>
+    <div class="sg-w fx fx-right" style="--d:3"><div class="sg-res win">
+      <div class="win-bar"><i></i><i></i><i></i><span>Response · API 返回</span></div>
+<pre class="code sg-code"><span class="ln">{</span><span class="ln">  <span class="t-p">"choices"</span>: [{</span><span class="ln">    <span class="t-p">"message"</span>: {</span><span class="ln">      <span class="t-p">"role"</span>: <span class="t-s">"assistant"</span>,  <span class="t-c">← 模型生成</span></span><span class="ln">      <span class="t-p">"content"</span>: <span class="t-s">"Hi! I'm a coding assistant.</span></span><span class="ln"><span class="t-s">        I can help you write code, debug</span></span><span class="ln"><span class="t-s">        issues, and explain technical</span></span><span class="ln"><span class="t-s">        concepts. How can I help?"</span></span><span class="ln">    }</span><span class="ln">  }]</span><span class="ln">}</span></pre>
+    </div></div>
+  </div>
+  <div class="sg-ban"><svg class="ic"><use href="#i-refresh"/></svg><p><b>每次调用都是无状态的</b>——下一次调用时模型什么都不记得，所有需要的信息必须在请求的 messages 列表中<b>完整提供</b></p></div>
+  <div class="src">第二章 ·「单轮对话：最简单的 API 调用」· 图2-2</div>
+</section>
+<style>
+.sg-stage{display:flex;align-items:stretch;gap:0;height:520px}
+.sg-w{width:670px;flex:none;display:flex}
+.sg-req,.sg-res{flex:1;transition:opacity .5s,box-shadow .5s}
+.sg-code{font-size:17px;line-height:1.75;padding:16px 22px}
+.sg-code .ln{opacity:0;transform:translateX(-10px);transition:opacity .4s,transform .4s;transition-delay:calc(var(--i,0)*70ms)}
+#c02-single .sg-req.go .ln,#c02-single .sg-res.go .ln{opacity:1;transform:none}
+.sg-mid{position:relative;flex:1}
+.sg-svg{position:absolute;inset:0;overflow:visible}
+.sg-p{fill:none;stroke-width:3;stroke-dasharray:7 9;animation:flow 1.1s linear infinite;opacity:.25;transition:opacity .4s}
+.sg-p.a{stroke:var(--tool)}.sg-p.b{stroke:var(--llm)}
+.sg-p.on{opacity:.9}
+.sg-model{position:absolute;left:30px;right:30px;top:180px;height:110px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 10%,rgba(10,16,36,.95));z-index:2}
+.sg-model>.ic{font-size:30px;color:var(--llm)}
+.sg-model b{font:700 18px var(--num)}
+.sg-mem{position:absolute;left:0;right:0;top:122px;display:flex;flex-direction:column;align-items:center;gap:6px}
+.sg-mem em{font-style:normal;padding:6px 18px;border-radius:10px;font-size:18px;color:var(--text3);border:1px dashed var(--line2);transition:all .4s}
+.sg-mem em.wipe{color:var(--bad);border-color:var(--bad);animation:shake .5s}
+.sg-tl{position:absolute;left:0;right:0;text-align:center;font-size:16px}
+.sg-tl.a{top:116px;color:var(--tool)}.sg-tl.b{top:320px;color:var(--llm)}
+#c02-single[data-k="0"] .sg-res{opacity:.3}
+.sg-ban{display:flex;align-items:center;gap:18px;margin-top:22px;padding:16px 24px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent);opacity:.3;transition:opacity .6s}
+.sg-ban .ic{font-size:32px;color:var(--acc);flex:none}
+.sg-ban p{font-size:23px;line-height:1.55}
+.sg-ban b{color:var(--acc)}
+#c02-single[data-k="2"] .sg-ban{opacity:1}
+</style>
+<script>
+HOOKS['c02-single'] = {
+  init(s) { s.querySelectorAll('.sg-code').forEach((c) => [...c.querySelectorAll('.ln')].forEach((l, i) => l.style.setProperty('--i', i))); },
+  async play(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const req = s.querySelector('.sg-req'), res = s.querySelector('.sg-res'), mem = s.querySelector('.sg-mem em');
+    const pa = s.querySelector('.sg-p.a'), pb = s.querySelector('.sg-p.b');
+    s.dataset.k = k;
+    req.classList.add('go');
+    res.classList.toggle('go', k >= 1);
+    pa.classList.toggle('on', k >= 1); pb.classList.toggle('on', k >= 1);
+    mem.classList.remove('wipe');
+    mem.textContent = '空';
+    if (!ctx || k < 1) return;
+    while (ok()) {
+      await U.fly(s.querySelector('.sg-k1'), pa, 1000, { ctx });
+      if (!ok()) return;
+      mem.textContent = '处理本次请求中…';
+      await U.wait(ctx, 500);
+      if (!ok()) return;
+      await U.fly(s.querySelector('.sg-k2'), pb, 1000, { ctx });
+      if (!ok()) return;
+      // 调用结束：模型不保留任何状态
+      mem.textContent = '空（不记得刚才的对话）';
+      if (k >= 2) U.restart(mem, 'wipe');
+      await U.wait(ctx, 1800);
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.play(s, k); },
+  step(s, ctx, k) { this.play(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.k = 0; s.querySelectorAll('.go,.on').forEach((x) => x.classList.remove('go', 'on')); },
+};
+</script>
+
+<section class="slide" id="c02-call1" data-part="2" data-steps="2" data-trans="zoom" data-dur="9000" data-title="第一次 API 调用：返回工具调用请求" data-notes="真正的 Agent 场景远比单轮问答复杂。当用户问“What's the current time and weather in Vancouver?”时，模型无法凭自身知识回答（它不知道“现在”是什么时候，更不知道天气），需要调用外部工具。<b>图2-3</b> 中的两次调用均指<b>调用模型 API</b>，而不是先后调用两个工具。<br><b>第一次 API 调用——Agent 框架发送初始请求：</b>system、user 两条消息，加上 tools 字段里的 get_current_time 和 get_weather。这份 tools 清单是开发者事先注册好的<b>静态工具元数据</b>——工具名称、描述和参数 schema 都写在代码里，和用户这次问了什么无关。无论用户问的是温哥华的天气，还是让 Agent 订一张机票，发出去的都是同一份清单；示例中只列出相关的两个工具，是为了让请求体短一些，真实的 Agent 往往一次挂上几十个工具。<b>并不是 Agent 先把用户输入拆成“查时间”和“查天气”两个子任务，再据此生成对应的工具描述</b>——拆解发生在模型一侧，就是响应里的 tool_calls。<br><b>模型返回工具调用请求（不是最终回复）：</b>content 为 null，tool_calls 里有两个<b>工具调用请求</b>——它判断“当前时间”和“天气”需要通过工具获取，而且两者之间没有依赖关系，可以并行调用。<b>模型只是发出了调用请求，真正执行工具的是 Agent 框架</b>。这是理解 Agent 架构的关键：模型负责决策（调用什么工具、传什么参数），Agent 框架负责执行（实际调用 API、运行代码）。<br>右上角可以切换用户的问题，观察 tools 清单是否跟着变。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第一次调用：模型返回的是<em>工具调用请求</em></h2></div>
+    <div class="c1-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="wx">问：时间和天气</button><button data-v="fl">问：订一张机票</button></div></header>
+  <div class="c1-body">
+    <div class="c1-req panel fx fx-left" style="--d:2">
+      <div class="c1-h"><span class="badge" style="--c:var(--har)">第 1 次模型 API 调用</span><span class="lbl">Agent 框架发送初始请求</span></div>
+      <div class="ml c1-ml">
+        <div class="mr" data-r="system"><span class="rl">system</span><span class="tx">You are a helpful assistant. Use the provided tools to get real-time information when needed.</span></div>
+        <div class="mr c1-u" data-r="user"><span class="rl">user</span><span class="tx c1-ut">What's the current time and weather in Vancouver?</span></div>
+      </div>
+      <div class="c1-tools">
+        <div class="c1-th"><b class="mono">tools</b><span>开发者事先注册好的静态工具元数据</span><em class="c1-same">清单未变</em></div>
+        <div class="c1-t"><b class="mono">get_current_time</b><span>Get the current date and time in a specific timezone</span><code>timezone: string</code></div>
+        <div class="c1-t"><b class="mono">get_weather</b><span>Get the current weather for a specific city</span><code>city: string · unit: celsius | fahrenheit</code></div>
+        <div class="c1-more">示例只列两个；真实的 Agent 往往一次挂上<b>几十个</b>工具</div>
+      </div>
+    </div>
+    <div class="c1-res panel" data-step="1">
+      <div class="c1-h"><span class="badge" style="--c:var(--llm)">API 返回</span><span class="lbl">不是最终回复</span></div>
+      <div class="c1-null mono">"content": <span class="t-n">null</span>　<span class="t-c">// 没有文本回复</span></div>
+      <div class="c1-calls">
+        <div class="c1-call"><span class="c1-id mono">call_abc123</span><b class="mono">get_current_time</b><code>{"timezone": "America/Vancouver"}</code></div>
+        <div class="c1-call"><span class="c1-id mono">call_def456</span><b class="mono">get_weather</b><code>{"city": "Vancouver", "unit": "celsius"}</code></div>
+        <div class="c1-par"><svg class="ic"><use href="#i-merge"/></svg>两者无数据依赖 → 可以并行</div>
+      </div>
+      <p class="c1-note">拆解发生在<b>模型一侧</b>：并不是 Agent 先把问题拆成“查时间”“查天气”，再生成对应的工具描述</p>
+    </div>
+  </div>
+  <div class="c1-split" data-step="2">
+    <div class="c1-sp" style="--c:var(--llm)"><svg class="ic"><use href="#i-brain"/></svg><b>模型：决策</b><span>调用什么工具、传什么参数</span></div>
+    <div class="c1-sx">模型只是发出了调用请求，<br>真正执行工具的是 Agent 框架</div>
+    <div class="c1-sp" style="--c:var(--har)"><svg class="ic"><use href="#i-wrench"/></svg><b>Agent 框架：执行</b><span>实际调用 API、运行代码</span></div>
+  </div>
+  <div class="src">第二章 ·「带工具调用的多轮交互：Agent 的核心循环」· 图2-3</div>
+</section>
+<style>
+#c02-call1 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:22px}
+.c1-body{display:flex;gap:30px;height:540px}
+.c1-req{width:860px;flex:none;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.c1-res{flex:1;min-width:0;padding:20px 24px;display:flex;flex-direction:column;gap:14px;border-color:color-mix(in srgb,var(--llm) 40%,transparent)}
+.c1-res{opacity:.25;translate:30px 0;transition:opacity .6s,translate .6s var(--ease)}
+.c1-res.on{opacity:1;translate:0 0}
+.c1-h{display:flex;align-items:center;gap:14px}
+.c1-ml .mr{font-size:18px}
+.c1-u.flash{animation:glowPulse 1s ease 2;--c:var(--tool)}
+.c1-tools{padding:14px 16px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--har) 60%,transparent);background:color-mix(in srgb,var(--har) 6%,transparent);display:flex;flex-direction:column;gap:10px;transition:box-shadow .4s}
+.c1-th{display:flex;align-items:center;gap:12px}
+.c1-th b{font-size:19px;color:var(--har)}
+.c1-th span{font-size:16px;color:var(--text3)}
+.c1-same{margin-left:auto;font-style:normal;font-size:15px;color:var(--ok);padding:3px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);opacity:0;transition:opacity .4s}
+.c1-tools.same{box-shadow:0 0 28px color-mix(in srgb,var(--ok) 30%,transparent)}
+.c1-tools.same .c1-same{opacity:1}
+.c1-t{display:grid;grid-template-columns:200px 1fr;gap:2px 14px;padding:10px 14px;border-radius:12px;background:rgba(5,9,22,.6);border:1px solid var(--line)}
+.c1-t b{font-size:17px;color:var(--tool)}
+.c1-t span{font-size:16px;color:var(--text2)}
+.c1-t code{grid-column:2;font:15px var(--mono);color:var(--text3)}
+.c1-more{font-size:16px;color:var(--text3)}
+.c1-more b{color:var(--warn)}
+.c1-null{font-size:18px;color:var(--text2)}
+.c1-calls{display:flex;flex-direction:column;gap:12px;position:relative}
+.c1-call{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center;padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 10%,rgba(10,16,36,.9))}
+.c1-call b{font-size:19px;color:var(--tool)}
+.c1-call code{grid-column:1/-1;font:16px var(--mono);color:#cbd5f5}
+.c1-id{font-size:15px;padding:2px 10px;border-radius:8px;color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 50%,transparent)}
+.c1-par{display:flex;align-items:center;gap:10px;align-self:flex-start;padding:8px 16px;border-radius:999px;font-size:18px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.c1-note{margin-top:auto;font-size:18px;line-height:1.6;color:var(--text2)}
+.c1-note b{color:var(--llm)}
+.c1-split{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:center;margin-top:20px;opacity:0;transform:translateY(14px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.c1-split.on{opacity:1;transform:none}
+.c1-sp{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.c1-sp .ic{font-size:30px;color:var(--c)}
+.c1-sp b{font-size:21px;color:var(--c)}
+.c1-sp span{font-size:18px;color:var(--text2)}
+.c1-sx{text-align:center;font-size:20px;font-weight:700;color:var(--acc);line-height:1.5}
+</style>
+<script>
+HOOKS['c02-call1'] = {
+  Q: { wx: "What's the current time and weather in Vancouver?", fl: 'Book me a flight from Vancouver to Tokyo next Friday.' },
+  init(s) { this.set = U.seg(s.querySelector('.c1-seg'), (v) => { this.auto = false; this.ask(s, v); }); },
+  ask(s, v) {
+    this.v = v;
+    this.set(v);
+    s.querySelector('.c1-ut').textContent = this.Q[v];
+    U.restart(s.querySelector('.c1-u'), 'flash');
+    const t = s.querySelector('.c1-tools');
+    t.classList.remove('same'); void t.offsetWidth; t.classList.add('same');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.ask(s, 'wx');
+    s.querySelector('.c1-tools').classList.remove('same');
+    ctx.every(() => { if (this.auto) this.ask(s, this.v === 'wx' ? 'fl' : 'wx'); }, 3400);
+  },
+  reset(s) { s.querySelector('.c1-ut').textContent = this.Q.wx; s.querySelector('.c1-tools').classList.remove('same'); },
+};
+</script>
+
+<section class="slide" id="c02-call2" data-part="2" data-steps="2" data-dur="10000" data-title="第二次 API 调用：完整历史 + 工具结果" data-notes="<b>Agent 框架执行工具，然后发起第二次 API 调用：</b>Agent 框架拿到模型的工具调用请求后，实际执行这两个工具（比如调用时间 API 和天气 API），然后将<b>完整的对话历史加上工具执行结果</b>一起发送给模型。在这个例子中，get_current_time 的时区参数和 get_weather 的城市、单位参数都可以直接确定，天气服务会自行返回最新天气、不依赖时间工具的输出，因此框架可以并行执行；如果后一个工具的参数必须来自前一个工具的结果，模型就需要在后续一轮中再发起工具调用，两个工具只能串行执行（左上角可切换）。<br>这里有三个关键细节：① <b>第二次请求包含了第一次的全部对话历史</b>——system、user、第一次的 assistant 回复（包含工具调用），以及新增的 tool 结果。这就是“每次调用都是无状态的”：模型不会“记住”上一次的对话，Agent 框架必须每次都把完整历史送回去。② <b>第一次的 assistant 消息被原样放回消息列表</b>——这让模型能“看到”自己之前做了什么决策。③ <b>tool 消息通过 tool_call_id 与对应的工具调用关联</b>——模型据此知道哪个结果对应哪个调用。<br><b>模型根据工具结果生成最终回复：</b>这一次没有返回 tool_calls，而是直接给出文本回复——它判断已经有了足够的信息，Agent 就停止执行了。<b>这个“请求→工具调用→执行→送回结果→再请求”的循环，就是第一章介绍的 ReAct 循环在 API 层面的具体实现。</b>如果用户追问“那东京呢？”，Agent 框架会把追问追加到对话历史的末尾，然后发起又一次模型 API 调用，如此循环。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第二次调用：把<em>完整历史</em>加上工具结果再发一遍</h2></div>
+    <div class="c2-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="par">并行：参数互不依赖</button><button data-v="ser">串行：参数依赖前一个结果</button></div></header>
+  <div class="c2-body">
+    <div class="c2-w fx fx-left" style="--d:2"><div class="c2-ex panel">
+      <div class="c2-hd"><svg class="ic"><use href="#i-wrench"/></svg><b>Agent 框架执行工具</b></div>
+      <div class="c2-job" data-j="0"><div class="c2-jh"><b class="mono">get_current_time</b><span class="mono">call_abc123</span></div><div class="c2-pb"><i></i></div><code>{"datetime": "2025-09-13T05:18:47", "day_of_week": "Saturday"}</code></div>
+      <div class="c2-gap"><span>模型再调用一轮，拿到前一个结果后才能发出下一个调用</span></div>
+      <div class="c2-job" data-j="1"><div class="c2-jh"><b class="mono">get_weather</b><span class="mono">call_def456</span></div><div class="c2-pb"><i></i></div><code>{"temperature": 13.2, "conditions": "clear", "humidity": 93}</code></div>
+      <p class="c2-ec"></p>
+    </div></div>
+    <div class="c2-w fx fx-up" style="--d:3"><div class="c2-req panel">
+      <div class="c2-hd"><span class="badge" style="--c:var(--har)">第 2 次模型 API 调用</span></div>
+      <div class="c2-wrap">
+        <div class="ml c2-ml"></div>
+        <div class="c2-b1"><em>①</em>全部对话历史</div>
+      </div>
+      <div class="c2-tl mono">"tools": [ … ]　<span>同上，省略</span></div>
+    </div></div>
+    <div class="c2-w fx fx-right" style="--d:4"><div class="c2-res panel">
+      <div class="c2-hd"><span class="badge" style="--c:var(--llm)">API 返回：最终回复</span></div>
+      <p class="c2-fin mono">It's currently 5:18 AM on Saturday, September 13, 2025 in Vancouver. Weather: 13.2°C with clear skies and 93% humidity. It's quite cool this morning - you might want to grab a jacket.</p>
+      <div class="c2-stop"><svg class="ic"><use href="#i-check"/></svg>无 tool_calls → 停止执行</div>
+      <div class="c2-fu"><span class="mr" data-r="user"><span class="rl">user</span><span class="tx">那东京呢？</span></span><small>追问追加到历史末尾 → 又一次模型调用，循环继续</small></div>
+    </div></div>
+  </div>
+  <p class="tagline c2-tag" data-step="2">“请求 → 工具调用 → 执行 → 送回结果 → 再请求”：这就是第一章的 <b>ReAct 循环在 API 层面的具体实现</b></p>
+  <div class="src">第二章 ·「带工具调用的多轮交互：Agent 的核心循环」· 图2-3</div>
+</section>
+<style>
+#c02-call2 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+.c2-body{display:grid;grid-template-columns:440px 1fr 450px;gap:24px;height:560px}
+.c2-w{display:flex;min-width:0}
+.c2-ex,.c2-req,.c2-res{flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;gap:12px;transition:opacity .5s,border-color .5s}
+.c2-hd{display:flex;align-items:center;gap:10px;font-size:20px}
+.c2-hd .ic{font-size:24px;color:var(--har)}
+.c2-job{padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--env) 40%,transparent);background:color-mix(in srgb,var(--env) 7%,rgba(10,16,36,.9));display:flex;flex-direction:column;gap:8px}
+.c2-jh{display:flex;justify-content:space-between;align-items:center}
+.c2-jh b{font-size:17px;color:var(--tool)}
+.c2-jh span{font-size:15px;color:var(--text3)}
+.c2-pb{height:10px;border-radius:10px;background:rgba(255,255,255,.08);overflow:hidden}
+.c2-pb i{display:block;height:100%;width:0;border-radius:10px;background:linear-gradient(90deg,var(--env),#a7f3d0)}
+.c2-job code{font:15px/1.5 var(--mono);color:#a7f3d0;opacity:0;transition:opacity .4s;word-break:break-all}
+.c2-job.done code{opacity:1}
+.c2-gap{display:none;padding:8px 12px;border-radius:10px;font-size:15px;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent)}
+#c02-call2[data-m=ser] .c2-gap{display:block}
+.c2-ec{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+.c2-wrap{position:relative;padding-right:120px}
+.c2-ml .mr{font-size:16px;padding:8px 12px 8px 16px}
+.c2-ml .mr .rl{min-width:92px}
+.c2-tag2{display:inline-block;margin-left:8px;font-size:14px;padding:1px 8px;border-radius:6px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.c2-b1{position:absolute;right:0;top:0;bottom:0;width:104px;border:2px solid var(--acc);border-left:0;border-radius:0 14px 14px 0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:15px;color:var(--acc);padding-left:16px;opacity:0;transition:opacity .5s}
+.c2-b1 em{font-style:normal;font-size:20px;margin-right:2px}
+.c2-b1.on{opacity:1}
+.c2-tl{font-size:16px;color:var(--har);padding:8px 12px;border-radius:10px;border:1px dashed color-mix(in srgb,var(--har) 50%,transparent)}
+.c2-tl span{color:var(--text3)}
+.c2-fin{font-size:17px;line-height:1.65;padding:14px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 9%,rgba(10,16,36,.9));min-height:200px}
+.c2-stop{display:flex;align-items:center;gap:10px;font-size:18px;color:var(--ok)}
+.c2-fu{display:flex;flex-direction:column;gap:8px;margin-top:auto;opacity:0;transform:translateY(10px);transition:all .6s var(--ease)}
+.c2-fu.on{opacity:1;transform:none}
+.c2-fu small{font-size:16px;color:var(--text3)}
+#c02-call2[data-k="0"] .c2-req,#c02-call2[data-k="0"] .c2-res,#c02-call2[data-k="1"] .c2-res{opacity:.3}
+#c02-call2[data-k="1"] .c2-ex,#c02-call2[data-k="2"] .c2-ex,#c02-call2[data-k="2"] .c2-req{opacity:.55}
+.c2-tag{margin-top:18px;font-size:23px;opacity:0;transform:translateY(12px);transition:all .6s var(--ease)}
+.c2-tag.on{opacity:1;transform:none}
+</style>
+<script>
+HOOKS['c02-call2'] = {
+  ROWS: [
+    ['system', 'You are a helpful assistant. Use the provided tools…', '同第 1 次', '#94a3b8'],
+    ['user', "What's the current time and weather in Vancouver?", '同第 1 次', '#94a3b8'],
+    ['assistant', 'tool_calls: [call_abc123 get_current_time, call_def456 get_weather]', '② 原样放回', '#a78bfa'],
+    ['tool', 'tool_call_id: call_abc123 · {"datetime": "2025-09-13T05:18:47", …}', '③ 新增', '#34d399'],
+    ['tool', 'tool_call_id: call_def456 · {"temperature": 13.2, …}', '③ 新增', '#34d399'],
+  ],
+  init(s) { this.set = U.seg(s.querySelector('.c2-seg'), (v) => { this.mode = v; this.run(s, this.k); }); this.mode = 'par'; },
+  async run(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.k = k;
+    s.dataset.k = k;
+    s.dataset.m = this.mode;
+    this.set(this.mode);
+    const jobs = [...s.querySelectorAll('.c2-job')], ml = s.querySelector('.c2-ml'), b1 = s.querySelector('.c2-b1'), fu = s.querySelector('.c2-fu'), ec = s.querySelector('.c2-ec');
+    const bar = (j, ms) => { const i = jobs[j].querySelector('i'); i.style.transition = 'none'; i.style.width = '0'; void i.offsetWidth; i.style.transition = `width ${ms}ms linear`; i.style.width = '100%'; };
+    jobs.forEach((j) => { j.classList.remove('done'); const i = j.querySelector('i'); i.style.transition = 'none'; i.style.width = '0'; });
+    ml.innerHTML = '';
+    b1.classList.remove('on');
+    fu.classList.remove('on');
+    const fin = s.querySelector('.c2-fin');
+    fin.textContent = fin.dataset.orig || fin.textContent;
+    fin.dataset.orig = fin.textContent;
+    ec.textContent = this.mode === 'par' ? '两个工具同时执行，结果一起送回：一次模型调用就够' : '后一个工具的参数来自前一个工具的结果：只能串行，多一次模型调用';
+    if (!ctx) return;
+    if (k === 0) {
+      // 执行两个工具：并行或串行
+      while (ok()) {
+        jobs.forEach((j) => { j.classList.remove('done'); const i = j.querySelector('i'); i.style.transition = 'none'; i.style.width = '0'; });
+        if (this.mode === 'par') {
+          bar(0, 1400); bar(1, 1700);
+          await U.wait(ctx, 1450); if (!ok()) return; jobs[0].classList.add('done');
+          await U.wait(ctx, 300); if (!ok()) return; jobs[1].classList.add('done');
+        } else {
+          bar(0, 1400);
+          await U.wait(ctx, 1450); if (!ok()) return; jobs[0].classList.add('done');
+          await U.wait(ctx, 1000); if (!ok()) return;
+          bar(1, 1400);
+          await U.wait(ctx, 1450); if (!ok()) return; jobs[1].classList.add('done');
+        }
+        await U.wait(ctx, 2200);
+      }
+      return;
+    }
+    jobs.forEach((j) => { j.classList.add('done'); j.querySelector('i').style.width = '100%'; });
+    // 第 2 次请求：完整历史逐条装入
+    for (let i = 0; i < this.ROWS.length; i++) {
+      const [r, t, tag, c] = this.ROWS[i];
+      ml.insertAdjacentHTML('beforeend', C02.mr(r, `${C02.esc(t)}<span class="c2-tag2" style="--c:${c}">${tag}</span>`, { cls: 'new', mono: r !== 'user' && r !== 'system' }));
+      await U.wait(ctx, k === 1 ? 420 : 60);
+      if (!ok()) return;
+    }
+    b1.classList.add('on');
+    if (k >= 2) {
+      U.type(fin, { ctx, speed: 16 });
+      await U.wait(ctx, 4200);
+      if (!ok()) return;
+      fu.classList.add('on');
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.run(s, k); },
+  step(s, ctx, k) { this.run(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1; this.mode = 'par'; s.querySelector('.c2-ml').innerHTML = ''; s.dataset.k = 0;
+    const fin = s.querySelector('.c2-fin');
+    if (fin.dataset.orig) fin.textContent = fin.dataset.orig;
+    fin.classList.remove('typing');
+  },
+};
+</script>
+
+<section class="slide" id="c02-loop" data-part="2" data-trans="flip" data-dur="26000" data-title="用代码实现 Agent 的核心循环" data-notes="理解了 JSON 结构之后，用 Python 代码把交互过程串起来。最简的 Agent 实现，核心只有一个 while 循环和一个判断：<b>模型返回了 tool_calls 就执行工具并继续循环，没有就输出结果并退出</b>。整个过程中 messages 列表不断增长——每一轮都会追加模型的回复和工具的执行结果。（原书刻意保留这段完整 API 循环作为协议参照；其他章节用 Python 风格的骨架代码说明机制。）<br>跟踪 messages 列表在每一轮的变化：<b>初始状态（第 1 次调用前）：</b>system 和 user 两条。<b>第 1 次调用后（模型返回工具调用）：</b>追加 assistant（tool_calls: get_current_time, get_weather）和两条 tool 结果，共 5 条。<b>第 2 次调用后（模型返回最终回复，循环结束）：</b>再追加最终的 assistant 回复，共 6 条。<br>注意代码里的注释：生产代码需要 max_iterations 上限——Agent 可能陷入重复调用同样工具的死循环。示例中的 execute_tool 只返回预置结果，真实实现必须解析 JSON 格式的 arguments 并调用真正的 API。<br>从这个过程可以清楚地看到：<b>Agent 框架的核心工作就是管理这个 messages 列表</b>——在合适的时机往里追加消息，然后把整个列表送给模型。本章后续所有的上下文工程技术，本质上都是在优化这个列表的内容和结构。右上角可以暂停或单步执行。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">核心循环：<em>一个 while + 一个判断</em></h2></div>
+    <div class="lp2-ctl fx fx-up" style="--d:2"><span class="lp2-c">模型调用 <b class="lp2-n">0</b> 次</span><span class="lp2-c">messages <b class="lp2-m">0</b> 条</span><button class="btn lp2-play"><svg class="ic"><use href="#i-pause"/></svg><span>暂停</span></button><button class="btn lp2-one"><svg class="ic"><use href="#i-right"/></svg>单步</button></div></header>
+  <div class="lp2-body">
+    <div class="lp2-code win fx fx-left" style="--d:2">
+      <div class="win-bar"><i></i><i></i><i></i><span>agent.py（节选）</span></div>
+<pre class="code lp2-pre"><span class="ln"><span class="t-p">messages</span> = [</span><span class="ln">    {<span class="t-s">"role"</span>: <span class="t-s">"system"</span>, <span class="t-s">"content"</span>: <span class="t-s">"You are a helpful assistant..."</span>},</span><span class="ln">    {<span class="t-s">"role"</span>: <span class="t-s">"user"</span>, <span class="t-s">"content"</span>: <span class="t-s">"What's the current time and weather in Vancouver?"</span>},</span><span class="ln">]</span><span class="ln"><span class="t-c"># 生产代码需要 max_iterations 上限：Agent 可能陷入重复调用</span></span><span class="ln"><span class="t-k">while</span> <span class="t-n">True</span>:</span><span class="ln">    response = client.chat.completions.<span class="t-p">create</span>(</span><span class="ln">        model=<span class="t-s">"Qwen3-0.6B"</span>, messages=messages, tools=tools)</span><span class="ln">    assistant_message = response.choices[<span class="t-n">0</span>].message</span><span class="ln">    messages.<span class="t-p">append</span>(assistant_message)     <span class="t-c"># 文本或工具调用都追加</span></span><span class="ln">    <span class="t-k">if not</span> assistant_message.tool_calls:   <span class="t-c"># 没有工具调用 = 最终回复</span></span><span class="ln">        <span class="t-p">print</span>(assistant_message.content)</span><span class="ln">        <span class="t-k">break</span></span><span class="ln">    <span class="t-k">for</span> tool_call <span class="t-k">in</span> assistant_message.tool_calls:</span><span class="ln">        result = <span class="t-p">execute_tool</span>(tool_call.function.name, tool_call.function.arguments)</span><span class="ln">        messages.<span class="t-p">append</span>({<span class="t-s">"role"</span>: <span class="t-s">"tool"</span>, <span class="t-s">"tool_call_id"</span>: tool_call.id,</span><span class="ln">                         <span class="t-s">"content"</span>: result})</span><span class="ln">    <span class="t-c"># 回到循环顶部，带着更新后的列表再调用模型</span></span></pre>
+    </div>
+    <div class="lp2-right panel fx fx-right" style="--d:3">
+      <div class="lp2-lab"><span class="lp2-st"></span><span class="lp2-note"></span></div>
+      <div class="ml lp2-ml"></div>
+    </div>
+  </div>
+  <p class="tagline lp2-tag fx fx-up" style="--d:5"><b>Agent 框架的核心工作就是管理这个 messages 列表</b>——后续所有上下文工程技术，本质上都在优化这个列表的内容和结构</p>
+  <div class="src">第二章 ·「用代码实现 Agent 的核心循环」</div>
+</section>
+<style>
+#c02-loop .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:20px}
+.lp2-ctl{display:flex;align-items:center;gap:12px}
+.lp2-c{font-size:18px;color:var(--text3);margin-right:6px}
+.lp2-c b{font:800 26px var(--num);color:var(--acc)}
+.lp2-body{display:flex;gap:26px;height:600px}
+.lp2-code{width:1000px;flex:none}
+.lp2-pre{font-size:16.5px;line-height:1.68;padding:14px 18px}
+.lp2-pre .ln{padding:0 6px}
+.lp2-right{flex:1;min-width:0;padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.lp2-lab{display:flex;flex-direction:column;gap:4px;min-height:64px}
+.lp2-st{font-size:20px;font-weight:700;color:var(--acc)}
+.lp2-note{font-size:17px;color:var(--text2)}
+.lp2-ml{flex:1;overflow:hidden}
+.lp2-ml .mr{font-size:16px;padding:8px 12px 8px 16px}
+.lp2-ml .mr .rl{min-width:84px}
+.lp2-ml .mr.hit{box-shadow:0 0 22px color-mix(in srgb,var(--c) 45%,transparent);border-color:var(--c)}
+.lp2-tag{margin-top:20px;font-size:23px}
+</style>
+<script>
+HOOKS['c02-loop'] = {
+  // 每一步：高亮的代码行、追加的消息、提示
+  S: [
+    { hl: [0, 1, 2, 3], add: [['system', 'You are a helpful assistant...'], ['user', "What's the current time and weather in Vancouver?"]], st: '初始状态（第 1 次调用前）', nt: 'messages 只有开发者写的 system 和用户输入的 user' },
+    { hl: [5, 6, 7], call: true, nt: '第 1 次调用模型：把整个列表连同 tools 发出去' },
+    { hl: [8, 9], add: [['assistant', 'tool_calls: [get_current_time, get_weather]']], nt: '模型的回复（这次是工具调用）追加到列表' },
+    { hl: [10], nt: '有 tool_calls → 不退出，继续往下' },
+    { hl: [13, 14, 15, 16], add: [['tool', 'tool_call_id: call_abc → {time…}']], nt: '执行第一个工具，结果以 tool 角色追加' },
+    { hl: [13, 14, 15, 16], add: [['tool', 'tool_call_id: call_def → {weather…}']], st: '第 1 次调用后（模型返回工具调用）', nt: '执行第二个工具，结果追加——列表增长到 5 条' },
+    { hl: [17, 5], nt: '回到循环顶部' },
+    { hl: [5, 6, 7], call: true, nt: '第 2 次调用模型：带着 5 条消息的完整历史' },
+    { hl: [8, 9], add: [['assistant', "It's currently Saturday, Sep 13, 2025 in Vancouver..."]], nt: '这次模型直接给出文本回复' },
+    { hl: [10, 11, 12], st: '第 2 次调用后（模型返回最终回复，循环结束）', nt: '没有 tool_calls → 输出结果，break 退出', end: true },
+  ],
+  init(s) {
+    this.lines = [...s.querySelectorAll('.lp2-pre .ln')];
+    this.play = s.querySelector('.lp2-play');
+    this.play.addEventListener('click', () => this.setPlay(s, !this.playing));
+    s.querySelector('.lp2-one').addEventListener('click', () => { this.setPlay(s, false); this.tick(s); });
+  },
+  setPlay(s, v) {
+    this.playing = v;
+    this.play.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play');
+    this.play.querySelector('span').textContent = v ? '暂停' : '继续';
+  },
+  clear(s) {
+    this.idx = 0; this.calls = 0;
+    s.querySelector('.lp2-ml').innerHTML = '';
+    s.querySelector('.lp2-n').textContent = 0;
+    s.querySelector('.lp2-m').textContent = 0;
+    s.querySelector('.lp2-st').textContent = '';
+    s.querySelector('.lp2-note').textContent = '';
+    this.lines.forEach((l) => l.classList.remove('hl'));
+  },
+  tick(s) {
+    if (this.idx >= this.S.length) this.clear(s);
+    const p = this.S[this.idx++], ml = s.querySelector('.lp2-ml');
+    this.lines.forEach((l, i) => l.classList.toggle('hl', p.hl.includes(i)));
+    ml.querySelectorAll('.hit').forEach((x) => x.classList.remove('hit'));
+    if (p.call) { this.calls++; s.querySelector('.lp2-n').textContent = this.calls; ml.querySelectorAll('.mr').forEach((x) => x.classList.add('hit')); }
+    (p.add || []).forEach(([r, t]) => ml.insertAdjacentHTML('beforeend', C02.mr(r, C02.esc(t), { cls: 'new', mono: r === 'assistant' || r === 'tool' })));
+    s.querySelector('.lp2-m').textContent = ml.children.length;
+    if (p.st) s.querySelector('.lp2-st').textContent = p.st;
+    s.querySelector('.lp2-note').textContent = p.nt;
+    return p;
+  },
+  enter(s, ctx) {
+    this.clear(s);
+    this.setPlay(s, true);
+    let wait = 0;
+    ctx.every(() => {
+      if (!this.playing) return;
+      if (wait > 0) { wait--; return; }
+      const p = this.tick(s);
+      if (p.end) wait = 3;
+    }, 1500);
+    ctx.later(() => { if (this.idx === 0) this.tick(s); }, 600);
+  },
+  reset(s) { this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c02-prefix" data-part="2" data-trans="zoom" data-dur="14000" data-title="静态前缀 + 轨迹" data-notes="通过前面的例子，可以清晰地看到 Agent 每次调用模型时上下文的完整构成（<b>图2-4</b>）：<br>上半部分（System Prompt + Tool Definitions）在整个对话过程中保持不变，下半部分（对话历史，即第一章所定义的<b>轨迹</b>）随着交互的进行不断增长。这正是第一章“上下文的五个组成部分”在 API 层面的具体样子：系统提示词和工具定义构成<b>静态前缀</b>，用户消息、模型回复和工具执行结果构成动态增长的消息历史。<br>这个<b>“静态前缀 + 轨迹”</b>的结构，是后续讨论 KV Cache 优化、上下文压缩等技术的基础——理解了这个结构，就能理解为什么<b>“前面不能动、后面可以压缩”</b>。本章后续将围绕这个结构逐层展开，先从利用静态前缀的不变性加速推理的 KV Cache 讲起。<br>演示中轨迹会自动增长，快放不下时，较早的工具结果被折叠成摘要；静态前缀始终上锁不动。也可以手动点击按钮。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每次调用的上下文 = <em>静态前缀 + 轨迹</em></h2></div>
+    <div class="pf-ctl fx fx-up" style="--d:2"><button class="btn pf-cmp"><svg class="ic"><use href="#i-compress"/></svg>压缩旧工具结果</button><button class="btn pf-rst"><svg class="ic"><use href="#i-refresh"/></svg>重来</button></div></header>
+  <div class="pf-stage fx fx-scale" style="--d:3">
+    <div class="pf-top"><span class="pf-l1">静态前缀（每一轮都不变）</span><span class="pf-l2">对话历史 / 轨迹（随交互不断增长 →）</span></div>
+    <div class="pf-bar">
+      <div class="pf-pre">
+        <div class="pf-b sys"><svg class="ic"><use href="#i-lock"/></svg><b>System Prompt</b><small>系统提示词</small></div>
+        <div class="pf-b tls"><svg class="ic"><use href="#i-lock"/></svg><b>Tool Definitions</b><small>工具定义</small></div>
+      </div>
+      <div class="pf-tr" data-clip-ok></div>
+    </div>
+    <div class="pf-bot"><span class="pf-r1"><svg class="ic"><use href="#i-lock"/></svg>前面不能动：利于 KV Cache</span><span class="pf-r2"><svg class="ic"><use href="#i-compress"/></svg>后面可以压缩</span></div>
+    <div class="pf-cnt"><span>轮次 <b class="pf-n">0</b></span><span>已压缩 <b class="pf-c">0</b> 次</span></div>
+  </div>
+  <div class="pf-map fx fx-up" style="--d:5">
+    <div class="pf-g"><span class="lbl">静态前缀</span><span class="chip">系统提示词</span><span class="chip har">工具定义</span></div>
+    <div class="pf-g"><span class="lbl">动态消息历史</span><span class="chip tool">用户消息</span><span class="chip llm">模型回复</span><span class="chip env">工具执行结果</span></div>
+    <p>第一章“上下文的五个组成部分”在 API 层面的具体样子</p>
+  </div>
+  <div class="src">第二章 ·「从 API 视角看上下文的构成」· 图2-4</div>
+</section>
+<style>
+#c02-prefix .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.pf-ctl{display:flex;gap:10px}
+.pf-stage{position:relative;padding:20px 0 0}
+.pf-top,.pf-bot{display:flex;font-size:19px}
+.pf-l1{width:520px;color:var(--har)}.pf-l2{color:var(--acc);padding-left:14px}
+.pf-bar{display:flex;gap:14px;height:150px;margin:12px 0}
+.pf-pre{width:520px;flex:none;display:flex;gap:10px;padding:10px;border-radius:18px;border:2px solid color-mix(in srgb,var(--har) 55%,transparent);background:color-mix(in srgb,var(--har) 7%,transparent)}
+.pf-b{flex:1;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center}
+.pf-b .ic{font-size:22px;color:var(--text3)}
+.pf-b b{font:700 18px var(--num)}
+.pf-b small{font-size:15px;color:var(--text2)}
+.pf-b.sys{background:rgba(148,163,184,.14);border:1px solid rgba(148,163,184,.45)}
+.pf-b.tls{background:color-mix(in srgb,var(--har) 16%,transparent);border:1px solid color-mix(in srgb,var(--har) 50%,transparent)}
+.pf-tr{flex:1;min-width:0;display:flex;gap:8px;padding:10px;border-radius:18px;border:2px dashed color-mix(in srgb,var(--acc) 50%,transparent);overflow:hidden;align-items:stretch}
+.pf-m{--c:var(--text3);flex:none;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font:600 15px var(--mono);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 13%,rgba(10,16,36,.9));animation:swIn .5s var(--spring) both;transition:width .6s var(--ease),opacity .5s}
+.pf-m small{font:14px var(--font);color:var(--text3)}
+.pf-m.sum{--c:#38bdf8;border-style:dashed}
+.pf-m.out{opacity:0;width:0!important;padding:0;border-width:0}
+.pf-bot{gap:0}
+.pf-r1{width:520px;display:flex;align-items:center;gap:8px;color:var(--har)}
+.pf-r2{display:flex;align-items:center;gap:8px;color:var(--acc);padding-left:14px}
+.pf-cnt{position:absolute;right:0;top:20px;display:flex;gap:22px;font-size:17px;color:var(--text3)}
+.pf-cnt b{font:800 22px var(--num);color:var(--acc)}
+.pf-map{margin-top:34px;display:flex;align-items:center;gap:28px;padding:18px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);flex-wrap:wrap}
+.pf-g{display:flex;align-items:center;gap:10px}
+.pf-map p{font-size:18px;color:var(--text2);margin-left:auto}
+</style>
+<script>
+HOOKS['c02-prefix'] = {
+  PAT: [['user', '#fbbf24', 92], ['assistant', '#a78bfa', 112], ['tool 结果', '#34d399', 150], ['assistant', '#a78bfa', 112], ['tool 结果', '#34d399', 150], ['assistant', '#a78bfa', 112], ['user', '#fbbf24', 92]],
+  init(s) {
+    s.querySelector('.pf-cmp').addEventListener('click', () => { this.auto = false; this.compress(s); });
+    s.querySelector('.pf-rst').addEventListener('click', () => { this.auto = true; this.clear(s); });
+  },
+  clear(s) { s.querySelector('.pf-tr').innerHTML = ''; this.n = 0; this.cmp = 0; s.querySelector('.pf-n').textContent = 0; s.querySelector('.pf-c').textContent = 0; },
+  add(s) {
+    const [t, c, w] = this.PAT[this.n % this.PAT.length];
+    this.n++;
+    s.querySelector('.pf-tr').insertAdjacentHTML('beforeend', `<div class="pf-m${t === 'tool 结果' ? ' tl' : ''}" style="--c:${c};width:${w}px">${t}<small>#${this.n}</small></div>`);
+    s.querySelector('.pf-n').textContent = this.n;
+  },
+  used(s) { return [...s.querySelectorAll('.pf-m:not(.out)')].reduce((a, m) => a + m.offsetWidth + 8, 0); },
+  // 把最早的几条工具结果折叠成一条摘要
+  compress(s) {
+    const tl = [...s.querySelectorAll('.pf-m.tl:not(.out)')].slice(0, 3);
+    if (!tl.length) return;
+    tl[0].insertAdjacentHTML('beforebegin', `<div class="pf-m sum" style="width:96px">摘要<small>${tl.length} 条结果</small></div>`);
+    tl.forEach((m) => m.classList.add('out'));
+    this.cmp++;
+    s.querySelector('.pf-c').textContent = this.cmp;
+    const ctx = this.ctx;
+    if (ctx) ctx.later(() => tl.forEach((m) => m.remove()), 700);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.clear(s);
+    const cap = s.querySelector('.pf-tr').clientWidth - 20;
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (this.n > 24) { this.clear(s); return; }
+      if (this.used(s) + 160 > cap) this.compress(s);
+      else this.add(s);
+    }, 900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c02-build" data-part="2" data-trans="rise" data-dur="20000" data-title="每次请求前的上下文构造" data-notes="后续技术虽然名称很多，落到每次请求前其实只是<b>一次上下文构造决策</b>。左侧是原书给出的 Python 风格伪代码，保留了这个决策的最小骨架；它与前面的完整 API 循环互补，强调上下文布局，不替代消息角色、tool_call_id 等协议细节。<br>读法：stable_prefix 是系统消息，stable_tools 是核心工具定义；trajectory 从会话中载入历史；status_message 由当前轨迹推导出的状态生成。如果估算的 token 数超过预算，就压缩旧证据，但要保留 decisions（决策）、constraints（约束）、failures（失败）和 citations（引用）；最后按“稳定前缀 + 轨迹 + 状态消息”的顺序组装请求。<br>一句话概括：<b>系统提示词和核心工具定义尽量保持稳定；旧工具输出只在接近预算时成批压缩；当前状态放在轨迹尾部，让模型不必从长历史中重新推导。</b><br>右侧演示：每一轮追加新的工具输出，估算长度越过预算线时触发一次成批压缩——大块原始输出变成摘要，决策、约束、失败与引用原样保留（长度为示意）。可以拖动预算滑块。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每次请求前，都是一次<em>上下文构造决策</em></h2></header>
+  <div class="bd-body">
+    <div class="bd-code win fx fx-left" style="--d:2">
+      <div class="win-bar"><i></i><i></i><i></i><span>build_request（伪代码）</span></div>
+<pre class="code bd-pre"><span class="ln">stable_prefix = system_message</span><span class="ln">stable_tools = core_tool_schemas</span><span class="ln">trajectory = <span class="t-p">load_message_history</span>(session)</span><span class="ln">status_message = <span class="t-p">make_status_message</span>(</span><span class="ln">    <span class="t-p">derive_current_state</span>(trajectory))</span><span class="ln"> </span><span class="ln"><span class="t-k">if</span> <span class="t-p">estimated_tokens</span>(stable_prefix, trajectory,</span><span class="ln">                    status_message) &gt; budget:</span><span class="ln">    trajectory = <span class="t-p">compress_old_evidence</span>(</span><span class="ln">        trajectory,</span><span class="ln">        preserve = [<span class="t-g">decisions</span>, <span class="t-g">constraints</span>,</span><span class="ln">                    <span class="t-g">failures</span>, <span class="t-g">citations</span>])</span><span class="ln"> </span><span class="ln">request.messages = [stable_prefix] + trajectory</span><span class="ln">                   + [status_message]</span><span class="ln">request.tools = stable_tools</span><span class="ln">response = <span class="t-p">call_model</span>(request)</span></pre>
+    </div>
+    <div class="bd-vis panel fx fx-right" style="--d:3">
+      <div class="bd-h"><b>本次请求</b><span class="bd-est">估算 <b>0</b> / 预算 <b>0</b>（示意）</span></div>
+      <div class="bd-bar" data-clip-ok>
+        <div class="bd-s pre">system<br>+ tools</div>
+        <div class="bd-tr"></div>
+        <div class="bd-s st">status</div>
+        <i class="bd-line"></i>
+      </div>
+      <div class="bd-leg"><span class="bd-k" style="--c:#34d399">工具输出（原始证据）</span><span class="bd-k" style="--c:#38bdf8">压缩后的摘要</span><span class="bd-k" style="--c:#fbbf24">决策 · 约束 · 失败 · 引用（保留）</span></div>
+      <div class="bd-rng"><span>预算 budget</span><input class="rng bd-r" type="range" min="600" max="840" value="760"><b class="bd-rv"></b></div>
+      <div class="bd-log"></div>
+    </div>
+  </div>
+  <p class="tagline bd-tag fx fx-up" style="--d:5">系统提示词和核心工具定义<b>尽量保持稳定</b>；旧工具输出只在<b>接近预算时成批压缩</b>；当前状态放在<b>轨迹尾部</b></p>
+  <div class="src">第二章 ·「从 API 视角看上下文的构成」· 上下文构造伪代码</div>
+</section>
+<style>
+.bd-body{display:flex;gap:26px;height:560px}
+.bd-code{width:720px;flex:none}
+.bd-pre{font-size:17px;line-height:1.62;padding:12px 18px}
+.bd-vis{flex:1;min-width:0;padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+.bd-h{display:flex;justify-content:space-between;align-items:baseline;font-size:20px}
+.bd-est{font-size:17px;color:var(--text3)}
+.bd-est b{font:800 20px var(--num);color:var(--acc)}
+.bd-est.over b:first-child{color:var(--bad)}
+.bd-bar{position:relative;display:flex;gap:5px;height:120px;padding:8px;border-radius:14px;background:rgba(5,9,22,.65);border:1px solid var(--line);overflow:hidden}
+.bd-s{flex:none;width:96px;border-radius:10px;display:grid;place-items:center;text-align:center;font:600 15px/1.4 var(--mono)}
+.bd-s.pre{color:var(--har);border:1px solid color-mix(in srgb,var(--har) 55%,transparent);background:color-mix(in srgb,var(--har) 14%,transparent)}
+.bd-s.st{width:76px;color:var(--pink);border:1px solid color-mix(in srgb,var(--pink) 55%,transparent);background:color-mix(in srgb,var(--pink) 14%,transparent)}
+.bd-tr{display:flex;gap:5px;min-width:0}
+.bd-e{--c:#34d399;flex:none;border-radius:8px;display:grid;place-items:center;font-size:14px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 14%,transparent);transition:width .7s var(--ease),background .5s;animation:swIn .4s var(--ease) both;overflow:hidden;white-space:nowrap}
+.bd-e.keep{--c:#fbbf24}
+.bd-e.sum{--c:#38bdf8;border-style:dashed}
+.bd-line{position:absolute;top:0;bottom:0;width:0;border-left:3px dashed var(--bad);transition:left .4s var(--ease)}
+.bd-line::after{content:"budget";position:absolute;top:2px;left:6px;font:600 14px var(--mono);color:var(--bad)}
+.bd-leg{display:flex;gap:20px;flex-wrap:wrap}
+.bd-k{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text2)}
+.bd-k::before{content:"";width:16px;height:16px;border-radius:5px;background:color-mix(in srgb,var(--c) 35%,transparent);border:1px solid var(--c)}
+.bd-rng{display:flex;align-items:center;gap:16px;font-size:17px;color:var(--text2)}
+.bd-rng .rng{flex:1}
+.bd-rv{font:700 18px var(--num);color:var(--acc);min-width:60px}
+.bd-log{flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.bd-lg{font-size:16px;color:var(--text2);padding:6px 12px;border-radius:9px;background:rgba(255,255,255,.03);border:1px solid var(--line);animation:upIn .4s var(--spring) both}
+.bd-lg b{color:var(--acc)}
+.bd-lg.c b{color:var(--bad)}
+.bd-tag{margin-top:20px;font-size:23px}
+</style>
+<script>
+HOOKS['c02-build'] = {
+  // 每轮新增的条目：w 宽度（示意的 token 量），k 保留类
+  TURN: [
+    [{ t: '工具输出', w: 120 }, { t: '决策', w: 44, k: 1 }],
+    [{ t: '工具输出', w: 140 }],
+    [{ t: '工具输出', w: 110 }, { t: '失败', w: 44, k: 1 }],
+    [{ t: '约束', w: 44, k: 1 }, { t: '工具输出', w: 130 }],
+    [{ t: '工具输出', w: 120 }, { t: '引用', w: 44, k: 1 }],
+  ],
+  init(s) {
+    const r = s.querySelector('.bd-r');
+    const upd = () => { r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min)) * 100 + '%'); s.querySelector('.bd-rv').textContent = r.value; this.budget = +r.value; this.line(s); };
+    r.addEventListener('input', () => { this.auto = false; upd(); });
+    this.upd = upd;
+    this.lines = [...s.querySelectorAll('.bd-pre .ln')];
+  },
+  // 估算长度：前缀 + 轨迹 + 状态（单位都是示意的“宽度”）
+  est(s) { return 96 + 5 + 76 + [...s.querySelectorAll('.bd-e')].reduce((a, e) => a + (+e.dataset.w) + 5, 0); },
+  scale() { return 1; },
+  line(s) { s.querySelector('.bd-line').style.left = 8 + this.budget * this.scale() + 'px'; this.show(s); },
+  show(s) {
+    const e = this.est(s), el = s.querySelector('.bd-est');
+    el.querySelectorAll('b')[0].textContent = e;
+    el.querySelectorAll('b')[1].textContent = this.budget;
+    el.classList.toggle('over', e > this.budget);
+  },
+  hl(...idx) { this.lines.forEach((l, i) => l.classList.toggle('hl', idx.includes(i))); },
+  log(s, html, c) {
+    const lg = s.querySelector('.bd-log');
+    lg.insertAdjacentHTML('afterbegin', `<div class="bd-lg${c ? ' c' : ''}">${html}</div>`);
+    while (lg.children.length > 4) lg.lastElementChild.remove();
+  },
+  item(it) { return `<div class="bd-e${it.k ? ' keep' : ''}" data-w="${it.w}" style="width:${it.w * this.scale()}px">${it.t}</div>`; },
+  async loop(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const tr = s.querySelector('.bd-tr');
+    while (ok()) {
+      tr.innerHTML = '';
+      this.show(s);
+      for (let t = 0; t < this.TURN.length && ok(); t++) {
+        this.hl(2);
+        tr.insertAdjacentHTML('beforeend', this.TURN[t].map((it) => this.item(it)).join(''));
+        this.log(s, `第 <b>${t + 1}</b> 轮：载入轨迹，追加新的工具输出`);
+        this.show(s);
+        await U.wait(ctx, 1200); if (!ok()) return;
+        this.hl(3, 4);
+        await U.wait(ctx, 700); if (!ok()) return;
+        this.hl(6, 7);
+        await U.wait(ctx, 800); if (!ok()) return;
+        if (this.est(s) > this.budget) {
+          // 成批压缩：所有未压缩的原始工具输出变成短摘要，保留项原样不动
+          this.hl(8, 9, 10, 11);
+          tr.querySelectorAll('.bd-e:not(.keep):not(.sum)').forEach((e) => { e.classList.add('sum'); e.dataset.w = 34; e.style.width = 34 * this.scale() + 'px'; e.textContent = '摘要'; });
+          this.log(s, '超出预算：<b>成批压缩</b>旧证据，决策 · 约束 · 失败 · 引用原样保留', true);
+          await U.wait(ctx, 900);
+          this.show(s);
+          await U.wait(ctx, 900); if (!ok()) return;
+        }
+        this.hl(13, 14, 15, 16);
+        await U.wait(ctx, 900); if (!ok()) return;
+      }
+      await U.wait(ctx, 2000);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    const r = s.querySelector('.bd-r');
+    r.value = 760;
+    this.upd();
+    s.querySelector('.bd-log').innerHTML = '';
+    this.loop(s);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.bd-tr').innerHTML = ''; s.querySelector('.bd-log').innerHTML = ''; this.hl(); },
+};
+</script>
+
+<section class="slide" id="c02-exp1" data-part="2" data-trans="zoom" data-dur="16000" data-title="实验 2-1 ★：本地 LLM 服务部署与工具调用" data-notes="<b>实验 2-1 ★</b>：在深入理解 Agent 上下文之前，先通过一个实际项目体验小型模型的能力。local_llm_serving 项目展示了一个重要的观点：具备思维链（Chain of Thought, CoT）思考和工具调用能力的模型<b>并不一定需要很大的参数量</b>。即使是 0.6B（六亿）参数的超小模型，在合理的提示词设计和系统架构下，也能展现出令人满意的工具调用能力。架构见<b>图2-5</b>：用户请求 → 本地 LLM 服务（vLLM/Ollama，OpenAI 兼容接口）→ 模型推理并生成 tool_call → 本地执行工具 → 结果回传模型，生成最终回复。<br>通过这个实验应该观察到：<br>1. <b>小模型的能力</b>：即使是 0.6B 的模型，在适当的提示工程（通过精心设计输入提示词来引导模型行为的技术）下也能准确理解并执行工具调用。<br>2. <b>性能表现</b>：在作者所用的苹果 M2 芯片上，模型能够以超过每秒 100 个 token 的速度生成响应，对于实时交互完全足够。Token 是模型处理文本的基本单位，一个中文字通常对应 1-2 个 token，一个英文单词通常对应 1-3 个 token。<br>3. <b>ReAct 循环</b>：观察模型如何通过多轮思考和工具调用来解决复杂问题。<br>4. <b>流式响应的优势</b>：流式输出让用户能够实时看到模型的思考过程，包括工具调用的决策和结果的处理。<br>5. <b>KV Cache 的影响（顺带留意）</b>：保持系统提示词不变连续发起两次对话，记录第二次的首 token 延迟；再修改系统提示词开头的任意几个字符发起一次对话并对比——前者因为前缀缓存命中而更快，后者需要重新计算整个前缀，这正是下一部分的主题。<br>配套仓库的验收记录（2026-07-29，Ollama 0.20.7 + qwen3:0.6b Q4_K_M，macOS arm64）：两次工具调用全部正确并行执行，工具阶段解码均值 106.7 tok/s；5 组缓存配对中命中组首 token 延迟均值 1.30 秒、未命中组 1.51 秒，4 组命中更快——差距随机器和负载而变，本次记录中并不悬殊。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-1 ★：<em>0.6B 小模型</em>也能可靠地调用工具</h2></header>
+  <div class="e1-flow fx fx-scale" style="--d:2">
+    <svg class="e1-svg" viewBox="0 0 1660 230" width="1660" height="230">
+      <path class="fl on e1-p" d="M300 70 H408" style="--c:#fbbf24"/>
+      <path class="fl on e1-p" d="M720 70 H828" style="--c:#60a5fa"/>
+      <path class="fl on e1-p" d="M1140 70 H1248" style="--c:#a78bfa"/>
+      <path class="fl on e1-p" d="M1404 128 C 1404 215, 564 215, 564 128" style="--c:#34d399"/>
+      <circle class="pk e1-k" r="9" style="fill:#fbbf24"/><circle class="pk e1-k" r="9" style="fill:#60a5fa"/><circle class="pk e1-k" r="9" style="fill:#a78bfa"/><circle class="pk e1-k" r="9" style="fill:#34d399"/>
+      <text class="e1-rt" x="984" y="208">工具结果回传模型，生成最终回复</text>
+    </svg>
+    <div class="nd e1-n" style="left:0;--c:var(--tool)"><svg class="ic"><use href="#i-user"/></svg><div><b>用户请求</b><small>“帮我联系 Xfinity 砍价”</small></div></div>
+    <div class="nd e1-n" style="left:420px;--c:var(--har)"><svg class="ic"><use href="#i-server"/></svg><div><b>本地 LLM 服务</b><small>vLLM / Ollama（OpenAI 兼容）</small></div></div>
+    <div class="nd e1-n" style="left:840px;--c:var(--llm)"><svg class="ic"><use href="#i-cpu"/></svg><div><b>模型推理</b><small>决定并生成 tool_call</small></div></div>
+    <div class="nd e1-n" style="left:1260px;--c:var(--env)"><svg class="ic"><use href="#i-wrench"/></svg><div><b>本地工具执行</b><small>调用函数 / 外部 API</small></div></div>
+  </div>
+  <div class="e1-obs"></div>
+  <div class="src">第二章 · 实验 2-1 · 图2-5 · 数据：配套仓库 chapter2/local_llm_serving 验收记录（2026-07-29，Ollama + qwen3:0.6b）</div>
+</section>
+<style>
+.e1-flow{position:relative;height:230px}
+.e1-svg{position:absolute;inset:0;overflow:visible}
+.e1-rt{fill:var(--env);font-size:17px;text-anchor:middle}
+.e1-n{position:absolute;top:12px;width:300px;height:116px}
+.e1-n b{font-size:21px}
+.e1-n small{font-size:16px}
+.e1-obs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:14px}
+.e1-o{padding:14px 16px;gap:14px}
+.e1-o.wide{grid-column:span 2}
+.e1-o b{display:block;font-size:20px;margin-bottom:4px}
+.e1-o p{font-size:16.5px;line-height:1.55;color:var(--text2)}
+.e1-d{display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:4px 12px;border-radius:9px;font-size:15.5px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.e1-d.q{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+</style>
+<script>
+HOOKS['c02-exp1'] = {
+  O: [
+    { b: '小模型的能力', p: '0.6B 的模型在适当的提示工程下，也能准确理解并执行工具调用', d: '实测：两个工具都调对了（时区 America/Vancouver；城市 Vancouver，celsius）' },
+    { b: '性能表现', p: '原书：苹果 M2 上超过每秒 100 个 token。中文字通常 1-2 token，英文单词 1-3 token', d: '实测：工具阶段解码均值 106.7 tok/s' },
+    { b: 'ReAct 循环', p: '观察模型如何通过多轮思考和工具调用来解决复杂问题', d: '实测：两个结果回传后，第 2 轮直接给出最终回答' },
+    { b: '流式响应的优势', p: '用户能实时看到模型的思考过程、工具调用的决策和结果的处理', d: '' },
+    { b: 'KV Cache 的影响（顺带留意）', p: '系统提示词不变连发两次 vs 修改开头几个字符再发：对比首 token 延迟——改前缀需要重算整个前缀', d: '实测 5 组配对：命中均值 1.30 s，未命中 1.51 s，4/5 组命中更快', q: 1 },
+  ],
+  init(s) {
+    s.querySelector('.e1-obs').innerHTML = this.O.map((o, i) => `
+      <div class="chk e1-o${i === 4 ? ' wide' : ''}" data-i="${i}"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>
+        <div><b>${i + 1}. ${o.b}</b><p>${o.p}</p>${o.d ? `<span class="e1-d${o.q ? ' q' : ''}"><svg class="ic"><use href="#i-flask"/></svg>${o.d}</span>` : ''}</div></div>`).join('');
+    s.querySelector('.e1-obs').addEventListener('click', (e) => { const c = e.target.closest('.chk'); if (c) c.classList.toggle('done'); });
+  },
+  async flow(s, ctx) {
+    const ps = [...s.querySelectorAll('.e1-p')], ks = [...s.querySelectorAll('.e1-k')], ns = [...s.querySelectorAll('.e1-n')];
+    while (ctx.alive) {
+      for (let i = 0; i < 4 && ctx.alive; i++) {
+        ns.forEach((n, j) => n.classList.toggle('on', j === (i === 3 ? 1 : i)));
+        await U.fly(ks[i], ps[i], i === 3 ? 1500 : 900, { ctx });
+        if (i < 3) ns.forEach((n, j) => n.classList.toggle('on', j === i + 1));
+        await U.wait(ctx, 350);
+      }
+      await U.wait(ctx, 700);
+    }
+  },
+  enter(s, ctx) {
+    this.flow(s, ctx);
+    const cs = [...s.querySelectorAll('.e1-o')];
+    cs.forEach((c, i) => ctx.later(() => c.classList.add('done'), 1200 + i * 900));
+  },
+  reset(s) { s.querySelectorAll('.e1-o').forEach((c) => c.classList.remove('done')); s.querySelectorAll('.e1-n').forEach((n) => n.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-exp1b" data-part="2" data-trans="slide" data-dur="20000" data-title="实验 2-1：原始 token 流" data-notes="<b>ReAct 循环的实际案例。</b>项目中的多轮工具调用遵循第一章介绍的 ReAct 思考-行动-观察循环。在本地部署的实验中，API 消息会被服务端（如 vLLM、Ollama）自动转换为模型内部的 token 格式；local_llm_serving 允许直接观察模型的原始输入输出 token 流，包括以下在 API 层面不可见的细节：<br><b>模型的内部思考过程</b>：支持思维链的模型（如 Qwen3）在生成工具调用之前，会先在 &lt;think&gt; 标签内思考——分析用户意图、评估哪些工具适用、规划调用顺序，这对调试 Agent 行为非常有价值。<br><b>输出的顺序结构</b>：模型的输出 token 按固定顺序生成——先是内部思考（&lt;think&gt; 内），然后是给用户的文本回复，最后是工具调用请求。理解这个顺序对实现流式响应很关键：当 &lt;think&gt; 出现时可以切换到“思考中”状态；第一个工具调用的参数一经完整生成并通过校验，即可立即开始执行，无需等待后续的工具调用。<br><b>并行工具调用</b>：在温哥华时间和天气的例子中，模型发现两个子问题之间没有依赖，因此在一次输出中同时生成了两个工具调用请求；框架检测到后可以并行执行，实现流水线式的加速。<br><b>模型的终止判断</b>：工具结果送回后，模型判断是否已有足够信息；够了就直接输出最终回复（不含工具调用），不够就继续输出新的工具调用，触发下一轮 ReAct 循环。<br><b>实验总结。</b>这个实验最值得记住的一点是：0.6B 的小模型在合理的提示词设计下也能可靠地完成工具调用。模型大小固然重要，但不是唯一的决定因素。一些高端移动设备已经能运行 0.6B 级别的小模型，端侧模型的可用能力也在持续提升——端侧 Agent 的时代比大多数人预期的更近。你可能还注意到，修改系统提示词后模型的首次响应会变慢——这正是下一部分要解释的 KV Cache 机制。<br>左侧的工具调用标签和最终回答取自配套仓库的真实运行记录；思考段落的具体文字为示意（Ollama 默认会把 &lt;think&gt; 内容解析成单独的 thinking 字段）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">原始 token 流里，有 API 层面<em>看不见的细节</em></h2></header>
+  <div class="tb-body">
+    <div class="tb-term win fx fx-left" style="--d:2">
+      <div class="win-bar"><i></i><i></i><i></i><span>qwen3:0.6b · 原始输出流</span><span class="tb-state"></span></div>
+      <pre class="tb-out" data-clip-ok></pre>
+    </div>
+    <div class="tb-side">
+      <div class="tb-pt" data-p="0"><svg class="ic"><use href="#i-brain"/></svg><div><b>模型的内部思考过程</b><p>工具调用之前先在 &lt;think&gt; 里分析意图、评估工具、规划顺序</p></div></div>
+      <div class="tb-pt" data-p="1"><svg class="ic"><use href="#i-list"/></svg><div><b>输出的顺序结构</b><p>思考 → 文本回复 → 工具调用；第一个调用参数完整且校验通过即可开始执行</p></div></div>
+      <div class="tb-pt" data-p="2"><svg class="ic"><use href="#i-merge"/></svg><div><b>并行工具调用</b><p>两个子问题无依赖：一次输出同时生成两个调用，流水线式加速</p></div></div>
+      <div class="tb-pt" data-p="3"><svg class="ic"><use href="#i-flag"/></svg><div><b>模型的终止判断</b><p>信息够了 → 最终回复（无工具调用）；不够 → 新的工具调用，再来一轮</p></div></div>
+      <div class="tb-ex"><span class="tb-x" data-x="0">工具 1：等待生成</span><span class="tb-x" data-x="1">工具 2：等待生成</span></div>
+    </div>
+  </div>
+  <p class="tagline tb-tag fx fx-up" style="--d:5"><b>实验总结</b>：0.6B 的小模型在合理的提示词设计下也能可靠完成工具调用——<b>端侧 Agent 的时代比大多数人预期的更近</b></p>
+  <div class="src">第二章 · 实验 2-1「ReAct 循环的实际案例」「实验总结」· 数据：配套仓库 chapter2/local_llm_serving 运行记录（思考文字为示意）</div>
+</section>
+<style>
+.tb-body{display:flex;gap:26px;height:600px}
+.tb-term{width:960px;flex:none;display:flex;flex-direction:column}
+.tb-state{margin-left:auto;font:600 15px var(--font);padding:3px 12px;border-radius:999px;color:#06101f;background:var(--acc);transition:background .3s}
+.tb-state:empty{display:none}
+.tb-out{flex:1;margin:0;padding:16px 20px;font:16px/1.65 var(--mono);color:#cbd5f5;white-space:pre-wrap;word-break:break-all;overflow:hidden}
+.tb-out .th{color:#c4b5fd}
+.tb-out .tg{color:#f0abfc;font-weight:700}
+.tb-out .tc{color:var(--tool)}
+.tb-out .tr{color:#86efac}
+.tb-out .an{color:var(--text)}
+.tb-out .sys{color:var(--text3)}
+.tb-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+.tb-pt{display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.45;transition:all .45s var(--ease)}
+.tb-pt>.ic{font-size:28px;color:var(--acc);flex:none;margin-top:2px}
+.tb-pt b{font-size:20px}
+.tb-pt p{font-size:16.5px;line-height:1.5;color:var(--text2);margin-top:2px}
+.tb-pt.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 22%,transparent)}
+.tb-ex{margin-top:auto;display:flex;gap:10px}
+.tb-x{flex:1;text-align:center;padding:10px;border-radius:12px;font-size:16px;color:var(--text3);border:1px dashed var(--line2);transition:all .4s}
+.tb-x.run{color:var(--tool);border-style:solid;border-color:var(--tool);animation:glowPulse 1.2s ease-in-out infinite;--c:var(--tool)}
+.tb-x.done{color:var(--ok);border-style:solid;border-color:var(--ok)}
+.tb-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c02-exp1b'] = {
+  // 流式输出的片段：cls 着色，ev 到达时触发的事件
+  SEG: [
+    { t: '<think>', c: 'tg', ev: 'think' },
+    { t: '\n用户想知道温哥华现在的时间和天气。两件事互不依赖，\n可以同时调用 get_current_time 和 get_current_temperature……\n', c: 'th' },
+    { t: '</think>', c: 'tg' },
+    { t: '\n<tool_call>', c: 'tg', ev: 'call' },
+    { t: '\n{"name": "get_current_time", "arguments": {"timezone": "America/Vancouver"}}\n', c: 'tc' },
+    { t: '</tool_call>', c: 'tg', ev: 'exec0' },
+    { t: '\n<tool_call>', c: 'tg' },
+    { t: '\n{"name": "get_current_temperature", "arguments": {"location": "Vancouver", "unit": "celsius"}}\n', c: 'tc' },
+    { t: '</tool_call>', c: 'tg', ev: 'exec1' },
+    { t: '\n\n── 框架并行执行两个工具，结果作为 <tool_response> 送回 ──\n', c: 'sys', ev: 'back' },
+    { t: '{"time": "11:11:28", "utc_offset": "-0700", …}\n{"temperature": 17.9, "conditions": "mainly clear", …}\n\n', c: 'tr' },
+    { t: 'The current time in Vancouver is **11:11** (UTC-7), and the weather is **mainly clear** with a temperature of **17.9°C**.', c: 'an', ev: 'final' },
+  ],
+  pt(s, i) { s.querySelectorAll('.tb-pt').forEach((p) => p.classList.toggle('on', +p.dataset.p === i)); },
+  state(s, t) { s.querySelector('.tb-state').textContent = t; },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const out = s.querySelector('.tb-out'), xs = [...s.querySelectorAll('.tb-x')];
+    while (ok()) {
+      out.innerHTML = '';
+      xs.forEach((x, i) => { x.className = 'tb-x'; x.textContent = `工具 ${i + 1}：等待生成`; });
+      this.pt(s, -1); this.state(s, '');
+      for (const g of this.SEG) {
+        if (!ok()) return;
+        if (g.ev === 'think') { this.pt(s, 0); this.state(s, '思考中'); }
+        if (g.ev === 'call') { this.pt(s, 1); this.state(s, '生成工具调用'); }
+        if (g.ev === 'exec0') { this.pt(s, 1); xs[0].className = 'tb-x run'; xs[0].textContent = '工具 1：已校验，立即执行'; xs[1].textContent = '工具 2：仍在生成…'; }
+        if (g.ev === 'exec1') { this.pt(s, 2); xs[1].className = 'tb-x run'; xs[1].textContent = '工具 2：并行执行'; }
+        if (g.ev === 'back') { xs.forEach((x, i) => { x.className = 'tb-x done'; x.textContent = `工具 ${i + 1}：结果已回传`; }); this.state(s, '等待模型判断'); }
+        if (g.ev === 'final') { this.pt(s, 3); this.state(s, '最终回复 · 无工具调用 → 结束'); }
+        const span = document.createElement('span');
+        span.className = g.c;
+        out.appendChild(span);
+        // 逐字吐出，模拟流式
+        const step = g.c === 'th' || g.c === 'an' ? 3 : 6;
+        for (let i = 0; i < g.t.length; i += step) {
+          span.textContent = g.t.slice(0, i + step);
+          await U.wait(ctx, 28);
+          if (!ok()) return;
+        }
+        await U.wait(ctx, g.ev ? 500 : 120);
+      }
+      await U.wait(ctx, 3800);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.tb-out').innerHTML = ''; this.pt(s, -1); this.state(s, ''); },
+};
+</script>

@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>深入理解 AI Agent · 动画版 · 总目录</title>
+<style>
+{{CSS}}
+</style>
+<script>
+{{CORE}}
+</script>
+<script>
+window.BOOK = {{BOOK}};
+</script>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+<div class="gridlines"></div><div class="vignette"></div>
+{{ICONS}}
+<div id="viewport"><div id="deck">
+  <section class="slide hub-page">
+    <header class="hb-head">
+      <div class="hb-kicker fx fx-up"><i></i>开源图书 · 非官方动画版</div>
+      <h1 class="hb-title"><span class="split" data-grad="#22d3ee,#818cf8,#c084fc">深入理解 AI Agent</span></h1>
+      <p class="hb-sub fx fx-up" style="--d:9">设计原理与工程实践 · 李博杰 著 · 一章一个动画页面</p>
+      <div class="hb-formula fx fx-up" style="--d:11">
+        <span class="tk-a">Agent</span><span class="op">=</span>
+        <span class="tk" style="--c:var(--llm)">LLM<small>大脑</small></span><span class="op">+</span>
+        <span class="tk" style="--c:var(--ctx)">上下文<small>眼睛</small></span><span class="op">+</span>
+        <span class="tk" style="--c:var(--tool)">工具<small>手脚</small></span>
+      </div>
+      <div class="hb-bar fx fx-up" style="--d:13">
+        <div class="hb-stat"><b data-v="ready">0</b><span>已上线</span></div>
+        <div class="hb-stat"><b data-v="all">0</b><span>篇章</span></div>
+        <div class="hb-parts"></div>
+        <a class="hb-resume" data-leave hidden><svg class="ic"><use href="#i-history"/></svg><span></span></a>
+      </div>
+    </header>
+    <div class="hb-orbit fx fx-scale" style="--d:5"></div>
+    <div class="hb-grid"></div>
+    <footer class="hb-foot fx fx-up" style="--d:30">
+      <span>非官方二次创作，内容依据 github.com/bojieli/ai-agent-book（Apache-2.0）</span>
+      <span class="hb-keys"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>Enter</kbd> 打开 <kbd>F</kbd> 全屏</span>
+    </footer>
+  </section>
+</div></div>
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+<div id="leaveMask"></div>
+<script>
+{{HUB_JS}}
+</script>
+</body>
+</html>

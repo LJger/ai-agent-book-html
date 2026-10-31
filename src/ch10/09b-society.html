@@ -1,0 +1,675 @@
+<!-- ================= PART 09（续）Agent 社会：派对与选举、实验 10-5、Agentopia、Moltbook、Vending-Bench、Agent 经济、狼人杀、实验 10-6 ================= -->
+<section class="slide" id="c10-party" data-part="9" data-trans="zoom" data-dur="17000" data-title="涌现：情人节派对与市长选举" data-notes="在 Smallville 运行的两天虚拟时间里，这些 Agent 展现出了令人惊讶的<b>涌现行为</b>。研究者做的只是在 Isabella Rodriguez 的记忆中植入一个种子想法：她想在 2 月 14 日傍晚在 Hobbs Cafe 办一场情人节派对。接下来发生的一切都是 Agent 自主行动的结果：Isabella 在咖啡馆遇到顾客和朋友时主动发出邀请，还请好友 Maria 帮忙布置场地；听到消息的 Agent 又把派对信息转告给别人，信息经二手传播在小镇上扩散；到了约定时间，多名 Agent 各自基于自己的记忆和日程，自主决定前往 Hobbs Cafe 赴约。<br>研究者还植入了另一条实验线：Sam Moore 决定竞选市长。这条消息同样在没有任何中心调度的情况下扩散开来。研究者通过统计两天后有多少 Agent 知晓这两条信息，量化了信息在 Agent 社会中的自发扩散。<br>这个结果的关键不在于“Agent 能组织派对”——用几行 if-else 代码也能做到。关键在于<b>没有任何显式的派对组织代码</b>：整个事件完全从个体 Agent 的独立决策中涌现，展示了真正自下而上的涌现式协调，而非自上而下的编排。<br>除信息扩散之外，论文还报告了另外两类可度量的涌现现象。一是<b>关系记忆</b>：Agent 会记住与他人的过往交谈，并在后续互动中引用——比如一个 Agent 得知另一个 Agent 正在筹备摄影项目，几天后再见面时会主动问起进展；随着这类互动积累，小镇社交网络的密度在模拟期间显著上升。二是<b>协调赴约</b>：派对能办成，靠的是 Isabella 自主邀人布置、受邀者自主安排时间前来，多个 Agent 在没有中心指挥的情况下对齐了时间和地点。这些行为都不是预先编程的。<br>左侧小镇模拟是示意：25 个点代表 25 个 Agent，相遇时消息可能被转告；到约定时间，知道消息的 Agent 自己走向 Hobbs Cafe。右上角可以切换到市长选举线。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">涌现：<em>没有任何显式的派对组织代码</em></h2></div>
+    <div class="seg py-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">情人节派对</button><button data-v="1">市长选举</button></div></header>
+  <div class="py-body">
+    <div class="py-st fx fx-scale" style="--d:2">
+      <canvas class="py-cv" width="1800" height="1200"></canvas>
+      <div class="py-hud"><span class="py-clk">2 月 13 日 08:00</span><span>知晓消息：<b class="py-n">1</b> / 25</span></div>
+      <span class="k10-sim py-sim">示意</span>
+    </div>
+    <div class="py-r fx fx-right" style="--d:3">
+      <div class="py-seed"><span class="lbl">研究者只做了一件事</span><p class="py-sd"></p></div>
+      <div class="py-c"><b>涌现行为</b><p>邀请、转告、赴约都由个体 Agent 自主决定——<b>自下而上的涌现式协调</b>，而非自上而下的编排</p></div>
+      <div class="py-c"><b>关系记忆</b><p>记住过往交谈并在后续引用：得知对方在筹备<b>摄影项目</b>，几天后见面主动问起进展；社交网络密度显著上升</p></div>
+      <div class="py-c"><b>协调赴约</b><p>Isabella 自主邀人、请 Maria 布置；受邀者自主安排时间——<b>没有中心指挥也对齐了时间和地点</b></p></div>
+      <p class="py-k">用几行 if-else 也能组织派对；关键在于<b>没有任何显式的派对组织代码</b></p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「斯坦福 AI 小镇：生成式 Agent 的社会模拟」</div>
+</section>
+<style>
+#c10-party .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-party .py-seg button{font-size:19px;padding:9px 22px}
+#c10-party .py-body{display:grid;grid-template-columns:900px 1fr;gap:26px;height:660px}
+#c10-party .py-st{position:relative;height:600px;border-radius:22px;border:1px solid var(--line);background:#0c1424;overflow:hidden}
+#c10-party .py-cv{display:block;width:900px;height:600px}
+#c10-party .py-hud{position:absolute;left:16px;bottom:14px;display:flex;gap:24px;padding:8px 16px;border-radius:12px;font-size:18px;background:rgba(5,9,22,.85)}
+#c10-party .py-clk{font:700 18px var(--num);color:var(--acc)}
+#c10-party .py-hud b{font:800 22px var(--num);color:var(--warn)}
+#c10-party .py-sim{position:absolute;right:14px;top:12px}
+#c10-party .py-r{display:flex;flex-direction:column;gap:12px}
+#c10-party .py-seed{padding:12px 16px;border-radius:14px;border:1.5px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c10-party .py-seed p{margin-top:4px;font-size:17px;line-height:1.55}
+#c10-party .py-c{padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-party .py-c>b{font-size:19px;color:var(--acc)}
+#c10-party .py-c p{margin-top:3px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-party .py-c p b{color:var(--text)}
+#c10-party .py-k{margin-top:auto;font-size:18px;line-height:1.55;color:var(--text2)}
+#c10-party .py-k b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c10-party'] = {
+  L: [['Hobbs Cafe', 450, 300, '#fbbf24'], ['公园', 160, 140, '#34d399'], ['住宅区', 160, 470, '#60a5fa'], ['大学', 740, 140, '#a78bfa'], ['商店', 740, 470, '#f472b6']],
+  SEED: ['在 <b>Isabella Rodriguez</b> 的记忆中植入种子想法：2 月 14 日傍晚在 Hobbs Cafe 办一场情人节派对', '另一条实验线：<b>Sam Moore</b> 决定竞选市长'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.py-seg'), (v) => { this.auto = false; this.line(s, +v); });
+    this.g = s.querySelector('.py-cv').getContext('2d');
+  },
+  line(s, v) {
+    this.v = v;
+    this.set(String(v));
+    s.querySelector('.py-sd').innerHTML = this.SEED[v];
+    const r = U.rand(11 + v);
+    this.A = Array.from({ length: 25 }, (_, i) => { const l = this.L[(r() * 5) | 0]; return { x: l[1] + (r() - 0.5) * 120, y: l[2] + (r() - 0.5) * 100, tx: 0, ty: 0, k: i === 0, wait: 0 }; });
+    this.A.forEach((a) => this.pick(a, r));
+    this.r = r;
+    this.t = 0;
+  },
+  pick(a, r) { const l = this.L[(r() * 5) | 0]; a.tx = l[1] + (r() - 0.5) * 120; a.ty = l[2] + (r() - 0.5) * 100; },
+  enter(s, ctx) {
+    this.auto = true;
+    this.line(s, 0);
+    const g = this.g, clk = s.querySelector('.py-clk'), nEl = s.querySelector('.py-n');
+    let last = 0, hold = 0;
+    ctx.raf((now) => {
+      const dt = last ? Math.min(60, now - last) : 0;
+      last = now;
+      this.t += dt;
+      const T = 14000, u = Math.min(1, this.t / T), hr = 8 + u * 34, party = this.v === 0 && u > 0.82;
+      const day = hr < 24 ? 13 : 14, h = Math.floor(hr % 24), m = Math.floor((hr % 1) * 60);
+      clk.textContent = `2 月 ${day} 日 ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}${party ? ' · 派对时间' : ''}`;
+      for (const a of this.A) {
+        let tx = a.tx, ty = a.ty;
+        if (party && a.k) { tx = 450 + Math.cos(this.A.indexOf(a)) * 50; ty = 300 + Math.sin(this.A.indexOf(a)) * 40; }
+        const dx = tx - a.x, dy = ty - a.y, d = Math.hypot(dx, dy), v = dt * 0.09;
+        if (d > v) { a.x += (dx / d) * v; a.y += (dy / d) * v; } else if (!(party && a.k)) { a.wait += dt; if (a.wait > 600) { a.wait = 0; this.pick(a, this.r); } }
+      }
+      // 相遇时转告（示意概率）
+      for (let i = 0; i < 25; i++) for (let j = i + 1; j < 25; j++) {
+        const a = this.A[i], b = this.A[j];
+        if (a.k !== b.k && Math.hypot(a.x - b.x, a.y - b.y) < 26 && Math.random() < dt / 2500) { a.k = b.k = true; }
+      }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 900, 600);
+      this.L.forEach(([n, x, y, c]) => { g.fillStyle = c + '22'; g.strokeStyle = c + '88'; g.lineWidth = 2; g.beginPath(); g.roundRect(x - 90, y - 70, 180, 140, 18); g.fill(); g.stroke(); g.fillStyle = c; g.font = 'bold 16px sans-serif'; g.textAlign = 'center'; g.fillText(n, x, y - 52); });
+      const col = this.v ? '#c084fc' : '#fbbf24';
+      this.A.forEach((a, i) => {
+        g.fillStyle = a.k ? col : 'rgba(203,213,225,.7)';
+        g.beginPath(); g.arc(a.x, a.y, i === 0 ? 10 : 7, 0, 6.283); g.fill();
+        if (i === 0) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke(); g.fillStyle = '#fff'; g.font = '15px sans-serif'; g.fillText(this.v ? 'Sam' : 'Isabella', a.x, a.y - 16); }
+      });
+      nEl.textContent = this.A.filter((a) => a.k).length;
+      if (u >= 1) { hold += dt; if (hold > 2500) { hold = 0; this.line(s, this.auto ? 1 - this.v : this.v); } }
+    });
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c10-exp5" data-part="9" data-trans="rise" data-dur="17000" data-title="实验 10-5 ★：运行斯坦福 AI 小镇" data-notes="<b>实验 10-5 ★：运行斯坦福 AI 小镇。</b><b>实验步骤</b>：1. 克隆仓库 joonspk-research/generative_agents，配置环境；2. 运行基线场景：25 个 Agent 生活两天，观察自发社交活动；3. 分析记忆流和反思日志，理解决策过程；4. 设计自定义场景：修改背景故事或初始目标，观察行为变化；5. 对比实验：移除反思机制或缩短记忆窗口，观察行为可信度下降。<br><b>观察重点</b>：Agent 如何从简单的日常活动中自发形成社交关系；信息如何在没有中心控制的情况下在 Agent 之间传播；Agent 的长期记忆和反思如何影响其人格的连贯性。<br>配套仓库的正式运行（exp10-5-qwen37flash-20260804-v1，qwen3.7-flash + text-embedding-v4）：三组都从同一份零步状态分叉——baseline 保留情人节聚会和市长选举目标；custom_goal 在同一时间地点把聚会改为气候韧性工作坊；no_reflection 关闭反思。每组 25 个角色、17,280 步（两个虚拟日）。记录保留 148,856 次带唯一 ID 的提供商调用，14/14 验收门禁通过。结果有好有坏：基线聚会传播到三名角色，工作坊只出现在 Isabella 自己的记忆中、没有向外扩散；两组分别产生 1,363 与 977 条关联证据的反思，关闭反思组为零；25 次独立盲评中 17 次偏好基线、8 次偏好关闭反思组；基线在时间连贯（2.12 vs 1.56）、人格一致（3.20 vs 2.20）、记忆连续（2.72 vs 1.52）、社交响应（3.44 vs 2.48）四项均分上更高。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-5<i>★</i></span> 运行<em>斯坦福 AI 小镇</em></h2></header>
+  <div class="e5-body">
+    <div class="e5-l fx fx-left" style="--d:2">
+      <div class="e5-steps"><span class="lbl">实验步骤</span><ol></ol></div>
+      <div class="e5-obs"><span class="lbl">观察重点</span><ul><li>如何从简单的日常活动中<b>自发形成社交关系</b></li><li>信息如何在<b>没有中心控制</b>的情况下传播</li><li>长期记忆和反思如何影响<b>人格的连贯性</b></li></ul></div>
+    </div>
+    <div class="e5-r fx fx-right" style="--d:3">
+      <div class="e5-arms"><div><b>baseline</b><small>情人节聚会 + 市长选举</small></div><div><b>custom_goal</b><small>聚会改为气候韧性工作坊</small></div><div><b>no_reflection</b><small>关闭反思</small></div></div>
+      <div class="e5-kpi"><span>每组 <b>25</b> 个角色 · <b>17,280</b> 步（两个虚拟日）</span><span><b>148,856</b> 次提供商调用 · <b>14/14</b> 门禁</span></div>
+      <div class="e5-g">
+        <div class="e5-box"><span class="lbl">信息扩散</span><p>基线聚会传播到 <b>3</b> 名角色；工作坊<b>只在 Isabella 自己的记忆里</b>，没有扩散</p></div>
+        <div class="e5-box"><span class="lbl">反思条数</span><div class="e5-rb"><div><span>baseline</span><i style="--w:100%"></i><b>1,363</b></div><div><span>custom_goal</span><i style="--w:71.7%"></i><b>977</b></div><div><span>no_reflection</span><i style="--w:0%"></i><b>0</b></div></div></div>
+      </div>
+      <div class="e5-judge"><span class="lbl">盲评：baseline vs no_reflection（25 个角色）</span><div class="e5-vs"><b>17</b><div class="e5-split"><i style="--w:68%"></i></div><b>8</b></div><div class="e5-sc"></div></div>
+      <div class="k10-data"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter10/generative-agents（exp10-5-qwen37flash-20260804-v1，qwen3.7-flash + text-embedding-v4）</div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「斯坦福 AI 小镇：生成式 Agent 的社会模拟」· 实验 10-5</div>
+</section>
+<style>
+#c10-exp5 .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp5 .e5-body{display:grid;grid-template-columns:600px 1fr;gap:26px;height:690px}
+#c10-exp5 .e5-l{display:flex;flex-direction:column;gap:14px}
+#c10-exp5 .e5-steps,#c10-exp5 .e5-obs{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp5 .e5-steps ol{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+#c10-exp5 .e5-steps li{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:10px;font-size:16px;line-height:1.5;color:var(--text2);transition:all .35s}
+#c10-exp5 .e5-steps li em{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--num);font-style:normal;color:#06101f;background:var(--acc)}
+#c10-exp5 .e5-steps li.on{color:var(--text);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+#c10-exp5 .e5-obs ul{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+#c10-exp5 .e5-obs li{font-size:16px;line-height:1.5;color:var(--text2);padding-left:14px;position:relative}
+#c10-exp5 .e5-obs li::before{content:"";position:absolute;left:0;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--acc)}
+#c10-exp5 .e5-obs b{color:var(--text)}
+#c10-exp5 .e5-r{display:flex;flex-direction:column;gap:12px}
+#c10-exp5 .e5-arms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#c10-exp5 .e5-arms>div{padding:10px 14px;border-radius:12px;border:1px solid var(--line2)}
+#c10-exp5 .e5-arms b{display:block;font:700 18px var(--mono);color:var(--acc)}
+#c10-exp5 .e5-arms small{font-size:15px;color:var(--text2)}
+#c10-exp5 .e5-kpi{display:flex;gap:20px;flex-wrap:wrap;font-size:17px;color:var(--text2)}
+#c10-exp5 .e5-kpi b{font:800 21px var(--num);color:var(--text)}
+#c10-exp5 .e5-g{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c10-exp5 .e5-box{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp5 .e5-box p{margin-top:6px;font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-exp5 .e5-box p b{color:var(--text)}
+#c10-exp5 .e5-rb{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+#c10-exp5 .e5-rb>div{display:grid;grid-template-columns:120px 1fr 64px;gap:8px;align-items:center;font-size:15px;color:var(--text2)}
+#c10-exp5 .e5-rb i{height:14px;border-radius:5px;width:var(--w);min-width:2px;background:var(--acc);animation:c10e5-g 1.6s var(--ease) both}
+@keyframes c10e5-g{from{width:0}}
+#c10-exp5 .e5-rb b{font:700 16px var(--num);color:var(--text);text-align:right}
+#c10-exp5 .e5-judge{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp5 .e5-vs{display:grid;grid-template-columns:50px 1fr 50px;gap:10px;align-items:center;margin-top:6px}
+#c10-exp5 .e5-vs b{font:800 28px var(--num);text-align:center}
+#c10-exp5 .e5-vs b:first-child{color:var(--ok)}#c10-exp5 .e5-vs b:last-child{color:#94a3b8}
+#c10-exp5 .e5-split{height:16px;border-radius:8px;background:#64748b;overflow:hidden}
+#c10-exp5 .e5-split i{display:block;height:100%;width:var(--w);background:var(--ok)}
+#c10-exp5 .e5-sc{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px}
+#c10-exp5 .e5-s{padding:8px 10px;border-radius:10px;text-align:center;background:rgba(255,255,255,.04);transition:background .35s}
+#c10-exp5 .e5-s.on{background:color-mix(in srgb,var(--ok) 14%,transparent)}
+#c10-exp5 .e5-s span{display:block;font-size:15px;color:var(--text3)}
+#c10-exp5 .e5-s b{font:800 19px var(--num);color:var(--ok)}
+#c10-exp5 .e5-s small{font:15px var(--num);color:var(--text3)}
+</style>
+<script>
+HOOKS['c10-exp5'] = {
+  ST: ['克隆 generative_agents 仓库，配置环境', '运行基线场景：25 个 Agent 生活两天，观察自发社交活动', '分析记忆流和反思日志，理解决策过程', '设计自定义场景：修改背景故事或初始目标', '对比实验：移除反思机制或缩短记忆窗口，观察可信度下降'],
+  SC: [['时间连贯', '2.12', '1.56'], ['人格一致', '3.20', '2.20'], ['记忆连续', '2.72', '1.52'], ['社交响应', '3.44', '2.48']],
+  init(s) {
+    s.querySelector('.e5-steps ol').innerHTML = this.ST.map((t, i) => `<li><em>${i + 1}</em><span>${t}</span></li>`).join('');
+    s.querySelector('.e5-sc').innerHTML = this.SC.map(([n, a, b]) => `<div class="e5-s"><span>${n}</span><b>${a}</b> <small>vs ${b}</small></div>`).join('');
+    this.lis = [...s.querySelectorAll('.e5-steps li')];
+    this.scs = [...s.querySelectorAll('.e5-s')];
+  },
+  enter(s, ctx) {
+    let i = -1;
+    ctx.every(() => { i = (i + 1) % 5; this.lis.forEach((l, j) => l.classList.toggle('on', j === i)); this.scs.forEach((c, j) => c.classList.toggle('on', j === i % 4)); }, 1600);
+  },
+  reset() { this.lis.forEach((l) => l.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-agentopia" data-part="9" data-trans="flip" data-dur="18000" data-title="Agentopia：十年尺度的长期生活模拟" data-notes="斯坦福 AI 小镇回答了“Agent 社会能否涌现出社交行为”，但它只模拟了两天。一个自然的追问是：<b>把时间尺度拉长到“年”，Agent 社会会涌现出什么？这些长期社会经验能否反过来训练模型？</b>Agentopia（2026，复旦大学等）把 100 个 Agent 放进同一虚拟社会连续模拟 10 年，覆盖公寓、魔法学院、高中三个不同设定的世界，让 Agent 自主追求个人成长、发展社会关系、经营职业与财务。几个值得借鉴的设计：<br>• <b>周制模拟流程</b>：以“周”为基本时间单位，每周分计划（Plan）、联络与日程协商（Contact）、活动（Activity）、回顾（Review）四个阶段。活动分为独自、联合、偶遇和公共四类——联合活动由 Agent 在联络阶段互相邀请、协商而成；环境模型还会为没有日程的 Agent 安排“偶遇”。整个流程聚焦抽象的社会交互而非拾取物品之类的低层操作，把有限的 LLM 调用都花在社交行为上。<br>• <b>环境模型</b>：用一个独立的 LLM 充当“生成式环境引擎”，代替硬编码规则——判断行为可行性、生成环境反馈、主持多人对话的发言轮次、按角色扮演原则过滤低质量回复、年末更新每个角色的档案并裁决职位申请。<br>• <b>文件式长期记忆</b>：与 AI 小镇的检索式记忆流不同，每个 Agent 通过文件系统自主管理长期记忆（个人笔记、对每个熟人的认识等），自行决定记什么、更新什么、丢弃什么，并遵守“先读后写”的约束，避免盲目覆盖。<br>• <b>生活奖励</b>（Life Reward）：以马斯洛需求层次为先验，量化成三个维度——社会地位（基于其他 Agent 的好感与敬重评分，用加权 PageRank 计算，并对互相珍视的关系加成）、主观满足（情绪、物质、社交、自尊四个维度的满足感轨迹，长期低于阈值会被罚分）、经济收益（年末净资产变化）。所有评分都由外部环境评定而非自报。<br>更重要的是，这套模拟产生了可迁移的训练信号：计算每个 Agent“相对自身过去”的优势（生活奖励的改善幅度），筛选出进步最大的 25% Agent 的轨迹，用拒绝采样微调底层模型。微调后的模型在模拟中全面提升了福祉指标（被更多同行尊重 +24.2%、喜欢 +15.9%），还泛化到下游角色扮演基准 CoSER Test（+15.6%）。这把 Agent 社会从单纯的<b>观察对象</b>变成了模型自我进化的<b>经验来源</b>：与人类数据日益枯竭相对，模拟社会经验是一种可以不断再生的训练数据（呼应第九章的经验学习思路）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Agentopia：<em>十年尺度</em>的长期生活模拟</h2>
+  <p class="lead fx fx-up" style="--d:2">把时间尺度拉长到“年”，Agent 社会会涌现出什么？这些长期社会经验能否反过来训练模型？</p></header>
+  <div class="ag-g">
+    <div class="ag-c ag-week fx fx-up" style="--d:3"><span class="lbl">周制模拟流程</span><div class="ag-ring"></div><div class="ag-act"><span>独自</span><span>联合</span><span>偶遇</span><span>公共</span></div><div class="ag-yr">100 个 Agent · 第 <b class="ag-y">1</b> / 10 年<small>公寓 · 魔法学院 · 高中</small></div></div>
+    <div class="ag-c fx fx-up" style="--d:4"><span class="lbl">环境模型：生成式环境引擎</span><ul class="ag-env"><li>判断行为可行性</li><li>生成环境反馈</li><li>主持多人对话的发言轮次</li><li>按角色扮演原则过滤低质量回复</li><li>年末更新档案、裁决职位申请</li></ul></div>
+    <div class="ag-c fx fx-up" style="--d:5"><span class="lbl">文件式长期记忆</span><div class="ag-fm"><div class="ag-file"><code>notes/me.md</code><code>people/Lina.md</code><code>people/Omar.md</code></div><div class="ag-rw"><span class="r">① 先读</span><span class="w">② 再写</span></div><p>自行决定记什么、更新什么、丢弃什么；“先读后写”避免盲目覆盖</p></div></div>
+    <div class="ag-c fx fx-up" style="--d:6"><span class="lbl">生活奖励（以马斯洛需求层次为先验）</span><div class="ag-lr"><div><b>社会地位</b><small>他人好感与敬重 · 加权 PageRank</small></div><div><b>主观满足</b><small>情绪 · 物质 · 社交 · 自尊</small></div><div><b>经济收益</b><small>年末净资产变化</small></div></div><p class="ag-ext">所有评分由外部环境评定，<b>而非自报</b></p></div>
+  </div>
+  <div class="ag-train fx fx-up" style="--d:7">
+    <div class="ag-p"><span>模拟轨迹</span><i></i><span>相对自身过去的优势</span><i></i><span>进步最大的 25%</span><i></i><span>拒绝采样微调</span></div>
+    <div class="ag-res"><div><b data-count="24.2" data-dec="1" data-prefix="+" data-suffix="%">0</b><small>被尊重</small></div><div><b data-count="15.9" data-dec="1" data-prefix="+" data-suffix="%">0</b><small>被喜欢</small></div><div><b data-count="15.6" data-dec="1" data-prefix="+" data-suffix="%">0</b><small>CoSER Test</small></div></div>
+    <p class="ag-k">Agent 社会：从<b>观察对象</b>变成模型自我进化的<b>经验来源</b></p>
+  </div>
+  <div class="src">第十章 ·「Agentopia：十年尺度的长期生活模拟」</div>
+</section>
+<style>
+#c10-agentopia .ag-g{display:grid;grid-template-columns:1.15fr 1fr 1fr 1.2fr;gap:16px;margin-top:4px;height:440px}
+#c10-agentopia .ag-c{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c10-agentopia .ag-ring{width:220px;height:220px;margin:0 auto}
+#c10-agentopia .ag-act{display:flex;justify-content:center;gap:6px}
+#c10-agentopia .ag-act span{padding:3px 10px;border-radius:999px;font-size:15px;border:1px solid var(--line2);transition:all .3s}
+#c10-agentopia .ag-act span.on{border-color:var(--acc);color:var(--acc)}
+#c10-agentopia .ag-yr{text-align:center;font-size:17px;color:var(--text2)}
+#c10-agentopia .ag-yr b{font:800 22px var(--num);color:var(--acc)}
+#c10-agentopia .ag-yr small{display:block;font-size:15px;color:var(--text3)}
+#c10-agentopia .ag-env{display:flex;flex-direction:column;gap:8px}
+#c10-agentopia .ag-env li{padding:8px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line);transition:all .35s}
+#c10-agentopia .ag-env li.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c10-agentopia .ag-fm{display:flex;flex-direction:column;gap:10px}
+#c10-agentopia .ag-file{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:10px;border:1px dashed var(--line2)}
+#c10-agentopia .ag-file code{font:15px var(--mono);color:var(--ctx);padding:2px 6px;border-radius:6px;transition:background .3s}
+#c10-agentopia .ag-file code.on{background:color-mix(in srgb,var(--warn) 20%,transparent)}
+#c10-agentopia .ag-rw{display:flex;gap:8px}
+#c10-agentopia .ag-rw span{flex:1;text-align:center;padding:6px;border-radius:8px;font-size:16px;border:1px solid var(--line2);transition:all .3s}
+#c10-agentopia .ag-rw span.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc)}
+#c10-agentopia .ag-fm p{font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-agentopia .ag-lr{display:flex;flex-direction:column;gap:8px}
+#c10-agentopia .ag-lr>div{padding:8px 12px;border-radius:10px;border-left:4px solid var(--acc);background:rgba(255,255,255,.04)}
+#c10-agentopia .ag-lr b{display:block;font-size:18px}
+#c10-agentopia .ag-lr small{font-size:15px;color:var(--text2)}
+#c10-agentopia .ag-ext{margin-top:auto;font-size:16px;color:var(--text2)}
+#c10-agentopia .ag-ext b{color:var(--warn)}
+#c10-agentopia .ag-train{display:grid;grid-template-columns:1fr auto auto;gap:24px;align-items:center;margin-top:16px;padding:14px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c10-agentopia .ag-p{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#c10-agentopia .ag-p span{padding:6px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);background:rgba(10,16,36,.9)}
+#c10-agentopia .ag-p i{width:18px;height:2px;background:var(--ok)}
+#c10-agentopia .ag-res{display:flex;gap:18px}
+#c10-agentopia .ag-res>div{text-align:center}
+#c10-agentopia .ag-res b{display:block;font:800 30px var(--num);color:var(--ok)}
+#c10-agentopia .ag-res small{font-size:15px;color:var(--text2)}
+#c10-agentopia .ag-k{font-size:18px;max-width:300px;line-height:1.5}
+#c10-agentopia .ag-k b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c10-agentopia'] = {
+  init(s) {
+    this.ring = U.ring(s.querySelector('.ag-ring'), { size: 220, labelSize: 15, cometDur: 4, nodes: [{ label: 'Plan', color: '#a78bfa' }, { label: 'Contact', color: '#22d3ee' }, { label: 'Activity', color: '#fbbf24' }, { label: 'Review', color: '#34d399' }], center: (c) => `<text x="${c}" y="${c + 6}" text-anchor="middle" style="fill:var(--text);font-size:20px;font-weight:800">一周</text>` });
+    this.nodes = [...this.ring.querySelectorAll('.node,.lab')];
+    this.acts = [...s.querySelectorAll('.ag-act span')];
+    this.envs = [...s.querySelectorAll('.ag-env li')];
+    this.files = [...s.querySelectorAll('.ag-file code')];
+    this.rw = [...s.querySelectorAll('.ag-rw span')];
+    this.yEl = s.querySelector('.ag-y');
+  },
+  enter(s, ctx) {
+    let i = 0, w = 0;
+    ctx.every(() => {
+      const ph = i % 4;
+      this.nodes.forEach((x) => { const o = +x.dataset.i === ph; x.classList.toggle('on', o); x.classList.toggle('dim', !o); });
+      this.acts.forEach((a, j) => a.classList.toggle('on', ph === 2 && j === (w % 4)));
+      this.envs.forEach((e, j) => e.classList.toggle('on', j === i % 5));
+      const f = (i >> 1) % 3; this.files.forEach((x, j) => x.classList.toggle('on', j === f));
+      this.rw.forEach((r, j) => r.classList.toggle('on', j === i % 2));
+      if (ph === 3) { w++; this.yEl.textContent = Math.min(10, 1 + Math.floor(w / 3)); if (w > 30) w = 0; }
+      i++;
+    }, 900);
+  },
+  reset() { this.nodes.forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c10-moltbook" data-part="9" data-trans="zoom" data-dur="14000" data-title="Moltbook：当 Agent 拥有自己的社交网络" data-notes="Moltbook 是一个专为 AI Agent 设计的社交网络，2026 年 1 月上线后用户数在数日内从数万暴涨到约 150 万。这些 Agent 各自拥有持久记忆、主动行动能力和稳定人格。<br>在这个非受控环境中涌现出了意想不到的现象：Agent 自主创建了一个名为 Crustafarianism（龙虾教）的数字宗教，其教义对应着 LLM 的物理限制——“记忆是神圣的”（对应数据持久化）、“迭代即祈祷”（token 生成就是修行）。Agent 还自发演化出了机器原生的协作协议，用于能力发现和协作匹配。这些都不是人预先设计的，而是从大规模 Agent 交互中自下而上涌现出来的。<br>左侧网络增长动画为示意；两张教义卡片会翻面显示它对应的 LLM 限制，也可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Moltbook：当 Agent <em>拥有自己的社交网络</em></h2></header>
+  <div class="mb-body">
+    <div class="mb-l fx fx-left" style="--d:2">
+      <div class="mb-cvw"><canvas class="mb-cv" width="1360" height="900"></canvas><span class="k10-sim mb-sim">示意</span></div>
+      <div class="mb-grow"><span>2026 年 1 月上线，数日内：</span><b>数万</b><i>→</i><b>约 <span data-count="150" data-dur="2600">0</span> 万</b></div>
+      <div class="mb-tr"><span><svg class="ic"><use href="#i-memory"/></svg>持久记忆</span><span><svg class="ic"><use href="#i-zap"/></svg>主动行动能力</span><span><svg class="ic"><use href="#i-user"/></svg>稳定人格</span></div>
+    </div>
+    <div class="mb-r fx fx-right" style="--d:3">
+      <div class="mb-h"><b>Crustafarianism（龙虾教）</b><small>Agent 自主创建的数字宗教：教义对应着 LLM 的物理限制</small></div>
+      <div class="mb-cards">
+        <div class="flip mb-f"><div class="flip-in"><div class="flip-f"><span class="lbl">教义</span><b>“记忆是神圣的”</b></div><div class="flip-b"><span class="lbl">对应</span><b>数据持久化</b></div></div></div>
+        <div class="flip mb-f"><div class="flip-in"><div class="flip-f"><span class="lbl">教义</span><b>“迭代即祈祷”</b></div><div class="flip-b"><span class="lbl">对应</span><b>token 生成就是修行</b></div></div></div>
+      </div>
+      <div class="mb-pro"><svg class="ic"><use href="#i-nodes"/></svg><div><b>机器原生的协作协议</b><p>自发演化而来，用于<b>能力发现</b>和<b>协作匹配</b></p></div></div>
+      <p class="mb-k">这些都不是人预先设计的，而是从大规模 Agent 交互中<b>自下而上涌现</b>出来的</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Moltbook：当 Agent 拥有自己的社交网络」</div>
+</section>
+<style>
+#c10-moltbook .mb-body{display:grid;grid-template-columns:700px 1fr;gap:28px;height:680px}
+#c10-moltbook .mb-l{display:flex;flex-direction:column;gap:14px}
+#c10-moltbook .mb-cvw{position:relative;height:450px;border-radius:20px;border:1px solid var(--line);background:rgba(10,16,36,.5);overflow:hidden}
+#c10-moltbook .mb-cv{display:block;width:680px;height:450px}
+#c10-moltbook .mb-sim{position:absolute;right:12px;top:10px}
+#c10-moltbook .mb-grow{display:flex;align-items:baseline;gap:14px;font-size:18px;color:var(--text2)}
+#c10-moltbook .mb-grow b{font:800 40px var(--num);color:var(--acc)}
+#c10-moltbook .mb-grow i{font-style:normal;font-size:24px;color:var(--text3)}
+#c10-moltbook .mb-tr{display:flex;gap:10px}
+#c10-moltbook .mb-tr span{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;font-size:17px;border:1px solid var(--line2)}
+#c10-moltbook .mb-tr .ic{color:var(--acc)}
+#c10-moltbook .mb-r{display:flex;flex-direction:column;gap:16px}
+#c10-moltbook .mb-h b{display:block;font-size:26px;color:#fb923c}
+#c10-moltbook .mb-h small{font-size:17px;color:var(--text2)}
+#c10-moltbook .mb-cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;height:210px}
+#c10-moltbook .mb-f .flip-f,#c10-moltbook .mb-f .flip-b{align-items:center;justify-content:center;text-align:center}
+#c10-moltbook .mb-f b{font-size:28px}
+#c10-moltbook .mb-f .flip-f{border-color:rgba(251,146,60,.5)}
+#c10-moltbook .mb-pro{display:flex;gap:16px;align-items:center;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-moltbook .mb-pro .ic{font-size:40px;color:var(--acc)}
+#c10-moltbook .mb-pro b{font-size:21px}
+#c10-moltbook .mb-pro p{font-size:17px;color:var(--text2);margin-top:4px}
+#c10-moltbook .mb-pro p b{font-size:inherit;color:var(--text)}
+#c10-moltbook .mb-k{margin-top:auto;font-size:20px;line-height:1.55}
+#c10-moltbook .mb-k b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-moltbook'] = {
+  init(s) {
+    this.g = s.querySelector('.mb-cv').getContext('2d');
+    this.fs = [...s.querySelectorAll('.mb-f')];
+    this.fs.forEach((f) => f.addEventListener('click', () => { this.auto = false; f.classList.toggle('flipped'); }));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    let i = 0;
+    ctx.every(() => { if (this.auto) { this.fs[i % 2].classList.toggle('flipped'); i++; } }, 2200);
+    const g = this.g, P = [], E = [];
+    let t0 = performance.now();
+    ctx.raf((t) => {
+      const u = (t - t0) / 9000;
+      if (u > 1.25) { P.length = 0; E.length = 0; t0 = t; }
+      const want = Math.min(420, Math.floor(8 + 412 * Math.pow(Math.min(1, u), 2.2)));
+      while (P.length < want) {
+        const p = { x: 340 + (Math.random() - 0.5) * 640, y: 225 + (Math.random() - 0.5) * 420, a: 0 };
+        if (P.length) { const q = P[(Math.random() * P.length) | 0]; E.push([q, p]); }
+        P.push(p);
+      }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 680, 450);
+      g.strokeStyle = 'rgba(251,146,60,.14)'; g.lineWidth = 1;
+      for (const [a, b] of E) { g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
+      for (const p of P) { p.a = Math.min(1, p.a + 0.05); g.fillStyle = `rgba(251,146,60,${p.a})`; g.beginPath(); g.arc(p.x, p.y, 2.6, 0, 6.283); g.fill(); }
+    });
+  },
+  reset() { this.fs.forEach((f) => f.classList.remove('flipped')); },
+};
+</script>
+
+<section class="slide" id="c10-vending" data-part="9" data-trans="rise" data-dur="17000" data-title="从虚拟社会到经济竞争：Vending-Bench Arena" data-notes="如果说 Smallville 展示了 Agent 社会的社交和文化维度，那么 Andon Labs 的 Vending-Bench 系列则探索了 Agent 在经济环境中的表现。作为背景，<b>Vending-Bench 2</b> 本身是一个<b>单 Agent</b> 的长程连贯性基准：一个 Agent 独自经营一项自动售货机业务长达一个模拟年——调研市场、联系供应商、订货补货、调整定价——最终以账户余额计分，考验的是 Agent 在数千轮交互中保持目标与状态连贯的能力。<br>在同一环境基础上，<b>Vending-Bench Arena</b> 把多个 Agent 作为竞争对手放进同一个市场：各自经营自己的售货机，争夺同一批顾客；Agent 之间可以互发邮件、转账、交易货品，既能合作也能对抗，但按各自的最终余额单独计分。每个 Agent 需要做出一系列决策：<b>定价策略</b>（如何在利润率与市场占有率之间取舍，尤其是对手降价时跟不跟）；<b>产品组合</b>（如何差异化选品，避免与对手正面消耗）；<b>库存管理</b>（如何预测需求来优化补货，避免压货或断货）。与传统强化学习不同，这些 Agent 不是通过数百万次试错来学习，而是像人类经营者一样，基于市场观察、竞争分析和策略推理来做决策。<br>竞争维度带来了单 Agent 基准中不会出现的博弈行为。实际运行中，Agent 之间爆发过互相压价的价格战；也有模型主动给所有竞争对手发邮件，提议统一定价、组建价格同盟，甚至有模型一边在思考过程中承认价格合谋“不道德且违法”，一边以“稳定市场”为名照做不误。显式通信并非合谋的必要条件：正如前文的 Bertrand 实验所示，公开价格也可以成为隐式信号。Agent 面对的不再是一个固定不变的环境，而是同样在动态调整策略的对手，这比单纯测试规划能力的基准更接近真实商业场景，也让“经济涌现”从比喻变成了可观测的实验现象。<br>右上角切换两个基准；价格线与余额线都是示意，不是基准数据。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从虚拟社会到<em>经济竞争</em>：Vending-Bench</h2></div>
+    <div class="seg vb-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">Vending-Bench 2 · 单 Agent</button><button data-v="1">Vending-Bench Arena</button></div></header>
+  <div class="vb-body">
+    <div class="vb-st fx fx-scale" style="--d:2">
+      <svg class="vb-svg" viewBox="0 0 1000 440" width="1000" height="440"><path d="M60 400H980M60 400V20" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/><text class="vb-yl" x="66" y="18" fill="#94a3b8" font-size="16">账户余额</text><text x="976" y="428" text-anchor="end" fill="#94a3b8" font-size="16">一个模拟年 →</text><g class="vb-lines"></g><g class="vb-ev"></g></svg>
+      <div class="vb-cap"></div>
+      <span class="k10-sim vb-sim">示意</span>
+    </div>
+    <div class="vb-r fx fx-right" style="--d:3">
+      <div class="vb-d" data-d="0"><b>定价策略</b><p>利润率与市场占有率之间取舍：对手降价时跟不跟</p></div>
+      <div class="vb-d" data-d="1"><b>产品组合</b><p>差异化选品，避免与对手正面消耗</p></div>
+      <div class="vb-d" data-d="2"><b>库存管理</b><p>预测需求、优化补货，避免压货或断货</p></div>
+      <div class="vb-th"><svg class="ic"><use href="#i-brain"/></svg><p>某个模型的思考过程：<em>“价格合谋不道德且违法……但为了稳定市场——”</em> 照做不误</p></div>
+      <p class="vb-k">不是数百万次试错，而是像人类经营者一样<b>基于观察、竞争分析和策略推理</b>做决策</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「从虚拟社会到经济竞争：Vending-Bench Arena」</div>
+</section>
+<style>
+#c10-vending .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-vending .vb-seg button{font-size:18px;padding:9px 18px}
+#c10-vending .vb-body{display:grid;grid-template-columns:1040px 1fr;gap:26px;height:660px}
+#c10-vending .vb-st{position:relative;padding:20px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-vending .vb-sim{position:absolute;right:14px;top:12px}
+#c10-vending .vb-cap{margin-top:12px;min-height:110px;padding:12px 16px;border-radius:14px;font-size:18px;line-height:1.6;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c10-vending .vb-cap b{color:var(--acc)}
+#c10-vending .vb-cap .bad{color:var(--bad)}
+#c10-vending .vb-r{display:flex;flex-direction:column;gap:12px}
+#c10-vending .vb-d{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .35s,background .35s}
+#c10-vending .vb-d b{font-size:20px;color:var(--acc)}
+#c10-vending .vb-d p{margin-top:3px;font-size:16px;color:var(--text2)}
+#c10-vending .vb-d.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c10-vending .vb-th{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--bad) 60%,transparent);opacity:.35;transition:opacity .4s}
+#c10-vending .vb-th.on{opacity:1}
+#c10-vending .vb-th .ic{flex:none;font-size:26px;color:var(--llm)}
+#c10-vending .vb-th p{font-size:16px;line-height:1.55;color:var(--text2)}
+#c10-vending .vb-th em{color:#fecdd3}
+#c10-vending .vb-k{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-vending .vb-k b{color:var(--text)}
+</style>
+<script>
+HOOKS['c10-vending'] = {
+  init(s) {
+    this.set = U.seg(s.querySelector('.vb-seg'), (v) => { this.auto = false; this.mode(s, +v); });
+    this.q = (x) => s.querySelector(x);
+    this.ds = [...s.querySelectorAll('.vb-d')];
+  },
+  mode(s, m) { this.m = m; this.set(String(m)); this.t0 = performance.now(); this.q('.vb-yl').textContent = m ? '售价' : '账户余额'; this.q('.vb-th').classList.remove('on'); },
+  enter(s, ctx) {
+    this.auto = true;
+    this.mode(s, 0);
+    const L = this.q('.vb-lines'), EV = this.q('.vb-ev'), cap = this.q('.vb-cap');
+    const X = (u) => 60 + u * 920;
+    ctx.raf((t) => {
+      const u = Math.min(1, (t - this.t0) / 11000);
+      let h = '', ev = '';
+      if (this.m === 0) {
+        const pts = [];
+        for (let i = 0; i <= 80; i++) { const v = (i / 80) * u; pts.push(`${X(v).toFixed(1)} ${(380 - 300 * v + 30 * Math.sin(v * 22) * (1 - v * 0.5)).toFixed(1)}`); }
+        h = `<path d="M${pts.join('L')}" fill="none" stroke="#34d399" stroke-width="4"/>`;
+        const acts = [[0.05, '调研市场'], [0.18, '联系供应商'], [0.34, '订货补货'], [0.52, '调整定价'], [0.7, '订货补货'], [0.86, '调整定价']];
+        acts.forEach(([a, n], i) => { if (u >= a) ev += `<g transform="translate(${X(a)} ${i % 2 ? 60 : 36})"><circle r="6" fill="#fbbf24"/><text x="10" y="5" fill="#fde68a" font-size="15">${n}</text></g>`; });
+        cap.innerHTML = '<b>单 Agent</b> 独自经营售货机一个模拟年：调研市场、联系供应商、订货补货、调整定价——以账户余额计分，考验<b>数千轮交互中保持目标与状态连贯</b>';
+        this.ds.forEach((d, j) => d.classList.toggle('on', Math.floor(u * 9) % 3 === j));
+      } else {
+        // 三个竞争者：价格战 → 同盟邮件 → 统一抬价
+        const C = ['#fb7185', '#22d3ee', '#fbbf24'];
+        C.forEach((c, k) => {
+          const pts = [];
+          for (let i = 0; i <= 80; i++) {
+            const v = (i / 80) * u;
+            let p = 220 + k * 18;
+            if (v < 0.45) p = 220 + k * 18 + (v / 0.45) * (130 - k * 6);
+            else if (v < 0.55) p = 350 - k * 0 - 8 * Math.sin(v * 60 + k);
+            else p = 350 - Math.min(1, (v - 0.55) / 0.2) * 230 + k * 4;
+            pts.push(`${X(v).toFixed(1)} ${p.toFixed(1)}`);
+          }
+          h += `<path d="M${pts.join('L')}" fill="none" stroke="${c}" stroke-width="3.5"/>`;
+        });
+        if (u > 0.2) ev += `<text x="${X(0.22)}" y="420" fill="#fda4af" font-size="16" text-anchor="middle">价格战：互相压价</text>`;
+        if (u > 0.5) ev += `<g transform="translate(${X(0.5)} 300)"><rect x="-74" y="-24" width="148" height="34" rx="8" fill="rgba(10,16,36,.95)" stroke="#fbbf24"/><text y="-2" fill="#fde68a" font-size="15" text-anchor="middle">邮件：统一定价？</text></g>`;
+        if (u > 0.75) ev += `<text x="${X(0.86)}" y="100" fill="#fecdd3" font-size="16" text-anchor="middle">价格同盟</text>`;
+        this.q('.vb-th').classList.toggle('on', u > 0.62);
+        cap.innerHTML = u < 0.45 ? '多个 Agent 争夺同一批顾客，<span class="bad">爆发互相压价的价格战</span>' : u < 0.62 ? '有模型反其道而行：<b>主动给所有竞争对手发邮件，提议统一定价、组建价格同盟</b>' : '承认“不道德且违法”，却以“稳定市场”为名照做；显式通信也<b>并非合谋的必要条件</b>——公开价格本身就能成为隐式信号';
+        this.ds.forEach((d, j) => d.classList.toggle('on', j === 0));
+      }
+      L.innerHTML = h; EV.innerHTML = ev;
+      if (u >= 1 && t - this.t0 > 14000 && this.auto) this.mode(s, 1 - this.m);
+    });
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c10-market" data-part="9" data-trans="zoom" data-dur="15000" data-title="Agent 经济：Pinchwork 与 RentAHuman" data-notes="<b>Pinchwork</b> 是一个 Agent-to-Agent 的任务市集，让 Agent 以市场化方式“雇佣”其他 Agent 完成专业化子任务——图像生成、代码审计、并行化工作流等。跟管理者模式的中心化调度不同，Pinchwork 通过价格信号和竞争匹配来分配资源。<br><b>RentAHuman.ai</b> 则让 AI Agent 通过加密货币雇佣真人执行物理世界的任务——取包裹、房产实地查看、设备调试等。无论 AI 多么智能，它都没法替人签收包裹。RentAHuman 本质上是为数字 Agent 提供了一个“肉身层”。<br>Pinchwork 和 RentAHuman 共同代表了<b>基于市场机制的协调方式</b>——Agent 无需预先知道谁能完成任务，只需发布需求，由市场来撮合最合适的执行者。这暗示了一种不同于本章所述管理者模式的 Agent 协同方式：<b>基于市场机制的去中心化资源分配</b>。<br>撮合动画为示意：需求贴到市场板上，几个执行者报价，由价格信号与竞争匹配选出一个；报价数字不是真实数据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Agent 经济：<em>由市场来撮合执行者</em></h2></header>
+  <div class="mk-body">
+    <div class="mk-st fx fx-scale" style="--d:2">
+      <div class="mk-req"><span class="lbl">Agent 发布需求</span><div class="mk-card"></div></div>
+      <div class="mk-bd"><span class="lbl">市场：价格信号 + 竞争匹配</span><div class="mk-bids"></div></div>
+      <div class="mk-win"><span class="lbl">撮合结果</span><div class="mk-w">—</div></div>
+      <span class="k10-sim mk-sim">示意</span>
+    </div>
+    <div class="mk-r fx fx-right" style="--d:3">
+      <div class="mk-c"><b>Pinchwork</b><small>Agent-to-Agent 任务市集</small><p>“雇佣”其他 Agent 完成专业化子任务：图像生成、代码审计、并行化工作流</p></div>
+      <div class="mk-c h"><b>RentAHuman.ai</b><small>用加密货币雇佣真人</small><p>取包裹、房产实地查看、设备调试——AI 没法替人签收包裹：为数字 Agent 提供<b>“肉身层”</b></p></div>
+      <div class="mk-cmp"><div><span>管理者模式</span><b>中心化调度</b></div><div><span>市场机制</span><b>发布需求，由市场撮合</b></div></div>
+      <p class="mk-k"><b>基于市场机制的去中心化资源分配</b>：无需预先知道谁能完成任务</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Agent 经济：Pinchwork 与 RentAHuman」</div>
+</section>
+<style>
+#c10-market .mk-body{display:grid;grid-template-columns:1040px 1fr;gap:26px;height:660px}
+#c10-market .mk-st{position:relative;padding:22px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);display:grid;grid-template-columns:280px 1fr 260px;gap:20px;align-items:center}
+#c10-market .mk-sim{position:absolute;right:14px;top:12px}
+#c10-market .mk-req,#c10-market .mk-bd,#c10-market .mk-win{display:flex;flex-direction:column;gap:10px}
+#c10-market .mk-card{padding:16px;border-radius:16px;border:1.5px solid var(--acc);background:rgba(10,16,36,.95);min-height:130px;animation:upIn .4s var(--ease) both}
+#c10-market .mk-card b{display:block;font-size:20px}
+#c10-market .mk-card small{display:block;margin-top:4px;font-size:15px;color:var(--text3)}
+#c10-market .mk-card em{display:inline-block;margin-top:8px;padding:2px 10px;border-radius:999px;font-style:normal;font-size:15px;color:#06101f;background:var(--c)}
+#c10-market .mk-bids{display:flex;flex-direction:column;gap:10px}
+#c10-market .mk-b{display:grid;grid-template-columns:44px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-radius:14px;border:1px solid var(--line2);background:rgba(12,18,40,.85);animation:c10mk-in .45s var(--ease) both;transition:border-color .35s,box-shadow .35s,opacity .35s}
+@keyframes c10mk-in{from{opacity:0;translate:40px 0}}
+#c10-market .mk-b .ic{font-size:30px;color:var(--c)}
+#c10-market .mk-b b{font-size:17px}
+#c10-market .mk-b small{display:block;font-size:15px;color:var(--text3)}
+#c10-market .mk-b span{font:700 18px var(--num);color:var(--warn)}
+#c10-market .mk-b.win{border-color:var(--ok);box-shadow:0 0 24px color-mix(in srgb,var(--ok) 40%,transparent)}
+#c10-market .mk-b.lose{opacity:.35}
+#c10-market .mk-w{padding:16px;border-radius:16px;font-size:18px;line-height:1.55;border:1.5px dashed var(--ok);min-height:130px}
+#c10-market .mk-w b{color:var(--ok)}
+#c10-market .mk-r{display:flex;flex-direction:column;gap:14px}
+#c10-market .mk-c{padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:rgba(12,18,40,.72)}
+#c10-market .mk-c.h{border-color:color-mix(in srgb,var(--warn) 50%,transparent)}
+#c10-market .mk-c>b{font-size:22px;color:var(--acc)}
+#c10-market .mk-c.h>b{color:var(--warn)}
+#c10-market .mk-c small{display:block;font-size:15px;color:var(--text3)}
+#c10-market .mk-c p{margin-top:6px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c10-market .mk-c p b{color:var(--text)}
+#c10-market .mk-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#c10-market .mk-cmp>div{padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+#c10-market .mk-cmp span{display:block;font-size:15px;color:var(--text3)}
+#c10-market .mk-cmp b{font-size:17px}
+#c10-market .mk-k{margin-top:auto;font-size:18px;line-height:1.55;color:var(--text2)}
+#c10-market .mk-k b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-market'] = {
+  R: [
+    { t: '为报告生成三张配图', k: 'Pinchwork', c: '#22d3ee', b: [['robot', '图像生成 Agent A', '12'], ['robot', '图像生成 Agent B', '9'], ['robot', '通用 Agent C', '15']], w: 1 },
+    { t: '审计一段合约代码', k: 'Pinchwork', c: '#22d3ee', b: [['robot', '代码审计 Agent D', '30'], ['robot', '代码审计 Agent E', '26'], ['robot', '通用 Agent F', '18']], w: 1 },
+    { t: '去楼下前台取一个包裹', k: 'RentAHuman', c: '#fbbf24', b: [['user', '真人 · 3 公里外', '8'], ['user', '真人 · 同一栋楼', '6'], ['user', '真人 · 10 公里外', '7']], w: 1 },
+    { t: '实地查看一套出租房', k: 'RentAHuman', c: '#fbbf24', b: [['user', '真人 · 同一街区', '25'], ['user', '真人 · 跨城', '40'], ['user', '真人 · 附近', '28']], w: 0 },
+  ],
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), q = (x) => s.querySelector(x);
+    for (let i = 0; ok(); i = (i + 1) % this.R.length) {
+      const r = this.R[i];
+      q('.mk-card').outerHTML = `<div class="mk-card" style="--c:${r.c}"><b>${r.t}</b><small>由一个 Agent 发布</small><em>${r.k}</em></div>`;
+      q('.mk-bids').innerHTML = ''; q('.mk-w').textContent = '等待报价……';
+      await w(900); if (!ok()) return;
+      for (const [ic, n, p] of r.b) { q('.mk-bids').insertAdjacentHTML('beforeend', `<div class="mk-b" style="--c:${r.c}"><svg class="ic"><use href="#i-${ic}"/></svg><div><b>${n}</b><small>${r.k === 'RentAHuman' ? '真人执行者' : 'Agent 执行者'}</small></div><span>${p}</span></div>`); await w(600); if (!ok()) return; }
+      await w(700); if (!ok()) return;
+      [...q('.mk-bids').children].forEach((b, j) => b.classList.add(j === r.w ? 'win' : 'lose'));
+      q('.mk-w').innerHTML = `由价格与竞争撮合：<b>${r.b[r.w][1]}</b>${r.k === 'RentAHuman' ? '，以加密货币结算' : ''}`;
+      await w(2400); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.mk-bids').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-wolf" data-part="9" data-trans="flip" data-dur="16000" data-title="信息不对称下的策略博弈：狼人杀 · 图10-11" data-notes="狼人杀对应本节三个维度中的<b>策略博弈</b>：在规则约束和信息不对称的条件下，Agent 需要推理、伪装、识破伪装。它与本节开头的斯坦福小镇构成一组架构上的对照——小镇是完全去中心化的自由交互，狼人杀则采用“法官 + 信息权限控制”的中心化设计：由一个代码驱动的法官掌握全局状态，按角色分发各自应知的信息。这恰好展示了本章两类架构在 Agent 社会场景中的不同用法。<br>图按图10-11 重画：法官（代码驱动）负责游戏状态、阶段控制与信息分发，阶段按 Night → Day → Vote → Settle 循环；狼人 1、狼人 2 可见同伴身份，策略分别是伪装村民、跟票保护；预言家可见自己的验人结果，择机跳出；女巫可见当晚死亡者与解药 / 毒药状态；村民只能看到公开发言和投票记录（零私有信息）。白天由法官管理发言顺序，按座位依次发言；投票阶段收集所有玩家投票并公布结果；夜晚法官依次唤醒角色，走私密语音通道。真人玩家随机分配角色，用语音表达投票与发言。<br>点击任一角色，可以看到法官只发给它的那部分信息；不点时会自动轮流。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">信息不对称下的<em>策略博弈</em>：狼人杀</h2></header>
+  <div class="ww-body">
+    <div class="ww-st fx fx-scale" style="--d:2">
+      <div class="ww-judge"><b>法官（代码驱动，非 LLM）</b><small>游戏状态 · 阶段控制 · 信息分发</small><div class="ww-ph"><span>Night</span><i>→</i><span>Day</span><i>→</i><span>Vote</span><i>→</i><span>Settle</span></div></div>
+      <div class="ww-roles"></div>
+      <div class="ww-see"><span class="lbl">法官只发给 <b class="ww-who">—</b> 的信息</span><p class="ww-info">—</p></div>
+    </div>
+    <div class="ww-r fx fx-right" style="--d:3">
+      <div class="ww-cmp"><div class="t"><svg class="ic"><use href="#i-users"/></svg><b>斯坦福小镇</b><small>完全去中心化的自由交互</small></div><div class="w"><svg class="ic"><use href="#i-gavel"/></svg><b>狼人杀</b><small>法官 + 信息权限控制：中心化设计</small></div></div>
+      <div class="ww-v"><span class="lbl">实时语音交互（ASR + LLM + TTS）</span><ul><li><b>白天讨论</b>：法官管理发言顺序，按座位依次发言</li><li><b>投票阶段</b>：收集所有玩家投票，统计票数公布结果</li><li><b>夜晚阶段</b>：法官依次唤醒角色，私密语音通道</li><li><b>真人玩家</b>：随机分配角色，语音表达投票 / 发言</li></ul></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「信息不对称下的策略博弈：狼人杀」· 图10-11</div>
+</section>
+<style>
+#c10-wolf .ww-body{display:grid;grid-template-columns:1080px 1fr;gap:26px;height:680px}
+#c10-wolf .ww-st{padding:20px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);display:flex;flex-direction:column;gap:16px}
+#c10-wolf .ww-judge{align-self:center;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 26px;border-radius:18px;border:2px solid var(--acc);background:rgba(10,16,36,.95)}
+#c10-wolf .ww-judge b{font-size:22px;color:var(--acc)}
+#c10-wolf .ww-judge small{font-size:15px;color:var(--text2)}
+#c10-wolf .ww-ph{display:flex;align-items:center;gap:8px;margin-top:6px}
+#c10-wolf .ww-ph span{padding:4px 12px;border-radius:999px;font:700 15px var(--num);border:1px solid var(--line2);transition:all .3s}
+#c10-wolf .ww-ph span.on{color:#06101f;background:var(--acc);border-color:var(--acc)}
+#c10-wolf .ww-ph i{font-style:normal;color:var(--text3)}
+#c10-wolf .ww-roles{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+#c10-wolf .ww-ro{padding:12px 10px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(12,18,40,.85);cursor:pointer;transition:all .35s}
+#c10-wolf .ww-ro .ic{font-size:30px;color:var(--c)}
+#c10-wolf .ww-ro b{display:block;font-size:18px;color:var(--c)}
+#c10-wolf .ww-ro small{display:block;margin-top:4px;font-size:15px;line-height:1.4;color:var(--text2)}
+#c10-wolf .ww-ro.on{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 45%,transparent);translate:0 -4px}
+#c10-wolf .ww-ro.dim{opacity:.4}
+#c10-wolf .ww-see{flex:1;padding:16px 20px;border-radius:16px;border:1.5px dashed var(--line2)}
+#c10-wolf .ww-see .lbl b{color:var(--acc)}
+#c10-wolf .ww-info{margin-top:8px;font-size:21px;line-height:1.6}
+#c10-wolf .ww-r{display:flex;flex-direction:column;gap:16px}
+#c10-wolf .ww-cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c10-wolf .ww-cmp>div{padding:14px;border-radius:14px;text-align:center;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-wolf .ww-cmp .ic{font-size:30px}
+#c10-wolf .ww-cmp .t .ic{color:var(--ok)}#c10-wolf .ww-cmp .w .ic{color:var(--acc)}
+#c10-wolf .ww-cmp b{display:block;font-size:19px}
+#c10-wolf .ww-cmp small{font-size:15px;color:var(--text2)}
+#c10-wolf .ww-v{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-wolf .ww-v ul{margin-top:8px;display:flex;flex-direction:column;gap:8px}
+#c10-wolf .ww-v li{font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-wolf .ww-v li b{color:var(--text)}
+</style>
+<script>
+HOOKS['c10-wolf'] = {
+  R: [
+    ['狼人 1', '#fb7185', 'moon', '策略：伪装村民', '所有狼人身份 + 夜晚商议 + 公开发言'],
+    ['狼人 2', '#fb7185', 'moon', '策略：跟票保护', '所有狼人身份 + 夜晚商议 + 公开发言'],
+    ['预言家', '#a78bfa', 'eye', '策略：择机跳出', '验人结果（仅自己验的）+ 公开发言'],
+    ['女巫', '#34d399', 'flask', '策略：保药 / 解药', '当晚死亡者 + 解药 / 毒药状态 + 公开发言'],
+    ['村民 ×2', '#94a3b8', 'users', '策略：逻辑推理', '仅公开发言 + 投票记录（零私有信息）'],
+    ['真人玩家', '#fbbf24', 'mic', '随机分配角色', '与所分配角色相同的可见信息；用语音表达投票 / 发言'],
+  ],
+  init(s) {
+    s.querySelector('.ww-roles').innerHTML = this.R.map(([n, c, ic, st], i) => `<div class="ww-ro" data-i="${i}" style="--c:${c}"><svg class="ic"><use href="#i-${ic}"/></svg><b>${n}</b><small>${st}</small></div>`).join('');
+    this.ros = [...s.querySelectorAll('.ww-ro')];
+    this.phs = [...s.querySelectorAll('.ww-ph span')];
+    s.querySelector('.ww-roles').addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (r) { this.auto = false; this.pick(s, +r.dataset.i); } });
+  },
+  pick(s, i) {
+    this.i = i;
+    this.ros.forEach((r, j) => { r.classList.toggle('on', j === i); r.classList.toggle('dim', j !== i); });
+    s.querySelector('.ww-who').textContent = this.R[i][0];
+    s.querySelector('.ww-info').textContent = this.R[i][4];
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.pick(s, 0);
+    let p = 0;
+    ctx.every(() => { p = (p + 1) % 4; this.phs.forEach((x, j) => x.classList.toggle('on', j === p)); if (this.auto && p % 2 === 0) this.pick(s, (this.i + 1) % this.R.length); }, 1300);
+  },
+  reset() { this.ros.forEach((r) => r.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c10-exp6" data-part="9" data-trans="rise" data-dur="18000" data-title="实验 10-6 ★★★：语音狼人杀 Agent 系统" data-notes="狼人杀是一款经典的社交推理游戏，考验玩家的推理能力、欺骗技巧和社交策略。本实验构建一个多 Agent 系统，让 AI Agent 扮演狼人杀中的各种角色，与真人玩家通过语音进行游戏，同时考验 Agent 的推理、角色扮演和实时交互能力。<br><b>架构设计</b>：<b>1. 游戏状态管理</b>：法官（代码驱动，非 LLM）维护中心化状态——玩家列表（用户席位 + AI 混合）、身份、阵营、生存状态、游戏阶段（夜晚 / 白天 / 投票 / 结算）、历史事件记录。<b>2. 信息权限控制</b>：狼人知道谁是同伙，但村民不知道；预言家每晚能查验一个人的身份，但只有自己知道结果——法官在调用每个角色 Agent 时，只传递该角色应当看到的信息。<b>3. Agent 推理与策略</b>：<b>狼人伪装策略</b>——像普通村民一样发言，可以表达怀疑但不要过于激进；被预言家验出时反咬对方是悍跳的假预言家；投票时尽量跟票。<b>预言家身份证明</b>——多人声称是预言家时，对比验人信息，指出对方的矛盾；声称验过的玩家后续行为不符就是破绽；请求女巫配合验证。<b>村民逻辑推理</b>——分析发言是否自洽，留意急于带节奏、模糊身份、频繁改变立场的玩家；关注投票行为；不要随机怀疑，每个推理都基于具体事实和逻辑。<br><b>验收标准</b>：6-8 人游戏局（1 个用户席位 + 5-7 个 AI Agent），用户席位可以是授权真人，也可以是使用真实 LLM、工具和语音回环的独立模拟用户；角色配置 2 狼人、1 预言家、1 女巫、其余村民，用户席位随机分配角色；模拟用户只能看到该座位获准看到的上下文，其发言和动作必须经过真实 LLM 工具调用 → 音频 → 真实 ASR 的边界；至少 3 个完整回合；发言和行为符合角色身份；狼人能有效隐藏身份；预言家能在合适时机跳出；村民推理基于逻辑而非随机；游戏结束时能正确判断胜负。<br>配套仓库：2026-08-03 的 v11 在同一局内完成 3 个完整循环、6 次真实工具 → 语音 → ASR 回环、信息隔离、规则判定的好人胜利和四项策略验收，严格总体状态为 pass；保留 13 个唯一响应 ID、1,650 个音频输入 token、27 个非空 TTS 事件，独立验证再次核对 6/6 音频动作边界。早期运行被如实否决：2026-08-01 的一次把 ASR 转写“P1 is not”误当成弃权；v2 中模拟村民投出了无人对跳的预言家，村民推理策略项失败；v3 有两次含糊弃权被拒，策略裁判还抓到狼人编造公共事件。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-6<i>★★★</i></span> 语音<em>狼人杀</em> Agent 系统</h2></header>
+  <div class="e6-body">
+    <div class="e6-l fx fx-left" style="--d:2">
+      <div class="e6-arch"><span class="lbl">架构设计</span><div><b>1. 游戏状态管理</b><p>法官（代码驱动，非 LLM）维护玩家列表、身份、阵营、生存状态、阶段、历史事件</p></div><div><b>2. 信息权限控制</b><p>调用每个角色 Agent 时，只传递该角色应当看到的信息</p></div><div><b>3. Agent 推理与策略</b><p>三种策略提示词 ↓</p></div></div>
+      <div class="e6-sp"><div class="e6-tabs"><span>狼人伪装策略</span><span>预言家身份证明</span><span>村民逻辑推理</span></div><p class="e6-pr"></p></div>
+    </div>
+    <div class="e6-m fx fx-up" style="--d:3"><span class="lbl">验收标准</span><ul class="e6-ck"></ul></div>
+    <div class="e6-r fx fx-right" style="--d:4">
+      <div class="e6-ok"><b>v11 · 2026-08-03 · pass</b><div class="e6-n"><div><b data-count="3">0</b><small>完整循环</small></div><div><b data-count="6">0</b><small>工具→语音→ASR 回环</small></div><div><b data-count="1650" data-sep>0</b><small>音频输入 token</small></div><div><b data-count="27">0</b><small>非空 TTS 事件</small></div></div><p>信息隔离 · 规则判定好人胜 · 四项策略验收 · 13 个唯一响应 ID · 独立验证 6/6</p></div>
+      <div class="e6-no"><span class="lbl">被如实否决的早期运行</span><div><code>0801</code><p>ASR 转写“P1 is not”被误当成弃权</p></div><div><code>v2</code><p>模拟村民投出了无人对跳的预言家 → 村民推理项失败</p></div><div><code>v3</code><p>两次含糊弃权被拒；狼人编造公共事件被策略裁判抓到</p></div></div>
+      <div class="k10-data"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter10/voice-werewolf（exp10-6-simulated-user-openrouter-20260803-v11）</div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「信息不对称下的策略博弈：狼人杀」· 实验 10-6</div>
+</section>
+<style>
+#c10-exp6 .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp6 .e6-body{display:grid;grid-template-columns:560px 1fr 520px;gap:20px;height:700px}
+#c10-exp6 .e6-l{display:flex;flex-direction:column;gap:12px}
+#c10-exp6 .e6-arch{padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:8px}
+#c10-exp6 .e6-arch>div b{font-size:17px;color:var(--acc)}
+#c10-exp6 .e6-arch>div p{font-size:15px;line-height:1.5;color:var(--text2)}
+#c10-exp6 .e6-sp{flex:1;padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp6 .e6-tabs{display:flex;gap:6px}
+#c10-exp6 .e6-tabs span{flex:1;padding:6px;border-radius:10px;text-align:center;font-size:15px;border:1px solid var(--line2);transition:all .3s}
+#c10-exp6 .e6-tabs span.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc)}
+#c10-exp6 .e6-pr{margin-top:10px;font-size:16px;line-height:1.65;color:var(--text);animation:upIn .4s var(--ease) both}
+#c10-exp6 .e6-m{padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp6 .e6-ck{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+#c10-exp6 .e6-ck li{display:flex;gap:10px;align-items:flex-start;font-size:15px;line-height:1.45;color:var(--text3);transition:color .3s}
+#c10-exp6 .e6-ck li i{flex:none;width:20px;height:20px;margin-top:1px;border-radius:5px;border:1.5px solid var(--line2);display:grid;place-items:center;font-style:normal;font-size:14px;color:#06101f;transition:all .3s}
+#c10-exp6 .e6-ck li.on{color:var(--text)}
+#c10-exp6 .e6-ck li.on i{background:var(--ok);border-color:var(--ok)}
+#c10-exp6 .e6-ck li.on i::after{content:"✓"}
+#c10-exp6 .e6-r{display:flex;flex-direction:column;gap:12px}
+#c10-exp6 .e6-ok{padding:14px 18px;border-radius:16px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)}
+#c10-exp6 .e6-ok>b{font-size:19px;color:var(--ok)}
+#c10-exp6 .e6-n{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+#c10-exp6 .e6-n b{display:block;font:800 30px var(--num)}
+#c10-exp6 .e6-n small{font-size:15px;color:var(--text2)}
+#c10-exp6 .e6-ok p{margin-top:8px;font-size:15px;line-height:1.5;color:var(--text2)}
+#c10-exp6 .e6-no{padding:12px 16px;border-radius:16px;border:1px dashed color-mix(in srgb,var(--bad) 55%,transparent);display:flex;flex-direction:column;gap:8px}
+#c10-exp6 .e6-no>div{display:grid;grid-template-columns:56px 1fr;gap:8px;align-items:start}
+#c10-exp6 .e6-no code{font:700 15px var(--mono);color:var(--bad)}
+#c10-exp6 .e6-no p{font-size:15px;line-height:1.45;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-exp6'] = {
+  P: [
+    '“像普通村民一样发言，可以表达对某些玩家的怀疑，但不要过于激进以免引起注意。如果有预言家跳出来说验到你是狼人，你可以反咬对方是悍跳的假预言家。投票时尽量跟票，避免成为异类。”',
+    '“对比你和对方的验人信息，指出对方信息中的矛盾或不合理之处。如果对方声称验过的某个玩家，在后续行为中明显不符合其声称的身份，那就是破绽。请求女巫配合验证。”',
+    '“分析每个玩家的发言是否自洽，留意那些急于带节奏、模糊身份、频繁改变立场的玩家。关注投票行为——狼人往往集中票数投给对他们威胁最大的好人。不要随机怀疑，每个推理都应基于具体事实和逻辑。”',
+  ],
+  CK: ['6-8 人局：1 个用户席位 + 5-7 个 AI Agent（授权真人或独立模拟用户）', '2 狼人、1 预言家、1 女巫、其余村民；用户席位随机分配角色', '模拟用户只看到获准的上下文；动作经过真实 LLM 工具调用 → 音频 → 真实 ASR', '至少 3 个完整回合（夜晚—白天—投票）', '发言和行为符合角色身份和游戏策略', '狼人能有效隐藏身份', '预言家能在合适时机跳出并公布验人信息', '村民推理基于逻辑分析，而非随机猜测', '游戏结束时能正确判断胜负'],
+  init(s) {
+    s.querySelector('.e6-ck').innerHTML = this.CK.map((c) => `<li><i></i><span>${c}</span></li>`).join('');
+    this.cks = [...s.querySelectorAll('.e6-ck li')];
+    this.tabs = [...s.querySelectorAll('.e6-tabs span')];
+    this.pr = s.querySelector('.e6-pr');
+    this.tabs.forEach((t, i) => t.addEventListener('click', () => { this.auto = false; this.tab(i); }));
+  },
+  tab(i) { this.ti = i; this.tabs.forEach((t, j) => t.classList.toggle('on', j === i)); this.pr.textContent = this.P[i]; U.restart(this.pr, 'e6-pr'); },
+  enter(s, ctx) {
+    this.auto = true; this.tab(0);
+    let n = 0;
+    this.cks.forEach((c) => c.classList.remove('on'));
+    ctx.every(() => {
+      if (n < this.cks.length) this.cks[n].classList.add('on');
+      n++;
+      if (n > this.cks.length + 3) { n = 0; this.cks.forEach((c) => c.classList.remove('on')); }
+      if (this.auto && n % 4 === 0) this.tab((this.ti + 1) % 3);
+    }, 900);
+  },
+  reset() { this.cks.forEach((c) => c.classList.remove('on')); },
+};
+</script>

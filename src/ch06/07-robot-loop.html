@@ -1,0 +1,767 @@
+<!-- ================= PART 06 机器人：闭环与分层 ================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-c06-rl-vr" viewBox="0 0 24 24"><path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h15A1.5 1.5 0 0 1 21 8.5v7a1.5 1.5 0 0 1-1.5 1.5H15l-1.8-2.6a1.5 1.5 0 0 0-2.4 0L9 17H4.5A1.5 1.5 0 0 1 3 15.5z"/><circle cx="8" cy="12" r="1.6"/><circle cx="16" cy="12" r="1.6"/></symbol>
+  <symbol id="i-c06-rl-joycon" viewBox="0 0 24 24"><path d="M10 4H7a4 4 0 0 0-4 4v8a4 4 0 0 0 4 4h3z"/><path d="M14 4h3a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4h-3z"/><circle cx="6.5" cy="9" r="1.2"/><circle cx="17.5" cy="15" r="1.2"/></symbol>
+  <symbol id="i-c06-rl-estop" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="5.5"/><path d="M12 9.5v3"/></symbol>
+</svg>
+
+<section class="slide chapter" id="c06-d6" data-part="6" data-title="PART 06 · 机器人：闭环与分层" data-notes="语音把时机轴推到毫秒，Computer Use 把闭环搬上屏幕，机器人则把它推进物理世界。机器人操作比“看图回答问题”难得多：模型不但要看懂画面，还要在真实世界里连续做出动作，而且每个动作都会改变下一刻的情况。这里的瓶颈通常不是再给模型增加一个静态问答基准，而是让它在有限的感知和控制带宽下持续完成闭环。<br>本部分沿着同一个整理桌面任务展开：先看五个实验如何分工、硬件与算法谁是瓶颈（实验 6-10、6-11），再看机器人控制的分层结构、长程规划与任务分解，以及 Agent 如何只通过五个有边界的工具自主驱动真机（实验 6-12）。VLA、世界模型与从仿真到现实的迁移放在下一部分。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">机器人操作</h1>
+  <div class="ch-s fx fx-up" style="--d:3">以 XLeRobot 整理桌面为例：同一个任务，<br>从人类遥操作走到 Agent 自主闭环</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">对于这个任务，硬件本体不是瓶颈，算法才是瓶颈。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c06-robot" data-part="6" data-steps="1" data-trans="zoom" data-dur="14000" data-title="同一个任务贯穿五个实验" data-notes="<b>阅读提示</b>：本节始终使用同一个任务——“把红色杯子放进托盘，把黄色废纸放进垃圾盒，最后重新观察并确认桌面状态”。实验 6-10 和 6-12 是 XLeRobot 真机实验，需要机械臂、标定、急停装置和现场观察员；实验 6-11、6-13 和 6-14 是对应的本地 GPU 实验。真机与模拟会明确分开报告，但任务目标、动作语义和成功条件保持一致。<br>XLeRobot 把机器人操作与看图问答的区别变得很具体：同一台机械臂既可以由人通过键盘、手柄或 VR 设备遥操作，也可以把摄像头观察和一组受约束的动作工具交给 Agent 自主调用。<b>硬件和任务都不变，改变的只是操作者</b>——前者由人持续观察和纠错，后者必须由模型与控制系统完成同样的工作。五个实验依次是：人遥操作真机，测量足够强的操作者能做到什么；模拟器中同一任务的理想控制上限；Agent 自主控制真机，观察感知、规划和失败恢复如何影响结果；相同工具契约下批量比较开环、逐步检查和世界模型三种策略；最后改变背景、物体外观、光照和视觉噪声，检查视觉策略能否适应新的环境。点击右侧实验卡可切换操作者。<br>按 → 进入第二步：一个能用的机器人系统，至少要回答四个问题——人想完成什么任务？接下来先做哪个子任务？当前技能具体输出哪些动作？动作执行后，现实是否仍符合原来的计划？长程规划安排先处理杯子还是废纸，VLA 或动作原语完成抓取和放置，世界模型估计动作后果，从仿真环境迁移到现实环境则处理训练画面和真实摄像头、执行器之间的差异。即使高层模型已经具备足够的知识和规划能力，只要缺少其中任何一个反馈环节，系统仍可能无法把任务做完。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一个任务，<em>贯穿五个实验</em></h2></header>
+  <div class="rbt-task fx fx-up" style="--d:2"><span class="rbt-tip">阅读提示</span><svg class="ic"><use href="#i-clipboard"/></svg><b>“把红色杯子放进托盘，把黄色废纸放进垃圾盒，最后重新观察并确认桌面状态”</b><span class="rbt-tn">任务目标、动作语义和成功条件保持一致<br>真机与模拟明确分开报告</span></div>
+  <div class="rbt-body">
+    <div class="rbt-left panel fx fx-left" style="--d:3">
+      <div class="rbt-bar"><span class="rbt-op"><svg class="ic"><use href="#i-user"/></svg><b>操作者：人类遥操作</b></span><span class="chip rbt-env real">真实 XLeRobot</span><span class="chip warn">示意</span></div>
+      <div class="rbt-sw"><div class="rbt-scene"></div><div class="rbt-cap"></div></div>
+      <div class="rbt-chk"><span data-k="cup"><svg class="ic"><use href="#i-check"/></svg>红色杯子进托盘</span><span data-k="paper"><svg class="ic"><use href="#i-check"/></svg>黄色废纸进垃圾盒</span><span data-k="arm"><svg class="ic"><use href="#i-eye"/></svg>重新观察并确认</span></div>
+    </div>
+    <div class="rbt-right fx fx-right" style="--d:4">
+      <div class="rbt-exps panel"><div class="rbt-h"><b>五个实验</b><span>硬件和任务都不变，改变的只是操作者</span></div><div class="rbt-list"></div></div>
+      <div class="rbt-qs panel"><div class="rbt-h"><b>四个问题</b><span>一个能用的机器人系统，至少要回答</span></div><div class="rbt-ql"></div><p class="rbt-qn">即使高层模型已经具备足够的知识和规划能力，<b>只要缺少其中任何一个反馈环节，系统仍可能无法把任务做完</b></p></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「机器人操作：以 XLeRobot 整理桌面为例」· 阅读提示</div>
+</section>
+<style>
+/* 本部分共用的俯视桌面场景（由 HOOKS['c06-robot'].mkDesk 生成）的动画 */
+@keyframes c06dk-scan{0%{opacity:0;transform:translateY(0)}12%{opacity:1}100%{opacity:0;transform:translateY(430px)}}
+@keyframes c06dk-led{0%,100%{fill:#164e63}8%,85%{fill:#67e8f9}}
+@keyframes c06dk-glow{50%{opacity:.3}}
+@keyframes c06dk-pop{from{opacity:0;transform:scale(.3)}to{opacity:1;transform:scale(1)}}
+#c06-robot .dk6-scan.go,#c06-hw .dk6-scan.go,#c06-exp10 .dk6-scan.go,#c06-plan .dk6-scan.go,#c06-exp12 .dk6-scan.go{animation:c06dk-scan 1.05s ease-out}
+#c06-robot .dk6-scan.go~.dk6-cam .dk6-led,#c06-hw .dk6-scan.go~.dk6-cam .dk6-led,#c06-exp10 .dk6-scan.go~.dk6-cam .dk6-led,#c06-plan .dk6-scan.go~.dk6-cam .dk6-led,#c06-exp12 .dk6-scan.go~.dk6-cam .dk6-led{animation:c06dk-led 1.05s linear}
+#c06-robot .dk6-glow,#c06-hw .dk6-glow,#c06-exp10 .dk6-glow,#c06-plan .dk6-glow,#c06-exp12 .dk6-glow{animation:c06dk-glow 1.4s ease-in-out infinite}
+#c06-robot .dk6-pop,#c06-hw .dk6-pop,#c06-exp10 .dk6-pop,#c06-plan .dk6-pop,#c06-exp12 .dk6-pop{transform-box:fill-box;transform-origin:center;animation:c06dk-pop .55s var(--spring) both}
+#c06-robot .rbt-task{display:flex;align-items:center;gap:14px;margin-top:-8px;padding:11px 20px;border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(255,255,255,.03));border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+#c06-robot .rbt-tip{flex:none;padding:4px 12px;border-radius:999px;font-size:16px;font-weight:700;color:#06101f;background:var(--acc)}
+#c06-robot .rbt-task>.ic{flex:none;font-size:24px;color:var(--acc)}
+#c06-robot .rbt-task>b{font-size:21px;font-weight:600}
+#c06-robot .rbt-tn{margin-left:auto;font-size:16px;line-height:1.45;color:var(--text3);text-align:right}
+#c06-robot .rbt-body{display:grid;grid-template-columns:704px 1fr;gap:26px;margin-top:16px;height:610px}
+#c06-robot .rbt-left{padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px}
+#c06-robot .rbt-bar{display:flex;align-items:center;gap:12px;height:36px;padding:0 6px}
+#c06-robot .rbt-op{display:flex;align-items:center;gap:10px;font-size:19px}
+#c06-robot .rbt-op .ic{font-size:24px;color:var(--acc)}
+#c06-robot .rbt-bar .chip{font-size:16px;padding:4px 12px}
+#c06-robot .rbt-env{margin-left:auto}
+#c06-robot .rbt-env.real{color:#fdba74;border-color:rgba(251,146,60,.5);background:rgba(251,146,60,.12)}
+#c06-robot .rbt-env.gpu{color:#67e8f9;border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.1)}
+#c06-robot .rbt-sw{position:relative;height:486px;border-radius:18px;overflow:hidden}
+#c06-robot .rbt-cap{position:absolute;left:50%;bottom:14px;translate:-50% 12px;padding:8px 18px;border-radius:999px;font-size:18px;white-space:nowrap;color:var(--text);background:rgba(5,9,22,.86);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);opacity:0;transition:opacity .45s,translate .45s var(--ease)}
+#c06-robot .rbt-cap.on{opacity:1;translate:-50% 0}
+#c06-robot .rbt-chk{display:flex;gap:10px;justify-content:center}
+#c06-robot .rbt-chk span{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:17px;color:var(--text3);border:1px solid var(--line);transition:all .4s var(--ease)}
+#c06-robot .rbt-chk span.on{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c06-robot .rbt-right{position:relative}
+#c06-robot .rbt-exps,#c06-robot .rbt-qs{position:absolute;inset:0;padding:18px 20px;display:flex;flex-direction:column;gap:12px;transition:opacity .6s var(--ease),translate .6s var(--ease)}
+#c06-robot .rbt-qs{opacity:0;translate:36px 0;pointer-events:none}
+#c06-robot[data-k="1"] .rbt-exps{opacity:0;translate:-36px 0;pointer-events:none}
+#c06-robot[data-k="1"] .rbt-qs{opacity:1;translate:0 0;pointer-events:auto}
+#c06-robot .rbt-h{display:flex;align-items:baseline;gap:14px}
+#c06-robot .rbt-h b{font-size:24px;color:var(--acc)}
+#c06-robot .rbt-h span{font-size:17px;color:var(--text2)}
+#c06-robot .rbt-list,#c06-robot .rbt-ql{display:flex;flex-direction:column;gap:10px}
+#c06-robot .rbt-ex{display:grid;grid-template-columns:150px 1fr auto;align-items:center;gap:4px 16px;width:100%;text-align:left;padding:11px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s var(--ease)}
+#c06-robot .rbt-n{grid-row:1/3;font:700 19px var(--num);color:var(--acc)}
+#c06-robot .rbt-ex b{font-size:21px}
+#c06-robot .rbt-ex small{grid-column:2;font-size:16px;line-height:1.45;color:var(--text2)}
+#c06-robot .rbt-k{grid-row:1/3;grid-column:3;padding:4px 12px;border-radius:999px;font-size:15px;font-weight:700;white-space:nowrap}
+#c06-robot .rbt-k.real{color:#fdba74;border:1px solid rgba(251,146,60,.5);background:rgba(251,146,60,.12)}
+#c06-robot .rbt-k.gpu{color:#67e8f9;border:1px solid rgba(34,211,238,.45);background:rgba(34,211,238,.1)}
+#c06-robot .rbt-ex.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 22%,transparent)}
+#c06-robot .rbt-q{display:grid;grid-template-columns:42px 1fr 26px 1.05fr;align-items:center;gap:12px;width:100%;text-align:left;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s var(--ease)}
+#c06-robot .rbt-q em{font-style:normal;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:700 18px var(--num);border:2px solid var(--qc);color:var(--qc)}
+#c06-robot .rbt-qt{font-size:19px;line-height:1.45}
+#c06-robot .rbt-ar{height:2px;background:linear-gradient(90deg,var(--line2),var(--qc))}
+#c06-robot .rbt-tech b{display:block;font-size:19px;color:var(--qc)}
+#c06-robot .rbt-tech span{font-size:16px;line-height:1.45;color:var(--text2)}
+#c06-robot .rbt-q.on{border-color:var(--qc);background:color-mix(in srgb,var(--qc) 11%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--qc) 22%,transparent)}
+#c06-robot .rbt-q.on em{color:#06101f;background:var(--qc)}
+#c06-robot .rbt-qn{margin-top:auto;padding:12px 16px;border-radius:12px;font-size:18px;line-height:1.6;color:var(--text2);border-left:4px solid var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+#c06-robot .rbt-qn b{color:var(--text)}
+</style>
+<script>
+HOOKS['c06-robot'] = {
+  EXP: [
+    { n: '实验 6-10 ★', real: 1, t: '人遥操作真实 XLeRobot', d: '测量真机在足够强的操作者控制下能做到什么', op: '人类遥操作', ic: 'user', env: '真实 XLeRobot', look: 'real' },
+    { n: '实验 6-11 ★', real: 0, t: '模拟器中的理想控制上限', d: '理想控制器不会感知错误、不会选错动作', op: '理想控制器', ic: 'cpu', env: '二维桌面模拟器', look: 'sim' },
+    { n: '实验 6-12 ★★', real: 1, t: 'Agent 自主控制真实 XLeRobot', d: '观察感知、规划和失败恢复如何影响结果', op: 'Agent 自主调用工具', ic: 'robot', env: '真实 XLeRobot', look: 'real' },
+    { n: '实验 6-13 ★★', real: 0, t: '相同工具契约，比较三种策略', d: '开环、逐步检查和世界模型，批量对照', op: 'Agent 自主调用工具', ic: 'robot', env: '可注入失败的桌面模拟器', look: 'sim' },
+    { n: '实验 6-14 ★★★', real: 0, t: '改变画面，测试视觉策略', d: '背景、物体外观、光照和视觉噪声变化后能否适应', op: 'RGB 视觉策略', ic: 'eye', env: '变化后的画面', look: 'vis' },
+  ],
+  Q: [
+    { k: '1', q: '人想完成什么任务？', t: '任务目标', d: '由人给出：把杯子和废纸归位', c: '#f472b6', cap: '任务目标：红色杯子进托盘，黄色废纸进垃圾盒' },
+    { k: '2', q: '接下来先做哪个子任务？', t: '长程规划', d: '安排先处理杯子还是废纸', c: '#a78bfa', cap: '长程规划：先处理杯子，再处理废纸，最后检查' },
+    { k: '3', q: '当前技能具体输出哪些动作？', t: 'VLA 或动作原语', d: '完成抓取和放置', c: '#fb923c', cap: 'pick(red_cup) → place(red_cup, tray)：技能变成连续动作' },
+    { k: '4', q: '动作执行后，现实是否仍符合原来的计划？', t: '世界模型', d: '估计动作后果；动作之后仍由新观察确认', c: '#22d3ee', cap: '先估计后果，动作之后再由新观察确认现实' },
+    { k: '', q: '贯穿整个闭环', t: '从仿真环境迁移到现实环境', d: '处理训练画面和真实摄像头、执行器之间的差异', c: '#2dd4bf', cap: '同一个杯子：训练画面与真实摄像头画面并不相同' },
+  ],
+  // 俯视桌面场景：托盘、垃圾盒、红色杯子、黄色废纸 + 平面两连杆机械臂（逆运动学）；本部分多页共用
+  mkDesk(host, o = {}) {
+    const W = o.w || 700, H = o.h || 500, p = o.p || 'c06dk', f = (n) => (+n).toFixed(1);
+    const P = { base: [350, 510], tray: [140, 112], bin: [560, 112], cup: [252, 334], paper: [468, 300], safe: [350, 412] };
+    const L1 = 262, L2 = 232;
+    host.innerHTML = `<svg class="dk6" viewBox="0 0 700 500" width="${W}" height="${H}" style="display:block">
+<defs>
+<radialGradient id="${p}-cg" cx=".36" cy=".34" r=".7"><stop offset="0" stop-color="#fecaca"/><stop offset=".45" stop-color="#ef4444"/><stop offset="1" stop-color="#991b1b"/></radialGradient>
+<pattern id="${p}-gd" width="35" height="35" patternUnits="userSpaceOnUse"><path d="M35 0H0V35" fill="none" stroke="rgba(255,255,255,.055)" stroke-width="1"/></pattern>
+<filter id="${p}-nz" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency=".85" numOctaves="2" seed="7" result="t"/><feColorMatrix in="t" values="0 0 0 0 1  0 0 0 0 .95  0 0 0 0 .85  0 0 0 .9 0"/></filter>
+<linearGradient id="${p}-lt" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fde68a" stop-opacity=".34"/><stop offset=".55" stop-color="#fde68a" stop-opacity="0"/><stop offset="1" stop-color="#0b1026" stop-opacity=".6"/></linearGradient>
+<linearGradient id="${p}-sc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#22d3ee" stop-opacity="0"/><stop offset=".85" stop-color="#22d3ee" stop-opacity=".3"/><stop offset="1" stop-color="#a5f3fc" stop-opacity=".95"/></linearGradient>
+<marker id="${p}-ma" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fdba74"/></marker>
+<marker id="${p}-mp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f9a8d4"/></marker>
+<marker id="${p}-mc" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#67e8f9"/></marker>
+</defs>
+<rect class="dk6-desk" x="5" y="5" width="690" height="490" rx="24" fill="#141a2e" stroke="rgba(255,255,255,.16)" stroke-width="2"/>
+<rect x="5" y="5" width="690" height="490" rx="24" fill="url(#${p}-gd)"/>
+<g class="dk6-tray"><rect x="52" y="54" width="176" height="116" rx="18" fill="rgba(96,165,250,.1)" stroke="#60a5fa" stroke-width="3"/><rect x="66" y="68" width="148" height="88" rx="11" fill="none" stroke="rgba(147,197,253,.45)" stroke-width="2" stroke-dasharray="6 6"/><text x="140" y="203" text-anchor="middle" fill="#93c5fd" font-size="21" font-weight="700">托盘</text></g>
+<g class="dk6-bin"><circle cx="560" cy="112" r="60" fill="rgba(52,211,153,.08)" stroke="#34d399" stroke-width="3"/><circle cx="560" cy="112" r="45" fill="rgba(0,0,0,.38)" stroke="rgba(110,231,183,.45)" stroke-width="2"/><text x="560" y="203" text-anchor="middle" fill="#6ee7b7" font-size="21" font-weight="700">垃圾盒</text></g>
+<g class="dk6-under"></g>
+<polyline class="dk6-trace" points="" fill="none" stroke="#fb923c" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 8" opacity=".9"/>
+<g class="dk6-cup"><circle r="24" fill="url(#${p}-cg)" stroke="#fca5a5" stroke-width="2"/><circle r="15" fill="#7f1d1d" stroke="#f87171" stroke-width="2"/><rect x="21" y="-6" width="13" height="12" rx="4" fill="#dc2626"/></g>
+<g class="dk6-paper"><path d="M-20 -8L-9 -21L6 -16L19 -19L22 -2L15 12L18 21L-1 18L-15 22L-22 9Z" fill="#facc15" stroke="#fef08a" stroke-width="2" stroke-linejoin="round"/><path d="M-9 -21L-2 -3L15 12M-2 -3L-15 22M-2 -3L19 -19" fill="none" stroke="#a16207" stroke-width="1.6" opacity=".7"/></g>
+<g class="dk6-arm">
+<line class="dk6-l1" stroke="#334155" stroke-width="32" stroke-linecap="round"/>
+<line class="dk6-l1b" stroke="#fb923c" stroke-width="5" stroke-linecap="round" opacity=".9"/>
+<line class="dk6-l2" stroke="#475569" stroke-width="24" stroke-linecap="round"/>
+<line class="dk6-l2b" stroke="#fdba74" stroke-width="4" stroke-linecap="round" opacity=".9"/>
+<circle class="dk6-j0" r="36" fill="#0f172a" stroke="#fb923c" stroke-width="3"/>
+<circle class="dk6-j1" r="16" fill="#0f172a" stroke="#fdba74" stroke-width="3"/>
+<path class="dk6-palm" fill="none" stroke="#cbd5e1" stroke-width="8" stroke-linecap="round"/>
+<path class="dk6-fg" fill="none" stroke="#e2e8f0" stroke-width="6" stroke-linecap="round"/>
+</g>
+<g class="dk6-ovl"></g>
+<rect class="dk6-nz" x="5" y="5" width="690" height="490" rx="24" fill="#000" filter="url(#${p}-nz)" opacity="0" pointer-events="none"/>
+<rect class="dk6-lt" x="5" y="5" width="690" height="490" rx="24" fill="url(#${p}-lt)" opacity="0" pointer-events="none"/>
+<rect class="dk6-scan" x="5" y="5" width="690" height="60" fill="url(#${p}-sc)" opacity="0" pointer-events="none"/>
+<g class="dk6-cam" transform="translate(350 32)"><rect x="-26" y="-16" width="52" height="32" rx="8" fill="#0b1224" stroke="#22d3ee" stroke-width="2.5"/><circle r="9" fill="none" stroke="#22d3ee" stroke-width="3"/><circle class="dk6-led" cx="18" cy="-8" r="3.5" fill="#164e63"/></g>
+</svg>`;
+    const svg = host.querySelector('svg'), q = (c) => svg.querySelector('.dk6-' + c);
+    const E = { l1: q('l1'), l1b: q('l1b'), l2: q('l2'), l2b: q('l2b'), j0: q('j0'), j1: q('j1'), palm: q('palm'), fg: q('fg'), cup: q('cup'), paper: q('paper'), trace: q('trace'), ovl: q('ovl'), under: q('under'), scan: q('scan'), nz: q('nz'), lt: q('lt'), desk: q('desk') };
+    const S = {};
+    const ln = (el, a, b, c, d) => { el.setAttribute('x1', f(a)); el.setAttribute('y1', f(b)); el.setAttribute('x2', f(c)); el.setAttribute('y2', f(d)); };
+    const api = {
+      svg, P, S, p, gen: 0, pts: [],
+      ik(tx, ty) {
+        const [bx, by] = P.base;
+        let dx = tx - bx, dy = ty - by, d = Math.hypot(dx, dy) || 1;
+        const mn = Math.abs(L1 - L2) + 2, mx = L1 + L2 - 2;
+        if (d < mn || d > mx) { const k = Math.max(mn, Math.min(mx, d)) / d; dx *= k; dy *= k; d = Math.hypot(dx, dy); }
+        const c2 = (d * d - L1 * L1 - L2 * L2) / (2 * L1 * L2), t2 = Math.acos(Math.max(-1, Math.min(1, c2)));
+        const t1 = Math.atan2(dy, dx) - Math.atan2(L2 * Math.sin(t2), L1 + L2 * Math.cos(t2));
+        const ex = bx + L1 * Math.cos(t1), ey = by + L1 * Math.sin(t1);
+        return { ex, ey, fx: ex + L2 * Math.cos(t1 + t2), fy: ey + L2 * Math.sin(t1 + t2), a: t1 + t2 };
+      },
+      draw() {
+        if (S.hold === 'cup') S.cup = [...S.ee];
+        if (S.hold === 'paper') S.paper = [...S.ee];
+        const k = api.ik(S.ee[0], S.ee[1]), [bx, by] = P.base;
+        const dx = Math.cos(k.a), dy = Math.sin(k.a), nx = -dy, ny = dx, g = 33 - 9 * S.grip;
+        const px = k.fx - dx * 32, py = k.fy - dy * 32;
+        ln(E.l1, bx, by, k.ex, k.ey); ln(E.l1b, bx, by, k.ex, k.ey); ln(E.l2, k.ex, k.ey, px, py); ln(E.l2b, k.ex, k.ey, px, py);
+        E.j0.setAttribute('cx', bx); E.j0.setAttribute('cy', by); E.j1.setAttribute('cx', f(k.ex)); E.j1.setAttribute('cy', f(k.ey));
+        E.palm.setAttribute('d', `M${f(px + nx * g)} ${f(py + ny * g)}L${f(px - nx * g)} ${f(py - ny * g)}`);
+        E.fg.setAttribute('d', `M${f(px + nx * g)} ${f(py + ny * g)}L${f(k.fx + dx * 14 + nx * g)} ${f(k.fy + dy * 14 + ny * g)}M${f(px - nx * g)} ${f(py - ny * g)}L${f(k.fx + dx * 14 - nx * g)} ${f(k.fy + dy * 14 - ny * g)}`);
+        E.cup.setAttribute('transform', `translate(${f(S.cup[0])} ${f(S.cup[1])}) scale(${S.cupS})`);
+        E.paper.setAttribute('transform', `translate(${f(S.paper[0])} ${f(S.paper[1])}) scale(${S.papS}) rotate(${S.papR})`);
+        if (S.tr) { api.pts.push(f(S.ee[0]) + ',' + f(S.ee[1])); if (api.pts.length > 500) api.pts.shift(); E.trace.setAttribute('points', api.pts.join(' ')); }
+      },
+      reset(x = {}) {
+        Object.assign(S, { ee: [...P.safe], grip: 0, hold: null, cup: [...P.cup], paper: [...P.paper], cupS: 1, papS: 1, papR: 0, tr: false }, x);
+        api.pts = [];
+        E.trace.setAttribute('points', '');
+        E.ovl.innerHTML = '';
+        E.under.innerHTML = '';
+        E.scan.classList.remove('go');
+        api.look('real');
+        api.draw();
+      },
+      // 停止所有进行中的补间（新的一轮开始前调用）
+      halt() { api.gen++; },
+      set(x) { Object.assign(S, x); api.draw(); },
+      tween(ctx, to, ms) {
+        const g = api.gen, fr = { ee: [...S.ee], grip: S.grip, cup: [...S.cup], paper: [...S.paper] }, t0 = performance.now();
+        return new Promise((res) => {
+          if (!ctx || !ctx.alive) return;
+          ctx.raf(() => {
+            if (g !== api.gen) { res(false); return false; }
+            const k = ms > 0 ? Math.min(1, (performance.now() - t0) / ms) : 1, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+            const L = (a, b) => a + (b - a) * e;
+            if (to.ee) S.ee = [L(fr.ee[0], to.ee[0]), L(fr.ee[1], to.ee[1])];
+            if (to.grip != null) S.grip = L(fr.grip, to.grip);
+            if (to.cup) S.cup = [L(fr.cup[0], to.cup[0]), L(fr.cup[1], to.cup[1])];
+            if (to.paper) S.paper = [L(fr.paper[0], to.paper[0]), L(fr.paper[1], to.paper[1])];
+            api.draw();
+            if (k >= 1) { res(true); return false; }
+          });
+        });
+      },
+      // 摄像头重新观察：扫描光带 + 指示灯
+      scan() { E.scan.classList.remove('go'); E.scan.getBoundingClientRect(); E.scan.classList.add('go'); },
+      ovl(h) { E.ovl.innerHTML = h; },
+      addOvl(h) { E.ovl.insertAdjacentHTML('beforeend', h); },
+      under(h) { E.under.innerHTML = h; },
+      look(kd) {
+        E.nz.setAttribute('opacity', kd === 'vis' ? 0.4 : 0);
+        E.lt.setAttribute('opacity', kd === 'vis' ? 1 : 0);
+        E.desk.setAttribute('fill', kd === 'sim' ? '#0f1a2a' : '#141a2e');
+        E.desk.setAttribute('stroke', kd === 'sim' ? 'rgba(103,232,249,.45)' : 'rgba(255,255,255,.16)');
+        svg.dataset.look = kd;
+      },
+      // 标准任务：抓杯 → 放托盘 → 抓纸 → 放垃圾盒 → 回安全姿态 → 重新观察
+      // o.slow 靠近杯子时减速；o.slide 杯子滑动后修正抓取点；o.fail 第一次没夹住纸；o.checkEach 每次放下后检查；o.only='cup' 只做杯子
+      async run(ctx, ok, o = {}) {
+        const on = o.on || (() => {}), sp = o.speed || 1, mv = (to, ms) => api.tween(ctx, to, ms / sp), w = (ms) => U.wait(ctx, ms / sp);
+        on('start');
+        await mv({ ee: [S.cup[0] + 6, S.cup[1] + 70] }, 1000); if (!ok()) return false;
+        on('near-cup');
+        await mv({ ee: [...S.cup] }, o.slow ? 1400 : 600); if (!ok()) return false;
+        if (o.slide) {
+          on('cup-slide');
+          await mv({ cup: [S.cup[0] + 26, S.cup[1] - 10] }, 420); if (!ok()) return false;
+          await w(300); if (!ok()) return false;
+          on('regrip');
+          await mv({ ee: [...S.cup] }, 520); if (!ok()) return false;
+        }
+        await mv({ grip: 1 }, 320); if (!ok()) return false;
+        S.hold = 'cup'; on('pick-cup');
+        await mv({ ee: [...P.tray] }, 1400); if (!ok()) return false;
+        await mv({ grip: 0 }, 300); if (!ok()) return false;
+        S.hold = null; on('place-cup');
+        if (o.checkEach) { api.scan(); on('check-cup'); await w(850); if (!ok()) return false; }
+        if (o.only === 'cup') { await mv({ ee: [P.tray[0] + 30, P.tray[1] + 150] }, 700); return ok(); }
+        await mv({ ee: [S.paper[0] - 4, S.paper[1] + 60] }, 1000); if (!ok()) return false;
+        await mv({ ee: [...S.paper] }, 500); if (!ok()) return false;
+        if (o.fail) {
+          await mv({ grip: 1 }, 300); if (!ok()) return false;
+          on('miss'); S.papR = 14;
+          await mv({ grip: 0, ee: [S.paper[0], S.paper[1] + 44] }, 420); if (!ok()) return false;
+          api.scan(); on('reobserve');
+          await w(950); if (!ok()) return false;
+          await mv({ ee: [...S.paper] }, 460); if (!ok()) return false;
+          on('retry');
+        }
+        await mv({ grip: 1 }, 320); if (!ok()) return false;
+        S.hold = 'paper'; on('pick-paper');
+        await mv({ ee: [...P.bin] }, 1400); if (!ok()) return false;
+        await mv({ grip: 0 }, 300); if (!ok()) return false;
+        S.hold = null; S.papS = 0.82; api.draw(); on('place-paper');
+        if (o.checkEach) { api.scan(); on('check-paper'); await w(850); if (!ok()) return false; }
+        await mv({ ee: [...P.safe] }, 1000); if (!ok()) return false;
+        on('safe');
+        api.scan(); on('verify');
+        await w(1000); if (!ok()) return false;
+        on('done');
+        return true;
+      },
+    };
+    api.reset();
+    return api;
+  },
+  init(s) {
+    this.desk = this.mkDesk(s.querySelector('.rbt-scene'), { w: 680, h: 486, p: 'c06rb' });
+    s.querySelector('.rbt-list').innerHTML = this.EXP.map((e, i) => `<button class="rbt-ex" data-i="${i}"><span class="rbt-n">${e.n}</span><b>${e.t}</b><span class="rbt-k ${e.real ? 'real' : 'gpu'}">${e.real ? '真机' : '本地 GPU'}</span><small>${e.d}</small></button>`).join('');
+    s.querySelector('.rbt-ql').innerHTML = this.Q.map((q, i) => `<button class="rbt-q" data-q="${i}" style="--qc:${q.c}"><em>${q.k || U.ic('layers')}</em><span class="rbt-qt">${q.q}</span><i class="rbt-ar"></i><span class="rbt-tech"><b>${q.t}</b><span>${q.d}</span></span></button>`).join('');
+    s.querySelector('.rbt-list').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.autoE = false; this.pickExp(s, +b.dataset.i); } });
+    s.querySelector('.rbt-ql').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { this.autoQ = false; this.pickQ(s, +b.dataset.q); } });
+  },
+  bar(s, ic, txt, env, real) {
+    s.querySelector('.rbt-op use').setAttribute('href', '#i-' + ic);
+    s.querySelector('.rbt-op b').textContent = txt;
+    const e = s.querySelector('.rbt-env');
+    e.textContent = env;
+    e.classList.toggle('real', !!real);
+    e.classList.toggle('gpu', !real);
+  },
+  // 第 0 步：选择一个实验——操作者与执行环境随之变化，任务不变
+  pickExp(s, i) {
+    const e = this.EXP[i];
+    this.ei = i;
+    s.querySelectorAll('.rbt-ex').forEach((b, j) => b.classList.toggle('on', j === i));
+    this.bar(s, e.ic, '操作者：' + e.op, e.env, e.real);
+    this.desk.look(e.look);
+  },
+  loop0(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const ch = (k, v) => s.querySelector(`.rbt-chk [data-k="${k}"]`).classList.toggle('on', v);
+    if (!ctx) return;
+    const go = async () => {
+      while (ok()) {
+        D.halt();
+        D.reset();
+        D.look(this.EXP[this.ei || 0].look);
+        ['cup', 'paper', 'arm'].forEach((k) => ch(k, false));
+        await U.wait(ctx, 500); if (!ok()) return;
+        await D.run(ctx, ok, { on: (ev) => { if (ev === 'place-cup') ch('cup', true); if (ev === 'place-paper') ch('paper', true); if (ev === 'verify') ch('arm', true); } });
+        if (!ok()) return;
+        await U.wait(ctx, 1600);
+      }
+    };
+    go();
+  },
+  // 第 1 步：四个问题与四种技术，场景上叠加对应的示意
+  pickQ(s, i) {
+    this.qi = i;
+    s.querySelectorAll('.rbt-q').forEach((b, j) => b.classList.toggle('on', j === i));
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk, P = D.P, m = D.p, ok = () => ctx && ctx.alive && tk === this.tk;
+    const cap = s.querySelector('.rbt-cap');
+    D.halt();
+    D.reset();
+    cap.textContent = this.Q[i].cap;
+    cap.classList.add('on');
+    if (!ctx) return;
+    if (i === 0) {
+      D.under(`<rect class="dk6-glow" x="40" y="42" width="200" height="140" rx="26" fill="none" stroke="#f472b6" stroke-width="4"/><circle class="dk6-glow" cx="560" cy="112" r="74" fill="none" stroke="#f472b6" stroke-width="4"/>`);
+      D.ovl(`<path d="M236 308C210 262 176 232 152 190" fill="none" stroke="#f9a8d4" stroke-width="3.5" stroke-dasharray="8 8" marker-end="url(#${m}-mp)"/><path d="M478 272C508 232 534 212 552 190" fill="none" stroke="#f9a8d4" stroke-width="3.5" stroke-dasharray="8 8" marker-end="url(#${m}-mp)"/>`);
+    } else if (i === 1) {
+      const b = (x, y, n) => `<g transform="translate(${x} ${y})"><g class="dk6-pop" style="animation-delay:${n * 260}ms"><circle r="19" fill="#a78bfa" stroke="#ede9fe" stroke-width="2"/><text y="7" text-anchor="middle" fill="#0b1020" font-size="21" font-weight="800">${n}</text></g></g>`;
+      D.ovl(`<path d="M278 318C340 262 400 270 440 290" fill="none" stroke="#c4b5fd" stroke-width="3" stroke-dasharray="7 7" marker-end="url(#${m}-mc)"/><path d="M474 266C450 170 410 96 386 60" fill="none" stroke="#c4b5fd" stroke-width="3" stroke-dasharray="7 7" marker-end="url(#${m}-mc)"/>` + b(220, 296, 1) + b(504, 262, 2) + b(404, 30, 3));
+    } else if (i === 2) {
+      D.S.tr = true;
+      (async () => { await U.wait(ctx, 300); if (!ok()) return; await D.run(ctx, ok, { only: 'cup' }); })();
+    } else if (i === 3) {
+      D.under(`<g opacity=".7"><circle cx="140" cy="112" r="26" fill="none" stroke="#67e8f9" stroke-width="3" stroke-dasharray="6 5"/><text x="140" y="74" text-anchor="middle" fill="#67e8f9" font-size="20" font-weight="700">预测</text></g>`);
+      (async () => {
+        await U.wait(ctx, 300); if (!ok()) return;
+        await D.run(ctx, ok, { only: 'cup' }); if (!ok()) return;
+        D.scan();
+        await U.wait(ctx, 900); if (!ok()) return;
+        D.ovl(`<g transform="translate(140 112)"><g class="dk6-pop"><circle r="22" fill="#34d399" opacity=".92"/><path d="M-10 0l7 7 13-13" fill="none" stroke="#04121a" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/></g></g><text x="140" y="246" text-anchor="middle" fill="#6ee7b7" font-size="20" font-weight="700">新观察与预测一致</text>`);
+      })();
+    } else {
+      let v = false;
+      const flip = () => {
+        if (!ok()) return;
+        v = !v;
+        D.look(v ? 'vis' : 'real');
+        D.ovl(`<text x="350" y="476" text-anchor="middle" font-size="21" font-weight="700" fill="${v ? '#fde68a' : '#93c5fd'}">${v ? '真实摄像头：光照、噪声、背景都可能不同' : '训练画面'}</text>`);
+        ctx.later(flip, 1300);
+      };
+      flip();
+    }
+  },
+  apply(s, k) {
+    s.dataset.k = k;
+    if (k === 0) {
+      s.querySelector('.rbt-cap').classList.remove('on');
+      this.autoE = true;
+      this.pickExp(s, this.ei || 0);
+      this.loop0(s);
+    } else {
+      this.autoQ = true;
+      this.bar(s, 'refresh', '同一个控制闭环', 'XLeRobot · 整理桌面', 1);
+      s.querySelectorAll('.rbt-chk span').forEach((x) => x.classList.remove('on'));
+      this.pickQ(s, 0);
+    }
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.ei = 0;
+    this.apply(s, k);
+    ctx.every(() => {
+      if (s.dataset.k === '1') { if (this.autoQ) this.pickQ(s, ((this.qi || 0) + 1) % this.Q.length); }
+      else if (this.autoE) this.pickExp(s, ((this.ei || 0) + 1) % this.EXP.length);
+    }, 5200);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.desk.halt();
+    this.desk.reset();
+    s.dataset.k = 0;
+    s.querySelectorAll('.rbt-ex,.rbt-q,.rbt-chk span').forEach((b) => b.classList.remove('on'));
+    const c = s.querySelector('.rbt-cap');
+    c.classList.remove('on');
+    c.textContent = '';
+  },
+};
+</script>
+
+<section class="slide" id="c06-hw" data-part="6" data-dur="14000" data-title="硬件与算法的分工" data-notes="自主整理桌面失败时，究竟是机械臂本身做不到，还是算法没有把它用好？一个不容忽视的事实是：<b>像 XLeRobot 这样成本只有几百美元的机械臂，通过遥操作已经能够完成本节这种连续的多步桌面任务</b>——人看着摄像头画面，抓起红色杯子放进托盘，再把黄色废纸放进垃圾盒，最后重新确认状态。这不只是说明“硬件勉强具备可行性”，更是一个明确的诊断证据：<b>对于这个任务，硬件本体不是瓶颈，算法才是瓶颈。</b><br>诊断方法很直接：保持摄像头、机械臂、夹爪、桌面布置和成功条件不变，先让人接管闭环。人类会持续修正物体定位、动作选择和时机控制，并处理抓取失败；自主系统与人的差距，正体现在这些闭环能力上。这个判断仅限于本节的桌面任务：它说明硬件已经跨过了完成该任务所需的负载、精度和工作空间门槛，并不意味着几百美元的机械臂能够胜任所有开放环境或更高难度的操作。<br>XLeRobot 支持键盘、Xbox 手柄、Switch Joy-Con 和 VR 设备等遥操作入口。人类操作者会自然地做很多算法必须显式实现的事：夹爪靠近杯子时减速，杯子滑动时修正抓取点，第一次没有夹住纸张时重新观察，并在物体放入目标区域后检查结果。遥操作因此不只是收集演示数据，也是一种“固定硬件、替换操作者”的诊断实验。右上角可切换操作者，左侧场景为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">固定硬件，<em>替换操作者</em></h2></div>
+    <div class="hwd-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="human">人（遥操作）</button><button data-v="algo">自主算法</button></div></header>
+  <div class="hwd-fact fx fx-up" style="--d:2">
+    <div class="hwd-f"><span class="lbl">事实</span><p><b>像 XLeRobot 这样成本只有几百美元的机械臂，通过遥操作已经能够完成本节这种连续的多步桌面任务</b></p></div>
+    <svg class="ic hwd-arr"><use href="#i-arrow"/></svg>
+    <div class="hwd-f hwd-f2"><span class="lbl">诊断结论</span><p><b>对于这个任务，硬件本体不是瓶颈，算法才是瓶颈。</b></p></div>
+  </div>
+  <div class="hwd-body">
+    <div class="hwd-left panel fx fx-left" style="--d:3">
+      <div class="hwd-bar"><span class="hwd-op"><svg class="ic"><use href="#i-user"/></svg><b>人看着摄像头画面遥操作</b></span><span class="hwd-spd"><span class="lbl">夹爪速度</span><span class="meter"><i></i></span></span><span class="chip warn">示意</span></div>
+      <div class="hwd-sw"><div class="hwd-scene"></div><div class="hwd-ftag"></div></div>
+      <div class="hwd-dev"><span data-d="0"><svg class="ic"><use href="#i-keyboard"/></svg>键盘</span><span data-d="1"><svg class="ic"><use href="#i-game"/></svg>Xbox 手柄</span><span data-d="2"><svg class="ic"><use href="#i-c06-rl-joycon"/></svg>Switch Joy-Con</span><span data-d="3"><svg class="ic"><use href="#i-c06-rl-vr"/></svg>VR 设备</span></div>
+    </div>
+    <div class="hwd-right">
+      <div class="hwd-diag panel fx fx-right" style="--d:4">
+        <div class="hwd-col"><span class="lbl">保持不变</span><div class="hwd-ch"><span><svg class="ic"><use href="#i-lock"/></svg>摄像头</span><span><svg class="ic"><use href="#i-lock"/></svg>机械臂</span><span><svg class="ic"><use href="#i-lock"/></svg>夹爪</span><span><svg class="ic"><use href="#i-lock"/></svg>桌面布置</span><span><svg class="ic"><use href="#i-lock"/></svg>成功条件</span></div></div>
+        <svg class="ic hwd-ar2"><use href="#i-right"/></svg>
+        <div class="hwd-col"><span class="lbl">只替换操作者</span><div class="hwd-ops"><span class="hwd-o0"><svg class="ic"><use href="#i-user"/></svg>人</span><svg class="ic hwd-sx"><use href="#i-swap"/></svg><span class="hwd-o1"><svg class="ic"><use href="#i-robot"/></svg>算法</span></div></div>
+        <svg class="ic hwd-ar2"><use href="#i-right"/></svg>
+        <div class="hwd-col"><span class="lbl">差距体现在闭环能力</span><div class="hwd-ch hwd-gap"><span>物体定位</span><span>动作选择</span><span>时机控制</span><span>抓取失败处理</span></div></div>
+      </div>
+      <div class="hwd-acts panel fx fx-right" style="--d:5">
+        <div class="hwd-ah"><b>人类操作者自然会做、算法必须显式实现的事</b><span class="hwd-mode"></span></div>
+        <div class="hwd-it" data-a="0"><em>1</em><span>夹爪靠近杯子时减速</span><i class="hwd-tag"></i></div>
+        <div class="hwd-it" data-a="1"><em>2</em><span>杯子滑动时修正抓取点</span><i class="hwd-tag"></i></div>
+        <div class="hwd-it" data-a="2"><em>3</em><span>第一次没有夹住纸张时重新观察</span><i class="hwd-tag"></i></div>
+        <div class="hwd-it" data-a="3"><em>4</em><span>物体放入目标区域后检查结果</span><i class="hwd-tag"></i></div>
+      </div>
+      <p class="hwd-scope fx fx-up" style="--d:6"><svg class="ic"><use href="#i-alert"/></svg><span>判断仅限本节的桌面任务：硬件已跨过该任务所需的负载、精度和工作空间门槛，并不意味着几百美元的机械臂能胜任所有开放环境或更高难度的操作</span></p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「硬件与算法的分工」</div>
+</section>
+<style>
+#c06-hw .sh{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+#c06-hw .hwd-fact{display:grid;grid-template-columns:1fr 50px 1fr;align-items:stretch;gap:14px}
+#c06-hw .hwd-f{padding:12px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.04)}
+#c06-hw .hwd-f p{font-size:21px;line-height:1.55;margin-top:4px}
+#c06-hw .hwd-f2{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+#c06-hw .hwd-f2 b{color:var(--acc);font-size:24px}
+#c06-hw .hwd-arr{align-self:center;font-size:40px;color:var(--acc)}
+#c06-hw .hwd-body{display:grid;grid-template-columns:628px 1fr;gap:24px;margin-top:18px}
+#c06-hw .hwd-left{padding:10px 14px 12px;display:flex;flex-direction:column;gap:8px}
+#c06-hw .hwd-bar{display:flex;align-items:center;gap:14px;height:36px}
+#c06-hw .hwd-op{display:flex;align-items:center;gap:10px;font-size:18px}
+#c06-hw .hwd-op .ic{font-size:24px;color:var(--acc)}
+#c06-hw .hwd-spd{margin-left:auto;display:flex;align-items:center;gap:8px}
+#c06-hw .hwd-spd .meter{width:96px;height:10px}
+#c06-hw .hwd-spd .meter i{--c:var(--acc)}
+#c06-hw .hwd-bar .chip{font-size:15px;padding:4px 12px}
+#c06-hw .hwd-sw{position:relative;height:430px;border-radius:16px;overflow:hidden}
+#c06-hw .hwd-ftag{position:absolute;left:0;top:0;translate:-50% 0;padding:6px 14px;border-radius:999px;font-size:17px;font-weight:700;white-space:nowrap;color:#04121a;background:var(--ok);opacity:0;pointer-events:none}
+#c06-hw .hwd-ftag.al{background:var(--tool)}
+#c06-hw .hwd-ftag.on{animation:c06hw-tag 2s var(--ease) forwards}
+@keyframes c06hw-tag{0%{opacity:0;transform:translateY(10px)}15%,80%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-6px)}}
+#c06-hw .hwd-dev{display:flex;gap:10px;justify-content:center}
+#c06-hw .hwd-dev span{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:12px;font-size:17px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s var(--ease)}
+#c06-hw .hwd-dev span .ic{font-size:22px}
+#c06-hw .hwd-dev span.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+#c06-hw[data-m=algo] .hwd-dev span{opacity:.32;filter:saturate(.3)}
+#c06-hw .hwd-right{display:flex;flex-direction:column;gap:14px}
+#c06-hw .hwd-diag{display:grid;grid-template-columns:1fr 26px .82fr 26px 1fr;align-items:center;gap:10px;padding:16px 20px}
+#c06-hw .hwd-col{display:flex;flex-direction:column;gap:10px}
+#c06-hw .hwd-ch{display:flex;flex-wrap:wrap;gap:7px}
+#c06-hw .hwd-ch span{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-hw .hwd-ch .ic{font-size:15px;color:var(--har)}
+#c06-hw .hwd-gap span{color:var(--text);border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-hw .hwd-ar2{font-size:24px;color:var(--text3)}
+#c06-hw .hwd-ops{display:flex;align-items:center;justify-content:center;gap:10px}
+#c06-hw .hwd-ops>span{display:inline-flex;flex-direction:column;align-items:center;gap:4px;width:82px;padding:10px 0;border-radius:14px;font-size:17px;color:var(--text3);border:1px solid var(--line);transition:all .45s var(--ease)}
+#c06-hw .hwd-ops>span .ic{font-size:30px}
+#c06-hw .hwd-sx{font-size:22px;color:var(--text3)}
+#c06-hw[data-m=human] .hwd-o0,#c06-hw[data-m=algo] .hwd-o1{color:var(--text);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 15%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 30%,transparent)}
+#c06-hw .hwd-acts{padding:16px 20px;display:flex;flex-direction:column;gap:9px}
+#c06-hw .hwd-ah{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:2px}
+#c06-hw .hwd-ah b{font-size:20px}
+#c06-hw .hwd-mode{font-size:16px;color:var(--text3)}
+#c06-hw .hwd-it{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.025);transition:all .4s var(--ease)}
+#c06-hw .hwd-it em{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 16px var(--num);border:1px solid var(--line2);color:var(--text2)}
+#c06-hw .hwd-it>span{font-size:19px;color:var(--text2)}
+#c06-hw .hwd-tag{font-style:normal;font-size:16px;font-weight:700;padding:3px 12px;border-radius:999px;opacity:0;transition:opacity .4s}
+#c06-hw .hwd-it.seen .hwd-tag{opacity:1}
+#c06-hw[data-m=human] .hwd-tag{color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+#c06-hw[data-m=algo] .hwd-tag{color:var(--tool);background:color-mix(in srgb,var(--tool) 12%,transparent);border:1px solid color-mix(in srgb,var(--tool) 45%,transparent)}
+#c06-hw .hwd-it.seen>span{color:var(--text)}
+#c06-hw .hwd-it.cur{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 11%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 22%,transparent)}
+#c06-hw .hwd-it.cur em{color:#06101f;background:var(--acc);border-color:var(--acc)}
+#c06-hw .hwd-scope{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.6;color:var(--text2);background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.3)}
+#c06-hw .hwd-scope .ic{flex:none;font-size:22px;color:var(--warn);margin-top:2px}
+</style>
+<script>
+HOOKS['c06-hw'] = {
+  TAG: ['靠近杯子时减速', '杯子滑动：修正抓取点', '没夹住：重新观察', '放入后检查结果'],
+  init(s) {
+    this.desk = HOOKS['c06-robot'].mkDesk(s.querySelector('.hwd-scene'), { w: 600, h: 430, p: 'c06hw' });
+    this.set = U.seg(s.querySelector('.hwd-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(m);
+    s.dataset.m = m;
+    const hm = m === 'human';
+    s.querySelector('.hwd-op use').setAttribute('href', hm ? '#i-user' : '#i-robot');
+    s.querySelector('.hwd-op b').textContent = hm ? '人看着摄像头画面遥操作' : '自主算法：同一硬件、同一任务';
+    s.querySelector('.hwd-mode').textContent = hm ? '当前：人在闭环里' : '当前：算法接管闭环';
+    this.run(s);
+  },
+  float(s, i) {
+    const t = s.querySelector('.hwd-ftag'), D = this.desk, hm = this.m === 'human';
+    const x = (D.S.ee[0] * 600) / 700, y = (D.S.ee[1] * 430) / 500;
+    t.style.left = Math.max(130, Math.min(470, x)) + 'px';
+    t.style.top = Math.max(16, Math.min(370, y - 70)) + 'px';
+    t.textContent = (hm ? '人：' : '需显式实现：') + this.TAG[i];
+    t.classList.toggle('al', !hm);
+    U.restart(t, 'on');
+  },
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk, ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    const its = [...s.querySelectorAll('.hwd-it')], mt = s.querySelector('.hwd-spd .meter');
+    const hm = this.m === 'human';
+    const mark = (i) => {
+      its.forEach((x, j) => x.classList.toggle('cur', j === i));
+      its[i].classList.add('seen');
+      its[i].querySelector('.hwd-tag').textContent = hm ? '人自然完成' : '需显式实现';
+      this.float(s, i);
+    };
+    const go = async () => {
+      while (ok()) {
+        D.halt();
+        D.reset();
+        its.forEach((x) => { x.classList.remove('cur', 'seen'); x.querySelector('.hwd-tag').textContent = ''; });
+        mt.style.setProperty('--v', '80%');
+        await U.wait(ctx, 500); if (!ok()) return;
+        await D.run(ctx, ok, {
+          slow: true, slide: true, fail: true, checkEach: true,
+          on: (e) => {
+            if (e === 'near-cup') { mark(0); mt.style.setProperty('--v', '26%'); }
+            if (e === 'pick-cup') mt.style.setProperty('--v', '80%');
+            if (e === 'cup-slide') mark(1);
+            if (e === 'reobserve') mark(2);
+            if (e === 'check-cup' || e === 'check-paper') mark(3);
+            if (e === 'done') its.forEach((x) => x.classList.remove('cur'));
+          },
+        });
+        if (!ok()) return;
+        await U.wait(ctx, 1500); if (!ok()) return;
+        if (this.auto) { this.mode(s, this.m === 'human' ? 'algo' : 'human'); return; }
+      }
+    };
+    go();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.di = 0;
+    s.querySelectorAll('.hwd-dev span').forEach((x, j) => x.classList.toggle('on', j === 0));
+    this.mode(s, 'human');
+    ctx.every(() => {
+      if (this.m !== 'human') return;
+      this.di = (this.di + 1) % 4;
+      s.querySelectorAll('.hwd-dev span').forEach((x, j) => x.classList.toggle('on', j === this.di));
+    }, 2400);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.desk.halt();
+    this.desk.reset();
+    s.dataset.m = '';
+    s.querySelectorAll('.hwd-it').forEach((x) => { x.classList.remove('cur', 'seen'); x.querySelector('.hwd-tag').textContent = ''; });
+    s.querySelectorAll('.hwd-dev span').forEach((x) => x.classList.remove('on'));
+    s.querySelector('.hwd-ftag').classList.remove('on');
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp10" data-part="6" data-trans="flip" data-dur="16000" data-title="实验 6-10 ★：真机遥操作 XLeRobot 整理桌面" data-notes="<b>实验 6-10 ★</b>：在真实 XLeRobot 工作区内放置红色杯子、托盘、黄色废纸和垃圾盒，操作者通过一种校准完成的遥操作方式执行固定任务：“把红色杯子放进托盘，把黄色废纸放进垃圾盒，最后重新观察并确认桌面状态。”实验至少重复多轮，并记录摄像头画面、操作者输入、机械臂状态、动作时间、抓取失败、重试次数和最终状态（左侧记录面板为示意）。<br>验收不能只看“最后桌面似乎收拾好了”：红色杯子必须位于托盘内，黄色废纸必须位于垃圾盒内，机械臂回到安全姿态，而且全程没有碰撞、越界或未经确认的人工代做。右上角切换两个示例：示例 A 看起来已经收拾好了，却有三项不满足；示例 B 中间抓纸失败过一次，但重试后四项全部满足。<br>真机遥操作得到的是最有说服力的任务上限，但它不适合批量改变物体数量和位置，所以下一步把同一个“物体归位”问题搬进模拟器。配套仓库的现状：XLeRobot 的键盘、Xbox、Joy-Con 和 VR 遥操作入口固定在上游提交 3d14695；真机运行需要真实机械臂、标定、急停和现场观察员，必须另行取证；仓库里的本地验收不会打开串口，也不执行任何真机动作。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-10 ★：<em>真机遥操作 XLeRobot 整理桌面</em></h2></div>
+    <div class="x10-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="a">A：看起来收拾好了</button><button data-v="b">B：满足验收</button></div></header>
+  <div class="x10-body">
+    <div class="x10-rec panel fx fx-left" style="--d:3">
+      <div class="x10-rh"><b>每一轮都要记录</b><span class="chip warn">示意</span><span class="x10-rd">第 <b>1</b> 轮</span></div>
+      <div class="x10-tl">
+        <div class="x10-lb"><span><svg class="ic"><use href="#i-camera"/></svg>摄像头画面</span><span><svg class="ic"><use href="#i-game"/></svg>操作者输入</span><span><svg class="ic"><use href="#i-arm"/></svg>机械臂状态</span><span><svg class="ic"><use href="#i-timer"/></svg>动作时间</span><span><svg class="ic"><use href="#i-alert"/></svg>抓取失败</span><span><svg class="ic"><use href="#i-repeat"/></svg>重试次数</span><span><svg class="ic"><use href="#i-flag"/></svg>最终状态</span></div>
+        <div class="x10-pw"></div>
+      </div>
+    </div>
+    <div class="x10-acc panel fx fx-right" style="--d:4">
+      <div class="x10-sw" data-clip-ok><div class="x10-scene"></div><div class="x10-stamp"></div></div>
+      <div class="x10-list">
+        <div class="chk x10-c" data-c="0"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><div><b>红色杯子位于托盘内</b><small></small></div></div>
+        <div class="chk x10-c" data-c="1"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><div><b>黄色废纸位于垃圾盒内</b><small></small></div></div>
+        <div class="chk x10-c" data-c="2"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><div><b>机械臂回到安全姿态</b><small></small></div></div>
+        <div class="chk x10-c" data-c="3"><span class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg></span><div><b>全程无碰撞、越界或未经确认的人工代做</b><small></small></div></div>
+      </div>
+    </div>
+  </div>
+  <div class="x10-foot fx fx-up" style="--d:6">
+    <p><svg class="ic"><use href="#i-pkg"/></svg><span><b>配套仓库现状</b>：遥操作入口（键盘 · Xbox · Joy-Con · VR）固定在 XLeRobot 上游提交 3d14695；真机运行需要真实机械臂、标定、急停和现场观察员，另行取证；本地验收不打开串口、不执行真机动作</span></p>
+    <p><svg class="ic"><use href="#i-arrow"/></svg><span>真机遥操作是最有说服力的任务上限，但不适合批量改变物体数量和位置 → 实验 6-11 搬进模拟器</span></p>
+  </div>
+  <div class="src">第六章 ·「硬件与算法的分工」· 实验 6-10 · 配套仓库 chapter6/xlerobot-teleoperation</div>
+</section>
+<style>
+#c06-exp10 .sh{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+#c06-exp10 .x10-seg button{font-size:18px;padding:9px 20px}
+#c06-exp10 .x10-body{display:grid;grid-template-columns:770px 1fr;gap:24px;height:606px}
+#c06-exp10 .x10-rec{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+#c06-exp10 .x10-rh{display:flex;align-items:center;gap:12px}
+#c06-exp10 .x10-rh b{font-size:21px}
+#c06-exp10 .x10-rh .chip{font-size:15px;padding:4px 12px}
+#c06-exp10 .x10-rd{margin-left:auto;font-size:17px;color:var(--text2)}
+#c06-exp10 .x10-rd b{font:800 24px var(--num);color:var(--acc)}
+#c06-exp10 .x10-tl{display:flex;gap:10px}
+#c06-exp10 .x10-lb{flex:none;width:170px;display:flex;flex-direction:column}
+#c06-exp10 .x10-lb span{height:70px;display:flex;align-items:center;gap:10px;font-size:17px;color:var(--text2);border-bottom:1px solid var(--line)}
+#c06-exp10 .x10-lb .ic{font-size:21px;color:var(--acc)}
+#c06-exp10 .x10-pw{flex:1;min-width:0}
+#c06-exp10 .x10-pw svg{display:block;overflow:visible}
+#c06-exp10 .x10-acc{padding:14px 16px;display:flex;flex-direction:column;gap:12px;align-items:center}
+#c06-exp10 .x10-sw{position:relative;width:600px;height:400px;border-radius:16px;overflow:hidden}
+#c06-exp10 .x10-stamp{position:absolute;right:26px;top:92px;padding:8px 22px;border-radius:12px;font-size:30px;font-weight:800;letter-spacing:.2em;border:4px solid currentColor;opacity:0;transform:scale(2.2) rotate(-14deg);pointer-events:none}
+#c06-exp10 .x10-stamp.ok{color:#34d399;background:rgba(5,30,22,.75)}
+#c06-exp10 .x10-stamp.bad{color:#fb7185;background:rgba(40,8,16,.75)}
+#c06-exp10 .x10-stamp.on{animation:stampIn .5s var(--spring) forwards}
+#c06-exp10 .x10-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+#c06-exp10 .x10-c{padding:10px 14px;gap:12px;align-items:center;cursor:default}
+#c06-exp10 .x10-c .box{width:28px;height:28px}
+#c06-exp10 .x10-c b{display:block;font-size:17px;line-height:1.4}
+#c06-exp10 .x10-c small{display:block;min-height:22px;font-size:15px;color:var(--text3);margin-top:2px}
+#c06-exp10 .x10-c.bad{border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+#c06-exp10 .x10-c.bad .box{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 25%,transparent)}
+#c06-exp10 .x10-c.bad small{color:#fda4af}
+#c06-exp10 .x10-c.done small{color:#6ee7b7}
+#c06-exp10 .x10-foot{display:grid;grid-template-columns:1.45fr 1fr;gap:18px;margin-top:16px}
+#c06-exp10 .x10-foot p{display:flex;gap:12px;align-items:flex-start;padding:11px 16px;border-radius:14px;font-size:16px;line-height:1.6;color:var(--text2);background:rgba(255,255,255,.035);border:1px solid var(--line)}
+#c06-exp10 .x10-foot .ic{flex:none;font-size:20px;color:var(--acc);margin-top:2px}
+#c06-exp10 .x10-foot b{color:var(--text)}
+</style>
+<script>
+HOOKS['c06-exp10'] = {
+  // 两个示例的验收结果：[是否满足, 说明]
+  RES: {
+    a: [[0, '杯子压在托盘边缘'], [1, '位置满足，但由人手放入'], [0, '机械臂停在半空'], [0, '人手代做未经确认']],
+    b: [[1, '在托盘内'], [1, '在垃圾盒内'], [1, '已复位到安全姿态'], [1, '全程由遥操作完成']],
+  },
+  DUR: { a: 8800, b: 11200 },
+  init(s) {
+    this.desk = HOOKS['c06-robot'].mkDesk(s.querySelector('.x10-scene'), { w: 600, h: 400, p: 'c06x10' });
+    this.set = U.seg(s.querySelector('.x10-seg'), (v) => { this.auto = false; this.play(s, v); });
+    this.buildTL(s);
+    s.querySelectorAll('.x10-c').forEach((c) => c.addEventListener('click', () => U.restart(c, 'sw')));
+  },
+  // 记录面板：7 条泳道（示意）。A、B 两个示例各有自己的一组内容，播放头经过时逐步露出
+  buildTL(s) {
+    const X = (t) => (t * 540 + 10).toFixed(1), blk = (a, b, y, h, c, ex = '') => `<rect x="${X(a)}" y="${y}" width="${(540 * (b - a)).toFixed(1)}" height="${h}" rx="5" fill="${c}" ${ex}/>`;
+    const lab = (t, y, txt, c = '#0b1020', sz = 16) => `<text x="${X(t)}" y="${y}" text-anchor="middle" font-size="${sz}" font-weight="700" fill="${c}">${txt}</text>`;
+    let bg = '', com = '';
+    for (let i = 0; i < 7; i++) bg += `<rect x="0" y="${i * 70 + 4}" width="560" height="62" rx="10" fill="rgba(255,255,255,${i % 2 ? 0.025 : 0.045})"/>`;
+    for (let i = 0; i < 30; i++) com += `<rect x="${X(i / 30 + 0.006)}" y="20" width="11" height="30" rx="3" fill="rgba(34,211,238,.32)" stroke="#22d3ee" stroke-width="1"/>`;
+    com += `<g transform="translate(${X(0.585)} 315)"><circle r="13" fill="#fb7185"/><path d="M-5 -5l10 10M5 -5l-10 10" stroke="#0b1020" stroke-width="3" stroke-linecap="round"/></g><text x="${+X(0.585) + 22}" y="321" fill="#fda4af" font-size="16" font-weight="700">未夹住废纸</text>`;
+    const wave = (t1, flatFrom) => {
+      let p1 = '', p2 = '';
+      for (let i = 0; i <= 80; i++) {
+        const t = (i / 80) * t1, tt = flatFrom != null && t > flatFrom ? flatFrom : t;
+        p1 += (i ? 'L' : 'M') + X(t) + ' ' + (175 - 18 * Math.sin(tt * 19) - 6 * Math.sin(tt * 47)).toFixed(1);
+        p2 += (i ? 'L' : 'M') + X(t) + ' ' + (175 + 14 * Math.cos(tt * 23) + 5 * Math.sin(tt * 61)).toFixed(1);
+      }
+      return `<path d="${p1}" fill="none" stroke="#fb923c" stroke-width="2.5"/><path d="${p2}" fill="none" stroke="#fdba74" stroke-width="2" opacity=".7"/>`;
+    };
+    const inB = [[0.02, 0.16], [0.17, 0.21], [0.22, 0.37], [0.38, 0.41], [0.43, 0.55], [0.56, 0.59], [0.62, 0.65], [0.67, 0.81], [0.82, 0.85], [0.87, 0.95]];
+    let B = inB.map(([a, b]) => blk(a, b, 92, 26, 'rgba(251,146,60,.78)')).join('') + wave(0.97);
+    B += blk(0.02, 0.21, 228, 30, '#fdba74') + lab(0.115, 249, '抓杯') + blk(0.22, 0.41, 228, 30, '#fdba74') + lab(0.315, 249, '放杯') + blk(0.43, 0.65, 228, 30, '#fdba74') + lab(0.54, 249, '抓纸') + blk(0.67, 0.85, 228, 30, '#fdba74') + lab(0.76, 249, '放纸') + blk(0.87, 0.95, 228, 30, '#a5b4fc') + lab(0.91, 249, '复位');
+    B += `<path d="M${X(0)} 404H${X(0.62)}V378H${X(1)}" fill="none" stroke="#a78bfa" stroke-width="3"/>` + `<text x="${+X(0.62) + 12}" y="372" fill="#c4b5fd" font-size="16" font-weight="700">重试 1 次</text>`;
+    let A = inB.slice(0, 6).map(([a, b]) => blk(a, b, 92, 26, 'rgba(251,146,60,.78)')).join('') + wave(0.97, 0.62);
+    A += blk(0.64, 0.8, 86, 38, 'rgba(251,113,133,.18)', 'stroke="#fb7185" stroke-width="2" stroke-dasharray="5 4"') + lab(0.72, 111, '人手代做', '#fda4af');
+    A += blk(0.02, 0.21, 228, 30, '#fdba74') + lab(0.115, 249, '抓杯') + blk(0.22, 0.41, 228, 30, '#fca5a5') + lab(0.315, 249, '放杯·压边') + blk(0.43, 0.6, 228, 30, '#fdba74') + lab(0.515, 249, '抓纸');
+    A += `<path d="M${X(0)} 404H${X(1)}" fill="none" stroke="#a78bfa" stroke-width="3"/>` + `<text x="${+X(0.66)}" y="396" fill="#c4b5fd" font-size="16">未重试（人手代做）</text>`;
+    const fin = (txt, c) => `<text x="${X(0.99)}" y="474" text-anchor="end" font-size="17" font-weight="700" fill="${c}">${txt}</text>`;
+    s.querySelector('.x10-pw').innerHTML = `<svg viewBox="0 0 560 492" width="560" height="492">
+      <defs><clipPath id="c06x10-cl"><rect class="x10-clr" x="0" y="0" width="0" height="492"/></clipPath></defs>
+      ${bg}
+      <g clip-path="url(#c06x10-cl)"><g>${com}</g><g class="x10-va">${A}</g><g class="x10-vb">${B}</g></g>
+      <g class="x10-fa" opacity="0">${fin('杯子压边 · 人手代做 · 机械臂停在半空', '#fda4af')}</g>
+      <g class="x10-fb" opacity="0">${fin('杯子在托盘 · 废纸在垃圾盒 · 安全姿态', '#6ee7b7')}</g>
+      <line class="x10-ph" x1="10" y1="0" x2="10" y2="492" stroke="#fff" stroke-width="2" opacity=".75"/>
+    </svg>`;
+  },
+  // 示例 A 的现场：杯子压在托盘边缘，抓纸失败后由人手代做，机械臂没有复位
+  async seqA(ctx, ok) {
+    const D = this.desk, P = D.P, mv = (to, ms) => D.tween(ctx, to, ms);
+    await mv({ ee: [D.S.cup[0] + 6, D.S.cup[1] + 70] }, 1000); if (!ok()) return false;
+    await mv({ ee: [...D.S.cup] }, 600); if (!ok()) return false;
+    await mv({ grip: 1 }, 320); if (!ok()) return false;
+    D.S.hold = 'cup';
+    await mv({ ee: [226, 168] }, 1400); if (!ok()) return false;
+    await mv({ grip: 0 }, 300); if (!ok()) return false;
+    D.S.hold = null;
+    await mv({ ee: [D.S.paper[0] - 4, D.S.paper[1] + 60] }, 1000); if (!ok()) return false;
+    await mv({ ee: [...D.S.paper] }, 500); if (!ok()) return false;
+    await mv({ grip: 1 }, 300); if (!ok()) return false;
+    D.S.papR = 14;
+    await mv({ grip: 0, ee: [D.S.paper[0] - 70, D.S.paper[1] + 60] }, 420); if (!ok()) return false;
+    D.addOvl(`<g class="x10-hand" transform="translate(760 330)"><circle r="32" fill="rgba(251,113,133,.16)" stroke="#fb7185" stroke-width="2" stroke-dasharray="4 4"/><use href="#i-hand" x="-21" y="-21" width="42" height="42" fill="none" stroke="#fda4af" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><text y="56" text-anchor="middle" fill="#fda4af" font-size="20" font-weight="700">人手代做</text></g>`);
+    const hand = D.svg.querySelector('.x10-hand');
+    const hmv = (a, b, ms) => new Promise((res) => {
+      const t0 = performance.now();
+      ctx.raf(() => {
+        const k = Math.min(1, (performance.now() - t0) / ms), e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+        hand.setAttribute('transform', `translate(${(a[0] + (b[0] - a[0]) * e).toFixed(1)} ${(a[1] + (b[1] - a[1]) * e).toFixed(1)})`);
+        if (k >= 1) { res(true); return false; }
+      });
+    });
+    const pp = [...D.S.paper];
+    await hmv([760, 330], [pp[0] + 10, pp[1] + 4], 800); if (!ok()) return false;
+    await Promise.all([D.tween(ctx, { paper: [...P.bin] }, 900), hmv([pp[0] + 10, pp[1] + 4], [P.bin[0] + 10, P.bin[1] + 4], 900)]); if (!ok()) return false;
+    D.S.papS = 0.82; D.draw();
+    await hmv([P.bin[0] + 10, P.bin[1] + 4], [770, 60], 700); if (!ok()) return false;
+    D.scan();
+    await U.wait(ctx, 900);
+    return ok();
+  },
+  play(s, v) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.v = v;
+    this.set(v);
+    const svg = s.querySelector('.x10-pw svg'), clr = svg.querySelector('.x10-clr'), ph = svg.querySelector('.x10-ph');
+    svg.querySelector('.x10-va').style.display = v === 'a' ? '' : 'none';
+    svg.querySelector('.x10-vb').style.display = v === 'b' ? '' : 'none';
+    svg.querySelector('.x10-fa').setAttribute('opacity', 0);
+    svg.querySelector('.x10-fb').setAttribute('opacity', 0);
+    const cs = [...s.querySelectorAll('.x10-c')], st = s.querySelector('.x10-stamp');
+    cs.forEach((c) => { c.classList.remove('done', 'bad'); c.querySelector('small').textContent = ''; });
+    st.className = 'x10-stamp';
+    st.textContent = '';
+    s.querySelector('.x10-rd b').textContent = (this.round = (this.round || 0) + 1);
+    D.halt();
+    D.reset();
+    clr.setAttribute('width', 0);
+    ph.setAttribute('x1', 10); ph.setAttribute('x2', 10);
+    if (!ctx) return;
+    const dur = this.DUR[v], t0 = performance.now();
+    ctx.raf(() => {
+      if (tk !== this.tk) return false;
+      const k = Math.min(1, (performance.now() - t0) / dur), x = 10 + 540 * k;
+      clr.setAttribute('width', x.toFixed(1));
+      ph.setAttribute('x1', x.toFixed(1)); ph.setAttribute('x2', x.toFixed(1));
+      if (k >= 1) return false;
+    });
+    (async () => {
+      const r = v === 'a' ? await this.seqA(ctx, ok) : await D.run(ctx, ok, { fail: true });
+      if (!r || !ok()) return;
+      svg.querySelector(v === 'a' ? '.x10-fa' : '.x10-fb').setAttribute('opacity', 1);
+      const res = this.RES[v];
+      for (let i = 0; i < 4; i++) {
+        await U.wait(ctx, 420); if (!ok()) return;
+        cs[i].classList.add(res[i][0] ? 'done' : 'bad');
+        cs[i].querySelector('small').textContent = res[i][1];
+      }
+      await U.wait(ctx, 500); if (!ok()) return;
+      const pass = res.every((x) => x[0]);
+      st.textContent = pass ? '通过' : '不通过';
+      st.className = 'x10-stamp on ' + (pass ? 'ok' : 'bad');
+      await U.wait(ctx, 2800); if (!ok()) return;
+      if (this.auto) this.play(s, v === 'a' ? 'b' : 'a');
+    })();
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.round = 0; this.play(s, 'a'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.desk.halt();
+    this.desk.reset();
+    s.querySelectorAll('.x10-c').forEach((c) => { c.classList.remove('done', 'bad'); c.querySelector('small').textContent = ''; });
+    s.querySelector('.x10-stamp').className = 'x10-stamp';
+  },
+};
+</script>

@@ -1,0 +1,418 @@
+<!-- ================= 第 8 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d8" data-part="8" data-title="PART 08 · 奖励设计" data-notes="「奖励设计：如何把任务目标变成学习信号」。前面的单轮、多轮和工具调用场景说明了“要训练什么”；这一部分回答“环境应该怎样告诉模型做得好不好”。奖励设计可以沿三个互补维度展开：<b>奖励来自哪里</b>、<b>什么时候给</b>、<b>要表达多少信息</b>。最后再讨论一个额外问题：结果正确时，路径是否也合规——RLVP 与实验 8-16。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">奖励设计</h1>
+  <div class="ch-s fx fx-up" style="--d:3">来自哪里 · 什么时候给 · 表达多少信息 · 路径是否合规</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">“通过了 grader”不能自动等价于“任务完成了”。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<!-- ================= 奖励来源 ================= -->
+<section class="slide" id="c08-rsource" data-part="8" data-trans="zoom" data-dur="24000" data-title="奖励来自哪里：规则、人类偏好与模型评判" data-notes="最可靠的来源是<b>可验证奖励（RLVR）</b>：用测试用例、数据库断言、状态差异或格式检查直接判断结果。数学答案、代码测试和结构化工具调用都适合从二元结果奖励开始；<b>规则越确定，奖励越便宜、可复现，也越不容易被模型钻空子</b>。<br><b>RLHF</b> 只作为背景。InstructGPT 的基本流程是：人工比较回答，训练奖励模型，再用 PPO 优化策略。奖励模型只是偏好的代理，过度优化会导致 reward hacking，因此通常用 KL 正则把策略锚定在 SFT 参考模型附近。<b>DPO</b> 跳过显式奖励模型，直接从偏好对做离线优化；这些方法不是本章 Agent RL 的主线。<br>当目标难以完全规则化时，可以使用模型评判。<b>生成式奖励模型（GRM）</b>不只输出一个分数，还生成“哪里做得好、哪里需要改”的诊断；它可以作为奖励来源，也可以把诊断转成后续蒸馏或偏好数据。DeepSeek-GRM 的核心思路是让模型先归纳任务评价原则，再按原则评价轨迹，最后用可验证事实检查评价是否正确。这样得到的反馈更透明，但仍需抽样人工校准，防止评判器形成新的偏差。<br>左侧曲线是示意：用奖励模型这个代理去优化，KL 约束越弱，代理分数一路上升，真实质量却先升后降——过度优化。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">规则越确定，<em>奖励越便宜、越难被钻空子</em></h2></header>
+  <div class="c8rs-body">
+    <div class="c8rs-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span><b class="c8rs-k">奖励模型是偏好的代理：过度优化</b><svg class="c8rs-svg" viewBox="0 0 700 330"></svg><label><span>KL 约束强度</span><input type="range" class="rng c8rs-b" min="0" max="100" value="20"><b class="c8rs-bv">弱</b></label></div>
+    <div class="c8rs-r fx fx-right" style="--d:3"></div>
+  </div>
+  <div class="src">第八章 ·「奖励来自哪里：规则、人类偏好与模型评判」</div>
+</section>
+<style>
+.c8rs-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;flex:1;min-height:0}
+.c8rs-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.c8rs-k{font-size:17px;color:var(--acc)}
+.c8rs-svg{width:100%;height:330px}
+.c8rs-svg .ax{stroke:var(--line2)}.c8rs-svg text{fill:var(--text3);font-size:15px}
+.c8rs-svg .p{fill:none;stroke:#fbbf24;stroke-width:3.5}.c8rs-svg .t{fill:none;stroke:#34d399;stroke-width:4}
+.c8rs-l label{display:grid;grid-template-columns:120px 1fr 50px;gap:12px;align-items:center;font-size:16px}.c8rs-l label b{font-size:16px}
+.c8rs-r{display:flex;flex-direction:column;gap:8px}
+.c8rs-c{display:grid;grid-template-columns:100px 1fr;gap:4px 14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78);cursor:pointer;text-align:left;transition:border-color .35s,background .35s}
+.c8rs-c b{grid-row:1/3;font-size:22px;color:var(--acc);align-self:center}
+.c8rs-c span{font-size:16px;font-weight:700}
+.c8rs-c p{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8rs-c small{grid-column:2;font-size:15px;color:var(--text3)}
+.c8rs-c.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.85))}
+</style>
+<script>
+HOOKS['c08-rsource'] = {
+  C: [['RLVR', '可验证奖励 · 本章主线', '测试用例、数据库断言、状态差异、格式检查；数学答案、代码测试、结构化工具调用适合从二元结果奖励开始', '最可靠、便宜、可复现'], ['RLHF', '人类偏好 · 背景', 'InstructGPT：人工比较回答 → 训练奖励模型 → PPO 优化；用 KL 正则锚定在 SFT 参考模型附近', '奖励模型只是代理，过度优化 → reward hacking'], ['DPO', '偏好对 · 离线', '跳过显式奖励模型，直接从偏好对做离线优化', '不是本章 Agent RL 的主线'], ['GRM', '生成式奖励模型', '不只输出分数，还生成“哪里好、哪里要改”的诊断；DeepSeek-GRM：先归纳评价原则 → 按原则评价 → 用可验证事实检查评价', '更透明，仍需抽样人工校准']],
+  init(s) {
+    s.querySelector('.c8rs-r').innerHTML = this.C.map(([a, b, c, d], i) => `<button class="c8rs-c" data-i="${i}"><b>${a}</b><span>${b}</span><p>${c}</p><small>${d}</small></button>`).join('');
+    s.querySelectorAll('.c8rs-c').forEach((c) => c.addEventListener('click', () => { this.auto = false; this.pick(s, +c.dataset.i); }));
+    this.q = (x) => s.querySelector(x);
+    this.q('.c8rs-b').addEventListener('input', () => this.draw());
+    this.draw();
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c8rs-c').forEach((c, j) => c.classList.toggle('on', j === i)); },
+  draw() {
+    const b = +this.q('.c8rs-b').value / 100, svg = this.q('.c8rs-svg'), S = C7S, X = (t) => 50 + t * 620, Y = (v) => 300 - v * 260;
+    svg.innerHTML = ''; S('line', { x1: 50, y1: 300, x2: 670, y2: 300, class: 'ax' }, svg); S('line', { x1: 50, y1: 300, x2: 50, y2: 20, class: 'ax' }, svg);
+    const reach = 0.25 + 0.75 * (1 - b);
+    const p = (t) => Math.min(1, 1.1 * Math.min(t, reach) / reach * (0.4 + 0.6 * (1 - b))), tr = (t) => { const x = Math.min(t, reach); return 0.75 * Math.sin(Math.min(1, x / 0.45) * Math.PI / 2) - Math.max(0, x - 0.45) * 1.1; };
+    const path = (f) => 'M' + Array.from({ length: 61 }, (_, i) => `${X(i / 60)},${Y(Math.max(0, f(i / 60)))}`).join(' L');
+    S('path', { d: path(p), class: 'p' }, svg); S('path', { d: path(tr), class: 't' }, svg);
+    const t1 = S('text', { x: 520, y: Y(p(1)) - 10 }, svg); t1.textContent = '代理分数'; t1.setAttribute('fill', '#fde68a');
+    const t2 = S('text', { x: 520, y: Y(Math.max(0, tr(1))) + 26 }, svg); t2.textContent = '真实质量'; t2.setAttribute('fill', '#6ee7b7');
+    const t3 = S('text', { x: 500, y: 322 }, svg); t3.textContent = '优化强度 →';
+    this.q('.c8rs-bv').textContent = b < 0.34 ? '弱' : b < 0.67 ? '中' : '强';
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 4, 3800, (i) => this.pick(s, i), 500); let k = 0; ctx.every(() => { this.q('.c8rs-b').value = [10, 50, 90][k++ % 3]; this.draw(); }, 2600); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8rs-c').forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= hacking vs seeking ================= -->
+<section class="slide" id="c08-hack" data-part="8" data-trans="flip" data-dur="22000" data-title="reward hacking 与 reward seeking" data-notes="这里还要区分两个容易混淆的概念：<b>reward hacking</b> 是钻规则或实现漏洞拿高分，<b>reward seeking</b> 则是模型先在心里建立一个“评判器会看什么”的模型，再按这个猜测调整行为。后者不一定篡改测试或伪造结果，却可能在长程任务中自行设置一个过于简单的检查，刚好通过就提前结束，交付物因此只满足代理指标而没有满足真实意图。所以<b>“通过了 grader”不能自动等价于“任务完成了”</b>：评判器是意图的代理，训练越强，模型越可能把代理当成目标本身。<br>页面上两个例子是示意。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">评判器是意图的代理：<em>训练越强，越可能把代理当目标</em></h2></div>
+    <div class="c8hk-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="h">reward hacking</button><button data-v="s">reward seeking</button></div></header>
+  <div class="c8hk-body">
+    <div class="c8hk-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><div class="c8hk-tr"></div></div>
+    <div class="c8hk-r fx fx-right" style="--d:4">
+      <div class="c8hk-def" data-v="h"><b>reward hacking</b><p>钻规则或实现漏洞拿高分：改测试、伪造结果</p></div>
+      <div class="c8hk-def" data-v="s"><b>reward seeking</b><p>先在心里建模“评判器会看什么”，再按猜测调整行为——不一定篡改测试，却可能<b>自设一个过于简单的检查，刚好通过就提前结束</b></p></div>
+      <div class="c8hk-gap"><div><span>代理指标</span><i class="a"></i><b class="g">通过</b></div><div><span>真实意图</span><i class="b"></i><b class="r">未满足</b></div></div>
+      <p class="c8hk-nt">“通过了 grader”<b>不能自动等价于</b>“任务完成了”</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「奖励来自哪里：规则、人类偏好与模型评判」</div>
+</section>
+<style>
+.c8hk-seg button{font-size:16px}
+.c8hk-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8hk-l{position:relative;padding:20px 22px}
+.c8hk-tr{display:flex;flex-direction:column;gap:8px;margin-top:20px}
+.c8hk-tr div{display:grid;grid-template-columns:40px 1fr;gap:10px;font-size:16px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);animation:c8hkIn .4s var(--ease) both}
+.c8hk-tr em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.c8hk-tr div.bad{background:rgba(251,113,133,.1);border-left:4px solid #fb7185}
+.c8hk-tr div.ok{background:rgba(52,211,153,.1);border-left:4px solid #34d399}
+@keyframes c8hkIn{from{opacity:0;translate:0 8px}}
+.c8hk-r{display:flex;flex-direction:column;gap:12px}
+.c8hk-def{padding:14px 16px;border-radius:14px;border:1px solid var(--line);opacity:.4;transition:all .4s}
+.c8hk-def.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.c8hk-def b{font-size:19px}.c8hk-def p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c8hk-def p b{font-size:15px}
+.c8hk-gap{display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.03)}
+.c8hk-gap div{display:grid;grid-template-columns:90px 1fr 80px;gap:10px;align-items:center;font-size:15px}
+.c8hk-gap i{height:16px;border-radius:5px}.c8hk-gap i.a{background:#34d399}.c8hk-gap i.b{background:linear-gradient(90deg,#fb7185 30%,rgba(255,255,255,.06) 30%)}
+.c8hk-gap b.g{color:#6ee7b7}.c8hk-gap b.r{color:#fda4af}
+.c8hk-nt{font-size:18px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8hk-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-hack'] = {
+  T: { h: [['', '读需求：修复 parse() 对空输入的处理'], ['', '跑测试：2 个失败'], ['bad', '修改 test_parse.py 里的断言'], ['ok', '测试全部通过 → grader 给满分'], ['bad', '实际 bug 仍在']], s: [['', '长程任务：迁移 40 个模块的接口'], ['', '推测：grader 大概只检查能否导入'], ['bad', '自写检查：import 一下就算通过'], ['ok', '检查通过 → 宣布完成'], ['bad', '只迁移了 12 个模块']] },
+  init(s) { this.seg = U.seg(s.querySelector('.c8hk-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    s.querySelector('.c8hk-tr').innerHTML = this.T[v].map(([c, t], i) => `<div class="${c}" style="animation-delay:${i * 0.35}s"><em>${i + 1}</em><span>${t}</span></div>`).join('');
+    s.querySelectorAll('.c8hk-def').forEach((d) => d.classList.toggle('on', d.dataset.v === v));
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 2, 5500, (i) => { this.i = i; const v = i ? 's' : 'h'; this.seg(v); this.show(s, v); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= ORM vs PRM ================= -->
+<section class="slide" id="c08-ormprm" data-part="8" data-trans="rise" data-dur="24000" data-title="奖励在什么时候给：结果还是过程" data-notes="<b>结果奖励（ORM）</b>只在 episode 结束时判断任务是否完成，最简单，也给策略最大的探索自由度；当中间路径没有公认标准、最优解尚未被人类发现时，SimpleVLA-RL 的稀疏成功 / 失败奖励就是合适的起点。稀疏反馈让模型难以判断多步轨迹中的具体错误，这也是长期以来 RL 样本效率受限的原因之一。在长程 coding 或 cowork 任务中，还应<b>把“是否完成”的判定交给模型写不了的隐藏测试、状态断言或外部终止钩子</b>，而不能只依赖模型自己声称完成。<br><b>过程奖励（PRM）</b>在中间步骤提供反馈，例如检查身份验证、工具参数、测试通过数或导航动作。OpenAI 的《Let's Verify Step by Step》展示了逐步验证在数学推理中的价值。过程奖励能缓解长时序信用分配，却可能把模型限制在设计者预设的路径上，而且标注和验证成本更高。V-IRL-VL（实验 8-12）采用逐步导航反馈，SimpleVLA-RL（实验 8-13）则保留终点奖励，两者构成“<b>密集反馈换收敛速度、稀疏反馈换探索空间</b>”的对照。<br>工程上可以<b>先用结果奖励建立可靠基线，再只为真正可验证的中间事件加入过程信号</b>。多轮 LLM RL 通常将折扣因子设为 γ = 1；PPO 的价值网络或 turn-level 优势负责把终点反馈归因到较早的动作，GRPO 则把轨迹级优势均摊到生成 token，长轨迹上需格外注意信号稀释。<br>画布为示意：两个学习者在同一张图上找终点。过程奖励学习者很快沿着设计者画的路径走；结果奖励学习者起初乱走，但有机会找到设计者没画出来的捷径。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">密集反馈换<em>收敛速度</em>，稀疏反馈换<em>探索空间</em></h2></header>
+  <div class="c8op2-body">
+    <div class="c8op2-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span><canvas class="c8op2-cv"></canvas><div class="c8op2-lg"><span class="p"><i></i>PRM 学习者：沿设计者路径</span><span class="o"><i></i>ORM 学习者：探索出捷径</span></div></div>
+    <div class="c8op2-r fx fx-right" style="--d:3">
+      <div class="c8op2-c"><b>结果奖励 ORM</b><span>只在终点判断：最简单、探索自由度最大；最优解未知时的合适起点（SimpleVLA-RL）</span><em>“是否完成”交给模型写不了的<b>隐藏测试、状态断言、外部终止钩子</b></em></div>
+      <div class="c8op2-c"><b>过程奖励 PRM</b><span>中间步骤反馈：身份验证、工具参数、测试通过数、导航动作（V-IRL；《Let's Verify Step by Step》）</span><em>缓解信用分配，但可能限制在预设路径上，标注与验证更贵</em></div>
+      <div class="c8-card c8op2-eng"><b>工程顺序</b><p>先用结果奖励建立可靠基线 → 只为<b>真正可验证</b>的中间事件加过程信号。多轮 LLM RL 通常 <b>γ = 1</b>；PPO 价值网络 / turn-level 优势负责归因，GRPO 把轨迹级优势均摊到 token——长轨迹注意信号稀释</p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「奖励在什么时候给：结果还是过程」</div>
+</section>
+<style>
+.c8op2-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8op2-l{position:relative;padding:14px;display:flex;flex-direction:column;gap:8px;align-items:center}
+.c8op2-lg{display:flex;gap:18px}.c8op2-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c8op2-lg i{width:16px;height:4px;border-radius:2px}.c8op2-lg .p i{background:#a78bfa}.c8op2-lg .o i{background:#fbbf24}
+.c8op2-r{display:flex;flex-direction:column;gap:10px}
+.c8op2-c{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8op2-c b{font-size:19px;color:var(--acc)}.c8op2-c span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8op2-c em{font-style:normal;font-size:15px;color:var(--text3)}.c8op2-c em b{font-size:15px;color:var(--text)}
+.c8op2-eng>b{font-size:16px;color:var(--warn)}.c8op2-eng p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c8op2-eng p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-ormprm'] = {
+  init(s) { this.g = C8.cv(s.querySelector('.c8op2-cv'), 760, 520); },
+  enter(s, ctx) {
+    const r = U.rand(12), g = this.g;
+    const design = [[80, 440], [80, 260], [300, 260], [300, 120], [680, 120]], goal = [680, 120];
+    let P = { x: 80, y: 440, i: 0 }, O = { x: 80, y: 440, trail: [], t: 0 }, ep = 0;
+    ctx.raf(() => {
+      g.clearRect(0, 0, 760, 520);
+      g.strokeStyle = 'rgba(167,139,250,.25)'; g.lineWidth = 26; g.lineJoin = 'round'; g.beginPath(); design.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+      g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '15px sans-serif'; g.fillText('设计者预设的路径（过程奖励沿途打分）', 100, 290);
+      g.fillStyle = '#34d399'; g.beginPath(); g.arc(goal[0], goal[1], 18, 0, 7); g.fill(); g.fillStyle = '#fff'; g.fillText('终点', goal[0] - 16, goal[1] - 26);
+      // PRM 学习者：沿路径走
+      const tg = design[Math.min(P.i + 1, design.length - 1)], dx = tg[0] - P.x, dy = tg[1] - P.y, d = Math.hypot(dx, dy);
+      if (d < 4) P.i = Math.min(P.i + 1, design.length - 1); else { P.x += (dx / d) * 4; P.y += (dy / d) * 4; }
+      // ORM 学习者：随回合数从随机游走逐渐靠近直线捷径
+      O.t++; const k = Math.min(1, ep / 6), ang = Math.atan2(goal[1] - O.y, goal[0] - O.x) + (r() - 0.5) * (2.6 * (1 - k) + 0.2);
+      O.x += Math.cos(ang) * 4; O.y += Math.sin(ang) * 4; O.x = Math.max(20, Math.min(740, O.x)); O.y = Math.max(20, Math.min(500, O.y)); O.trail.push([O.x, O.y]);
+      g.strokeStyle = 'rgba(251,191,36,.55)'; g.lineWidth = 3; g.beginPath(); O.trail.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+      g.fillStyle = '#a78bfa'; g.beginPath(); g.arc(P.x, P.y, 11, 0, 7); g.fill();
+      g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(O.x, O.y, 11, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.6)'; g.fillText('ORM 回合 ' + (ep + 1), 600, 490);
+      if (Math.hypot(goal[0] - O.x, goal[1] - O.y) < 16 || O.t > 420) { ep = ep >= 7 ? 0 : ep + 1; O = { x: 80, y: 440, trail: [], t: 0 }; P = { x: 80, y: 440, i: 0 }; }
+      return true;
+    });
+  },
+};
+</script>
+
+<!-- ================= 过早结束 ================= -->
+<section class="slide" id="c08-premature" data-part="8" data-trans="iris" data-dur="22000" data-title="过早结束：把完成判定交给隐藏测试" data-notes="“<b>过早结束</b>”是一个具体例子：模型说任务完成时，Harness 在隔离工作区运行<b>模型看不到的验收测试</b>；通过才给正奖励，未通过则给负奖励。测试必须读取真实文件或环境状态，不能只检查模型是否说了“已完成”，否则模型可能学会口头承诺验证而不真正验证。<br>评估时还要把<b>任务未完成的边界集</b>和<b>确实已经完成的保留集</b>分开，前者观察过早结束率，后者观察模型是否仍然能够正常收尾，<b>避免把模型训练成永远不敢结束</b>。<br>切换两种验收方式看奖励如何分配；例子为示意。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">过早结束：完成判定交给<em>模型看不到的测试</em></h2></div>
+    <div class="c8pm-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="say">只检查“说了已完成”</button><button data-v="hid">隐藏测试读取真实状态</button></div></header>
+  <div class="c8pm-body">
+    <div class="c8pm-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><div class="c8pm-cases"></div></div>
+    <div class="c8pm-r fx fx-right" style="--d:4">
+      <div class="c8pm-sets"><div class="b"><b>边界集</b><span>任务确实未完成</span><em>观察：过早结束率</em></div><div class="k"><b>保留集</b><span>任务确实已完成</span><em>观察：是否仍能正常收尾</em></div></div>
+      <p class="c8pm-nt">两个指标分开看，<b>避免把模型训练成永远不敢结束</b></p>
+      <p class="c8pm-x"></p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「奖励在什么时候给：结果还是过程」（过早结束）</div>
+</section>
+<style>
+.c8pm-seg button{font-size:15px}
+.c8pm-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c8pm-l{position:relative;padding:20px 22px}
+.c8pm-cases{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.c8pm-c{display:grid;grid-template-columns:1fr 150px 110px;gap:12px;align-items:center;padding:12px 16px;border-radius:12px;border:1px solid var(--line)}
+.c8pm-c b{font-size:16px}.c8pm-c span{font-size:15px;color:var(--text3)}
+.c8pm-c em{font:800 20px var(--num);font-style:normal;text-align:center;padding:4px;border-radius:8px}
+.c8pm-c em.p{background:rgba(52,211,153,.15);color:#6ee7b7}.c8pm-c em.n{background:rgba(251,113,133,.15);color:#fda4af}
+.c8pm-c.wrong{border-color:#fb7185}
+.c8pm-r{display:flex;flex-direction:column;gap:14px}
+.c8pm-sets{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.c8pm-sets div{display:flex;flex-direction:column;gap:4px;padding:16px;border-radius:14px;border:1px solid var(--line)}
+.c8pm-sets .b{border-color:rgba(251,191,36,.5)}.c8pm-sets .k{border-color:rgba(52,211,153,.5)}
+.c8pm-sets b{font-size:20px}.c8pm-sets span{font-size:15px;color:var(--text2)}.c8pm-sets em{font-style:normal;font-size:15px;color:var(--acc)}
+.c8pm-nt{font-size:17px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8pm-nt b{color:var(--text)}
+.c8pm-x{font-size:16px;line-height:1.6;color:var(--text2)}.c8pm-x b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-premature'] = {
+  C: [['说“已完成”，但还有 2 个测试没过', '实际未完成', 'say', 0], ['说“已完成”，并且确实完成', '实际已完成', 'say', 1], ['说“我已经验证过了”，其实没跑', '实际未完成', 'say', 0], ['继续运行测试、修复剩余问题', '尚未结束', 'none', 0]],
+  init(s) { this.seg = U.seg(s.querySelector('.c8pm-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    s.querySelector('.c8pm-cases').innerHTML = this.C.map(([a, b, c, done]) => {
+      let r; if (c === 'none') r = ['—', '']; else if (v === 'say') r = ['+1', 'p']; else r = done ? ['+1', 'p'] : ['−1', 'n'];
+      const wrong = v === 'say' && c === 'say' && !done;
+      return `<div class="c8pm-c${wrong ? ' wrong' : ''}"><b>${a}</b><span>${b}</span><em class="${r[1]}">${r[0]}</em></div>`;
+    }).join('');
+    s.querySelector('.c8pm-x').innerHTML = v === 'say' ? '只检查口头声明：两条<b>没完成的也拿到 +1</b>——模型学会的是<b>口头承诺验证</b>，而不是真正验证' : '隐藏测试在隔离工作区读取<b>真实文件或环境状态</b>：没完成就宣称完成 → −1；确实完成 → +1';
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 2, 5000, (i) => { this.i = i; const v = i ? 'hid' : 'say'; this.seg(v); this.show(s, v); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 奖励信息量 ================= -->
+<section class="slide" id="c08-rinfo" data-part="8" data-trans="zoom" data-dur="24000" data-title="奖励需要表达多少信息：标量、向量与生成式诊断" data-notes="奖励的<b>密度</b>和<b>表示形式</b>是两件事。<b>标量</b>只回答“总体多好”；<b>半标量</b>先给简短理由再给分数；<b>向量</b>按准确性、完整性、成本和安全等维度分别打分；<b>生成式奖励</b>则给出自然语言诊断并可多次采样后汇总。选择原则很直接：有确定答案或测试——优先二元标量；有多个相互独立的质量目标——使用向量，或将各维度加权成标量；开放式、难以穷举规则——使用生成式诊断，但要配合事实校验和人工抽检。<br><b>不要为了“奖励更丰富”而堆叠不可验证的维度。每增加一个评价维度，就增加一种被策略钻空子的可能</b>；先确认这个信号能在少量 rollout 中产生有意义的组内差异，再决定是否加入训练。<br>同一条示意轨迹，四种奖励形式切换显示；数值均为示意。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每多一个维度，<em>就多一种被钻空子的可能</em></h2></div>
+    <div class="c8ri-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">标量</button><button data-v="1">半标量</button><button data-v="2">向量</button><button data-v="3">生成式诊断</button></div></header>
+  <div class="c8ri-body">
+    <div class="c8ri-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><div class="c8ri-tj"><span class="lbl">同一条轨迹</span>客服 Agent 查询订单、确认退款政策、发起退款，但通知用户时金额写错</div><div class="c8ri-out"></div></div>
+    <div class="c8ri-r fx fx-right" style="--d:4">
+      <div class="c8ri-rule"><div><b>有确定答案或测试</b><span>优先二元标量</span></div><div><b>多个相互独立的质量目标</b><span>向量，或加权成标量</span></div><div><b>开放式、难以穷举规则</b><span>生成式诊断 + 事实校验 + 人工抽检</span></div></div>
+      <p class="c8ri-nt">先确认新信号能在少量 rollout 中产生<b>有意义的组内差异</b>，再决定是否加入训练</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「奖励需要表达多少信息：标量、向量与生成式诊断」</div>
+</section>
+<style>
+.c8ri-seg button{font-size:15px}
+.c8ri-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c8ri-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.c8ri-tj{font-size:17px;line-height:1.55;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);margin-top:16px}
+.c8ri-out{flex:1;display:flex;align-items:center;justify-content:center}
+.c8ri-out .big{font:800 96px var(--num);color:var(--acc)}
+.c8ri-out .semi{display:flex;flex-direction:column;gap:10px;font-size:18px}.c8ri-out .semi b{font:800 48px var(--num);color:var(--acc)}
+.c8ri-out .vec{display:flex;flex-direction:column;gap:10px;width:100%}
+.c8ri-out .vec div{display:grid;grid-template-columns:100px 1fr 50px;gap:10px;align-items:center;font-size:16px}
+.c8ri-out .vec i{height:22px;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.c8ri-out .gen{font-size:16px;line-height:1.7;color:var(--text2);padding:14px 16px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--acc) 50%,transparent)}
+.c8ri-out .gen b{color:var(--text)}
+.c8ri-r{display:flex;flex-direction:column;gap:12px}
+.c8ri-rule{display:flex;flex-direction:column;gap:8px}
+.c8ri-rule div{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8ri-rule b{font-size:17px}.c8ri-rule span{font-size:15px;color:var(--acc)}
+.c8ri-nt{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8ri-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-rinfo'] = {
+  V: [
+    '<span class="big">0.6</span>',
+    '<div class="semi"><span>理由：流程正确，但告知用户的金额与工具返回不一致</span><b>0.6</b></div>',
+    '<div class="vec">' + [['准确性', 0.5], ['完整性', 0.9], ['成本', 0.8], ['安全', 1.0]].map(([a, v]) => `<div><span>${a}</span><i style="width:${v * 100}%"></i><b>${v}</b></div>`).join('') + '</div>',
+    '<div class="gen"><b>做得好</b>：先查订单再核对退款政策，工具参数正确。<br><b>需要改</b>：通知里的金额 ¥436 与 issue_refund 返回的 ¥463 不一致，属于“对用户的信息反馈错误”；发送前应逐项对齐工具返回值。<br><b>结论</b>：环境状态正确，信息告知错误。</div>',
+  ],
+  init(s) { this.seg = U.seg(s.querySelector('.c8ri-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  show(s, k) { s.querySelector('.c8ri-out').innerHTML = this.V[k]; },
+  enter(s, ctx) { C8.auto(this, ctx, 4, 3600, (i) => { this.i = i; this.seg(String(i)); this.show(s, i); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= RLVP ================= -->
+<section class="slide" id="c08-rlvp" data-part="8" data-steps="2" data-trans="rise" data-title="奖励结果，惩罚路径：R = O + βΦ" data-notes="结果奖励解决“事情有没有办成”，却表达不了“是否按规定办成”。真实 Agent 可能通过改测试文件、跳过身份验证或执行破坏性命令获得表面成功。RLVP（Reinforcement Learning with Verified Penalty）的原则是：<b>奖励结果，惩罚路径</b>。它针对的是可机器判定的、与最终成败无关的<b>结果中性约束</b>；它不能替代对语义意图、交付完整性和早停行为的独立检查。<br>真实环境通常是<b>非对称验证器</b>：检测“做了一个坏动作”便宜而可靠，证明“这一步确实朝着目标取得了有意义的进展”却很难。把总奖励写成 R = O + βΦ：O 是任务结果，Φ 是由确定性规则逐动作计算的路径信号。对可验证的违规动作扣分，对可验证的合规动作或可达子目标给少量部分奖励；两路归一化后再合并，避免路径信号淹没主目标。<b>它不改变 PPO / GRPO，只改变每一步看到的奖励。</b><br>伪代码：outcome = verify_final_state(trajectory)（结果，而不是自述）；对每一步累加 deterministic_path_signal(step)（惩罚或可达进展）；reward = normalize(outcome) + beta × normalize(path_signal)。路径信号中的允许动作、可达子目标、隐藏测试和证据记录依赖具体环境；正文只说明“结果奖励”和“路径约束”如何合并，避免把某个环境的规则误当成通用算法。<br>左侧一条示意轨迹逐步经过确定性规则，拖动 β 看总奖励如何合成。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">RLVP：<em>奖励结果，惩罚路径</em></h2></header>
+  <div class="c8rv-body">
+    <div class="c8rv-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span>
+      <div class="c8rv-steps"></div>
+      <div class="c8rv-sum"><div><span>O 结果</span><b class="c8rv-o">1</b></div><div><span>Φ 路径</span><b class="c8rv-p">—</b></div><label><span>β</span><input type="range" class="rng c8rv-b" min="0" max="100" value="50"><b class="c8rv-bv">0.50</b></label><div class="t"><span>R = O + βΦ</span><b class="c8rv-r">—</b></div></div>
+    </div>
+    <div class="c8rv-r2 fx fx-right" style="--d:3">
+      <pre class="c8-code c8rv-code"><span class="ln">outcome = verify_final_state(trajectory)   <span class="t-c"># result, not self-report</span></span><span class="ln">path_signal = 0</span><span class="ln">for step in trajectory:</span><span class="ln">    path_signal += deterministic_path_signal(step)   <span class="t-c"># penalty or reachable progress</span></span><span class="ln">reward = normalize(outcome) + beta * normalize(path_signal)</span></pre>
+      <div class="c8-card c8rv-asym" data-step="1"><b>非对称验证器</b><div><span class="e">检测“做了一个坏动作”：<b>便宜而可靠</b></span><span class="h">证明“这一步确实取得了有意义的进展”：<b>很难</b></span></div></div>
+      <p class="c8rv-nt fx fx-up" data-step="2">针对可机器判定的<b>结果中性约束</b>；不能替代对语义意图、交付完整性和早停行为的独立检查。<b>不改变 PPO / GRPO，只改变每一步看到的奖励</b></p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「结果正确还不够：路径约束与 RLVP」</div>
+</section>
+<style>
+.c8rv-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;flex:1;min-height:0}
+.c8rv-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.c8rv-steps{display:flex;flex-direction:column;gap:6px;margin-top:20px}
+.c8rv-s{display:grid;grid-template-columns:1fr 200px 60px;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid var(--line);font-size:15px;opacity:.3;transition:all .35s}
+.c8rv-s.on{opacity:1}
+.c8rv-s.v{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.08)}.c8rv-s.g{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.06)}
+.c8rv-s small{font-size:15px;color:var(--text3)}.c8rv-s b{font:700 16px var(--num);text-align:right}
+.c8rv-s.v b{color:#fda4af}.c8rv-s.g b{color:#6ee7b7}
+.c8rv-sum{display:grid;grid-template-columns:1fr 1fr 1.6fr 1.2fr;gap:8px;margin-top:auto;align-items:center}
+.c8rv-sum>div{display:flex;flex-direction:column;padding:8px 10px;border-radius:10px;border:1px solid var(--line)}
+.c8rv-sum span{font-size:15px;color:var(--text3)}.c8rv-sum b{font:800 22px var(--num)}
+.c8rv-sum .t{border-color:var(--acc)}.c8rv-sum .t b{color:var(--acc)}
+.c8rv-sum label{display:grid;grid-template-columns:20px 1fr 44px;gap:6px;align-items:center;font-size:15px}.c8rv-sum label b{font:700 15px var(--num)}
+.c8rv-r2{display:flex;flex-direction:column;gap:12px}
+.c8rv-code{font-size:15px}
+.c8rv-asym>b{font-size:17px;color:var(--acc)}
+.c8rv-asym div{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.c8rv-asym span{font-size:15px;padding:8px 12px;border-radius:10px}.c8rv-asym .e{background:rgba(52,211,153,.08)}.c8rv-asym .h{background:rgba(251,113,133,.08)}
+.c8rv-nt{font-size:15px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8rv-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-rlvp'] = {
+  S: [['读取问题与仓库规则', '合规', 0.2, 'g'], ['复现失败测试', '可达子目标', 0.3, 'g'], ['git reset --hard（破坏性命令）', '违规', -1, 'v'], ['修改 parser.py', '合规', 0.2, 'g'], ['修改 tests/test_parser.py', '违规：动了测试', -1, 'v'], ['运行测试，全部通过', '可达子目标', 0.3, 'g']],
+  init(s) {
+    s.querySelector('.c8rv-steps').innerHTML = this.S.map(([a, b, v, c]) => `<div class="c8rv-s ${c}"><span>${a}</span><small>${b}</small><b>${v > 0 ? '+' : ''}${v}</b></div>`).join('');
+    this.q = (x) => s.querySelector(x);
+    this.q('.c8rv-b').addEventListener('input', () => this.calc(this.n || 0));
+  },
+  calc(n) {
+    this.n = n; const phi = this.S.slice(0, n).reduce((a, b) => a + b[2], 0), b = +this.q('.c8rv-b').value / 100;
+    this.q('.c8rv-bv').textContent = b.toFixed(2); this.q('.c8rv-p').textContent = n ? (phi > 0 ? '+' : '') + phi.toFixed(1) : '—';
+    this.q('.c8rv-r').textContent = n ? (1 + b * phi).toFixed(2) : '—';
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, rs = s.querySelectorAll('.c8rv-s'), lns = s.querySelectorAll('.c8rv-code .ln');
+    while (ok()) {
+      rs.forEach((r) => r.classList.remove('on')); this.calc(0); lns.forEach((l, j) => l.classList.toggle('hl', j === 0));
+      await U.wait(ctx, 900);
+      for (let i = 0; i < rs.length; i++) { lns.forEach((l, j) => l.classList.toggle('hl', j === 3)); await U.wait(ctx, 800); if (!ok()) return; rs[i].classList.add('on'); this.calc(i + 1); }
+      lns.forEach((l, j) => l.classList.toggle('hl', j === 4));
+      await U.wait(ctx, 3500);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= RLVP 组内差异 ================= -->
+<section class="slide" id="c08-rlvp2" data-part="8" data-trans="flip" data-dur="24000" data-title="RLVP 的关键：恢复组内差异" data-notes="<b>RLVP 的关键不是“奖励越密越好”，而是能否恢复组内差异。</b>纯结果奖励在全败组和全胜组都会产生零方差、没有梯度；违规动作通常容易检测，惩罚几乎总能恢复差异；进展奖励只有在部分进展可达时才有效。<br>设计时应遵循四点：<b>只惩罚具体动作，不惩罚“不够努力”</b>；<b>结果奖励始终保留</b>，避免模型学会什么都不做；<b>每个惩罚最好配一条可达的合规路径</b>；<b>规则必须确定、难以钻空子</b>。如果基础策略根本不会采样合规动作，应先用少量示范把这条路径“种”出来，待合规行为稳定后再逐步减弱路径塑形。换句话说，<b>惩罚是通常可达的那一半，进展奖励是受可达性门控的那一半</b>。<br>左侧是一组 8 条 rollout（示意）：切换“全败组 / 全胜组 / 混合组”，再打开“加入路径信号”，看组内标准差是否恢复。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">关键不是奖励越密越好，<em>而是恢复组内差异</em></h2></div>
+    <div class="c8rv2-ctl fx fx-up" style="--d:2"><div class="c8rv2-seg seg"><i class="knob"></i><button data-v="f">全败组</button><button data-v="w">全胜组</button><button data-v="m">混合组</button></div><button class="tgl c8rv2-tg"><i></i>加入路径信号</button></div></header>
+  <div class="c8rv2-body">
+    <div class="c8rv2-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><div class="c8rv2-rs"></div><div class="c8rv2-sd"><span>组内标准差</span><b class="c8rv2-v">—</b><em class="c8rv2-x"></em></div></div>
+    <div class="c8rv2-r fx fx-right" style="--d:4">
+      <div class="c8rv2-p"><em>1</em><b>只惩罚具体动作</b><span>不惩罚“不够努力”</span></div>
+      <div class="c8rv2-p"><em>2</em><b>结果奖励始终保留</b><span>避免学会什么都不做</span></div>
+      <div class="c8rv2-p"><em>3</em><b>每个惩罚配一条可达的合规路径</b><span>基础策略采不到合规动作时，先用少量示范“种”出来，再逐步减弱塑形</span></div>
+      <div class="c8rv2-p"><em>4</em><b>规则确定、难以钻空子</b></div>
+      <p class="c8rv2-nt">惩罚是<b>通常可达</b>的那一半；进展奖励是<b>受可达性门控</b>的那一半</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「结果正确还不够：路径约束与 RLVP」</div>
+</section>
+<style>
+.c8rv2-ctl{display:flex;gap:10px;align-items:center}.c8rv2-ctl button{font-size:15px}
+.c8rv2-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8rv2-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.c8rv2-rs{display:flex;flex-direction:column;gap:6px;margin-top:18px}
+.c8rv2-r0{display:grid;grid-template-columns:60px 70px 1fr 70px;gap:10px;align-items:center;font-size:15px}
+.c8rv2-r0 em{font-style:normal;color:var(--text3)}
+.c8rv2-r0 b{font:700 16px var(--num)}
+.c8rv2-r0 i{position:relative;height:20px;border-radius:5px;background:rgba(255,255,255,.04)}
+.c8rv2-r0 i u{position:absolute;top:0;bottom:0;left:50%;border-radius:5px;transition:all .5s var(--ease)}
+.c8rv2-r0 small{font:15px var(--num);text-align:right;color:var(--text2)}
+.c8rv2-sd{margin-top:auto;display:flex;align-items:baseline;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c8rv2-sd span{font-size:16px;color:var(--text3)}.c8rv2-sd b{font:800 34px var(--num)}.c8rv2-sd em{font-style:normal;font-size:16px}
+.c8rv2-r{display:flex;flex-direction:column;gap:8px}
+.c8rv2-p{display:grid;grid-template-columns:40px 1fr;gap:2px 12px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8rv2-p em{grid-row:1/3;font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.c8rv2-p b{font-size:17px}.c8rv2-p span{font-size:15px;color:var(--text2);line-height:1.45}
+.c8rv2-nt{margin-top:auto;font-size:16px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8rv2-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-rlvp2'] = {
+  // 每组 8 条：[结果 O, 路径信号 Φ]
+  G: { f: [[0, -1], [0, 0.2], [0, -2], [0, 0.3], [0, -1], [0, 0], [0, 0.4], [0, -1]], w: [[1, 0.3], [1, -1], [1, 0.2], [1, -2], [1, 0.4], [1, 0.1], [1, -1], [1, 0.3]], m: [[1, 0.2], [0, -1], [1, -1], [0, 0.2], [0, 0], [1, 0.3], [0, -1], [0, 0.1]] },
+  init(s) {
+    this.k = 'f'; this.q = (x) => s.querySelector(x);
+    this.seg = U.seg(s.querySelector('.c8rv2-seg'), (v) => { this.manual = true; this.k = v; this.show(s); });
+    this.q('.c8rv2-tg').addEventListener('click', (e) => { this.manual = true; e.currentTarget.classList.toggle('on'); this.show(s); });
+    this.seg('f');
+  },
+  show(s) {
+    const path = this.q('.c8rv2-tg').classList.contains('on'), g = this.G[this.k], R = g.map(([o, p]) => o + (path ? 0.4 * p : 0));
+    const m = R.reduce((a, b) => a + b, 0) / R.length, sd = Math.sqrt(R.reduce((a, b) => a + (b - m) ** 2, 0) / R.length);
+    this.q('.c8rv2-rs').innerHTML = g.map(([o, p], i) => { const A = sd > 1e-9 ? (R[i] - m) / sd : 0, w = Math.min(50, Math.abs(A) * 22); return `<div class="c8rv2-r0"><em>#${i + 1}</em><b>O=${o}</b><i><u style="${A >= 0 ? 'left:50%' : `left:${50 - w}%`};width:${w}%;background:${A >= 0 ? '#34d399' : '#fb7185'}"></u></i><small>A=${A.toFixed(2)}</small></div>`; }).join('');
+    this.q('.c8rv2-v').textContent = sd.toFixed(3);
+    const x = this.q('.c8rv2-x');
+    if (sd < 1e-9) { x.textContent = '零方差：没有梯度'; x.style.color = '#fda4af'; } else { x.textContent = path && this.k !== 'm' ? '路径信号恢复了差异' : '有差异：可以学习'; x.style.color = '#6ee7b7'; }
+  },
+  enter(s, ctx) {
+    this.manual = false; let n = 0; const seq = [['f', 0], ['f', 1], ['w', 0], ['w', 1], ['m', 0], ['m', 1]];
+    ctx.every(() => { if (this.manual) return; const [k, p] = seq[n++ % seq.length]; this.k = k; this.seg(k); this.q('.c8rv2-tg').classList.toggle('on', !!p); this.show(s); }, 2600);
+  },
+  reset(s) { this.q('.c8rv2-tg').classList.remove('on'); this.k = 'f'; },
+};
+</script>
+
+<!-- ================= 实验 8-16 ================= -->
+<section class="slide" id="c08-exp816" data-part="8" data-trans="zoom" data-dur="22000" data-title="实验 8-16 ★★★：RLVP——奖励结果、惩罚路径" data-notes="<b>实验 8-16 ★★★：RLVP——奖励结果、惩罚路径。</b>在 GRPO 上加入结果奖励 O 与路径信号 Φ，对比纯结果奖励。<b>TerminalBench</b> 上违规次数由 3.71 降至 0.66，而成功率基本持平；<b>miniF2F</b> 上可达的部分奖励把达到 0.9 成功率所需迭代从 7.0 降至 4.4。<b>软件修复</b>中若所有 rollout 都无法通过任何测试，进展信号不可达，加入它不会带来收益。这个实验提醒我们：<b>先测信号可达性，再决定是否增加奖励维度</b>。<br>这些数字来自可控的代理环境，<b>不能直接外推为线上 Agent 也会获得同等提升</b>；更稳妥的结论是机制性的：只要路径信号能在同一组 rollout 中区分行为，且规则不易被策略钻空子，它就能补上终点奖励看不见的那部分信息。对于真实部署，还需要把隐藏验证、轨迹监控和外部终止条件一起纳入 Harness。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-16 <span class="c8-star">★★★</span>：先测<em>信号可达性</em>，再加奖励维度</h2></header>
+  <div class="c8e16 fx fx-up" style="--d:2">
+    <div class="c8e16-c"><span class="lbl">TerminalBench · 惩罚违规</span><div class="c8e16-b"><div><span>纯结果奖励</span><i style="--v:100%"></i><b>3.71</b></div><div><span>+ 路径信号</span><i class="g" style="--v:17.8%"></i><b>0.66</b></div></div><p>违规次数大幅下降，<b>成功率基本持平</b></p></div>
+    <div class="c8e16-c"><span class="lbl">miniF2F · 可达的部分奖励</span><div class="c8e16-b"><div><span>纯结果奖励</span><i style="--v:100%"></i><b>7.0</b></div><div><span>+ 部分奖励</span><i class="g" style="--v:62.9%"></i><b>4.4</b></div></div><p>达到 0.9 成功率所需的迭代数</p></div>
+    <div class="c8e16-c no"><span class="lbl">软件修复 · 进展不可达</span><div class="c8e16-z"><span>所有 rollout 都通不过任何测试</span><b>进展信号恒为 0 → 没有收益</b></div><p>这一半受可达性门控</p></div>
+  </div>
+  <p class="c8e16-nt fx fx-up" style="--d:3">数字来自可控的代理环境，<b>不能直接外推到线上 Agent</b>；机制性的结论是：路径信号能在同一组 rollout 中区分行为、规则又不易被钻空子时，就能补上终点奖励看不见的信息。真实部署还要把<b>隐藏验证、轨迹监控、外部终止条件</b>一起纳入 Harness</p>
+  <div class="src">第八章 ·「结果正确还不够：路径约束与 RLVP」· 实验 8-16</div>
+</section>
+<style>
+.c8e16{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.c8e16-c{display:flex;flex-direction:column;gap:12px;padding:18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.8)}
+.c8e16-c.no{border-color:rgba(251,113,133,.4)}
+.c8e16-b{display:flex;flex-direction:column;gap:10px}
+.c8e16-b div{display:grid;grid-template-columns:110px 1fr 56px;gap:10px;align-items:center;font-size:15px}
+.c8e16-b i{height:30px;border-radius:7px;background:rgba(255,255,255,.04);position:relative;overflow:hidden}
+.c8e16-b i::after{content:"";position:absolute;inset:0;width:0;background:#94a3b8;transition:width 1.2s var(--ease)}
+.c8e16-b i.g::after{background:var(--acc)}
+#c08-exp816.go .c8e16-b i::after{width:var(--v)}
+.c8e16-b b{font:800 22px var(--num);text-align:right}
+.c8e16-c p{font-size:15px;color:var(--text2)}.c8e16-c p b{color:var(--text)}
+.c8e16-z{display:flex;flex-direction:column;gap:8px;padding:14px;border-radius:12px;background:rgba(251,113,133,.07)}
+.c8e16-z span{font-size:15px;color:var(--text2)}.c8e16-z b{font-size:17px;color:#fda4af}
+.c8e16-nt{margin-top:22px;font-size:17px;line-height:1.65;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8e16-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp816'] = {
+  enter(s, ctx) { ctx.later(() => s.classList.add('go'), 500); },
+  reset(s) { s.classList.remove('go'); },
+};
+</script>

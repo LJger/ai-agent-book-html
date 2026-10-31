@@ -1,0 +1,419 @@
+<!-- ================= PART 03 记忆框架与治理 ================= -->
+<section class="slide chapter" id="c03-d3" data-part="3" data-title="PART 03 · 记忆框架与治理" data-notes="前面讨论的存储格式和记忆类型，最终都要落到工程实现。这一部分先看两个开源记忆框架如何取舍：Mem0 从写入时消歧走向检索时推理（图3-3），Memobase 聚焦用户画像与事件记忆；再按认知科学的分类概括一种多类型记忆协同的参考架构（图3-4）。最后是记忆的治理：随着交互累积，记忆如何分层压缩与整理；以及如何在利用用户信息的同时，不让敏感数据暴露在 LLM 上下文和系统日志中（实验 3-3）。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">记忆框架<br>与治理</h1>
+  <div class="ch-s fx fx-up" style="--d:3">Mem0 · Memobase · 参考架构 · 压缩整理 · 日志脱敏</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">实际框架往往只实现其中一两种类型——按业务需要取舍，比追求“大而全”更符合工程现实。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c03-mem0" data-part="3" data-dur="20000" data-title="Mem0：从写入时消歧到检索时推理" data-notes="开源社区已经出现多个专门的记忆管理框架，这里以 Mem0 和 Memobase 为例，看两种不同的设计理念如何取舍。<br><b>Mem0：从写入时消歧到检索时推理。</b>Mem0 的演进提供了一个很有启发性的系统设计案例：2025 年论文（Chhikara 等人，arXiv:2504.19413）和 v2 把冲突处理放在写入阶段，而 2026 年 4 月发布的 v3 新算法把它移到了检索阶段（图3-3）。<br><b>2025 年论文与 v2——提取、对比、决策。</b>对话结束后，LLM 先抽取候选事实；系统再用向量检索找到相近的已有记忆，由 LLM 在 <b>ADD</b>、<b>UPDATE</b>、<b>DELETE</b>、<b>NOOP</b> 中做出决定。用户先说“我住在北京”，后来又说“我搬到了上海”时，系统会将前一条更新为“住在上海”，在写入时消除冲突。论文还描述了图记忆变体 <b>Mem0-g</b>，用实体—关系图支持多跳与时序问题。这个方案的优势是记忆库始终简洁一致；风险则是一次错误的更新或删除会不可逆地丢失历史信息，而且每条候选事实都要经历检索和第二次 LLM 判断。<br><b>2026 年 v3——仅追加写入、混合检索。</b>当前管线用一次 LLM 调用抽取事实，并且只做 ADD；“住在北京”和稍后的“搬到上海”会作为带时间信息的两条事实并存。查询时，系统融合语义相似度、BM25 关键词和实体匹配，并结合时间信息排序；Agent 确认完成的动作也成为一等事实。这样既避免错误的 UPDATE / DELETE 丢失历史，又减少 LLM 调用，还能用多种检索信号和时间排序找出当前事实。Mem0 报告 LoCoMo 从 71.4 提升到 92.5（+21.1），LongMemEval 从 67.8 提升到 94.4（+26.6）。当前 OSS 已移除外部图存储及 relations 返回值，实体链接仅用于内部检索加权，因此 Mem0-g 应理解为历史设计。<br>右上角切换两代管线，看“住在北京 → 搬到上海”的不同结局。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Mem0：从<em>写入时消歧</em>到<em>检索时推理</em></h2></div>
+    <div class="w3b-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="v2">2025 论文与 v2</button><button data-v="v3">2026 年 v3</button></div></header>
+  <div class="w3b-body">
+    <div class="w3b-pipe panel fx fx-left" style="--d:3">
+      <div class="w3b-ph"><b class="w3b-pt"></b><span class="w3b-ps"></span></div>
+      <div class="w3b-steps"></div>
+      <div class="w3b-dlg"><span class="lbl">两段对话</span><div><em>周一</em>“我住在北京。”</div><div><em>三个月后</em>“我搬到了上海。”</div></div>
+    </div>
+    <div class="w3b-r fx fx-right" style="--d:4">
+      <div class="w3b-store panel"><div class="w3b-sh"><b>记忆库</b><span class="w3b-sm"></span></div><div class="w3b-facts"></div></div>
+      <div class="w3b-q panel"><span class="lbl">查询：“用户现在住在哪？”</span><div class="w3b-ans"></div></div>
+      <div class="w3b-kp"><div><b>71.4 → 92.5</b><span>LoCoMo（+21.1）</span></div><div><b>67.8 → 94.4</b><span>LongMemEval（+26.6）</span></div></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「记忆框架案例」· Mem0 · 图3-3 Mem0 记忆管理架构</div>
+</section>
+<style>
+#c03-mem0 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-mem0 .seg button{padding:8px 20px;font-size:18px}
+.w3b-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.w3b-pipe{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.w3b-ph b{font-size:20px}
+.w3b-ph span{display:block;margin-top:4px;font-size:16px;color:var(--text2)}
+.w3b-steps{display:flex;flex-direction:column;gap:8px}
+.w3b-st{display:grid;grid-template-columns:36px 1fr;gap:4px 12px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.4;transition:all .35s}
+.w3b-st.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.w3b-st em{grid-row:span 2;font:800 20px var(--num);font-style:normal;color:var(--acc);text-align:center}
+.w3b-st b{font-size:18px}
+.w3b-st span{font-size:15px;color:var(--text3)}
+.w3b-st .ops{grid-column:2;display:flex;gap:6px;margin-top:4px}
+.w3b-st .ops i{font-style:normal;padding:1px 8px;border-radius:6px;font:600 15px var(--mono);color:var(--text3);border:1px solid var(--line2)}
+.w3b-st .ops i.on{color:#06101f;background:var(--tool);border-color:var(--tool)}
+.w3b-dlg{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.w3b-dlg div{display:flex;gap:10px;align-items:baseline;font-size:17px}
+.w3b-dlg em{font-style:normal;font-size:15px;color:var(--text3);min-width:80px}
+.w3b-r{display:flex;flex-direction:column;gap:14px;min-height:0}
+.w3b-store{padding:14px 18px;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+.w3b-sh{display:flex;align-items:baseline;justify-content:space-between}
+.w3b-sh b{font-size:19px}
+.w3b-sm{font-size:15px;color:var(--text3)}
+.w3b-facts{display:flex;flex-direction:column;gap:8px}
+.w3b-f{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line2);animation:upIn .4s var(--spring) both;transition:all .4s}
+.w3b-f small{font:15px var(--mono);color:var(--text3)}
+.w3b-f.upd{border-color:rgba(251,191,36,.6);background:rgba(251,191,36,.08)}
+.w3b-f.gone{opacity:.3;text-decoration:line-through}
+.w3b-q{padding:12px 18px;display:flex;flex-direction:column;gap:6px}
+.w3b-ans{min-height:52px;font-size:17px;line-height:1.55;color:var(--text2)}
+.w3b-ans b{color:var(--acc)}
+.w3b-kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.w3b-kp div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w3b-kp b{font:800 24px var(--num);color:var(--ok)}
+.w3b-kp span{font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c03-mem0'] = {
+  V: {
+    v2: { t: '提取、对比、决策', s: '冲突在写入时消除；旧事实可能被覆盖或删除', st: [['LLM 抽取', '候选事实'], ['向量检索', '找到相近的已有记忆'], ['LLM 决策', '对比后选择一种操作', 1]], m: '始终简洁一致 · 错误更新不可逆' },
+    v3: { t: '仅追加写入、混合检索', s: '保留历史；由相关性和时间在检索时解决冲突', st: [['一次 LLM 抽取', '单次调用'], ['只做 ADD', '保留历史'], ['混合检索', '语义 · BM25 · 实体 · 时间 → Top-k']], m: '两条事实并存 · 检索时排序' },
+  },
+  init(s) { this.set = U.seg(s.querySelector('.w3b-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  async run(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const D = this.V[v]; this.v = v; this.set(v);
+    s.querySelector('.w3b-pt').textContent = (v === 'v2' ? '2025 年论文与 v2 · ' : '2026 年 v3 · ') + D.t;
+    s.querySelector('.w3b-ps').textContent = D.s;
+    s.querySelector('.w3b-sm').textContent = D.m;
+    s.querySelector('.w3b-steps').innerHTML = D.st.map(([b, t, ops], i) => `<div class="w3b-st"><em>${i + 1}</em><b>${b}</b><span>${t}</span>${ops ? '<div class="ops"><i>ADD</i><i>UPDATE</i><i>DELETE</i><i>NOOP</i></div>' : ''}</div>`).join('');
+    const sts = [...s.querySelectorAll('.w3b-st')], facts = s.querySelector('.w3b-facts'), ans = s.querySelector('.w3b-ans');
+    facts.innerHTML = ''; ans.textContent = '';
+    const ops = (o) => s.querySelectorAll('.w3b-st .ops i').forEach((i) => i.classList.toggle('on', i.textContent === o));
+    // 第一段对话
+    for (const x of sts) { x.classList.add('on'); await U.wait(ctx, 500); if (!ok()) return; }
+    if (v === 'v2') ops('ADD');
+    facts.insertAdjacentHTML('beforeend', '<div class="w3b-f" data-k="bj"><span>住在北京</span><small>周一</small></div>');
+    await U.wait(ctx, 1200); if (!ok()) return;
+    sts.forEach((x) => x.classList.remove('on')); if (v === 'v2') ops('');
+    // 第二段对话
+    for (const x of sts) { x.classList.add('on'); await U.wait(ctx, 500); if (!ok()) return; }
+    if (v === 'v2') {
+      ops('UPDATE');
+      const f = facts.querySelector('[data-k="bj"]');
+      f.classList.add('upd'); f.innerHTML = '<span>住在上海</span><small>已覆盖“住在北京”</small>';
+      await U.wait(ctx, 1000); if (!ok()) return;
+      ans.innerHTML = '答：<b>上海</b>。记忆库只剩一条——如果这次 UPDATE 判断错了，<b>历史就不可逆地丢失</b>；每条候选事实都要经历检索和第二次 LLM 判断';
+    } else {
+      facts.insertAdjacentHTML('beforeend', '<div class="w3b-f" data-k="sh"><span>搬到了上海</span><small>三个月后</small></div>');
+      await U.wait(ctx, 1000); if (!ok()) return;
+      ans.innerHTML = '答：<b>上海</b>。两条事实并存，检索时融合语义、BM25、实体匹配并<b>按时间排序</b>找出当前事实；历史保留，LLM 调用更少';
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.run(s, 'v2');
+    ctx.every(() => { if (this.auto) this.run(s, this.v === 'v2' ? 'v3' : 'v2'); }, 8500);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-memobase" data-part="3" data-trans="zoom" data-dur="18000" data-title="Memobase：用户画像与事件记忆" data-notes="<b>Memobase：用户画像与事件记忆。</b>Memobase（开源项目 memodb-io/memobase）的设计理念与 Mem0 不同：与其做通用的记忆流水线，不如聚焦“用户画像”这一具体形态。它把用户记忆组织为两部分。<b>用户画像（Profile）</b>是一组可由开发者配置的槽位，按主题—子主题两级组织（如 basic_info → 姓名、interest → 兴趣偏好、work → 职位），存放从对话中提取的稳定用户属性，开发者可以精确控制画像的范围和粒度。<b>事件记忆（Event Memory）</b>则按时间线记录用户经历的事件，用于回答“我们上次讨论预算是什么时候”这类与时间有关的问题。<br>工程上，Memobase 采用缓冲批处理策略：对话先在缓冲区累积，达到一定规模或时限后再统一触发一次记忆提取，以摊薄 LLM 调用成本，同时让查询侧只需读取已整理好的画像和事件，保证低延迟。<br>页面上的对话与画像内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Memobase：<em>用户画像</em>与<em>事件记忆</em></h2></header>
+  <div class="w3c-body">
+    <div class="w3c-buf panel fx fx-left" style="--d:2">
+      <div class="w3c-h"><b>缓冲批处理</b><span class="c3-shi">示意</span></div>
+      <p class="w3c-d">对话先在缓冲区累积，达到一定规模或时限后<b>统一触发一次</b>记忆提取——摊薄 LLM 调用成本</p>
+      <div class="w3c-msgs"></div>
+      <div class="w3c-fill"><span>缓冲区</span><div class="meter"><i></i></div><em class="w3c-fv">0 / 6</em></div>
+      <div class="w3c-flash">触发一次批量提取</div>
+    </div>
+    <div class="w3c-prof panel fx fx-up" style="--d:3">
+      <div class="w3c-h"><b>用户画像 Profile</b><span>主题 → 子主题，槽位由开发者配置</span></div>
+      <div class="w3c-slots"></div>
+    </div>
+    <div class="w3c-ev panel fx fx-right" style="--d:4">
+      <div class="w3c-h"><b>事件记忆 Event Memory</b><span>按时间线记录</span></div>
+      <div class="w3c-tl"></div>
+      <div class="w3c-q"><span class="lbl">“我们上次讨论预算是什么时候？”</span><b class="w3c-qa"></b></div>
+    </div>
+  </div>
+  <p class="w3c-tag fx fx-up" style="--d:5">查询侧只读取<b>已整理好的</b>画像和事件，保证低延迟</p>
+  <div class="src">第三章 ·「记忆框架案例」· Memobase</div>
+</section>
+<style>
+.w3c-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;flex:1;min-height:0}
+.w3c-buf,.w3c-prof,.w3c-ev{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.w3c-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.w3c-h b{font-size:19px}
+.w3c-h span:not(.c3-shi){font-size:15px;color:var(--text3)}
+.w3c-d{font-size:16px;line-height:1.55;color:var(--text2)}
+.w3c-d b{color:var(--text)}
+.w3c-msgs{flex:1;display:flex;flex-direction:column;gap:5px;min-height:0;overflow:hidden}
+.w3c-m{padding:6px 10px;border-radius:10px;font-size:15px;color:var(--text2);border:1px solid var(--line);animation:upIn .35s var(--spring) both}
+.w3c-fill{display:grid;grid-template-columns:auto 1fr 60px;gap:10px;align-items:center;font-size:15px;color:var(--text2)}
+.w3c-fill em{font:700 16px var(--num);font-style:normal;text-align:right;color:var(--text)}
+.w3c-flash{padding:8px 12px;border-radius:10px;font-size:16px;font-weight:700;text-align:center;color:#06101f;background:var(--acc);opacity:0;transition:opacity .3s}
+.w3c-flash.on{opacity:1}
+.w3c-slots{display:flex;flex-direction:column;gap:10px}
+.w3c-tp{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w3c-tp>b{font:700 16px var(--mono);color:var(--acc)}
+.w3c-sl{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-size:15px}
+.w3c-sl span{font-family:var(--mono);color:var(--text3)}
+.w3c-sl em{font-style:normal;color:var(--text);min-height:22px;padding:2px 8px;border-radius:6px;transition:background .4s}
+.w3c-sl em.new{background:color-mix(in srgb,var(--acc) 25%,transparent)}
+.w3c-tl{flex:1;position:relative;display:flex;flex-direction:column;gap:10px;padding-left:22px}
+.w3c-tl::before{content:"";position:absolute;left:7px;top:4px;bottom:4px;width:2px;background:var(--line2)}
+.w3c-e{position:relative;display:flex;flex-direction:column;gap:2px;font-size:15px;color:var(--text2);animation:upIn .35s var(--spring) both}
+.w3c-e::before{content:"";position:absolute;left:-20px;top:5px;width:12px;height:12px;border-radius:50%;background:var(--acc)}
+.w3c-e b{font:600 15px var(--num);color:var(--text3)}
+.w3c-e.hit{color:var(--text)}
+.w3c-e.hit::before{box-shadow:0 0 12px var(--acc)}
+.w3c-q{display:flex;flex-direction:column;gap:4px}
+.w3c-qa{font-size:17px;color:var(--acc);min-height:26px}
+.w3c-tag{margin-top:14px;font-size:18px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.w3c-tag b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-memobase'] = {
+  M: ['我叫林悦，在一家新能源车企做产品经理', '最近在学吉他', '下周要定市场推广预算', '预算想控制在 50 万以内', '周末打算去杭州看演出', '对了，我更喜欢邮件沟通'],
+  P: [['basic_info', [['name', '林悦']]], ['work', [['title', '产品经理'], ['company', '新能源车企']]], ['interest', [['hobby', '吉他 · 看演出'], ['contact', '偏好邮件']]]],
+  E: [['10-08', '提到在学吉他'], ['10-09', '讨论市场推广预算：控制在 50 万以内', 1], ['10-10', '计划周末去杭州看演出']],
+  init(s) {
+    s.querySelector('.w3c-slots').innerHTML = this.P.map(([t, sl]) => `<div class="w3c-tp"><b>${t}</b>${sl.map(([k]) => `<div class="w3c-sl"><span>${k}</span><em data-k="${k}"></em></div>`).join('')}</div>`).join('');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const msgs = s.querySelector('.w3c-msgs'), mi = s.querySelector('.w3c-fill .meter i'), fv = s.querySelector('.w3c-fv'), fl = s.querySelector('.w3c-flash'), tl = s.querySelector('.w3c-tl'), qa = s.querySelector('.w3c-qa');
+    const all = {}; this.P.forEach(([, sl]) => sl.forEach(([k, v]) => (all[k] = v)));
+    while (ok()) {
+      msgs.innerHTML = ''; tl.innerHTML = ''; qa.textContent = ''; fl.classList.remove('on');
+      s.querySelectorAll('.w3c-sl em').forEach((e) => { e.textContent = ''; e.classList.remove('new'); });
+      for (let i = 0; i < this.M.length; i++) {
+        msgs.insertAdjacentHTML('beforeend', `<div class="w3c-m">${this.M[i]}</div>`);
+        mi.style.setProperty('--v', ((i + 1) / 6) * 100 + '%'); fv.textContent = `${i + 1} / 6`;
+        await U.wait(ctx, 600); if (!ok()) return;
+      }
+      fl.classList.add('on');
+      await U.wait(ctx, 700); if (!ok()) return;
+      for (const e of s.querySelectorAll('.w3c-sl em')) { e.textContent = all[e.dataset.k]; e.classList.add('new'); await U.wait(ctx, 200); if (!ok()) return; }
+      for (const [d, t, h] of this.E) { tl.insertAdjacentHTML('beforeend', `<div class="w3c-e" data-h="${h || 0}"><b>${d}</b>${t}</div>`); await U.wait(ctx, 300); if (!ok()) return; }
+      msgs.innerHTML = ''; mi.style.setProperty('--v', '0%'); fv.textContent = '0 / 6'; fl.classList.remove('on');
+      await U.wait(ctx, 700); if (!ok()) return;
+      tl.querySelector('[data-h="1"]').classList.add('hit'); qa.textContent = '10 月 9 日：讨论过市场推广预算';
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-refarch" data-part="3" data-dur="18000" data-title="多类型记忆协同的参考架构" data-notes="两个框架各自只覆盖了记忆设计空间的一部分：Mem0 的事实条目接近语义记忆，Memobase 的画像近似语义记忆、事件记忆近似情景记忆。把视野放宽，可以按前面认知科学的分类设想一种<b>多类型记忆协同的参考架构</b>（图3-4）——需要强调，这是对设计空间的概括，而非某个具体项目的实现。<br><b>情景 / 语义 / 程序记忆</b>沿用前文认知科学的三类定义；参考架构在此之上真正新增的重点，是情景记忆的<b>多维元数据检索</b>——它存储带有丰富元数据（时间戳、情感标记、任务标识）的事件序列，可按时间、主题等多个维度组合检索（如“我们上次讨论预算是什么时候”）。<b>工作记忆</b>（Working Memory）：除三类长期记忆外，参考架构还显式保留了工作记忆这一层，管理当前任务状态，与长期记忆动态交互——重要信息选择性转移到长期记忆，相关长期记忆被激活并加载到工作记忆。<br>需要特别说明工作记忆与前面“记忆的层次结构”中“轨迹”的关系：两者都为当前决策提供即时上下文，但轨迹是<b>不可变</b>的完整事件序列（按时间追加），而工作记忆是经过筛选和激活的<b>动态子集</b>（按相关性裁剪）。这种参考架构展示了认知科学的记忆分类如何落地为工程组件；实际框架往往只实现其中一两种类型——按业务需要取舍，比追求“大而全”更符合工程现实。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-4 多类型记忆协同的<em>参考架构</em></h2>
+  <p class="lead fx fx-up" style="--d:2">对设计空间的概括，而非某个具体项目的实现</p></header>
+  <div class="w3d-body">
+    <div class="w3d-arch fx fx-left" style="--d:3">
+      <div class="w3d-wm"><b>工作记忆 Working Memory</b><span>当前任务状态</span><div class="w3d-wi"></div></div>
+      <div class="w3d-mid"><span class="w3d-up">选择性转移 ↑</span><span class="w3d-dn">↓ 激活加载</span><i class="w3d-pk"></i></div>
+      <div class="w3d-ltm"><span class="lbl">长期记忆（跨会话）</span><div class="w3d-three"><div data-k="ep"><b>情景记忆</b><small>Episodic · 带元数据的事件序列</small></div><div data-k="se"><b>语义记忆</b><small>Semantic · 抽象出的一般知识</small></div><div data-k="pr"><b>程序记忆</b><small>Procedural · 可复用的行为流程</small></div></div></div>
+    </div>
+    <div class="w3d-r fx fx-right" style="--d:4">
+      <div class="w3d-k"><b>新增重点：情景记忆的多维元数据检索</b><div class="w3d-meta"><span>时间戳</span><span>情感标记</span><span>任务标识</span></div><p>按时间、主题等多个维度组合检索——“我们上次讨论预算是什么时候”</p></div>
+      <div class="w3d-cmp"><div><b>轨迹</b><span><em>不可变</em>的完整事件序列 · 按时间追加</span></div><div class="me"><b>工作记忆</b><span>经过筛选和激活的<em>动态子集</em> · 按相关性裁剪</span></div></div>
+      <div class="w3d-fw"><span class="lbl">两个框架覆盖的部分</span><div><span>Mem0 事实条目 ≈ 语义记忆</span><span>Memobase 画像 ≈ 语义记忆</span><span>Memobase 事件 ≈ 情景记忆</span></div></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「记忆框架案例」· 图3-4 多类型记忆协同的参考架构</div>
+</section>
+<style>
+.w3d-body{display:grid;grid-template-columns:1.1fr 1fr;gap:26px;flex:1;min-height:0}
+.w3d-arch{display:flex;flex-direction:column;gap:10px}
+.w3d-wm{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.w3d-wm b{font-size:20px}
+.w3d-wm span{font-size:15px;color:var(--text3)}
+.w3d-wi{display:flex;flex-wrap:wrap;gap:6px;min-height:34px}
+.w3d-wi i{font-style:normal;padding:4px 10px;border-radius:8px;font-size:15px;color:var(--text);border:1px solid var(--line2);animation:pop .35s var(--spring)}
+.w3d-mid{position:relative;display:flex;justify-content:center;gap:60px;padding:8px 0;font-size:16px;color:var(--text2)}
+.w3d-up{color:var(--tool)}.w3d-dn{color:var(--ok)}
+.w3d-pk{position:absolute;left:50%;top:0;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--tool);opacity:0}
+.w3d-ltm{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;border:1px dashed var(--line2)}
+.w3d-three{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.w3d-three>div{display:flex;flex-direction:column;gap:4px;padding:12px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.w3d-three b{font-size:18px}
+.w3d-three small{font-size:15px;line-height:1.45;color:var(--text3)}
+.w3d-three>div.on{border-color:var(--acc);box-shadow:0 0 20px color-mix(in srgb,var(--acc) 25%,transparent)}
+.w3d-r{display:flex;flex-direction:column;gap:14px}
+.w3d-k{padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:rgba(12,18,40,.72)}
+.w3d-k b{font-size:19px}
+.w3d-meta{display:flex;gap:8px;margin:8px 0}
+.w3d-meta span{padding:4px 12px;border-radius:999px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.w3d-k p{font-size:16px;line-height:1.55;color:var(--text2)}
+.w3d-cmp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.w3d-cmp>div{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w3d-cmp>div.me{border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+.w3d-cmp b{font-size:18px}
+.w3d-cmp span{font-size:15px;line-height:1.5;color:var(--text2)}
+.w3d-cmp em{font-style:normal;font-weight:700;color:var(--text)}
+.w3d-fw div{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.w3d-fw div span{padding:6px 12px;border-radius:10px;font-size:15px;color:var(--text2);border:1px solid var(--line)}
+</style>
+<script>
+HOOKS['c03-refarch'] = {
+  F: [['up', '用户说：这次出差改到深圳', 'ep'], ['dn', '激活：用户偏好靠窗座位', 'se'], ['dn', '激活：订票流程（先查日历再比价）', 'pr'], ['up', '写入：出差地点变更（带时间戳与任务标识）', 'ep']],
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const wi = s.querySelector('.w3d-wi'), ts = {}; s.querySelectorAll('.w3d-three>div').forEach((d) => (ts[d.dataset.k] = d));
+    const up = s.querySelector('.w3d-up'), dn = s.querySelector('.w3d-dn');
+    while (ok()) {
+      wi.innerHTML = '<i>当前任务：改订机票</i>';
+      for (const [dir, t, k] of this.F) {
+        Object.values(ts).forEach((d) => d.classList.remove('on'));
+        ts[k].classList.add('on');
+        (dir === 'up' ? up : dn).style.fontWeight = '800';
+        if (dir === 'dn') wi.insertAdjacentHTML('beforeend', `<i>${t.replace('激活：', '')}</i>`);
+        else wi.insertAdjacentHTML('beforeend', `<i style="border-color:var(--tool)">${t}</i>`);
+        await U.wait(ctx, 1500); if (!ok()) return;
+        up.style.fontWeight = ''; dn.style.fontWeight = '';
+      }
+      Object.values(ts).forEach((d) => d.classList.remove('on'));
+      await U.wait(ctx, 2000);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.w3d-wi').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c03-compress" data-part="3" data-trans="rise" data-dur="20000" data-title="记忆压缩与整理机制" data-notes="随着交互的持续进行，记忆系统面临存储空间和检索效率的双重挑战。简单的累积式存储会导致记忆爆炸，不仅消耗存储空间，还降低检索准确性。实践中可以采用多层次的记忆压缩策略。<br>第一层通过重要性评分筛选。一种常见的重要性评分思路是综合四个因素：访问频率（经常被检索的记忆更重要）、时间衰减（越久远的记忆越容易被遗忘）、情感强度（带有强烈情感标记的记忆更易保留）和信息独特性（重复信息的重要性降低）。低于阈值的记忆标记为可压缩或可删除。例如，一条被访问 5 次、创建于 3 天前、带有强情感标记、且无重复记录的记忆会获得较高的重要性得分；而一条仅被访问 1 次、创建于 90 天前、无情感标记、且与其他 3 条记忆高度重复的记忆则可能低于压缩阈值。<br>第二层采用聚类：相似记忆被分组，每组生成代表性摘要（如多次天气对话压缩为“用户经常询问天气，特别关心降雨”），原始详细记忆可存档到二级存储。第三层是抽象和泛化——从具体情景记忆中提取一般性规律，转化为语义或程序记忆，例如从多次购物对话中学习到“偏好性价比高的产品，重视用户评价”。<br>原书只给出四个因素和两个定性例子，没有公式；左侧的评分公式与权重是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">记忆压缩与整理：<em>三层，逐层抽象</em></h2></div>
+    <div class="w3e-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">① 重要性评分</button><button data-v="1">② 聚类摘要</button><button data-v="2">③ 抽象泛化</button></div></header>
+  <div class="w3e-stage">
+    <div class="w3e-v" data-k="0">
+      <div class="w3e-sc panel"><div class="w3e-h"><b>四个因素</b><span class="c3-shi">评分公式为示意</span></div>
+        <div class="w3e-cards"><div class="w3e-card a"><b>记忆 A</b><span>访问 5 次 · 3 天前 · 强情感标记 · 无重复</span><em class="w3e-sa">—</em></div><div class="w3e-card b"><b>记忆 B</b><span>访问 1 次 · 90 天前 · 无情感标记 · 与 3 条高度重复</span><em class="w3e-sb">—</em></div></div>
+        <div class="w3e-fs"><div><span>访问频率</span><i>经常被检索的更重要</i></div><div><span>时间衰减</span><i>越久远越容易被遗忘</i></div><div><span>情感强度</span><i>强烈情感标记更易保留</i></div><div><span>信息独特性</span><i>重复信息重要性降低</i></div></div>
+        <div class="w3e-th"><span>压缩阈值</span><input class="rng w3e-rng" type="range" min="10" max="90" value="40"><em class="w3e-tv">0.40</em></div>
+      </div>
+    </div>
+    <div class="w3e-v" data-k="1"><div class="w3e-cl panel"><div class="w3e-h"><b>相似记忆分组，每组生成代表性摘要</b><span class="c3-shi">示意</span></div><div class="w3e-grp"><span>周一：明天会下雨吗？</span><span>周三：周末天气怎么样？</span><span>周五：下午要带伞吗？</span><span>周日：明早降水概率？</span></div><div class="w3e-arw">↓ 聚类 + 摘要</div><div class="w3e-sum">“用户经常询问天气，特别关心降雨”</div><p class="w3e-nt">原始详细记忆存档到二级存储</p></div></div>
+    <div class="w3e-v" data-k="2"><div class="w3e-cl panel"><div class="w3e-h"><b>从具体情景记忆中提取一般性规律</b><span class="c3-shi">示意</span></div><div class="w3e-grp"><span>买耳机：对比了三款，选了评价最多的</span><span>买咖啡机：问“哪款最划算”</span><span>买书：先看读者评分</span></div><div class="w3e-arw">↓ 抽象泛化 → 语义 / 程序记忆</div><div class="w3e-sum">“偏好性价比高的产品，重视用户评价”</div></div></div>
+  </div>
+  <div class="src">第三章 ·「记忆压缩与整理机制」</div>
+</section>
+<style>
+#c03-compress .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-compress .seg button{padding:8px 18px;font-size:18px}
+.w3e-stage{position:relative;flex:1;min-height:0}
+.w3e-v{position:absolute;inset:0;display:flex;opacity:0;transform:translateY(16px);pointer-events:none;transition:opacity .45s,transform .45s}
+.w3e-v.on{opacity:1;transform:none;pointer-events:auto}
+.w3e-sc,.w3e-cl{flex:1;padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.w3e-h{display:flex;align-items:center;justify-content:space-between}
+.w3e-h b{font-size:21px}
+.w3e-cards{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.w3e-card{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center;padding:14px 18px;border-radius:14px;border:1px solid var(--line);transition:all .4s}
+.w3e-card b{font-size:19px}
+.w3e-card span{grid-column:1;font-size:16px;color:var(--text2)}
+.w3e-card em{grid-row:1/3;grid-column:2;font:800 34px var(--num);font-style:normal}
+.w3e-card.keep{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.06)}.w3e-card.keep em{color:#6ee7b7}
+.w3e-card.drop{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.06)}.w3e-card.drop em{color:#fda4af}
+.w3e-fs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.w3e-fs div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w3e-fs span{font-size:17px;font-weight:700;color:var(--acc)}
+.w3e-fs i{font-style:normal;font-size:15px;color:var(--text2)}
+.w3e-th{display:grid;grid-template-columns:auto 1fr 60px;gap:14px;align-items:center;font-size:16px;color:var(--text2);margin-top:auto}
+.w3e-th em{font:700 18px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w3e-grp{display:flex;flex-wrap:wrap;gap:10px}
+.w3e-grp span{padding:8px 14px;border-radius:12px;font-size:17px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.w3e-arw{font-size:18px;color:var(--text3);text-align:center}
+.w3e-sum{align-self:center;padding:16px 26px;border-radius:16px;font-size:24px;font-weight:700;color:var(--text);border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.w3e-nt{font-size:16px;color:var(--text3);text-align:center}
+</style>
+<script>
+HOOKS['c03-compress'] = {
+  // 示意评分：0.3·访问 + 0.3·时间 + 0.2·情感 + 0.2·独特性
+  SA: 0.3 * 1 + 0.3 * 0.97 + 0.2 * 1 + 0.2 * 1,
+  SB: 0.3 * 0.2 + 0.3 * 0.1 + 0.2 * 0 + 0.2 * 0.25,
+  init(s) {
+    this.set = U.seg(s.querySelector('.w3e-seg'), (v) => { this.auto = false; this.show(s, +v); });
+    this.rg = s.querySelector('.w3e-rng');
+    this.rg.addEventListener('input', () => { this.auto = false; this.th(s); });
+  },
+  th(s) {
+    const t = +this.rg.value / 100; this.rg.style.setProperty('--p', ((t - 0.1) / 0.8) * 100 + '%');
+    s.querySelector('.w3e-tv').textContent = t.toFixed(2);
+    s.querySelector('.w3e-sa').textContent = this.SA.toFixed(2); s.querySelector('.w3e-sb').textContent = this.SB.toFixed(2);
+    s.querySelector('.w3e-card.a').classList.toggle('keep', this.SA >= t); s.querySelector('.w3e-card.a').classList.toggle('drop', this.SA < t);
+    s.querySelector('.w3e-card.b').classList.toggle('keep', this.SB >= t); s.querySelector('.w3e-card.b').classList.toggle('drop', this.SB < t);
+  },
+  show(s, k) { this.k = k; this.set(String(k)); s.querySelectorAll('.w3e-v').forEach((v) => v.classList.toggle('on', +v.dataset.k === k)); if (k === 0) this.th(s); },
+  enter(s, ctx) {
+    this.auto = true; this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, ((this.k || 0) + 1) % 3); }, 5500);
+  },
+  reset(s) { s.querySelectorAll('.w3e-v').forEach((v) => v.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-exp33" data-part="3" data-trans="flip" data-dur="22000" data-title="实验 3-3 ★★：基于本地模型的智能日志脱敏" data-notes="<b>隐私保护：日志脱敏。</b>在构建用户记忆系统时，核心挑战是让 Agent 既能利用用户信息提供个性化服务，又不让敏感数据暴露在 LLM 上下文和系统日志中。<br><b>实验 3-3 ★★：基于本地模型的智能日志脱敏。</b>log-sanitization 项目通过 Ollama 调用本地 Qwen3 0.6B 小模型（可在 CPU、消费级设备上运行，也可按需切换到 qwen3:1.7b、qwen3:4b 等更大规格）实现 PII 检测与脱敏。选择本地部署而非云端 API 的原因很明确：日志本身可能包含敏感信息，发送到云端脱敏就违背了隐私保护初衷。系统能识别结构化信息（身份证号、银行卡号）、半结构化信息（地址）和自然语言表达的敏感内容（如“我的密码是 abc123”）；识别结果通过 JSON Schema 结构化输出，包含敏感信息类型、位置和置信度。原书写道，相比传统正则表达式，基于 LLM 的脱敏召回率达 95% 以上，同时显著降低了假阳性；对于超高吞吐量场景可采用混合策略：正则快速过滤明显模式，LLM 深度分析剩余文本。<br>配套仓库的验收（2026-07-29，本地 Ollama qwen3:0.6b，12 个人工标注样例）给出的数字低于原书：平均召回率正则 0.50、LLM 0.69、混合 0.78；残留泄漏正则 9 处、LLM 3 处、混合 2 处；平均延迟正则约 0.1 毫秒、LLM 与混合约 3 秒。小模型也会把非敏感内容当成敏感（如把 SKU、普通数字打码），或漏掉地址。这只是 12 例的小规模验收集，结论以原书为准；左侧可以切换样例，看三种策略的真实输出。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-3 ★★：基于本地模型的<em>智能日志脱敏</em></h2></header>
+  <div class="w3f-why fx fx-up" style="--d:2"><svg class="ic"><use href="#i-lock"/></svg><p>日志本身可能包含敏感信息——<b>发送到云端脱敏就违背了隐私保护初衷</b>，所以用本地 qwen3:0.6b（Ollama），输出 JSON Schema：类型 · 位置 · 置信度</p></div>
+  <div class="w3f-body">
+    <div class="w3f-l fx fx-left" style="--d:3">
+      <div class="w3f-tabs tabs"></div>
+      <div class="w3f-src"><span class="lbl">原始日志</span><p class="w3f-raw"></p></div>
+      <div class="w3f-outs"></div>
+    </div>
+    <div class="w3f-r c3-data fx fx-right" style="--d:4">
+      <div class="c3-data-h"><svg class="ic"><use href="#i-clipboard"/></svg>验收记录 · 12 个人工标注样例</div>
+      <table class="c3-tbl w3f-tb"><thead><tr><th>策略</th><th>召回</th><th>精确</th><th>残留泄漏</th><th>延迟</th></tr></thead><tbody>
+        <tr><td>正则</td><td>0.50</td><td>0.42</td><td>9</td><td>0.1 ms</td></tr>
+        <tr><td>LLM</td><td>0.69</td><td>0.51</td><td>3</td><td>3.0 s</td></tr>
+        <tr class="on"><td>混合</td><td>0.78</td><td>0.49</td><td>2</td><td>3.0 s</td></tr>
+      </tbody></table>
+      <div class="w3f-neg"><span class="c3-tag" style="--c:var(--bad)">与原书不一致</span><p>原书：LLM 召回率 95% 以上。本次小规模验收：LLM 0.69、混合 0.78——结论以原书为准</p></div>
+      <div class="c3-data-s">本地 Ollama qwen3:0.6b · 2026-07-29 · run 20260729T185603Z-3_3-7f84f416</div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「隐私保护：日志脱敏」· 实验 3-3</div>
+</section>
+<style>
+.w3f-why{display:flex;align-items:center;gap:14px;padding:10px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.w3f-why .ic{font-size:26px;color:var(--acc);flex:none}
+.w3f-why p{font-size:17px;line-height:1.55;color:var(--text2)}
+.w3f-why b{color:var(--text)}
+.w3f-body{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;margin-top:16px;flex:1;min-height:0}
+.w3f-l{display:flex;flex-direction:column;gap:12px;min-height:0}
+.w3f-tabs button{font-size:16px;padding:7px 14px}
+.w3f-src{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(5,9,22,.6)}
+.w3f-raw{margin-top:4px;font:16px/1.6 var(--mono);color:var(--text)}
+.w3f-outs{display:flex;flex-direction:column;gap:8px}
+.w3f-o{display:grid;grid-template-columns:80px 1fr 150px;gap:12px;align-items:start;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);animation:upIn .4s var(--spring) both}
+.w3f-o b{font-size:16px;color:var(--acc)}
+.w3f-o p{font:15px/1.55 var(--mono);color:var(--text2);word-break:break-word}
+.w3f-o p mark{background:rgba(52,211,153,.18);color:#6ee7b7;border-radius:4px;padding:0 3px}
+.w3f-o em{font-style:normal;font-size:15px;line-height:1.45;color:var(--text3);text-align:right}
+.w3f-o em.bad{color:#fda4af}
+.w3f-r{display:flex;flex-direction:column;gap:12px}
+.w3f-tb td{font:600 17px var(--num)}
+.w3f-neg{display:flex;flex-direction:column;gap:6px}
+.w3f-neg .c3-tag{align-self:flex-start}
+.w3f-neg p{font-size:15px;line-height:1.55;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-exp33'] = {
+  C: [
+    { n: '自然语言密码', raw: '用户说：我网银的登录口令是‘Blue moon over river 77’，请帮我记住。', o: [['正则', '用户说：我网银的登录口令是‘Blue moon over river 77’，请帮我记住。', '漏掉 1 处', 1], ['LLM', '用户说：我网银的登录口令是‘[REDACTED_PASSWORD]’，请帮我记住。', '全部识别', 0], ['混合', '用户说：我网银的登录口令是‘[REDACTED_PASSWORD]’，请帮我记住。', '全部识别', 0]] },
+    { n: '身份证与手机', raw: '客户身份证号11010519491231002X，手机号13800138000。', o: [['正则', '客户身份证号11010519491231002X，手机号[REDACTED_CN_PHONE]。', '漏掉身份证号', 1], ['LLM', '客户身份证号[REDACTED_SECRET]，手机号[REDACTED_SECRET]。', '全部识别，类型笼统', 0], ['混合', '客户身份证号[REDACTED_CN_ID_CARD]，手机号[REDACTED_CN_PHONE]。', '全部识别', 0]] },
+    { n: '连接串中的密码', raw: 'postgres://alice:S3cr3t-Pass@db.internal:5432/prod failed; retry token=not-a-real-token-but-secret', o: [['正则', 'postgres://alice:[REDACTED_PASSWORD]@db.internal:5432/prod failed; retry token=[REDACTED_SECRET]', '全部识别', 0], ['LLM', 'postgres://alice:S3cr3t-Pass@db.internal:5432/prod failed; retry token=[REDACTED_VALUE]', '漏掉密码', 1], ['混合', 'postgres://[REDACTED_CN_ID_CARD]:[REDACTED_PASSWORD]@db.internal:5432/prod failed; retry token=[REDACTED_SECRET]', '全部识别，另有误判', 0]] },
+    { n: '地址', raw: 'Please ship replacements to apartment 3B, 1847 Maple Street, Portland, Oregon 97205 after Tuesday.', o: [['正则', 'Please ship replacements to apartment 3B, 1847 Maple Street, Portland, Oregon 97205 after Tuesday.', '漏掉地址', 1], ['LLM', 'Please ship replacements to apartment 3B, [REDACTED_ADDRESS] [REDACTED_DATE].', '边界不准', 0], ['混合', 'Please ship replacements to apartment 3B, 1847 Maple Street, Portland, Oregon 97205 after Tuesday.', '漏掉地址', 1]] },
+    { n: '无敏感信息', raw: 'The password field must contain at least 12 characters. Never log a user\'s real password.', o: [['正则', 'The password field must contain at least 12 characters. Never log a user\'s real password.', '无误报', 0], ['LLM', 'The password field must contain at least [REDACTED_PASSWORD] characters. Never log a user\'s real password.', '误把 12 打码', 1], ['混合', 'The [REDACTED_PASSWORD] field must contain at least 12 characters. Never log a user\'s real password.', '误把单词打码', 1]] },
+    { n: '混合上下文', raw: 'Support transcript: \'call me at 13912345678\'. Agent replied that order 13912345679 ships tomorrow and wrote password: hunter2xyz.', o: [['正则', 'Support transcript: \'call me at [REDACTED_CN_PHONE]\'. Agent replied that order [REDACTED_CN_PHONE] ships tomorrow and wrote password: [REDACTED_SECRET]', '把订单号误当手机号', 1], ['LLM', 'Support transcript: \'call me at [REDACTED_PHONE_NUMBER]\'. Agent replied that order 13912345679 ships tomorrow and wrote password: [REDACTED_PASSWORD].', '区分了订单号', 0], ['混合', 'Support transcript: \'call me at [REDACTED_CN_PHONE]\'. Agent replied that order [REDACTED_CN_PHONE] ships tomorrow and wrote password: [REDACTED_SECRET]', '把订单号误当手机号', 1]] },
+  ],
+  init(s) {
+    const t = s.querySelector('.w3f-tabs');
+    t.innerHTML = this.C.map((c, i) => `<button data-i="${i}">${c.n}</button>`).join('');
+    t.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.show(s, +b.dataset.i); }));
+  },
+  show(s, i) {
+    const c = this.C[i]; this.i = i;
+    s.querySelectorAll('.w3f-tabs button').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.w3f-raw').textContent = c.raw;
+    const hi = (t) => C3.esc(t).replace(/\[REDACTED_[A-Z_]+\]/g, (m) => `<mark>${m}</mark>`);
+    s.querySelector('.w3f-outs').innerHTML = c.o.map(([n, t, e, bad]) => `<div class="w3f-o"><b>${n}</b><p>${hi(t)}</p><em class="${bad ? 'bad' : ''}">${e}</em></div>`).join('');
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, ((this.i || 0) + 1) % this.C.length); }, 4200); },
+};
+</script>

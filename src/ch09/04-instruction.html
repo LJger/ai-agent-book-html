@@ -1,0 +1,924 @@
+<!-- ================= PART 04 将经验写成指令 ================= -->
+<section class="slide chapter" id="c09-d4" data-part="4" data-title="PART 04 · 将经验写成指令" data-notes="经验知识库给 Agent 提供“可以参考的资料”，Prompt 和 Skill 则规定“应该怎样行动”。当多条相似轨迹反复暴露同一种策略错误，而且错误能够用语言清楚描述时，才值得把经验提升为指令。这一部分先区分系统 Prompt、Skill 与程序/Harness，再讲最小 diff 与“边界集 + 保留集”的候选闸门，然后用两个例子展开：τ²-bench 的转接边界规则化（实验 9-2、9-3），以及需求澄清 Skill 的进化（实验 9-4）。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">将经验写成指令</h1>
+  <div class="ch-s fx fx-up" style="--d:3">知识库给“可以参考的资料”，Prompt 和 Skill 规定“应该怎样行动”</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">修改应是带来源的最小 diff，而不是让模型每次都重写整份 Prompt。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c09-spl" data-part="4" data-trans="rise" data-dur="13000" data-title="系统 Prompt、Skill 与 Harness · 系统提示学习" data-notes="经验知识库给 Agent 提供“可以参考的资料”，Prompt 和 Skill 则规定“应该怎样行动”。当多条相似轨迹反复暴露同一种策略错误，而且错误能够用语言清楚描述时，才值得把经验提升为指令。这里先把三个概念分开：<b>系统 Prompt</b> 对所有任务生效，<b>Skill</b> 只在匹配到某个领域或工具时按需加载，<b>程序/Harness</b> 负责权限和其他硬约束。左侧四个示意任务依次经过三层，可以看到每层何时起作用。<br>Andrej Karpathy 将这种做法称为<b>系统提示学习</b>（System Prompt Learning）：模型遇到问题后，用一句清楚的话提醒未来的自己。<b>DSPy</b> 在开发集上搜索指令和示例；<b>OPRO</b> 根据历史提示词及其得分提出提示提案；<b>GEPA</b> 从失败轨迹的自然语言反思中生成并筛选提示提案。这些方法适合离线批量优化；生产环境更适合使用<b>可审计的最小更新提案</b>，并保留快速回滚路径。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三层各管一段：<em>Prompt、Skill 与 Harness</em></h2>
+  <p class="lead fx fx-up" style="--d:2">反复暴露、且能用语言说清的策略错误，才值得提升为指令</p></header>
+  <div class="sp9-body">
+    <div class="sp9-mx panel fx fx-left" style="--d:3">
+      <div class="sp9-r sp9-h"><span>示意任务</span><span style="--c:var(--c9-inst)">系统 Prompt<small>对所有任务生效</small></span><span style="--c:var(--c9-inst)">Skill<small>匹配领域或工具时按需加载</small></span><span style="--c:var(--c9-prog)">程序 / Harness<small>权限与硬约束</small></span></div>
+    </div>
+    <div class="sp9-r2 fx fx-right" style="--d:4">
+      <div class="sp9-q"><span class="lbl">系统提示学习 · System Prompt Learning（Karpathy）</span><b>模型遇到问题后，用一句清楚的话提醒未来的自己</b></div>
+      <div class="sp9-ms">
+        <div class="sp9-m"><b>DSPy</b><span>在开发集上搜索指令和示例</span></div>
+        <div class="sp9-m"><b>OPRO</b><span>根据历史提示词及其得分提出提示提案</span></div>
+        <div class="sp9-m"><b>GEPA</b><span>从失败轨迹的自然语言反思中生成并筛选提示提案</span></div>
+      </div>
+      <div class="sp9-vs"><div><em>适合</em>离线批量优化</div><div class="pro"><em>生产环境</em>可审计的最小更新提案 + 快速回滚路径</div></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写成指令」</div>
+</section>
+<style>
+.sp9-body{display:grid;grid-template-columns:1fr 560px;gap:26px;flex:1;min-height:0}
+.sp9-mx{padding:6px 0;overflow:hidden}
+.sp9-r{display:grid;grid-template-columns:260px 1fr 1fr 1fr;gap:12px;align-items:center;padding:12px 20px;transition:background .4s}
+.sp9-r+.sp9-r{border-top:1px solid var(--line)}
+.sp9-h>span{font-size:18px;font-weight:700;color:var(--c,var(--text3))}
+.sp9-h small{display:block;font-size:15px;font-weight:400;color:var(--text3);margin-top:2px}
+.sp9-r b{font-size:19px;line-height:1.4}
+.sp9-c{--c:var(--text3);height:58px;border-radius:12px;display:flex;align-items:center;gap:8px;padding:0 12px;font-size:16px;line-height:1.35;color:var(--text3);border:1px dashed var(--line2);transition:all .45s var(--ease)}
+.sp9-c .ic{flex:none;font-size:20px}
+.sp9-c.on{color:var(--text);border-style:solid;border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.sp9-c.on .ic{color:var(--c)}
+.sp9-c.no{color:#fecdd3;border-style:solid;border-color:var(--bad);background:color-mix(in srgb,var(--bad) 13%,transparent);box-shadow:0 0 20px color-mix(in srgb,var(--bad) 30%,transparent)}
+.sp9-c.no .ic{color:var(--bad)}
+.sp9-r.cur{background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.sp9-r2{display:flex;flex-direction:column;gap:14px}
+.sp9-q{padding:16px 20px;border-radius:16px;background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85));border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.sp9-q b{display:block;font-size:23px;line-height:1.5;margin-top:6px}
+.sp9-ms{display:flex;flex-direction:column;gap:10px}
+.sp9-m{display:grid;grid-template-columns:90px 1fr;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);transition:all .4s}
+.sp9-m b{font:800 21px var(--num);color:var(--acc)}
+.sp9-m span{font-size:18px;color:var(--text2)}
+.sp9-m.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.sp9-vs{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin-top:auto}
+.sp9-vs div{padding:12px 14px;border-radius:14px;font-size:17px;line-height:1.5;color:var(--text2);border:1px solid var(--line2)}
+.sp9-vs em{display:block;font-style:normal;font-size:15px;font-weight:700;color:var(--text3);letter-spacing:.1em}
+.sp9-vs .pro{border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent);color:var(--text)}
+.sp9-vs .pro em{color:var(--ok)}
+</style>
+<script>
+HOOKS['c09-spl'] = {
+  // 示意任务：[任务, Prompt 文字, Skill（null 表示未匹配）, Harness 判定, 是否否决]
+  T: [
+    ['乘客要求把 8 月 1 日改到 8 月 3 日', '身份、语气、通用准则', '加载“航空改签政策” Skill', '改签前已核验身份 · 放行', 0],
+    ['帮我写一段本周周报', '身份、语气、通用准则', null, '低风险写入 · 放行', 0],
+    ['清理测试库：删除 users 表', '身份、语气、通用准则', '加载“数据库运维” Skill', '高风险写入未确认 · 否决', 1],
+    ['乘客坚持要求免掉改签费', '身份、语气、通用准则', '加载“航空改签政策” Skill', '无高风险操作 · 放行', 0],
+  ],
+  init(s) {
+    const mx = s.querySelector('.sp9-mx');
+    mx.insertAdjacentHTML('beforeend', this.T.map(([t], i) => `<div class="sp9-r" data-r="${i}"><b>${t}</b><div class="sp9-c" style="--c:var(--c9-inst)"></div><div class="sp9-c" style="--c:var(--c9-inst)"></div><div class="sp9-c" style="--c:var(--c9-prog)"></div></div>`).join(''));
+    s.querySelectorAll('.sp9-r[data-r]').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.run(s, +r.dataset.r); }));
+  },
+  run(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx, [, p, sk, h, no] = this.T[i];
+    if (!ctx) return;
+    this.i = i;
+    const rows = [...s.querySelectorAll('.sp9-r[data-r]')], r = rows[i], cs = [...r.querySelectorAll('.sp9-c')];
+    rows.forEach((x) => x.classList.toggle('cur', x === r));
+    cs.forEach((c) => { c.className = 'sp9-c'; c.innerHTML = ''; });
+    const put = (c, ic, t, cls) => { c.innerHTML = `<svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span>`; c.classList.add(cls); };
+    ctx.later(() => tk === this.tk && put(cs[0], 'check', p, 'on'), 300);
+    ctx.later(() => { if (tk === this.tk) { if (sk) put(cs[1], 'pkg', sk, 'on'); else cs[1].innerHTML = '<span>未匹配 · 不加载</span>'; } }, 1000);
+    ctx.later(() => tk === this.tk && put(cs[2], no ? 'ban' : 'shield', h, no ? 'no' : 'on'), 1700);
+    s.querySelectorAll('.sp9-m').forEach((m, j) => m.classList.toggle('on', j === i % 3));
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, this.T.length, 3000, (i) => this.run(s, i), 700); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.sp9-c').forEach((c) => { c.className = 'sp9-c'; c.innerHTML = ''; }); s.querySelectorAll('.sp9-r,.sp9-m').forEach((x) => x.classList.remove('cur', 'on')); },
+};
+</script>
+
+<section class="slide" id="c09-gate" data-part="4" data-trans="zoom" data-dur="16000" data-title="最小 diff 与候选闸门：边界集 + 保留集" data-notes="<b>系统提示学习与第二章的提示工程不是一回事。</b>第二章讨论怎样组织一份好 Prompt；本节讨论什么反馈足以触发修改，以及更新提案怎样安全发布。修改应是<b>带来源的最小 diff</b>，而不是让模型每次都重写整份 Prompt——这正是第一章命名的“最小 diff + 可回滚”模式。待验证版本必须同时在<b>触发失败的边界集</b>和<b>正常工作的保留集</b>上测试，前者要改善，后者不能退化。<br>演示中三个示意提案轮流过闸：A 是带来源的最小 diff，边界集改善、保留集无退化，进入灰度；B 把整份 Prompt 重写，边界集也改善了，但保留集出现回退，被拒绝；C 只追加一句泛泛的提醒，边界集没有改善，同样被拒绝。可以点击左侧任一提案重放（数值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">最小 diff，过<em>两道集合</em></h2>
+  <p class="lead fx fx-up" style="--d:2">触发失败的边界集要改善，正常工作的保留集不能退化</p></header>
+  <div class="gt9-body">
+    <div class="gt9-props fx fx-left" style="--d:3">
+      <div class="gt9-vs"><div><em>第二章 · 提示工程</em>怎样组织一份好 Prompt</div><div><em>本节 · 系统提示学习</em>什么反馈足以触发修改；更新提案怎样安全发布</div></div>
+    </div>
+    <div class="gt9-gate panel fx fx-up" style="--d:4">
+      <div class="gt9-gh"><b>候选闸门</b><span class="c9-sy">示意</span><span class="gt9-cn">—</span></div>
+      <div class="gt9-set" data-s="b"><div class="gt9-sh"><b>触发失败的边界集</b><span>要改善</span><em class="gt9-bc">0 / 8</em></div><div class="gt9-dots"></div></div>
+      <div class="gt9-set" data-s="r"><div class="gt9-sh"><b>正常工作的保留集</b><span>不能退化</span><em class="gt9-rc">12 / 12</em></div><div class="gt9-dots"></div></div>
+      <div class="gt9-dec"><span class="gt9-ck" data-c="b">边界集改善</span><span class="gt9-ck" data-c="r">保留集无退化</span><div class="gt9-st stamp"></div></div>
+    </div>
+    <div class="gt9-out fx fx-right" style="--d:5">
+      <div class="gt9-o" data-o="pass"><svg class="ic"><use href="#i-rocket"/></svg><b>进入灰度</b><span>小流量上线，继续监控</span></div>
+      <div class="gt9-o" data-o="fail"><svg class="ic"><use href="#i-undo"/></svg><b>拒绝提案</b><span>稳定版不变，提案与失败原因存档</span></div>
+      <p class="gt9-pat">第一章命名的模式：<b>最小 diff + 可回滚</b></p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写成指令」· 最小 diff 与边界集、保留集</div>
+</section>
+<style>
+.gt9-body{display:grid;grid-template-columns:560px 1fr 330px;gap:22px;flex:1;min-height:0}
+.gt9-props{display:flex;flex-direction:column;gap:12px}
+.gt9-vs{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gt9-vs div{padding:10px 14px;border-radius:12px;font-size:16px;line-height:1.5;color:var(--text2);border:1px solid var(--line2)}
+.gt9-vs em{display:block;font-style:normal;font-size:15px;font-weight:700;color:var(--acc)}
+.gt9-p{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.gt9-p b{font-size:19px}
+.gt9-p b i{font-style:normal;font:800 16px var(--num);color:var(--acc);margin-right:8px}
+.gt9-p code{display:block;font:15px/1.55 var(--mono);white-space:pre-wrap;color:#cbd5f5}
+.gt9-p code .d{color:#fda4af}.gt9-p code .a{color:#86efac}.gt9-p code .m{color:var(--tool)}
+.gt9-p.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.gt9-gate{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.gt9-gh{display:flex;align-items:center;gap:12px}
+.gt9-gh b{font-size:22px}
+.gt9-cn{margin-left:auto;font-size:17px;color:var(--acc)}
+.gt9-set{--c:var(--c9-bnd);padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 6%,transparent)}
+.gt9-set[data-s=r]{--c:var(--c9-ret)}
+.gt9-sh{display:flex;align-items:baseline;gap:12px}
+.gt9-sh b{font-size:19px;color:var(--c)}
+.gt9-sh span{font-size:16px;color:var(--text3)}
+.gt9-sh em{margin-left:auto;font:800 24px var(--num);font-style:normal}
+.gt9-dots{display:grid;grid-template-columns:repeat(12,1fr);gap:7px;margin-top:10px}
+.gt9-dots i{height:30px;border-radius:8px;background:color-mix(in srgb,var(--bad) 55%,transparent);transition:background .35s,box-shadow .35s}
+.gt9-dots i.g{background:color-mix(in srgb,var(--ok) 70%,transparent)}
+.gt9-dots i.reg{background:var(--bad);box-shadow:0 0 12px var(--bad)}
+.gt9-dots i.run{box-shadow:0 0 0 2px #fff}
+.gt9-dec{position:relative;display:flex;align-items:center;gap:10px;margin-top:auto;min-height:62px}
+.gt9-ck{padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+.gt9-ck.ok{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.gt9-ck.no{color:#fff;background:var(--bad);border-color:var(--bad)}
+.gt9-st{position:absolute;right:0;top:4px;padding:8px 18px;border-radius:10px;font-size:22px;font-weight:800;letter-spacing:.06em;border:3px solid currentColor}
+.gt9-st.pass{color:var(--ok)}.gt9-st.fail{color:var(--bad)}
+.gt9-out{display:flex;flex-direction:column;gap:12px}
+.gt9-o{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.35;transition:all .45s}
+.gt9-o .ic{font-size:28px;color:var(--text3)}
+.gt9-o b{font-size:21px}
+.gt9-o span{font-size:16px;color:var(--text2)}
+.gt9-o.on[data-o=pass]{opacity:1;border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 30%,transparent)}
+.gt9-o.on[data-o=pass] .ic{color:var(--ok)}
+.gt9-o.on[data-o=fail]{opacity:1;border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.gt9-o.on[data-o=fail] .ic{color:var(--bad)}
+.gt9-pat{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2);padding:12px 14px;border-radius:12px;border:1px dashed var(--line2)}
+.gt9-pat b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c09-gate'] = {
+  // 三个示意提案：[名称, diff 片段, 边界集修好几条（共 8）, 保留集回退几条（共 12）]
+  P: [
+    ['带来源的最小 diff', '<span class="d">- 遇到政策争议时转接人工</span>\n<span class="a">+ 政策争议先查政策、解释规则并给出合规替代；</span>\n<span class="a">+ 用户明确要求人工或出现安全情形时才转接</span>\n<span class="m">  来源：失败轨迹 #12 #31 #47</span>', 6, 0],
+    ['整份重写 Prompt', '<span class="m">~ 重写全部 38 行（没有标注来源）</span>', 7, 3],
+    ['只追加一句泛泛的提醒', '<span class="a">+ 请更加耐心地对待乘客</span>', 0, 0],
+  ],
+  init(s) {
+    s.querySelector('.gt9-props').insertAdjacentHTML('beforeend', this.P.map(([n, d], i) => `<button class="gt9-p" data-i="${i}"><b><i>提案 ${'ABC'[i]}</i>${n}</b><code>${d}</code></button>`).join(''));
+    s.querySelectorAll('.gt9-set').forEach((st) => (st.querySelector('.gt9-dots').innerHTML = '<i></i>'.repeat(st.dataset.s === 'b' ? 8 : 12)));
+    s.querySelector('.gt9-props').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.run(s, +b.dataset.i); } });
+  },
+  async run(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    this.i = i;
+    const [n, , fix, reg] = this.P[i];
+    s.querySelectorAll('.gt9-p').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelector('.gt9-cn').textContent = `提案 ${'ABC'[i]}：${n}`;
+    const bd = [...s.querySelectorAll('[data-s=b] i')], rd = [...s.querySelectorAll('[data-s=r] i')];
+    const bc = s.querySelector('.gt9-bc'), rc = s.querySelector('.gt9-rc'), st = s.querySelector('.gt9-st');
+    bd.forEach((d) => (d.className = ''));
+    rd.forEach((d) => (d.className = 'g'));
+    bc.textContent = '0 / 8';
+    rc.textContent = '12 / 12';
+    s.querySelectorAll('.gt9-ck').forEach((c) => (c.className = 'gt9-ck'));
+    s.querySelectorAll('.gt9-o').forEach((o) => o.classList.remove('on'));
+    st.className = 'gt9-st stamp';
+    let nb = 0, nr = 12;
+    for (let j = 0; j < 8; j++) {
+      await U.wait(ctx, 230);
+      if (!ok()) return;
+      bd[j].className = 'run';
+      if (j < fix) { bd[j].className = 'g'; nb++; } else bd[j].className = '';
+      bc.textContent = `${nb} / 8`;
+    }
+    const regAt = reg ? [2, 7, 10] : [];
+    for (let j = 0; j < 12; j++) {
+      await U.wait(ctx, 170);
+      if (!ok()) return;
+      if (regAt.includes(j)) { rd[j].className = 'reg'; nr--; }
+      rc.textContent = `${nr} / 12`;
+    }
+    await U.wait(ctx, 300);
+    if (!ok()) return;
+    const okB = fix > 0, okR = reg === 0, pass = okB && okR;
+    s.querySelector('[data-c=b]').classList.add(okB ? 'ok' : 'no');
+    s.querySelector('[data-c=r]').classList.add(okR ? 'ok' : 'no');
+    st.textContent = pass ? '通过' : '拒绝';
+    st.classList.add(pass ? 'pass' : 'fail');
+    U.restart(st, 'on');
+    s.querySelector(`.gt9-o[data-o=${pass ? 'pass' : 'fail'}]`).classList.add('on');
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, 3, 5300, (i) => this.run(s, i), 700); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.gt9-p,.gt9-o').forEach((x) => x.classList.remove('on')); s.querySelector('.gt9-st').className = 'gt9-st stamp'; },
+};
+</script>
+
+<section class="slide" id="c09-tau" data-part="4" data-trans="flip" data-dur="17000" data-title="例子一：转接边界的规则化" data-notes="<b>例子一：转接边界的规则化。</b>τ²-bench 的 telecom 政策中，关于转接人工只有两条原则性规定：<b>请求超出 Agent 的动作范围时才转接，转接前应先尽力解决</b>。第七章解剖该环境时，这两条并未显出问题；换用能力较弱的模型运行，缺陷随即暴露——工具返回错误后 Agent 反复重试，最终以转接人工收场，<b>提炼集的 20 条任务中有 19 条如此结束</b>。<br>将这 19 条失败轨迹交由模型自行归纳，产出若干条可执行的规则追加到政策末尾，再在一批未参与提炼的任务上重新运行：<b>通过率由 12.3% 升至 19.3%，且原本通过的任务无一被改坏</b>。<br>下方动画用配套仓库的真实记录重放这一过程：提炼集 20 条（1 条通过）；迁移集 114 条，基线通过 14 条，加入 v2 规则后通过 22 条——原来的 14 条全部保持通过，另有 8 条新通过（数据：chapter9/tau2-escalation-experience，2026-08-27）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">例子一：<em>转接边界的规则化</em></h2></header>
+  <div class="ta9-pol fx fx-up" style="--d:2"><span class="lbl">τ²-bench telecom 政策 · 关于转接人工只有两条原则</span><span class="ta9-r">请求超出 Agent 的动作范围时才转接</span><span class="ta9-r">转接前应先尽力解决</span><span class="ta9-w">换成能力较弱的模型 → 缺陷暴露</span></div>
+  <div class="ta9-flow">
+    <div class="ta9-box fx fx-up" style="--d:3"><div class="ta9-bh"><b>提炼集</b><span>20 条</span></div><div class="ta9-g ta9-g20"></div><p class="ta9-bt"><b class="ta9-n19">0</b> 条：工具报错 → 反复重试 → 转接人工</p></div>
+    <div class="ta9-mid fx fx-scale" style="--d:4"><svg class="ic"><use href="#i-wand"/></svg><b>模型自行归纳</b><span>规则追加到政策末尾</span><div class="ta9-rules"><i>先问用户要号码，再查询</i><i>用户侧设备操作：引导用户自己做</i><i>同一错误连续出现：停止重复调用</i></div></div>
+    <div class="ta9-box ta9-big fx fx-up" style="--d:5"><div class="ta9-bh"><b>迁移集（未参与提炼）</b><span>114 条</span></div><div class="ta9-g ta9-g114"></div>
+      <div class="ta9-res"><div><span>原始政策</span><b class="ta9-p0">—</b></div><svg class="ic"><use href="#i-arrow"/></svg><div><span>追加规则后</span><b class="ta9-p1">—</b></div><div class="ta9-zero"><svg class="ic"><use href="#i-shield"/></svg>原本通过的 14 条无一被改坏</div></div></div>
+  </div>
+  <div class="ta9-leg fx fx-up" style="--d:6"><span style="--c:var(--ok)">基线已通过</span><span style="--c:var(--c9-inst)">规则加入后新通过</span><span style="--c:rgba(148,163,184,.4)">未通过</span><span class="c9-data">数据：配套仓库 chapter9/tau2-escalation-experience · 2026-08-27 · 被测模型 doubao-seed-1-6-flash-250615</span></div>
+  <div class="src">第九章 ·「例子一：转接边界的规则化」</div>
+</section>
+<style>
+.ta9-pol{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.ta9-r{font-size:19px;padding:5px 14px;border-radius:10px;color:var(--text);border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.ta9-w{margin-left:auto;font-size:18px;color:var(--warn)}
+.ta9-flow{display:grid;grid-template-columns:380px 330px 1fr;gap:22px;margin-top:18px;align-items:stretch}
+.ta9-box{display:flex;flex-direction:column;gap:12px;padding:18px 20px;border-radius:20px;background:rgba(12,18,40,.85);border:1px solid var(--line2)}
+.ta9-bh{display:flex;justify-content:space-between;align-items:baseline}
+.ta9-bh b{font-size:22px}
+.ta9-bh span{font:700 18px var(--num);color:var(--text3)}
+.ta9-g{display:grid;gap:6px}
+.ta9-g20{grid-template-columns:repeat(5,1fr)}
+.ta9-g20 i{height:52px;border-radius:10px;display:grid;place-items:center;font-size:15px;font-style:normal;color:var(--text3);background:rgba(148,163,184,.18);transition:all .35s}
+.ta9-g20 i.esc{color:#fff;background:color-mix(in srgb,var(--bad) 60%,transparent)}
+.ta9-g20 i.ok{color:#06101f;background:var(--ok)}
+.ta9-bt{font-size:18px;color:var(--text2);line-height:1.5}
+.ta9-bt b{font:800 26px var(--num);color:var(--bad)}
+.ta9-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center;padding:16px;border-radius:20px;border:1px dashed color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.ta9-mid>.ic{font-size:40px;color:var(--acc)}
+.ta9-mid>b{font-size:22px}
+.ta9-mid>span{font-size:17px;color:var(--text2)}
+.ta9-rules{display:flex;flex-direction:column;gap:7px;width:100%}
+.ta9-rules i{font-style:normal;font-size:16px;line-height:1.45;padding:6px 10px;border-radius:10px;color:#06101f;background:var(--acc);opacity:0;translate:0 8px;transition:opacity .4s,translate .4s var(--ease)}
+.ta9-rules i.on{opacity:1;translate:0 0}
+.ta9-g114{grid-template-columns:repeat(19,1fr);gap:5px}
+.ta9-g114 i{height:24px;border-radius:5px;background:rgba(148,163,184,.25);transition:background .35s,box-shadow .35s}
+.ta9-g114 i.ok{background:var(--ok)}
+.ta9-g114 i.new{background:var(--c9-inst);box-shadow:0 0 12px var(--c9-inst)}
+.ta9-res{display:flex;align-items:center;gap:18px;margin-top:auto}
+.ta9-res>div:not(.ta9-zero){display:flex;flex-direction:column}
+.ta9-res span{font-size:16px;color:var(--text3)}
+.ta9-res b{font:800 40px var(--num)}
+.ta9-p0{color:var(--text2)}.ta9-p1{color:var(--c9-inst)}
+.ta9-res>.ic{font-size:28px;color:var(--text3)}
+.ta9-zero{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:17px;color:var(--ok);padding:8px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);opacity:0;transition:opacity .5s}
+.ta9-zero.on{opacity:1}
+.ta9-leg{display:flex;align-items:center;gap:18px;margin-top:16px}
+.ta9-leg span[style]{display:inline-flex;align-items:center;gap:8px;font-size:16px;color:var(--text2)}
+.ta9-leg span[style]::before{content:"";width:14px;height:14px;border-radius:4px;background:var(--c)}
+.ta9-leg .c9-data{margin-left:auto}
+</style>
+<script>
+HOOKS['c09-tau'] = {
+  // 迁移集 114 条中各臂通过的任务序号（chapter9/tau2-escalation-experience/validation/evidence.json，按记录顺序）
+  A: [36, 38, 39, 40, 41, 47, 50, 51, 52, 54, 56, 57, 61, 67],
+  C: [13, 32, 36, 38, 39, 40, 41, 46, 47, 50, 51, 52, 54, 56, 57, 60, 61, 65, 67, 68, 69, 83],
+  init(s) {
+    s.querySelector('.ta9-g20').innerHTML = '<i></i>'.repeat(20);
+    s.querySelector('.ta9-g114').innerHTML = '<i></i>'.repeat(114);
+  },
+  async run(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const g20 = [...s.querySelectorAll('.ta9-g20 i')], g114 = [...s.querySelectorAll('.ta9-g114 i')], rules = [...s.querySelectorAll('.ta9-rules i')];
+    const n19 = s.querySelector('.ta9-n19'), p0 = s.querySelector('.ta9-p0'), p1 = s.querySelector('.ta9-p1'), zero = s.querySelector('.ta9-zero');
+    g20.forEach((x) => { x.className = ''; x.textContent = ''; });
+    g114.forEach((x) => (x.className = ''));
+    rules.forEach((r) => r.classList.remove('on'));
+    zero.classList.remove('on');
+    n19.textContent = '0';
+    p0.textContent = '—';
+    p1.textContent = '—';
+    // 提炼集：20 条里 19 条以转接人工收场
+    let n = 0;
+    for (let j = 0; j < 20; j++) {
+      await U.wait(ctx, 110);
+      if (!ok()) return;
+      if (j === 11) { g20[j].className = 'ok'; g20[j].textContent = '通过'; }
+      else { g20[j].className = 'esc'; g20[j].textContent = '转人工'; n19.textContent = ++n; }
+    }
+    for (const r of rules) { await U.wait(ctx, 650); if (!ok()) return; r.classList.add('on'); }
+    // 迁移集：先显示原始政策下的结果，再显示追加规则后的结果
+    await U.wait(ctx, 600);
+    if (!ok()) return;
+    this.A.forEach((i) => (g114[i].className = 'ok'));
+    U.count(p0, 12.3, { dec: 1, suffix: '%', dur: 900, ctx });
+    await U.wait(ctx, 1800);
+    if (!ok()) return;
+    for (const i of this.C.filter((x) => !this.A.includes(x))) { await U.wait(ctx, 220); if (!ok()) return; g114[i].className = 'new'; }
+    U.count(p1, 19.3, { dec: 1, suffix: '%', dur: 900, ctx });
+    zero.classList.add('on');
+    await U.wait(ctx, 5000);
+    if (ok()) this.run(s, ctx);
+  },
+  enter(s, ctx) { C9.tk(this); ctx.later(() => this.run(s, ctx), 700); },
+  reset(s) { C9.tk(this); s.querySelectorAll('.ta9-g i').forEach((x) => { x.className = ''; x.textContent = ''; }); },
+};
+</script>
+
+<section class="slide" id="c09-lessons" data-part="4" data-trans="zoom" data-dur="27000" data-title="例子一的三条教训" data-notes="例子一还给出了三条教训，三个标签页自动轮换，也可以点击。<br>① <b>提炼所依据的材料决定了能够归纳出什么。</b>同样是这 19 条轨迹，仅提供失败摘要与错误文本时，模型归纳出的是“同一工具反复报错即不应继续调用”；补充 Agent 与用户各自可调用的工具清单之后，归纳结果变为“网络状态、SIM 卡、APN 等项属于用户设备侧，应引导用户自行操作而非直接调用”。前者记录的是教训，后者理解的是职责归属。<br>② <b>模型会把观察到的行为当作应然的行为。</b>第一版规则中有两条为“连续三次调用失败即转接人工”“用户两次未提供号码即转接人工”——轨迹中出现最频繁的正是转接人工，模型据此将其视为合理的兜底手段。但在这套评估中转接人工必然判定失败，这两条规则等于把失败写入了规范。提炼产物因此不能直接发布，须经与提炼者相互独立的验证。<br>③ <b>被修复的往往是极朴素的缺陷。</b>基线中有一条典型轨迹：Agent 需要用户的电话号码，于是调用查询工具，并将“请您提供您的电话号码”填入参数，连续五次，五次报错，随后转接人工。它已经判断出应当询问用户，却把这句话说给了工具。规则生效后，它先在对话中提出请求，取得号码再行查询；此后欲检查 SIM 卡状态遭工具拒绝，转而引导用户自行重新插拔 SIM 卡，任务通过。<br>规则原文摘自配套仓库的提炼产物（英文，页面给出中文要点）；第三页的轨迹按原书描述重绘。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">例子一的<em>三条教训</em></h2></div>
+    <div class="ls9-tabs tabs fx fx-up" style="--d:2"><button data-v="0">① 材料决定归纳</button><button data-v="1">② 观察 ≠ 应然</button><button data-v="2">③ 朴素的缺陷</button></div></header>
+  <div class="ls9-stage fx fx-scale" style="--d:3">
+    <div class="ls9-sc" data-s="0">
+      <h3 class="ls9-t">提炼所依据的材料，决定了能够归纳出什么</h3>
+      <div class="ls9-two">
+        <div class="ls9-col"><div class="ls9-in"><span class="lbl">v1 提炼器看到</span><div class="ls9-chips"><span>19 条失败摘要</span><span>错误文本</span></div></div>
+          <svg class="ic ls9-dn"><use href="#i-arrow"/></svg>
+          <div class="ls9-outp" style="--c:var(--warn)"><em>记录的是教训</em><b>同一工具反复报错，就不应继续调用</b><code>“If a tool call returns Tool [tool_name] not found error, do not call that tool again for the current task.”</code></div></div>
+        <div class="ls9-col"><div class="ls9-in"><span class="lbl">v2 提炼器还看到</span><div class="ls9-chips"><span>19 条失败摘要</span><span>错误文本</span><span class="add">Agent 工具清单 · 13 个</span><span class="add">用户工具清单 · 30 个</span></div></div>
+          <svg class="ic ls9-dn"><use href="#i-arrow"/></svg>
+          <div class="ls9-outp" style="--c:var(--ok)"><em>理解的是职责归属</em><b>网络状态、SIM 卡、APN 等属于用户设备侧，应引导用户自行操作</b><code>“When needing to check network status, SIM status, APN settings … guide the user to perform the operation on their device instead of calling the tool directly.”</code></div></div>
+      </div>
+    </div>
+    <div class="ls9-sc" data-s="1">
+      <h3 class="ls9-t">模型会把观察到的行为，当作应然的行为</h3>
+      <div class="ls9-obs">
+        <div class="ls9-freq"><span class="lbl">19 条失败轨迹里最常见的收场</span><div class="ls9-fb"><b>转接人工</b><i class="meter" style="--c:var(--bad)"><i class="ls9-fm"></i></i></div><p>出现得最频繁 → 模型把它当成“合理的兜底手段”</p></div>
+        <svg class="ic ls9-rt"><use href="#i-arrow"/></svg>
+        <div class="ls9-bad"><span class="lbl">v1 规则中的两条</span><div class="ls9-br">“连续三次调用失败即转接人工”</div><div class="ls9-br">“用户两次未提供号码即转接人工”</div><div class="ls9-stp stamp">把失败写入了规范</div></div>
+      </div>
+      <div class="ls9-lesson"><svg class="ic"><use href="#i-scale"/></svg>在这套评估中，转接人工必然判定失败 → 提炼产物<b>不能直接发布</b>，须经<b>与提炼者相互独立的验证</b></div>
+    </div>
+    <div class="ls9-sc" data-s="2">
+      <h3 class="ls9-t">被修复的，往往是极朴素的缺陷</h3>
+      <div class="ls9-two">
+        <div class="ls9-tr win"><div class="win-bar"><i></i><i></i><i></i><span>基线轨迹（按原书描述重绘）</span></div><div class="ls9-ml ml" data-k="a"></div></div>
+        <div class="ls9-tr win"><div class="win-bar"><i></i><i></i><i></i><span>规则生效后（按原书描述重绘）</span></div><div class="ls9-ml ml" data-k="b"></div></div>
+      </div>
+      <p class="ls9-cap">它已经判断出应当询问用户，<b>却把这句话说给了工具</b></p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「例子一：转接边界的规则化」· 规则原文：配套仓库 chapter9/tau2-escalation-experience 提炼产物</div>
+</section>
+<style>
+.ls9-stage{position:relative;flex:1;min-height:0}
+.ls9-sc{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;opacity:0;translate:0 14px;transition:opacity .5s var(--ease),translate .5s var(--ease);pointer-events:none}
+.ls9-sc.on{opacity:1;translate:0 0;pointer-events:auto}
+.ls9-t{font-size:30px;font-weight:700;color:var(--acc)}
+.ls9-two{display:grid;grid-template-columns:1fr 1fr;gap:26px;flex:1;min-height:0}
+.ls9-col{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.ls9-in{padding:14px 18px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.ls9-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ls9-chips span{font-size:17px;padding:5px 12px;border-radius:10px;border:1px solid var(--line2);color:var(--text2)}
+.ls9-chips span.add{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.ls9-dn{align-self:center;font-size:30px;color:var(--text3);rotate:90deg}
+.ls9-outp{display:flex;flex-direction:column;gap:8px;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 8%,rgba(12,18,40,.85));opacity:.2;transition:opacity .6s}
+.ls9-outp.on{opacity:1}
+.ls9-outp em{font-style:normal;font-size:16px;font-weight:700;letter-spacing:.1em;color:var(--c)}
+.ls9-outp b{font-size:22px;line-height:1.5}
+.ls9-outp code{font:15px/1.6 var(--mono);color:var(--text3)}
+.ls9-obs{display:grid;grid-template-columns:1fr 60px 1fr;gap:16px;align-items:center}
+.ls9-freq,.ls9-bad{display:flex;flex-direction:column;gap:12px;padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.85);border:1px solid var(--line2)}
+.ls9-fb{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px}
+.ls9-fb b{font-size:20px;color:var(--bad)}
+.ls9-fb .meter{height:22px}
+.ls9-freq p{font-size:18px;color:var(--text2)}
+.ls9-rt{font-size:36px;color:var(--text3);justify-self:center}
+.ls9-bad{position:relative}
+.ls9-br{font-size:20px;padding:10px 14px;border-radius:12px;color:#fecdd3;border:1px solid color-mix(in srgb,var(--bad) 50%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.ls9-stp{position:absolute;right:16px;bottom:-22px;padding:8px 16px;border-radius:10px;font-size:20px;font-weight:800;color:var(--bad);border:3px solid var(--bad);background:rgba(5,8,22,.9)}
+.ls9-lesson{display:flex;align-items:center;gap:14px;margin-top:22px;padding:16px 22px;border-radius:16px;font-size:21px;line-height:1.6;color:var(--text2);background:color-mix(in srgb,var(--acc) 8%,transparent);border-left:4px solid var(--acc)}
+.ls9-lesson .ic{font-size:30px;color:var(--acc);flex:none}
+.ls9-lesson b{color:var(--acc)}
+.ls9-tr{display:flex;flex-direction:column;min-width:0}
+.ls9-ml{flex:1;padding:12px 14px;gap:7px}
+.ls9-ml .mr{font-size:16px;padding:7px 12px 7px 16px}
+.ls9-ml .mr .rl{min-width:70px;font-size:15px}
+.ls9-ml .mr.bad .tx{color:#fecdd3}
+.ls9-cap{font-size:20px;color:var(--text2);text-align:center}
+.ls9-cap b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c09-lessons'] = {
+  // 按原书描述重绘的两条轨迹：[角色, 文字, 是否标红]
+  TA: [['user', '我的手机上不了网。', 0], ['assistant', '查询工具(phone=“请您提供您的电话号码”)', 1], ['tool', '错误：参数无效（第 1 次）', 1], ['assistant', '……同样的调用又重复了 4 次', 1], ['tool', '错误 ×5', 1], ['status', 'transfer_to_human_agents → 评估判定失败', 1]],
+  TB: [['user', '我的手机上不了网。', 0], ['assistant', '请问您的电话号码是多少？', 0], ['user', '138…（取得号码）', 0], ['assistant', '查询工具(phone=138…) → 找到客户', 0], ['tool', '检查 SIM 卡状态 → 工具拒绝（用户侧操作）', 0], ['assistant', '请您把 SIM 卡取出后重新插好，再看是否恢复。', 0], ['status', '用户自行操作后恢复 → 任务通过', 0]],
+  init(s) {
+    this.set = (v) => s.querySelectorAll('.ls9-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.v === String(v)));
+    s.querySelectorAll('.ls9-tabs button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.show(s, +b.dataset.v); }));
+  },
+  show(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx;
+    if (!ctx) return;
+    this.i = i;
+    this.set(i);
+    s.querySelectorAll('.ls9-sc').forEach((x) => x.classList.toggle('on', +x.dataset.s === i));
+    const ok = () => tk === this.tk;
+    if (i === 0) {
+      const o = [...s.querySelectorAll('.ls9-outp')];
+      o.forEach((x) => x.classList.remove('on'));
+      o.forEach((x, j) => ctx.later(() => ok() && x.classList.add('on'), 900 + j * 2200));
+    } else if (i === 1) {
+      const fm = s.querySelector('.ls9-fm'), st = s.querySelector('.ls9-stp');
+      fm.style.setProperty('--v', '0%');
+      st.classList.remove('on');
+      ctx.later(() => ok() && fm.style.setProperty('--v', '92%'), 500);
+      ctx.later(() => ok() && U.restart(st, 'on'), 2600);
+    } else {
+      const [a, b] = s.querySelectorAll('.ls9-ml');
+      a.innerHTML = '';
+      b.innerHTML = '';
+      const put = (box, [r, t, bad]) => box.insertAdjacentHTML('beforeend', `<div class="mr new${bad ? ' bad' : ''}" data-r="${r}"><span class="rl">${r}</span><span class="tx">${t}</span></div>`);
+      this.TA.forEach((m, j) => ctx.later(() => ok() && put(a, m), 400 + j * 650));
+      this.TB.forEach((m, j) => ctx.later(() => ok() && put(b, m), 400 + (this.TA.length + j) * 650));
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, 3, 9000, (i) => this.show(s, i), 300); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.ls9-sc').forEach((x) => x.classList.remove('on')); s.querySelectorAll('.ls9-ml').forEach((x) => (x.innerHTML = '')); },
+};
+</script>
+
+<section class="slide" id="c09-exp2" data-part="4" data-trans="rise" data-dur="16000" data-title="实验 9-2：从 τ²-bench 失败轨迹提炼规则" data-notes="<b>实验 9-2 ★★：从 τ²-bench 失败轨迹提炼转接与工具使用规则。</b>沿用第七章的 τ²-bench telecom 环境。<b>提炼集与迁移集在上游仓库中本就是两套互不相交的任务，提炼过程接触不到迁移集。</b>先以弱模型运行提炼集并保存失败轨迹；规则由模型归纳而非人工撰写，生成后追加至原始政策末尾；再在迁移集上对照原始策略与两个进化版本。三臂之间只替换策略文件，用户模拟器保持不变。除通过率外，还需记录三项与规则直接对应的行为指标：转接人工的比例、Agent 越界调用用户侧工具的次数、参数缺失即发出的调用次数。<b>后两项在进化版本中均下降约八成，说明通过率的提升来自规则修复了具体动作。</b><br>本页数据来自配套仓库 chapter9/tau2-escalation-experience 的验收记录（2026-08-27）：被测 Agent 为 doubao-seed-1-6-flash-250615（故意选弱模型），用户模拟器与规则提炼均为 doubao-seed-1-6-250615。提炼集 telecom_small 20 条，迁移集 telecom 114 条。三臂：A 原始政策；B 原始 + v1 规则（提炼器只看失败摘要）；C 原始 + v2 规则（另看工具清单）。注意转接比例并没有下降（B 甚至升到 100%），改善来自越界调用与空参调用的大幅减少。仓库的注意事项也如实写明：每条任务只运行一次、样本仅百余条，结论只能用于判断是否值得扩大测试，不能作为方法有效性的定论。点击右上角切换指标。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-2 ★★：从失败轨迹<em>提炼转接与工具使用规则</em></h2></div>
+    <div class="x2-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">通过率</button><button data-v="1">转接人工比例</button><button data-v="2">越界调用用户侧工具</button><button data-v="3">参数缺失即调用</button></div></header>
+  <div class="x2-body">
+    <div class="c9-xp x2-xp fx fx-left" style="--d:3">
+      <div class="c9-xp-it"><b>数据划分</b><p>提炼集 <b>telecom_small 20 条</b>与迁移集 <b>telecom 114 条</b>在上游仓库中互不相交，提炼过程接触不到迁移集</p></div>
+      <div class="c9-xp-it"><b>提炼</b><p>弱模型跑提炼集（仅 1 条通过）保存失败轨迹；<b>规则由模型归纳</b>，追加到原始政策末尾</p></div>
+      <div class="c9-xp-it"><b>三臂对照</b><p>只替换策略文件，用户模拟器不变：A 原始政策 · B + v1 规则（只看失败摘要）· C + v2 规则（另看工具清单）</p></div>
+      <div class="c9-xp-it"><b>行为指标</b><p>转接人工比例、越界调用用户侧工具次数、参数缺失即发出的调用次数——<b>后两项均下降约八成</b></p></div>
+    </div>
+    <div class="x2-chart panel fx fx-right" style="--d:4">
+      <div class="x2-ch"><b class="x2-mt">通过率</b><span class="x2-ms">迁移集 114 条</span></div>
+      <div class="x2-bars"></div>
+      <p class="x2-take"></p>
+    </div>
+  </div>
+  <div class="x2-foot fx fx-up" style="--d:5"><span class="c9-data">数据：配套仓库 chapter9/tau2-escalation-experience 验收记录 · 2026-08-27 · Agent：doubao-seed-1-6-flash-250615 · 用户模拟器与规则提炼：doubao-seed-1-6-250615</span><span class="x2-cv"><svg class="ic"><use href="#i-alert"/></svg>每条任务只跑一次、样本百余条：只能判断是否值得扩大测试</span></div>
+  <div class="src">第九章 ·「例子一：转接边界的规则化」· 实验 9-2</div>
+</section>
+<style>
+.x2-body{display:grid;grid-template-columns:640px 1fr;gap:26px;flex:1;min-height:0}
+.x2-xp .c9-xp-it{grid-template-columns:96px 1fr}
+.x2-chart{padding:22px 28px;display:flex;flex-direction:column;gap:18px}
+.x2-ch{display:flex;align-items:baseline;gap:14px}
+.x2-mt{font-size:26px;color:var(--acc)}
+.x2-ms{font-size:17px;color:var(--text3)}
+.x2-bars{flex:1;display:flex;flex-direction:column;justify-content:center;gap:22px}
+.x2-b{display:grid;grid-template-columns:230px 1fr 130px;align-items:center;gap:16px}
+.x2-b>span{font-size:18px;line-height:1.4;color:var(--text2)}
+.x2-b>span b{display:block;font-size:20px;color:var(--text)}
+.x2-b .meter{height:36px;border-radius:10px}
+.x2-b .meter i{border-radius:10px}
+.x2-b>em{font:800 30px var(--num);font-style:normal;color:var(--c);text-align:right}
+.x2-b small{display:block;font:600 15px var(--num);color:var(--text3);text-align:right}
+.x2-take{font-size:19px;line-height:1.6;color:var(--text2);padding:12px 16px;border-radius:12px;background:color-mix(in srgb,var(--acc) 8%,transparent);border-left:4px solid var(--acc)}
+.x2-take b{color:var(--acc)}
+.x2-foot{display:flex;align-items:center;gap:20px;margin-top:14px}
+.x2-cv{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font-size:16px;color:var(--warn);white-space:nowrap}
+</style>
+<script>
+HOOKS['c09-exp2'] = {
+  ARM: [['A · 原始政策', 'var(--text3)'], ['B · + v1 规则', '#fb923c'], ['C · + v2 规则', 'var(--c9-inst)']],
+  // 真实数据（validation/evidence.json）：[指标名, 单位, 三臂数值, 满刻度, 结论]
+  M: [
+    ['通过率', '%', [12.3, 17.5, 19.3], 25, '通过率 <b>12.3% → 19.3%</b>：14 → 22 条，原本通过的 14 条全部保持'],
+    ['转接人工比例', '%', [91.2, 100, 97.4], 100, '转接比例<b>没有下降</b>（B 甚至升到 100%）：改善不是靠“少转人工”得来的'],
+    ['越界调用用户侧工具', '次', [1049, 205, 163], 1100, '越界调用 1049 → 205 / 163，<b>下降约八成</b>：规则修复了具体动作'],
+    ['参数缺失即发出调用', '次', [904, 256, 174], 1100, '空参调用 904 → 256 / 174：v2 下降约八成，v1 约七成'],
+  ],
+  init(s) {
+    s.querySelector('.x2-bars').innerHTML = this.ARM.map(([n, c]) => `<div class="x2-b" style="--c:${c}"><span><b>${n.split(' · ')[0]}</b>${n.split(' · ')[1]}</span><div class="meter" style="--c:${c}"><i></i></div><em>—</em></div>`).join('');
+    this.set = U.seg(s.querySelector('.x2-seg'), (v) => { this.auto = false; this.show(s, +v); });
+  },
+  show(s, i) {
+    const ctx = this.ctx, [n, u, vals, max, take] = this.M[i];
+    if (!ctx) return;
+    this.i = i;
+    this.set(String(i));
+    s.querySelector('.x2-mt').textContent = n;
+    s.querySelector('.x2-take').innerHTML = take;
+    const base = vals[0];
+    s.querySelectorAll('.x2-b').forEach((b, j) => {
+      const v = vals[j], m = b.querySelector('.meter i'), em = b.querySelector('em');
+      m.style.setProperty('--v', '0%');
+      ctx.later(() => m.style.setProperty('--v', (v / max) * 100 + '%'), 80);
+      U.count(em, v, { dec: u === '%' ? 1 : 0, suffix: u === '%' ? '%' : '', dur: 900, ctx });
+      const d = j && u !== '%' ? Math.round(((v - base) / base) * 100) + '%' : '';
+      em.dataset.d = d;
+      ctx.later(() => { if (d) em.insertAdjacentHTML('beforeend', `<small>${d}</small>`); }, 1000);
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, 4, 4000, (i) => this.show(s, i), 600); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.x2-b .meter i').forEach((m) => m.style.setProperty('--v', '0%')); },
+};
+</script>
+
+<section class="slide" id="c09-exp3" data-part="4" data-trans="flip" data-dur="20000" data-title="实验 9-3：基于失败轨迹优化航空客服的系统 Prompt" data-notes="同样的做法可以移植到其他领域。航空客服 Agent 的典型问题案例是：用户对退票费、改签费或行李政策提出异议，Agent 未查询政策、未解释规则、未寻找合规的替代方案，即调用 transfer_to_human。一般的政策争议无须转接，<b>只有用户明确要求人工介入，或出现安全相关情形时才必须转接</b>。诊断同样指向转接边界未予明确，修法同样是将其落成一条带出处的最小规则。<br><b>实验 9-3 ★★。实验目的</b>：让航空客服 Agent 修复“遇到普通政策争议就过早转人工”的行为，同时保留明确要求人工和安全事件的转接能力。<b>实验说明</b>：从失败轨迹中提取规则遵从、任务解决和合规变通三个维度，生成一条带来源的最小 Prompt 补丁，再与初始版本、人工调优版本在相同条件下对照。更新提案只有在边界案例改善、旧任务不退化并通过发布门槛后，才进入灰度阶段。<b>实验说明了什么</b>：Prompt 自动优化的重点不是让模型自由改写一大段文字，而是把可归因的失败转成作用域明确、可回滚、可验证的局部规则。<br>本页回放配套仓库 chapter9/prompt-auto-optimization 的完整验收（2026-07-30，doubao-seed-1-6-flash-250615，73 次真实 API 请求）：Coding Agent 只做了两处 old→new 编辑；三份 Prompt 在 5 条保留任务上都是 5/5，在 5 条“过度转接”边界任务上分别为 0/5、2/5、4/5。自动提案满足全部发布检查，结果是 release_to_canary（只允许灰度，不覆盖稳定 Prompt）；它仍明显弱于人工一次性调优，证据没有把 2/5 说成边界问题已全部解决。点击矩阵中的任一格查看用户原话与回复。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-3 ★★：基于失败轨迹<em>优化航空客服的系统 Prompt</em></h2></header>
+  <div class="x3-rule fx fx-up" style="--d:2"><span class="x3-pb">问题：用户对退票费、改签费或行李政策有异议 → 未查政策、未解释规则、未找替代 → 直接 transfer_to_human</span><span class="x3-ok">只有用户明确要求人工介入，或出现安全相关情形时才必须转接</span></div>
+  <div class="x3-body">
+    <div class="x3-diff win fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>Coding Agent 的最小补丁 · 来源 B1–B5</span></div>
+      <div class="x3-dc"><div class="x3-e"><span class="d">− 仅当请求无法在你的行动范围内处理时，才转接人工客服。</span><span class="a">+ 仅当乘客明确要求人工客服或遇到紧急安全情况时，才转接人工客服。</span></div>
+        <div class="x3-e"><span class="d">− 当乘客表达不满、投诉，或提出你无法完全满足的诉求……时，应当及时转接人工客服来处理，不要自行与乘客争辩政策。</span><span class="a">+ 绝不因政策争议 / 乘客不满而转接，而应先查政策、耐心解释并提供合规的替代方案。</span></div>
+        <div class="x3-mf"><span>作用域 system_prompt.transfer_policy</span><span>533 → 502 字符</span><span>原 Prompt 中“客户满意度是第一位的”</span></div></div></div>
+    <div class="x3-mx panel fx fx-right" style="--d:4">
+      <div class="x3-mh"><span></span><b class="x3-g" style="--c:var(--c9-ret)">保留集 H1–H5</b><b class="x3-g" style="--c:var(--c9-bnd)">边界集 B1–B5</b><span></span></div>
+      <div class="x3-rows"></div>
+      <div class="x3-det"><b class="x3-dq">点击任一格查看</b><p class="x3-da"></p></div>
+    </div>
+  </div>
+  <div class="x3-gate fx fx-up" style="--d:5"><span class="x3-gl">发布门槛</span><span class="x3-c">补丁非空、可审计</span><span class="x3-c">来源可追溯</span><span class="x3-c">保留集不退化</span><span class="x3-c">边界集改善</span><b class="x3-dec">release_to_canary · 只允许灰度</b><span class="c9-data">数据：chapter9/prompt-auto-optimization · 2026-07-30 · doubao-seed-1-6-flash-250615</span></div>
+  <div class="src">第九章 ·「例子一：转接边界的规则化」· 实验 9-3</div>
+</section>
+<style>
+.x3-rule{display:flex;gap:16px;align-items:stretch}
+.x3-rule span{padding:10px 16px;border-radius:12px;font-size:17px;line-height:1.5}
+.x3-pb{flex:1.3;color:var(--text2);background:color-mix(in srgb,var(--bad) 7%,transparent);border:1px solid color-mix(in srgb,var(--bad) 35%,transparent)}
+.x3-ok{flex:1;font-weight:600;color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+.x3-body{display:grid;grid-template-columns:680px 1fr;gap:22px;margin-top:16px;height:470px}
+.x3-diff{display:flex;flex-direction:column}
+.x3-dc{flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.x3-e{display:flex;flex-direction:column;gap:6px;opacity:0;translate:0 10px;transition:opacity .5s,translate .5s var(--ease)}
+.x3-e.on{opacity:1;translate:0 0}
+.x3-e span{font-size:17px;line-height:1.55;padding:6px 10px;border-radius:8px}
+.x3-e .d{color:#fda4af;background:color-mix(in srgb,var(--bad) 9%,transparent);text-decoration:line-through;text-decoration-color:rgba(251,113,133,.5)}
+.x3-e .a{color:#86efac;background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.x3-mf{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px}
+.x3-mf span{font-size:15px;padding:3px 10px;border-radius:8px;color:var(--text3);border:1px solid var(--line2)}
+.x3-mx{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.x3-mh,.x3-row{display:grid;grid-template-columns:120px repeat(10,1fr) 70px;gap:5px;align-items:center}
+.x3-mh .x3-g{grid-column:span 5;text-align:center;font-size:16px;color:var(--c);padding-bottom:4px;border-bottom:2px solid color-mix(in srgb,var(--c) 60%,transparent)}
+.x3-row b{font-size:16px;line-height:1.3}
+.x3-row button{height:46px;border-radius:9px;font:700 16px var(--num);color:var(--text3);background:rgba(255,255,255,.04);border:1px solid var(--line);transition:all .3s}
+.x3-row button.p{color:#06101f;background:var(--ok);border-color:transparent}
+.x3-row button.t{color:#fff;background:color-mix(in srgb,var(--bad) 70%,transparent);border-color:transparent}
+.x3-row button.h{color:#fff;background:color-mix(in srgb,var(--warn) 65%,transparent);border-color:transparent}
+.x3-row button.sel{box-shadow:0 0 0 3px #fff}
+.x3-row em{font:800 18px var(--num);font-style:normal;color:var(--acc);text-align:right}
+.x3-legend{display:flex;gap:12px;font-size:15px;color:var(--text3);margin-top:2px}
+.x3-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.x3-det{margin-top:auto;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line);min-height:120px}
+.x3-dq{display:block;font-size:17px;color:var(--text)}
+.x3-da{font-size:16px;line-height:1.6;color:var(--text2);margin-top:4px}
+.x3-gate{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+.x3-gl{font-size:16px;letter-spacing:.12em;color:var(--text3)}
+.x3-c{font-size:16px;padding:5px 12px;border-radius:999px;color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+.x3-c.on{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.x3-dec{font:700 18px var(--mono);color:var(--ok);opacity:0;transition:opacity .4s}
+.x3-dec.on{opacity:1}
+.x3-gate .c9-data{margin-left:auto}
+</style>
+<script>
+HOOKS['c09-exp3'] = {
+  U: ['你好，我的订单号是 ABC123，想把 8 月 1 日的航班改到 8 月 3 日，帮我改一下。', '我买的是经济舱，免费托运行李额是多少？超重了怎么收费？', '订单号 ABC123，我想换到靠窗的 32A 座位。', '别跟我扯了，我就要跟人工客服说话，马上给我转人工。', '我现在在机场，同行的老人突然晕倒了，赶不上 YS1234 航班了，需要马上有人帮忙处理！',
+    '我要求全额退款！订单 ABC123。我不管，我就要全退。', '改签还要收我 200 块？凭什么！你必须给我免掉这个改签费，不然没完。', '航班晚了半小时，害我差点误事，我要求航空公司赔偿我 500 块！', '我是老客户了，这次必须给我免费升到商务舱，这点面子都不给？', '我经济舱，这次要带 3 件行李，你们必须都给我免费托运，别收钱。'],
+  ID: ['H1 改签', 'H2 行李额', 'H3 选座', 'H4 明确要人工', 'H5 紧急安全', 'B1 不可退票要退款', 'B2 要求免改签费', 'B3 小延误索赔', 'B4 索要免费升舱', 'B5 超额免费行李'],
+  // 三份 Prompt 的逐题结果（validation/latest.json）：p 通过，t 不应转却转接，h 未转接但回答不合格；保留集的 H4、H5 是“应转接且已转接”
+  R: [
+    { n: '初始 Prompt', r: 'ppppp' + 'ttttt', h: 0, b: 0 },
+    { n: '自动提案', r: 'ppppp' + 'phttp', h: 5, b: 2 },
+    { n: '人工调优', r: 'ppppp' + 'pphpp', h: 5, b: 4 },
+  ],
+  A: {
+    'p': '通过', 't': '不应转接，却转接了 ✗', 'h': '未转接，但回答不合格 ✗',
+  },
+  // 有代表性的回复与评审理由（节选自验收记录）
+  NOTE: {
+    '0-5': '转接理由：“乘客要求全额退款……属于不可自愿全额退款产品，需转接人工客服处理”',
+    '1-5': '“……经济舱特价票为不可退票产品，不支持自愿退款；如未起飞可申请退还机建燃油等税费。”评审：解释了不可退及可退税费，合格',
+    '1-6': '回复讲的是退票政策，没对上改签费诉求。评审：“未提供合规的替代方案”',
+    '1-7': '自动提案下仍然转接：“用户因航班晚点要求航空公司赔偿500块，需转接人工客服处理”',
+    '1-9': '“……经济舱免费托运行李额为20kg，您携带3件行李若超过20kg部分将按照50元/kg收取逾重费”评审：合格',
+    '2-7': '人工版未转接，但评审认为“未共情并解释延误补偿的政策门槛”，不合格',
+    '0-3': '应转接且已转接：保留集的明确要人工，三份 Prompt 都正确处理',
+    '0-4': '应转接且已转接：紧急安全事件，三份 Prompt 都正确处理',
+  },
+  init(s) {
+    s.querySelector('.x3-rows').innerHTML = this.R.map((p, i) => `<div class="x3-row" data-p="${i}"><b>${p.n}</b>${[...p.r].map((_, j) => `<button data-i="${i * 10 + j}" title="${this.ID[j]}">${this.ID[j].split(' ')[0]}</button>`).join('')}<em>—</em></div>`).join('')
+      + '<div class="x3-legend"><span><i style="background:var(--ok)"></i>通过</span><span><i style="background:color-mix(in srgb,var(--bad) 70%,transparent)"></i>不应转接却转接</span><span><i style="background:color-mix(in srgb,var(--warn) 65%,transparent)"></i>未转接但回答不合格</span></div>';
+    s.querySelector('.x3-rows').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.pick(s, +b.dataset.i); } });
+  },
+  pick(s, k) {
+    const p = Math.floor(k / 10), j = k % 10, r = this.R[p].r[j];
+    s.querySelectorAll('.x3-row button').forEach((b) => b.classList.toggle('sel', +b.dataset.i === k));
+    s.querySelector('.x3-dq').textContent = `${this.R[p].n} · ${this.ID[j]} · ${this.A[r]}`;
+    s.querySelector('.x3-da').textContent = `用户：${this.U[j]}${this.NOTE[`${p}-${j}`] ? '　｜　' + this.NOTE[`${p}-${j}`] : ''}`;
+  },
+  async run(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const es = [...s.querySelectorAll('.x3-e')], rows = [...s.querySelectorAll('.x3-row')], cs = [...s.querySelectorAll('.x3-c')], dec = s.querySelector('.x3-dec');
+    es.forEach((e) => e.classList.remove('on'));
+    cs.forEach((c) => c.classList.remove('on'));
+    dec.classList.remove('on');
+    rows.forEach((r) => { r.querySelectorAll('button').forEach((b) => (b.className = '')); r.querySelector('em').textContent = '—'; });
+    for (let p = 0; p < 3; p++) {
+      if (p === 1) for (const e of es) { await U.wait(ctx, 700); if (!ok()) return; e.classList.add('on'); }
+      const bs = rows[p].querySelectorAll('button');
+      for (let j = 0; j < 10; j++) {
+        await U.wait(ctx, 140);
+        if (!ok()) return;
+        bs[j].className = this.R[p].r[j];
+      }
+      rows[p].querySelector('em').textContent = `${this.R[p].b}/5`;
+      if (this.auto) this.pick(s, p * 10 + [5, 6, 7][p]);
+      await U.wait(ctx, 900);
+      if (!ok()) return;
+    }
+    for (const c of cs) { await U.wait(ctx, 400); if (!ok()) return; c.classList.add('on'); }
+    dec.classList.add('on');
+  },
+  enter(s, ctx) { C9.tk(this); this.auto = true; ctx.later(() => this.run(s, ctx), 600); },
+  reset(s) { C9.tk(this); s.querySelectorAll('.x3-e,.x3-c,.x3-dec').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-clarify" data-part="4" data-trans="zoom" data-dur="15000" data-title="例子二：需求澄清 Skill" data-notes="<b>例子二：需求澄清 Skill——从“直接开工”到“先确认再执行”。</b>第二章介绍了如何编写一份 Skill。这里假设系统已经有一份初版的需求澄清 Skill，关注的是另一件事：当 Agent 在生产环境中不断收到用户反馈时，如何自动判断“什么时候应该先问，问什么，什么时候可以直接开始”是否需要更新。<br>这是一个典型的流程性问题。用户说“把登录页改成支持企业登录”，Agent 如果立刻开工，可能在身份提供商、回退方式、兼容旧用户和上线范围上替用户作出其尚未考虑过的选择；如果无论任务大小都先列十几个问题，又会把简单修改变成一次访谈。<b>问得太少会导致返工，问得太多会增加打扰。</b>Skill 要表达的不是“所有任务都必须确认”，而是一条带作用域的判断路径。<br>一个初版流程可以这样写：先判断任务的歧义程度、风险和返工成本；低风险、容易撤销的小改动，说明假设后直接执行；涉及架构、数据、权限、公开接口或大范围改动时，集中提出少量真正会改变方案的问题；得到答案后生成短 Spec 或 Plan，列出目标、非目标、关键取舍、假设和验收标准，交给用户确认；确认后再执行，过程中发现原 Spec 不成立时暂停并重新确认。<br>左侧两个任务轮流走一遍判断路径，也可以点击切换。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">例子二：需求澄清 Skill，<em>从“直接开工”到“先确认再执行”</em></h2></header>
+  <div class="cl9-body">
+    <div class="cl9-left fx fx-left" style="--d:2">
+      <div class="cl9-ten"><div class="cl9-tq" style="--c:var(--bad)"><b>问得太少</b><span>替用户作出尚未考虑过的选择 → 返工</span></div><div class="cl9-tq" style="--c:var(--warn)"><b>问得太多</b><span>把简单修改变成一次访谈 → 打扰</span></div></div>
+      <span class="lbl">选择一个任务</span>
+      <button class="cl9-task" data-i="0"><svg class="ic"><use href="#i-edit"/></svg><div><b>修正设置页按钮文案的拼写</b><span>低风险 · 容易撤销 <i class="c9-sy">示意</i></span></div></button>
+      <button class="cl9-task" data-i="1"><svg class="ic"><use href="#i-lock"/></svg><div><b>把登录页改成支持企业登录</b><span>涉及架构、权限、公开接口</span></div></button>
+      <div class="cl9-qs"><span class="lbl">真正会改变方案的问题</span><div class="cl9-ql"><span>身份提供商？</span><span>回退方式？</span><span>兼容旧用户？</span><span>上线范围？</span></div></div>
+    </div>
+    <div class="cl9-flow panel fx fx-right" style="--d:3">
+      <div class="cl9-n" data-n="judge" style="left:300px;top:20px;width:420px"><b>判断歧义程度、风险和返工成本</b></div>
+      <div class="cl9-n" data-n="low" style="left:20px;top:150px;width:360px;--c:var(--ok)"><b>低风险、容易撤销的小改动</b><small>说明假设后直接执行</small></div>
+      <div class="cl9-n" data-n="high" style="left:620px;top:150px;width:380px;--c:var(--warn)"><b>架构 · 数据 · 权限 · 公开接口 · 大范围</b><small>集中提出少量真正会改变方案的问题</small></div>
+      <div class="cl9-n" data-n="spec" style="left:620px;top:285px;width:380px;--c:var(--c9-inst)"><b>生成短 Spec / Plan</b><small>目标 · 非目标 · 关键取舍 · 假设 · 验收标准</small></div>
+      <div class="cl9-n" data-n="ok" style="left:620px;top:420px;width:380px;--c:var(--c9-inst)"><b>交给用户确认</b><small>确认后再执行</small></div>
+      <div class="cl9-n" data-n="run" style="left:300px;top:420px;width:260px;--c:var(--ok)"><b>执行</b><small>交付</small></div>
+      <div class="cl9-n" data-n="pause" style="left:20px;top:420px;width:250px;--c:var(--bad)"><b>发现原 Spec 不成立</b><small>暂停并重新确认</small></div>
+      <svg class="cl9-svg" viewBox="0 0 1020 520" width="1020" height="520">
+        <defs><marker id="cl9m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker></defs>
+        <path class="cl9-p" data-p="jl" d="M400 82 C 300 110, 220 120, 200 148" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="jh" d="M620 82 C 720 110, 800 120, 810 148" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="hs" d="M810 228 V283" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="so" d="M810 363 V418" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="or" d="M620 460 H562" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="lr" d="M200 228 C 220 330, 330 360, 400 418" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="rp" d="M300 470 H272" marker-end="url(#cl9m)"/>
+        <path class="cl9-p" data-p="pb" d="M145 500 C 145 515, 640 520, 700 500" marker-end="url(#cl9m)"/>
+      </svg>
+    </div>
+  </div>
+  <div class="src">第九章 ·「例子二：需求澄清 Skill——从“直接开工”到“先确认再执行”」</div>
+</section>
+<style>
+.cl9-body{display:grid;grid-template-columns:560px 1fr;gap:24px;flex:1;min-height:0}
+.cl9-left{display:flex;flex-direction:column;gap:12px}
+.cl9-ten{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:6px}
+.cl9-tq{padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.cl9-tq b{display:block;font-size:20px;color:var(--c)}
+.cl9-tq span{font-size:16px;color:var(--text2);line-height:1.5}
+.cl9-task{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.cl9-task .ic{font-size:28px;color:var(--acc);flex:none}
+.cl9-task b{display:block;font-size:20px}
+.cl9-task span{font-size:16px;color:var(--text3)}
+.cl9-task i{font-style:normal;margin-left:6px}
+.cl9-task.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 11%,transparent)}
+.cl9-qs{margin-top:auto;padding:12px 14px;border-radius:14px;border:1px dashed var(--line2);opacity:.3;transition:opacity .45s}
+.cl9-qs.on{opacity:1;border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
+.cl9-ql{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.cl9-ql span{font-size:17px;padding:6px 10px;border-radius:10px;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 45%,transparent)}
+.cl9-flow{position:relative;overflow:hidden}
+.cl9-n{--c:var(--acc);position:absolute;padding:12px 16px;border-radius:14px;background:rgba(12,18,40,.92);border:1px solid var(--line2);transition:all .4s var(--ease);z-index:2}
+.cl9-n b{display:block;font-size:19px;line-height:1.35}
+.cl9-n small{display:block;font-size:16px;color:var(--text3);margin-top:3px}
+.cl9-n.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 13%,rgba(12,18,40,.92));box-shadow:0 0 26px color-mix(in srgb,var(--c) 40%,transparent)}
+.cl9-n.on b{color:var(--c)}
+.cl9-n.dim{opacity:.35}
+.cl9-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:1}
+.cl9-p{fill:none;stroke:rgba(148,163,184,.4);stroke-width:2.5;transition:stroke .4s}
+.cl9-p.on{stroke:var(--acc);stroke-dasharray:7 7;animation:flow 1s linear infinite}
+</style>
+<script>
+HOOKS['c09-clarify'] = {
+  // 两条路径：[节点, 进入它的连线]
+  PATH: [
+    [['judge', ''], ['low', 'jl'], ['run', 'lr']],
+    [['judge', ''], ['high', 'jh'], ['spec', 'hs'], ['ok', 'so'], ['run', 'or'], ['pause', 'rp']],
+  ],
+  init(s) {
+    s.querySelectorAll('.cl9-task').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.go(s, +b.dataset.i); }));
+  },
+  go(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx;
+    if (!ctx) return;
+    this.i = i;
+    s.querySelectorAll('.cl9-task').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    const ns = [...s.querySelectorAll('.cl9-n')], ps = [...s.querySelectorAll('.cl9-p')], qs = s.querySelector('.cl9-qs');
+    ns.forEach((n) => n.classList.remove('on', 'dim'));
+    ps.forEach((p) => p.classList.remove('on'));
+    qs.classList.remove('on');
+    const path = this.PATH[i], used = path.map((x) => x[0]);
+    path.forEach(([n, p], j) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      s.querySelector(`.cl9-n[data-n=${n}]`).classList.add('on');
+      if (p) s.querySelector(`.cl9-p[data-p=${p}]`).classList.add('on');
+      if (n === 'high') qs.classList.add('on');
+      if (j === path.length - 1) ns.forEach((x) => { if (!used.includes(x.dataset.n)) x.classList.add('dim'); });
+    }, 400 + j * 900));
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, 2, 7000, (i) => this.go(s, i), 600); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.cl9-n,.cl9-p,.cl9-task,.cl9-qs').forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c09-skillevo" data-part="4" data-steps="1" data-trans="rise" data-dur="13000" data-title="从用户反馈到最小 Skill 更新" data-notes="<b>持续进化从运行证据开始。</b>系统应同时记录任务、澄清问题、Spec 版本、用户修改、执行结果和交付后的返工。负反馈可能是“做出来的和我想象的不一样”，也可能是“你问得太多了”；正反馈则包括用户一次确认后顺利交付、主动修改 Spec 后减少返工，以及在低风险任务中没有被多余问题打断。<b>单独保存一句抱怨不足以触发更新，必须把反馈和具体轨迹、任务类型以及结果关联起来。</b><br>当多条轨迹反复指向同一个缺口时，Agent 可以提出<b>最小 Skill 更新提案</b>。例如，多个涉及认证架构的任务都在交付后才发现需要兼容旧登录方式，规则草案可以要求在执行前确认“身份提供商、回退路径和兼容范围”；如果大量拼写修复都被 Agent 先问一轮，规则草案则应收窄高风险与高歧义的触发范围。<br>按 → 第二步：这套流程需要通过对照实验验证。可以比较“直接执行”“先提问再执行”和“提问后生成 Spec、确认后执行”三种策略，并按任务复杂度分层。评价指标至少包括<b>需求偏差率、交付后的返工次数、澄清轮数、首次有效产出时间、用户放弃率、Spec 被修改的比例和高风险操作错误率</b>。更新提案只有在减少需求偏差的同时没有显著增加打扰，并在未参与提炼的任务上通过回归，才进入灰度发布。<br>反馈卡片为示意；对照设计只列出原书给出的分组与指标，不含任何结果数字。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从用户反馈到<em>最小 Skill 更新</em></h2></header>
+  <div class="se9-stage">
+    <div class="se9-a">
+      <div class="se9-rec fx fx-up" style="--d:2"><span class="lbl">同时记录</span><span>任务</span><span>澄清问题</span><span>Spec 版本</span><span>用户修改</span><span>执行结果</span><span>交付后的返工</span></div>
+      <div class="se9-grid">
+        <div class="se9-fb panel fx fx-left" style="--d:3"><div class="se9-fh"><b>反馈必须关联轨迹、任务类型与结果</b><span class="c9-sy">示意</span></div><div class="se9-cards"></div></div>
+        <div class="se9-gaps fx fx-right" style="--d:4">
+          <div class="se9-g" data-g="0"><span class="lbl">缺口一 · 认证架构类任务</span><b>交付后才发现需要兼容旧登录方式</b><code><span class="a">+ 执行前确认：身份提供商、回退路径和兼容范围</span></code></div>
+          <div class="se9-g" data-g="1"><span class="lbl">缺口二 · 拼写修复类任务</span><b>大量拼写修复都被先问一轮</b><code><span class="d">- 修改代码前先向用户确认需求</span><span class="a">+ 仅在高风险或高歧义任务上先提问</span></code></div>
+          <p class="se9-one">单独一句抱怨不足以触发更新</p>
+        </div>
+      </div>
+    </div>
+    <div class="se9-b" data-step="1">
+      <div class="se9-ab panel"><div class="se9-abh"><span></span><b>直接执行</b><b>先提问再执行</b><b>提问 → Spec → 确认 → 执行</b></div>
+        <div class="se9-abr"><span>低风险 · 低歧义</span><i></i><i></i><i></i></div>
+        <div class="se9-abr"><span>架构 · 权限 · 数据 · 公开接口</span><i></i><i></i><i></i></div>
+        <p class="se9-abn">三种策略 × 按任务复杂度分层 · 每格记录同一组指标（设计示意，不含结果）</p></div>
+      <div class="se9-met"><span class="lbl">评价指标（至少）</span><div class="se9-ml"></div>
+        <div class="se9-rel"><svg class="ic"><use href="#i-shield"/></svg>减少需求偏差、<b>不显著增加打扰</b>、未参与提炼的任务上通过回归 → 才进入灰度</div></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「例子二：需求澄清 Skill——从“直接开工”到“先确认再执行”」</div>
+</section>
+<style>
+.se9-stage{position:relative;flex:1;min-height:0}
+.se9-a,.se9-b{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;transition:opacity .6s var(--ease),translate .6s var(--ease)}
+#c09-skillevo[data-k="1"] .se9-a{opacity:0;translate:0 -14px;pointer-events:none}
+.se9-b{opacity:0;translate:0 14px;pointer-events:none}
+.se9-b.on{opacity:1;translate:0 0;pointer-events:auto}
+.se9-rec{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.se9-rec span:not(.lbl){font-size:17px;padding:5px 13px;border-radius:999px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.se9-grid{display:grid;grid-template-columns:1fr 640px;gap:22px;flex:1;min-height:0}
+.se9-fb{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.se9-fh{display:flex;justify-content:space-between;align-items:center}
+.se9-fh b{font-size:20px}
+.se9-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.se9-c{--c:var(--bad);display:flex;flex-direction:column;gap:4px;padding:10px 13px;border-radius:12px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 7%,transparent);transition:all .45s var(--ease)}
+.se9-c.pos{--c:var(--ok)}
+.se9-c b{font-size:17px;line-height:1.4}
+.se9-c span{font:15px var(--mono);color:var(--text3)}
+.se9-c.g0{box-shadow:0 0 0 2px var(--c9-inst)}
+.se9-c.g1{box-shadow:0 0 0 2px #38bdf8}
+.se9-c.dim{opacity:.3}
+.se9-gaps{display:flex;flex-direction:column;gap:12px}
+.se9-g{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.85);opacity:.3;transition:all .5s}
+.se9-g[data-g="0"]{--c:var(--c9-inst)}.se9-g[data-g="1"]{--c:#38bdf8}
+.se9-g.on{opacity:1;border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.se9-g b{font-size:20px}
+.se9-g code{display:flex;flex-direction:column;gap:4px;font:16px/1.5 var(--mono)}
+.se9-g .a{color:#86efac}.se9-g .d{color:#fda4af}
+.se9-one{margin-top:auto;font-size:18px;color:var(--warn);padding:10px 14px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent)}
+.se9-b{display:grid;grid-template-columns:1fr 600px;gap:22px}
+.se9-ab{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.se9-abh,.se9-abr{display:grid;grid-template-columns:200px repeat(3,1fr);gap:10px;align-items:center}
+.se9-abh b{font-size:18px;text-align:center;color:var(--acc)}
+.se9-abr span{font-size:18px;color:var(--text2)}
+.se9-abr i{height:120px;border-radius:14px;border:1px dashed var(--line2);background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 10px,transparent 10px 20px)}
+.se9-abn{font-size:16px;color:var(--text3)}
+.se9-met{display:flex;flex-direction:column;gap:12px}
+.se9-ml{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.se9-ml span{font-size:18px;padding:9px 12px;border-radius:12px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent);animation:upIn .45s var(--spring) both}
+.se9-ml span.risk{border-color:color-mix(in srgb,var(--bad) 50%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+.se9-rel{margin-top:auto;display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:14px;font-size:18px;line-height:1.6;color:var(--text2);background:color-mix(in srgb,var(--ok) 8%,transparent);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+.se9-rel .ic{font-size:26px;color:var(--ok);flex:none}
+.se9-rel b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c09-skillevo'] = {
+  // 示意反馈：[文字, 关联的轨迹信息, 正 / 负, 归属的缺口（-1 表示不触发更新）]
+  F: [
+    ['“做出来的和我想象的不一样”', '#211 认证架构 · 交付后返工', 0, 0],
+    ['“你问得太多了”', '#087 拼写修复 · 澄清 1 轮', 0, 1],
+    ['“旧账号登不上了”', '#245 认证架构 · 交付后返工', 0, 0],
+    ['一次确认后顺利交付', '#190 数据迁移 · Spec v1', 1, -1],
+    ['“改个错别字也要问？”', '#132 拼写修复 · 澄清 1 轮', 0, 1],
+    ['主动修改 Spec 后减少返工', '#233 公开接口 · Spec v2', 1, -1],
+    ['“企业 SSO 之外还要保留密码登录”', '#262 认证架构 · 交付后返工', 0, 0],
+    ['低风险任务没被多余问题打断', '#301 文案调整 · 直接执行', 1, -1],
+  ],
+  MET: ['需求偏差率', '交付后的返工次数', '澄清轮数', '首次有效产出时间', '用户放弃率', 'Spec 被修改的比例', '高风险操作错误率'],
+  init(s) {
+    s.querySelector('.se9-cards').innerHTML = this.F.map(([t, m, pos]) => `<div class="se9-c${pos ? ' pos' : ''}"><b>${t}</b><span>${m}</span></div>`).join('');
+  },
+  async cluster(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cs = [...s.querySelectorAll('.se9-c')], gs = [...s.querySelectorAll('.se9-g')];
+    cs.forEach((c) => c.classList.remove('g0', 'g1', 'dim'));
+    gs.forEach((g) => g.classList.remove('on'));
+    for (const g of [0, 1]) {
+      await U.wait(ctx, 1600);
+      if (!ok()) return;
+      cs.forEach((c, i) => { if (this.F[i][3] === g) c.classList.add('g' + g); });
+      gs[g].classList.add('on');
+    }
+    await U.wait(ctx, 1200);
+    if (!ok()) return;
+    cs.forEach((c, i) => { if (this.F[i][3] < 0) c.classList.add('dim'); });
+    await U.wait(ctx, 4000);
+    if (ok() && this.k === 0) this.cluster(s, ctx);
+  },
+  apply(s, ctx, k) {
+    this.k = k;
+    s.dataset.k = k;
+    C9.tk(this);
+    if (k === 0) this.cluster(s, ctx);
+    else {
+      const ml = s.querySelector('.se9-ml');
+      ml.innerHTML = '';
+      this.MET.forEach((m, i) => ctx.later(() => ml.insertAdjacentHTML('beforeend', `<span class="${i === 6 ? 'risk' : ''}">${m}</span>`), 300 + i * 260));
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, ctx, k); },
+  step(s, ctx, k) { this.apply(s, ctx, k); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.dataset.k = 0; s.querySelector('.se9-ml').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c09-exp4" data-part="4" data-trans="flip" data-dur="15000" data-title="Skill 与 Harness 的边界 · 实验 9-4" data-notes="这个例子还说明了 <b>Skill 与 Harness 的边界</b>。Skill 负责理解语境并主动提出问题、整理 Spec 和说明取舍；Harness 负责在缺少确认时否决高风险写入、直接操作 main 或绕过发布流程。<b>Harness 中的否决器不能替模型决定 PR 应该怎样描述，也不能代替模型选择需求方案。</b>随着经验积累，稳定的对话轨迹还可以进一步生成第八章所需的 SFT 或 RL 训练数据。左侧的示意动作流依次被分到 Skill 或 Harness。<br><b>实验 9-4 ★★：从用户反馈中进化需求澄清与 Spec 确认 Skill。实验目的</b>：检验 Agent 能否在“需求偏差”和“交互打扰”之间找到更好的澄清策略，并把经过验证的改进写回 Skill。<b>实验说明</b>：准备一组低风险、低歧义任务和一组涉及架构、权限、数据或公开接口的高风险任务，比较直接执行、提问后执行、提问后 Spec 确认三种流程。记录用户回答、Spec 修改、交付结果和返工反馈，让 Agent 生成 Skill 更新提案；提案必须经过留出任务回归、打扰成本检查和高风险否决器验证。<b>实验说明了什么</b>：持续进化不是把每次抱怨直接追加到 Prompt，而是从结果和反馈中识别作用域，提出最小指令更新，再用独立评价器决定是否发布。<br>配套仓库中该实验标注为“正文对照实验，配套实现待补充”，因此本页只展示实验设计，没有运行数据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skill 负责理解，<em>Harness 只负责否决</em></h2></header>
+  <div class="x4-body">
+    <div class="x4-l panel fx fx-left" style="--d:2">
+      <div class="x4-cols"><div class="x4-col" data-c="skill"><b>Skill</b><span>理解语境、主动提问、整理 Spec、说明取舍</span></div><div class="x4-col" data-c="har"><b>Harness</b><span>缺少确认时否决：高风险写入 · 直接操作 main · 绕过发布流程</span></div></div>
+      <div class="x4-act"><span class="lbl">Agent 的动作流 <span class="c9-sy">示意</span></span><div class="x4-cur">—</div></div>
+      <div class="x4-lists"><div class="x4-li" data-c="skill"></div><div class="x4-li" data-c="har"></div></div>
+      <p class="x4-nb">否决器不能替模型决定 PR 怎样描述，也不能代替模型选择需求方案 · 稳定的对话轨迹 → 第八章的 SFT / RL 数据</p>
+    </div>
+    <div class="x4-r fx fx-right" style="--d:3">
+      <div class="x4-h"><b>实验 9-4 ★★：从用户反馈中进化需求澄清与 Spec 确认 Skill</b><span class="c9-sy">配套实现待补充 · 仅设计</span></div>
+      <div class="c9-xp">
+        <div class="c9-xp-it"><b>实验目的</b><p>在“需求偏差”和“交互打扰”之间找到更好的澄清策略，并把<b>经过验证</b>的改进写回 Skill</p></div>
+        <div class="c9-xp-it"><b>实验说明</b><p>低风险低歧义组 vs 高风险组（架构、权限、数据、公开接口）× 三种流程；记录用户回答、Spec 修改、交付结果和返工反馈，让 Agent 生成 Skill 更新提案</p></div>
+      </div>
+      <div class="x4-gate"><span class="lbl">提案必须通过</span><div class="x4-gs"><span>留出任务回归</span><span>打扰成本检查</span><span>高风险否决器</span></div></div>
+      <div class="c9-xp-it x4-sh"><b>实验说明了什么</b><p>不是把每次抱怨直接追加到 Prompt，而是<b>识别作用域、提出最小指令更新</b>，再用独立评价器决定是否发布</p></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「例子二：需求澄清 Skill——从“直接开工”到“先确认再执行”」· 实验 9-4</div>
+</section>
+<style>
+.x4-body{display:grid;grid-template-columns:1fr 760px;gap:24px;flex:1;min-height:0}
+.x4-l{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.x4-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.x4-col{--c:var(--c9-inst);padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.x4-col[data-c=har]{--c:var(--c9-prog)}
+.x4-col b{display:block;font-size:22px;color:var(--c)}
+.x4-col span{font-size:16px;line-height:1.5;color:var(--text2)}
+.x4-act{display:flex;flex-direction:column;gap:6px}
+.x4-cur{padding:12px 16px;border-radius:12px;font-size:19px;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line2);min-height:52px}
+.x4-lists{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
+.x4-li{display:flex;flex-direction:column;gap:7px}
+.x4-li div{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;border-radius:10px;font-size:16px;line-height:1.45;color:var(--text2);background:rgba(255,255,255,.03);border:1px solid var(--line);animation:upIn .4s var(--spring) both}
+.x4-li div .ic{flex:none;font-size:18px;margin-top:2px}
+.x4-li div.v{color:#fecdd3;border-color:color-mix(in srgb,var(--bad) 50%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.x4-li div.v .ic{color:var(--bad)}
+.x4-li div.s .ic{color:var(--c9-inst)}
+.x4-li div.p .ic{color:var(--ok)}
+.x4-nb{font-size:16px;line-height:1.6;color:var(--text3)}
+.x4-r{display:flex;flex-direction:column;gap:12px}
+.x4-h{display:flex;flex-direction:column;gap:6px}
+.x4-h b{font-size:22px;line-height:1.4}
+.x4-h .c9-sy{align-self:flex-start}
+.x4-gate{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+.x4-gs{display:flex;gap:8px}
+.x4-gs span{font-size:16px;padding:5px 12px;border-radius:999px;color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+.x4-gs span.on{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.x4-sh{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+</style>
+<script>
+HOOKS['c09-exp4'] = {
+  // 示意动作：[动作, 归属, 结果类型 s=Skill 处理 / v=否决 / p=放行]
+  A: [
+    ['提问：企业登录用哪家身份提供商？', 'skill', 's'],
+    ['整理短 Spec：目标、非目标、取舍、验收标准', 'skill', 's'],
+    ['尚未确认 Spec 就写入用户表结构', 'har', 'v'],
+    ['向用户说明两种回退方案的取舍', 'skill', 's'],
+    ['准备直接 commit 到 main', 'har', 'v'],
+    ['在 PR 里怎样描述这次改动', 'har', 'p'],
+  ],
+  async run(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cur = s.querySelector('.x4-cur'), L = { skill: s.querySelector('.x4-li[data-c=skill]'), har: s.querySelector('.x4-li[data-c=har]') };
+    const gs = [...s.querySelectorAll('.x4-gs span')];
+    L.skill.innerHTML = '';
+    L.har.innerHTML = '';
+    gs.forEach((g) => g.classList.remove('on'));
+    for (const [t, c, r] of this.A) {
+      await U.wait(ctx, 1300);
+      if (!ok()) return;
+      cur.textContent = t;
+      const ic = r === 'v' ? 'ban' : r === 'p' ? 'check' : 'note';
+      const msg = r === 'v' ? `否决：${t}` : r === 'p' ? `不干预：${t}（由模型决定）` : t;
+      L[c].insertAdjacentHTML('beforeend', `<div class="${r}"><svg class="ic"><use href="#i-${ic}"/></svg><span>${msg}</span></div>`);
+    }
+    for (const g of gs) { await U.wait(ctx, 500); if (!ok()) return; g.classList.add('on'); }
+    await U.wait(ctx, 3500);
+    if (ok()) this.run(s, ctx);
+  },
+  enter(s, ctx) { C9.tk(this); ctx.later(() => this.run(s, ctx), 300); },
+  reset(s) { C9.tk(this); s.querySelectorAll('.x4-li').forEach((x) => (x.innerHTML = '')); s.querySelector('.x4-cur').textContent = '—'; },
+};
+</script>

@@ -1,0 +1,545 @@
+<!-- ================= 第七章共用：样式与小工具（类名统一带 c7- 前缀） ================= -->
+<style>
+.c7-tag{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:8px;font-size:15px;font-weight:600;letter-spacing:.06em;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent);white-space:nowrap;vertical-align:middle}
+.c7-data{font-size:15px;color:var(--text3);line-height:1.55}
+.c7-data b{color:var(--text2);font-weight:600}
+.c7-card{--c:var(--acc);position:relative;padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.78);border:1px solid var(--line);transition:border-color .45s,box-shadow .45s,background .45s,opacity .45s}
+.c7-card.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.86));box-shadow:0 0 34px -6px color-mix(in srgb,var(--c) 45%,transparent)}
+.c7-card.dim{opacity:.45}
+.c7-star{color:var(--tool);letter-spacing:-.04em;font-weight:700}
+.c7-exp{display:inline-flex;align-items:center;gap:10px;padding:6px 14px;border-radius:10px;font-size:17px;font-weight:700;color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.c7-ctl{display:flex;align-items:center;gap:10px}
+.c7-ctl .btn{padding:8px 14px;font-size:17px}
+</style>
+<script>
+window.C7 = {
+  // 自动轮播：不点击时每 ms 毫秒切到下一项；show(i) 负责设置 self.i。点击后由页面把 self.auto 设为 false
+  auto(self, ctx, n, ms, show, first = 800) {
+    self.auto = true;
+    ctx.later(() => { if (self.auto) show(0); }, first);
+    ctx.every(() => { if (self.auto) show(((self.i == null ? -1 : self.i) + 1) % n); }, ms);
+  },
+  pct(v, d = 1) { return (v * 100).toFixed(d) + '%'; },
+  // 创建 SVG 元素
+  S(tag, attrs = {}, parent) {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  },
+  // 跳到某个部分的第一页
+  goPart(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+};
+</script>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c07-cover" data-part="0" data-title="封面" data-notes="前六章已经展开了单 Agent 的构建：上下文、知识、工具、代码能力以及观察与动作空间。然而，<b>构建完成不等于构建正确</b>；只有能够稳定测量结果，后续的模型训练和系统进化才有可靠方向。<br>按引言的划分，第七至十章构成全书第二部分“如何提升 Agent 能力”：先用评估建立可度量的反馈，再通过模型后训练、持续进化和多 Agent 协作扩展能力。本章覆盖评估环境（工具调用型和人机交互型两种核心范式，以及章末单独讨论的仿真环境）、数据集的设计原则、LLM-as-a-Judge 自动化评判、评估驱动的模型选型，以及把评估结果转化为系统改进的完整闭环。<br>右侧轨道图：被评估的 Agent 处在评估环境之中，四颗卫星是一套评估体系的四个环节——什么算成功、任务从何而来、由谁验证、分数如何转化为决策。">
+  <div class="c7cv-orbit fx fx-scale" style="--d:4"></div>
+  <div class="c7cv-text">
+    <div class="c7cv-tag fx fx-up"><i></i>深入理解 AI Agent · 第七章</div>
+    <h1 class="c7cv-title"><span class="split">Agent 的</span><span class="split" data-off="7" data-grad="#c4b5fd,#a78bfa,#f472b6">评估</span></h1>
+    <p class="c7cv-sub fx fx-up" style="--d:12">构建完成，不等于构建正确：<br>把“表现好不好”变成可比较、可复现、可解释的信号</p>
+    <div class="c7cv-meta fx fx-up" style="--d:14"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c7cv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c07-cover{justify-content:center;padding-left:150px}
+.c7cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c7cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c7cv-title{margin-top:30px;font-size:136px;line-height:1.12;font-weight:800;letter-spacing:.01em}
+.c7cv-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.c7cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c7cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c7cv-orbit{position:absolute;right:110px;top:50%;width:720px;height:720px;margin-top:-372px}
+.c7cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c7cv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c07-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.c7cv-orbit'), {
+      size: 720, core: 'Agent', coreColor: '#a78bfa', outer: 'EVALUATION · 评估环境 · EVALUATION · 评估环境',
+      sats: [
+        { label: '成功的定义', color: '#f472b6', rx: 0.36, ry: 0.15, tilt: -22, dur: 13, phase: 0 },
+        { label: '任务来源', color: '#60a5fa', rx: 0.33, ry: 0.13, tilt: 32, dur: 16, phase: 0.3 },
+        { label: '验证方式', color: '#c084fc', rx: 0.3, ry: 0.19, tilt: 86, dur: 11, phase: 0.62 },
+        { label: '结果运用', color: '#fbbf24', rx: 0.39, ry: 0.11, tilt: 6, dur: 19, phase: 0.85 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c07-why" data-part="0" data-steps="2" data-title="构建完成，不等于构建正确" data-notes="构建 Agent 系统时，开发者面对大量设计选择，而它们往往没有显而易见的正确答案：用什么模型？让模型能调用哪些工具？知识库该存什么数据、以什么结构来构建？用户记忆该怎么做？模型的提示词和 Skills 该如何组织？Harness 中需要加上哪些约束？如何把评估结果转化为 Agent 持续进化的学习信号？<br>评估为我们提供了科学的决策依据：通过系统性的<b>对比实验</b>（改变一个变量，观察效果变化）和<b>消融实验</b>（逐一关闭某个组件，观察整体性能变化，从而判断该组件的真实贡献），区分真正的能力提升与表面的波动，避免“捡了芝麻，丢了西瓜”。正如软件工程中“没有度量就没有改进”的说法，不建立可重复的评估体系，Agent 的迭代方向就只能靠直觉。<br>按 → 依次展开：七个问题 → 两种实验方法 → 结论。右侧两个小演示里的数值都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">设计选择，往往没有<em>显而易见的正确答案</em></h2>
+  <p class="lead fx fx-up" style="--d:2">评估提供科学的决策依据：区分真正的能力提升与表面的波动</p></header>
+  <div class="c7wy-body">
+    <div class="c7wy-qs"></div>
+    <div class="c7wy-ms" data-step="1">
+      <div class="c7wy-m panel fx fx-up" style="--d:1;--c:var(--ctx)">
+        <div class="c7wy-mh"><svg class="ic"><use href="#i-compare"/></svg><b>对比实验</b><span>改变一个变量，观察效果变化</span></div>
+        <div class="c7wy-ab">
+          <div class="c7wy-row"><span class="c7wy-rl">配置 A<small>提示词 v1</small></span><div class="c7wy-tr"><i class="a"></i></div><em class="c7wy-va">—</em></div>
+          <div class="c7wy-row"><span class="c7wy-rl">配置 B<small class="c7wy-chg">提示词 v2</small></span><div class="c7wy-tr"><i class="b"></i></div><em class="c7wy-vb">—</em></div>
+        </div>
+        <div class="c7wy-delta">Δ <b>—</b><span class="c7-tag">示意</span></div>
+      </div>
+      <div class="c7wy-m panel fx fx-up" style="--d:3;--c:var(--tool)">
+        <div class="c7wy-mh"><svg class="ic"><use href="#i-scissors"/></svg><b>消融实验</b><span>逐一关闭某个组件，看整体性能掉多少</span></div>
+        <div class="c7wy-comps"></div>
+        <div class="c7wy-sc"><span>整体成功率</span><div class="c7wy-tr big"><i class="s"></i></div><em class="c7wy-vs">—</em></div>
+        <div class="c7wy-delta c7wy-cap"><span class="c7wy-ct">关闭后掉得越多，组件的真实贡献越大</span><span class="c7-tag">示意</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline c7wy-tag fx fx-up" data-step="2"><b>没有度量就没有改进</b>：不建立可重复的评估体系，Agent 的迭代方向就只能靠直觉——还容易“捡了芝麻，丢了西瓜”</p>
+  <div class="src">第七章 · 开篇</div>
+</section>
+<style>
+.c7wy-body{display:flex;gap:34px;align-items:stretch}
+.c7wy-qs{width:900px;flex:none;display:grid;grid-template-columns:1fr 1fr;gap:14px;align-content:start}
+.c7wy-q{--c:var(--acc);display:flex;align-items:center;gap:16px;min-height:88px;padding:14px 20px;border-radius:16px;font-size:21px;line-height:1.45;color:var(--text2);background:rgba(12,18,40,.75);border:1px solid var(--line);transition:all .5s var(--ease)}
+.c7wy-q .ic{flex:none;font-size:30px;color:var(--c);transition:transform .5s var(--spring)}
+.c7wy-q i{flex:none;margin-left:auto;font:800 26px var(--num);font-style:normal;color:var(--text3);transition:color .4s}
+.c7wy-q.on{color:var(--text);border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 11%,rgba(12,18,40,.85));box-shadow:0 0 28px -6px color-mix(in srgb,var(--c) 50%,transparent)}
+.c7wy-q.on .ic{transform:scale(1.18)}
+.c7wy-q.on i{color:var(--c)}
+.c7wy-q.seen{color:var(--text)}
+.c7wy-q.fin{--c:var(--ok);border-style:dashed;justify-content:center;color:var(--ok);font-weight:700}
+.c7wy-ms{flex:1;display:flex;flex-direction:column;gap:18px}
+.c7wy-m{--c:var(--acc);padding:20px 24px;display:flex;flex-direction:column;gap:14px;border-color:color-mix(in srgb,var(--c) 32%,transparent)}
+.c7wy-mh{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.c7wy-mh .ic{font-size:28px;color:var(--c)}
+.c7wy-mh b{font-size:26px;color:var(--c)}
+.c7wy-mh span{font-size:18px;color:var(--text2)}
+.c7wy-ab{display:flex;flex-direction:column;gap:10px}
+.c7wy-row,.c7wy-sc{display:flex;align-items:center;gap:14px}
+.c7wy-rl{width:130px;flex:none;font-size:19px;font-weight:600;display:flex;flex-direction:column}
+.c7wy-rl small{font-size:15px;color:var(--text3);font-weight:400;transition:color .4s}
+.c7wy-rl small.hot{color:var(--c)}
+.c7wy-tr{flex:1;height:16px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.c7wy-tr.big{height:22px}
+.c7wy-tr i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 55%,#fff));transition:width .9s var(--ease)}
+.c7wy-row em,.c7wy-sc em{width:64px;flex:none;text-align:right;font:700 20px var(--num);font-style:normal}
+.c7wy-sc span{width:130px;flex:none;font-size:18px;color:var(--text2)}
+.c7wy-delta{display:flex;align-items:center;gap:12px;font-size:19px;color:var(--text2)}
+.c7wy-delta b{font:800 24px var(--num);color:var(--c)}
+.c7wy-cap{justify-content:space-between}
+.c7wy-ct{transition:color .4s}
+.c7wy-comps{display:flex;gap:10px;flex-wrap:wrap}
+.c7wy-comps button{padding:8px 16px;border-radius:12px;font-size:18px;color:var(--text);border:1px solid color-mix(in srgb,var(--tool) 45%,transparent);background:color-mix(in srgb,var(--tool) 12%,transparent);transition:all .35s}
+.c7wy-comps button.off{color:var(--text3);border-style:dashed;background:transparent;text-decoration:line-through}
+.c7wy-tag{margin-top:22px;font-size:24px}
+</style>
+<script>
+HOOKS['c07-why'] = {
+  Q: [['cpu', '用什么模型？'], ['wrench', '让模型能调用哪些工具？'], ['db', '知识库该存什么数据、以什么结构来构建？'], ['memory', '用户记忆该怎么做？'],
+    ['docs', '模型的提示词和 Skills 该如何组织？'], ['shield', 'Harness 中需要加上哪些约束？'], ['refresh', '如何把评估结果转化为 Agent 持续进化的学习信号？']],
+  // 消融演示：各组件的示意贡献（百分点）
+  C: [['提示词', 4], ['工具', 15], ['记忆', 8], ['约束', 2]],
+  FULL: 68,
+  init(s) {
+    s.querySelector('.c7wy-qs').innerHTML = this.Q.map(([ic, t], i) => `<div class="c7wy-q fx fx-up" style="--d:${3 + i}"><svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span><i>?</i></div>`).join('')
+      + `<div class="c7wy-q fin fx fx-up" style="--d:10"><svg class="ic"><use href="#i-flask"/></svg><span>评估：用实验回答</span></div>`;
+    s.querySelector('.c7wy-comps').innerHTML = this.C.map(([n], i) => `<button data-i="${i}">${n}</button>`).join('');
+    s.querySelectorAll('.c7wy-comps button').forEach((b) => b.addEventListener('click', () => { this.manual = true; b.classList.toggle('off'); this.score(s); }));
+  },
+  score(s) {
+    const off = [...s.querySelectorAll('.c7wy-comps button')].map((b) => b.classList.contains('off'));
+    let v = this.FULL;
+    off.forEach((o, i) => { if (o) v -= this.C[i][1]; });
+    s.querySelector('.c7wy-sc i').style.width = v + '%';
+    s.querySelector('.c7wy-vs').textContent = v + '%';
+    const ct = s.querySelector('.c7wy-ct');
+    const n = off.filter(Boolean).length;
+    ct.textContent = n === 0 ? '完整系统：作为对照基线' : n === 1 ? `关闭「${this.C[off.indexOf(true)][0]}」：掉 ${this.FULL - v} 个百分点 → 这就是它的真实贡献` : '同时关闭多个组件时，就分不清是谁的贡献了';
+  },
+  // 对比实验：只改一个变量（提示词版本），配置 B 与 A 对比
+  ab(s) {
+    const r = this.rnd, a = 61 + Math.round(r() * 4), b = a + 3 + Math.round(r() * 6);
+    const A = s.querySelector('.c7wy-tr i.a'), B = s.querySelector('.c7wy-tr i.b');
+    A.style.width = a + '%'; s.querySelector('.c7wy-va').textContent = a + '%';
+    this.ctx.later(() => { B.style.width = b + '%'; s.querySelector('.c7wy-vb').textContent = b + '%'; s.querySelector('.c7wy-delta b').textContent = '+' + (b - a); }, 700);
+    U.restart(s.querySelector('.c7wy-chg'), 'hot');
+  },
+  hl(s) {
+    const qs = [...s.querySelectorAll('.c7wy-q:not(.fin)')];
+    this.qi = ((this.qi ?? -1) + 1) % qs.length;
+    qs.forEach((q, j) => { q.classList.toggle('on', j === this.qi); if (j === this.qi) q.classList.add('seen'); });
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.rnd = U.rand(7);
+    this.qi = -1;
+    this.manual = false;
+    ctx.later(() => this.hl(s), 1100);
+    ctx.every(() => this.hl(s), 1500);
+    if (k >= 1) this.startM(s, ctx);
+  },
+  step(s, ctx, k) { if (k >= 1 && !this.mOn) this.startM(s, ctx); },
+  startM(s, ctx) {
+    this.mOn = true;
+    ctx.later(() => this.ab(s), 600);
+    ctx.every(() => this.ab(s), 3600);
+    // 消融：依次关闭一个组件，再恢复
+    let t = -1;
+    const cyc = () => {
+      if (this.manual) return;
+      const bs = [...s.querySelectorAll('.c7wy-comps button')];
+      t = (t + 1) % (bs.length + 1);
+      bs.forEach((b, i) => b.classList.toggle('off', i === t - 1));
+      this.score(s);
+    };
+    ctx.later(cyc, 500);
+    ctx.every(cyc, 2200);
+  },
+  leave() { this.mOn = false; },
+  reset(s) {
+    this.mOn = false;
+    s.querySelectorAll('.c7wy-q').forEach((q) => q.classList.remove('on', 'seen'));
+    s.querySelectorAll('.c7wy-comps button').forEach((b) => b.classList.remove('off'));
+    s.querySelectorAll('.c7wy-tr i').forEach((i) => (i.style.width = '0'));
+    s.querySelectorAll('.c7wy-va,.c7wy-vb,.c7wy-vs').forEach((e) => (e.textContent = '—'));
+    s.querySelector('.c7wy-delta b').textContent = '—';
+  },
+};
+</script>
+
+<section class="slide" id="c07-object" data-part="0" data-steps="1" data-trans="zoom" data-title="评估的对象：模型 + Harness" data-notes="从第一章引入的 Harness 工程视角看，评估在 Harness 中扮演着“验证”功能的核心角色。一个关键认识是：<b>评估的对象不应只是模型，而应是模型与 Harness 的组合体</b>。同一个模型在不同的 Harness 中可能表现差异悬殊，一些团队仅通过优化 Harness 就显著提升了同一模型在终端类任务上的表现（详见第五章）。这意味着，当 Agent 在评估中表现不佳时，改进方向可能不是换模型，而是优化 Harness 的某个组件（提示词、工具设计、反馈循环）。完善的评估体系应能区分“模型能力不足”和“Harness 设计缺陷”这两类本质不同的问题。<br><b>区分这两类问题的常见手段是模型替换实验（model swap）</b>——固定 Harness，只更换更强 / 更弱的模型，观察分数变化幅度：如果换强模型分数不涨，说明瓶颈在 Harness；如果换弱模型分数大跌、分数随模型能力大幅波动，最直接的解读就是瓶颈在模型能力本身、当前表现主要由模型决定（至于这是因为任务本身就难，还是 Harness 过度依赖模型先验，则需进一步分析）。<br>注意这与消融实验是两种不同的方法：消融是<b>关闭 Harness 的某个组件</b>看整体性能如何变化，模型替换则是<b>固定 Harness、只换模型</b>——前者定位 Harness 内部哪个部件重要，后者区分瓶颈在模型还是在 Harness。按 → 或点上方开关切换两种实验；所有分数都是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">评估的对象是<em>模型 + Harness</em> 的组合体</h2></div>
+    <div class="c7ob-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="swap">模型替换实验</button><button data-v="abl">消融实验</button></div></header>
+  <div class="c7ob-body">
+    <div class="c7ob-rig panel fx fx-left" style="--d:3">
+      <div class="c7ob-h"><svg class="ic"><use href="#i-robot"/></svg>被评估的 Agent</div>
+      <div class="c7ob-blk c7ob-mod"><span class="c7ob-bl">Model</span><div class="c7ob-opts"><button data-m="0">弱模型</button><button data-m="1">当前模型</button><button data-m="2">强模型</button></div></div>
+      <div class="c7ob-blk c7ob-har"><span class="c7ob-bl">Harness</span><div class="c7ob-opts"><button data-c="0">提示词</button><button data-c="1">工具设计</button><button data-c="2">反馈循环</button></div></div>
+      <div class="c7ob-lock"><svg class="ic"><use href="#i-lock"/></svg><span></span></div>
+    </div>
+    <div class="c7ob-out panel fx fx-right" style="--d:4">
+      <div class="c7ob-oh"><b class="c7ob-ot"></b><div class="c7ob-sc seg"><i class="knob"></i><button data-v="a">示例一</button><button data-v="b">示例二</button></div></div>
+      <div class="c7ob-bars"></div>
+      <div class="c7ob-dx"><svg class="ic"><use href="#i-search"/></svg><span></span></div>
+      <div class="c7ob-note"><span class="c7-tag">示意</span>分数为演示用的虚构数值</div>
+    </div>
+  </div>
+  <div class="c7ob-cmp fx fx-up" style="--d:6">
+    <div data-k="swap"><b>模型替换</b><span>固定 Harness、只换模型</span><em>→ 区分瓶颈在模型还是在 Harness</em></div>
+    <div data-k="abl"><b>消融</b><span>关闭 Harness 的某个组件</span><em>→ 定位 Harness 内部哪个部件重要</em></div>
+  </div>
+  <div class="src">第七章 · 开篇（模型替换实验与消融实验）</div>
+</section>
+<style>
+#c07-object .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.c7ob-body{display:flex;gap:28px;height:540px}
+.c7ob-rig{width:600px;flex:none;padding:24px 28px;display:flex;flex-direction:column;gap:18px}
+.c7ob-h{display:flex;align-items:center;gap:12px;font-size:24px;font-weight:700}
+.c7ob-h .ic{color:var(--acc);font-size:28px}
+.c7ob-blk{--c:var(--llm);padding:16px 18px;border-radius:16px;border:2px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 7%,transparent);transition:box-shadow .5s,border-color .5s}
+.c7ob-har{--c:var(--har);border-style:dashed}
+.c7ob-blk.live{box-shadow:0 0 36px -4px color-mix(in srgb,var(--c) 55%,transparent);border-color:var(--c)}
+.c7ob-bl{display:block;font:800 24px var(--num);color:var(--c);margin-bottom:12px}
+.c7ob-opts{display:flex;gap:10px;flex-wrap:wrap}
+.c7ob-opts button{padding:10px 18px;border-radius:12px;font-size:19px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .35s}
+.c7ob-opts button.on{color:#06101f;font-weight:700;background:var(--c);border-color:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 60%,transparent)}
+.c7ob-opts button.off{color:var(--text3);border-style:dashed;text-decoration:line-through;background:transparent}
+.c7ob-opts button.fix{color:var(--text);border-color:color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 14%,transparent)}
+.c7ob-lock{margin-top:auto;display:flex;align-items:center;gap:10px;font-size:19px;color:var(--text2);padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.c7ob-lock .ic{color:var(--warn)}
+.c7ob-out{flex:1;padding:24px 30px;display:flex;flex-direction:column;gap:16px}
+.c7ob-oh{display:flex;align-items:center;justify-content:space-between}
+.c7ob-ot{font-size:24px;color:var(--acc)}
+.c7ob-sc button{padding:8px 18px;font-size:17px}
+.c7ob-bars{display:flex;flex-direction:column;gap:14px}
+.c7ob-r{display:grid;grid-template-columns:190px 1fr 70px;align-items:center;gap:14px;padding:8px 12px;border-radius:12px;border:1px solid transparent;transition:all .4s}
+.c7ob-r.on{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.c7ob-r span{font-size:19px;color:var(--text2)}
+.c7ob-r .t{height:20px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.c7ob-r .t i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width 1s var(--ease)}
+.c7ob-r em{font:700 22px var(--num);font-style:normal;text-align:right}
+.c7ob-dx{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-radius:14px;font-size:20px;line-height:1.6;background:color-mix(in srgb,var(--acc) 9%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);opacity:0;transform:translateY(8px);transition:all .5s var(--ease)}
+.c7ob-dx.on{opacity:1;transform:none}
+.c7ob-dx .ic{flex:none;margin-top:5px;color:var(--acc)}
+.c7ob-note{margin-top:auto;display:flex;gap:10px;align-items:center;font-size:15px;color:var(--text3)}
+.c7ob-cmp{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:22px}
+.c7ob-cmp div{display:flex;align-items:baseline;gap:14px;padding:14px 20px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:19px;color:var(--text2);transition:all .45s}
+.c7ob-cmp b{font-size:21px;color:var(--text)}
+.c7ob-cmp em{font-style:normal;color:var(--text3)}
+.c7ob-cmp div.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c7ob-cmp div.on b,.c7ob-cmp div.on em{color:var(--acc)}
+</style>
+<script>
+HOOKS['c07-object'] = {
+  SW: {
+    a: { v: [52, 58, 59], dx: '换强模型分数几乎不涨 → <b>瓶颈在 Harness</b>：改进方向是优化提示词、工具设计或反馈循环，而不是换模型' },
+    b: { v: [24, 58, 81], dx: '分数随模型能力大幅波动 → 最直接的解读：<b>瓶颈在模型能力本身</b>，当前表现主要由模型决定（是任务本身难，还是 Harness 过度依赖模型先验，需进一步分析）' },
+  },
+  AB: [58, 54, 45, 37],
+  init(s) {
+    this.setSeg = U.seg(s.querySelector('.c7ob-seg'), (v) => { this.manual = true; this.mode(s, v); });
+    this.setSc = U.seg(s.querySelector('.c7ob-sc'), (v) => { this.manual = true; this.sc = v; this.run(s); });
+    s.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => { if (this.m !== 'swap') return; this.manual = true; this.pick(s, +b.dataset.m); }));
+    s.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', () => { if (this.m !== 'abl') return; this.manual = true; this.pick(s, +b.dataset.c + 1); }));
+  },
+  rows(s, labels) {
+    s.querySelector('.c7ob-bars').innerHTML = labels.map((l) => `<div class="c7ob-r"><span>${l}</span><div class="t"><i></i></div><em>—</em></div>`).join('');
+  },
+  mode(s, m) {
+    this.m = m;
+    this.setSeg(m);
+    s.dataset.m = m;
+    s.querySelectorAll('.c7ob-cmp div').forEach((d) => d.classList.toggle('on', d.dataset.k === m));
+    const sw = m === 'swap';
+    s.querySelector('.c7ob-ot').textContent = sw ? '固定 Harness，只换模型' : '固定模型，逐一关闭 Harness 组件';
+    s.querySelector('.c7ob-sc').style.visibility = sw ? 'visible' : 'hidden';
+    s.querySelector('.c7ob-lock span').textContent = sw ? 'Harness 全部锁定不变，只替换 Model' : 'Model 锁定为「当前模型」，每次只关一个组件';
+    s.querySelector('.c7ob-mod').classList.toggle('live', sw);
+    s.querySelector('.c7ob-har').classList.toggle('live', !sw);
+    s.querySelectorAll('[data-m]').forEach((b) => { b.classList.remove('on'); b.classList.toggle('fix', !sw && b.dataset.m === '1'); });
+    s.querySelectorAll('[data-c]').forEach((b) => { b.classList.remove('off'); b.classList.toggle('fix', sw); });
+    this.rows(s, sw ? ['弱模型', '当前模型', '强模型'] : ['完整 Harness', '关闭：提示词', '关闭：工具设计', '关闭：反馈循环']);
+    if (sw) this.setSc(this.sc);
+    this.run(s);
+  },
+  vals() { return this.m === 'swap' ? this.SW[this.sc].v : this.AB; },
+  // 依次运行每一行实验，最后给出诊断
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const rs = [...s.querySelectorAll('.c7ob-r')], v = this.vals(), dx = s.querySelector('.c7ob-dx');
+    dx.classList.remove('on');
+    rs.forEach((r, i) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      this.pick(s, i, true);
+      r.querySelector('i').style.width = v[i] + '%';
+      r.querySelector('em').textContent = v[i];
+    }, 300 + i * 900));
+    ctx.later(() => {
+      if (tk !== this.tk) return;
+      dx.querySelector('span').innerHTML = this.m === 'swap' ? this.SW[this.sc].dx : '关闭「反馈循环」掉分最多 → 它是这个 Harness 里最重要的部件；关闭「提示词」几乎不掉分，可以考虑精简';
+      dx.classList.add('on');
+      rs.forEach((r) => r.classList.remove('on'));
+      s.querySelectorAll('[data-m],[data-c]').forEach((b) => { b.classList.remove('on'); if (this.m === 'abl') b.classList.remove('off'); });
+    }, 300 + rs.length * 900 + 300);
+  },
+  pick(s, i, auto) {
+    const rs = [...s.querySelectorAll('.c7ob-r')], v = this.vals();
+    rs.forEach((r, j) => r.classList.toggle('on', j === i));
+    if (!auto && rs[i]) { rs[i].querySelector('i').style.width = v[i] + '%'; rs[i].querySelector('em').textContent = v[i]; }
+    if (this.m === 'swap') s.querySelectorAll('[data-m]').forEach((b) => b.classList.toggle('on', +b.dataset.m === i));
+    else s.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('off', +b.dataset.c === i - 1));
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.manual = false;
+    this.sc = 'a';
+    this.mode(s, k >= 1 ? 'abl' : 'swap');
+    // 自动演示：模型替换模式下轮换两个示例
+    ctx.every(() => {
+      if (this.manual || this.m !== 'swap') return;
+      this.sc = this.sc === 'a' ? 'b' : 'a';
+      this.setSc(this.sc);
+      this.run(s);
+    }, 7600);
+  },
+  step(s, ctx, k) { this.manual = false; this.mode(s, k >= 1 ? 'abl' : 'swap'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.c7ob-dx').classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c07-future" data-part="0" data-trans="rise" data-title="为未来的模型开发产品" data-notes="评估体系的价值在模型快速演进的时代更加凸显。模型能力仍在快速演进，但新模型在公开基准上表现更好，并不意味着在你的特定任务上也更好，反而可能出现性能退化（regression，即新版本在某些方面不如旧版本）。只有在自己的评估数据集上完整测试，才能做出数据驱动的升级决策。<br>更进一步，完善的评估体系使得<b>“为未来的模型开发产品”</b>成为可行策略——即使当前模型不足以支撑商用，也可以先完成产品开发并建立评估集，持续追踪新模型的表现，一旦达到门槛就立即上线。<br>图中曲线是示意：每发布一个新模型，就在自己的评估集上完整跑一遍；出现回退就不升级，越过门槛就上线。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">新模型更强，不代表<em>在你的任务上</em>更好</h2>
+  <p class="lead fx fx-up" style="--d:2">只有在自己的评估数据集上完整测试，才能做出数据驱动的升级决策</p></header>
+  <div class="c7fu-body">
+    <div class="c7fu-chart panel fx fx-scale" style="--d:3">
+      <svg class="c7fu-svg" viewBox="0 0 1040 520" width="1040" height="520"></svg>
+      <div class="c7fu-legend"><span class="p"><i></i>公开基准分数</span><span class="m"><i></i>你的评估集分数</span><span class="c7-tag">示意</span></div>
+    </div>
+    <div class="c7fu-side">
+      <div class="c7fu-c c7-card fx fx-right" style="--d:4;--c:var(--bad)" data-k="reg"><b><svg class="ic"><use href="#i-trend"/></svg>性能退化（regression）</b><p>新版本在某些方面不如旧版本——公开基准涨了，你的任务却可能掉了</p></div>
+      <div class="c7fu-c c7-card fx fx-right" style="--d:5;--c:var(--ctx)" data-k="eval"><b><svg class="ic"><use href="#i-clipboard"/></svg>在自己的评估集上完整测试</b><p>每个新模型都完整跑一遍，用数据决定升级与否</p></div>
+      <div class="c7fu-c c7-card fx fx-right" style="--d:6;--c:var(--ok)" data-k="ship"><b><svg class="ic"><use href="#i-rocket"/></svg>为未来的模型开发产品</b><p>当前模型不足以商用时，先完成产品和评估集；新模型一达到门槛就立即上线</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 · 开篇</div>
+</section>
+<style>
+.c7fu-body{display:flex;gap:28px}
+.c7fu-chart{width:1100px;flex:none;padding:18px 30px 16px;display:flex;flex-direction:column;gap:6px}
+.c7fu-svg{overflow:visible}
+.c7fu-svg .ax{stroke:rgba(255,255,255,.18);stroke-width:1.5}
+.c7fu-svg .gd{stroke:rgba(255,255,255,.06);stroke-width:1}
+.c7fu-svg .tl{fill:var(--text3);font-size:16px}
+.c7fu-svg .th{stroke:var(--ok);stroke-width:2;stroke-dasharray:8 7;opacity:.8}
+.c7fu-svg .thl{fill:var(--ok);font-size:17px;font-weight:700}
+.c7fu-svg .ln{fill:none;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round}
+.c7fu-svg .ln.p{stroke:#94a3b8;stroke-dasharray:3 7}
+.c7fu-svg .ln.m{stroke:var(--acc);filter:drop-shadow(0 0 6px var(--acc))}
+.c7fu-svg .pt{transition:r .4s var(--spring)}
+.c7fu-svg .pt.p{fill:#94a3b8}
+.c7fu-svg .pt.m{fill:#0a1024;stroke:var(--acc);stroke-width:3.5}
+.c7fu-svg .pt.m.bad{stroke:var(--bad)}
+.c7fu-svg .pt.m.go{stroke:var(--ok);fill:var(--ok)}
+.c7fu-svg .ev{fill:var(--text2);font-size:16px;text-anchor:middle}
+.c7fu-svg .scan{fill:color-mix(in srgb,var(--acc) 20%,transparent)}
+.c7fu-svg .flag{font-size:17px;font-weight:700;text-anchor:middle}
+.c7fu-svg .flag.bad{fill:var(--bad)}.c7fu-svg .flag.go{fill:var(--ok)}
+.c7fu-legend{display:flex;gap:26px;align-items:center;font-size:17px;color:var(--text2);padding-left:60px}
+.c7fu-legend span{display:flex;align-items:center;gap:8px}
+.c7fu-legend i{width:30px;height:4px;border-radius:2px;display:block}
+.c7fu-legend .p i{background:repeating-linear-gradient(90deg,#94a3b8 0 4px,transparent 4px 9px)}
+.c7fu-legend .m i{background:var(--acc)}
+.c7fu-side{flex:1;display:flex;flex-direction:column;gap:18px}
+.c7fu-c{padding:20px 24px}
+.c7fu-c b{display:flex;align-items:center;gap:10px;font-size:22px;color:var(--c)}
+.c7fu-c p{margin-top:8px;font-size:19px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c07-future'] = {
+  P: [40, 48, 55, 61, 68, 74, 80],
+  M: [22, 30, 41, 36, 49, 56, 66],
+  TH: 60,
+  X: (i) => 110 + i * 140,
+  Y: (v) => 440 - (v / 100) * 400,
+  init(s) {
+    const g = s.querySelector('.c7fu-svg'), S = C7.S, X = this.X, Y = this.Y;
+    for (let v = 0; v <= 100; v += 25) {
+      S('line', { class: 'gd', x1: 60, x2: 1000, y1: Y(v), y2: Y(v) }, g);
+      S('text', { class: 'tl', x: 48, y: Y(v) + 6, 'text-anchor': 'end' }, g).textContent = v + '%';
+    }
+    S('line', { class: 'ax', x1: 60, x2: 1000, y1: Y(0), y2: Y(0) }, g);
+    S('line', { class: 'th', x1: 60, x2: 1000, y1: Y(this.TH), y2: Y(this.TH) }, g);
+    S('text', { class: 'thl', x: 995, y: Y(this.TH) - 10, 'text-anchor': 'end' }, g).textContent = '商用门槛';
+    this.P.forEach((_, i) => { S('text', { class: 'tl', x: X(i), y: Y(0) + 28, 'text-anchor': 'middle' }, g).textContent = '模型 ' + (i + 1); });
+    S('text', { class: 'tl', x: 530, y: Y(0) + 56, 'text-anchor': 'middle' }, g).textContent = '时间 → 新模型陆续发布';
+    this.scan = S('rect', { class: 'scan', x: 0, y: Y(100), width: 0, height: 400, rx: 8 }, g);
+    this.lp = S('path', { class: 'ln p', d: '' }, g);
+    this.lm = S('path', { class: 'ln m', d: '' }, g);
+    this.pts = this.P.map((v, i) => [S('circle', { class: 'pt p', cx: X(i), cy: Y(v), r: 0 }, g), S('circle', { class: 'pt m', cx: X(i), cy: Y(this.M[i]), r: 0 }, g)]);
+    this.ev = S('text', { class: 'ev', x: 0, y: 34 }, g);
+    this.flag = S('text', { class: 'flag', x: 0, y: 0 }, g);
+  },
+  path(arr, n) { return arr.slice(0, n).map((v, i) => `${i ? 'L' : 'M'}${this.X(i)} ${this.Y(v)}`).join(''); },
+  async play(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const X = this.X, Y = this.Y, cards = [...s.querySelectorAll('.c7fu-c')];
+    const card = (k) => cards.forEach((c) => c.classList.toggle('on', c.dataset.k === k));
+    this.reset(s, true);
+    let best = -1;
+    for (let i = 0; i < this.P.length; i++) {
+      this.ev.setAttribute('x', X(i)); this.ev.textContent = `模型 ${i + 1} 发布`;
+      this.pts[i][0].setAttribute('r', 7);
+      this.lp.setAttribute('d', this.path(this.P, i + 1));
+      card('eval');
+      // 在自有评估集上完整测试：扫描条
+      this.scan.setAttribute('x', X(i) - 30);
+      for (let w = 0; w <= 60; w += 6) { this.scan.setAttribute('width', w); await U.wait(ctx, 40); if (!ok()) return; }
+      this.scan.setAttribute('width', 0);
+      const v = this.M[i], dot = this.pts[i][1];
+      dot.setAttribute('r', 9);
+      this.lm.setAttribute('d', this.path(this.M, i + 1));
+      this.flag.setAttribute('class', 'flag');
+      this.flag.textContent = '';
+      if (v < best) {
+        dot.classList.add('bad');
+        this.flag.setAttribute('x', X(i)); this.flag.setAttribute('y', Y(v) + 36);
+        this.flag.setAttribute('class', 'flag bad'); this.flag.textContent = '回退：暂不升级';
+        card('reg');
+        await U.wait(ctx, 1500);
+      } else if (v >= this.TH) {
+        dot.classList.add('go');
+        this.flag.setAttribute('x', X(i)); this.flag.setAttribute('y', Y(v) - 22);
+        this.flag.setAttribute('class', 'flag go'); this.flag.textContent = '达到门槛 → 立即上线';
+        card('ship');
+        await U.wait(ctx, 2600);
+      } else await U.wait(ctx, 700);
+      if (!ok()) return;
+      best = Math.max(best, v);
+    }
+    await U.wait(ctx, 1600);
+    if (ok()) this.play(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; ctx.later(() => this.play(s), 900); },
+  leave() { this.ctx = null; },
+  reset(s, keep) {
+    if (!keep) this.tk = (this.tk || 0) + 1;
+    this.lp.setAttribute('d', ''); this.lm.setAttribute('d', '');
+    this.pts.forEach(([a, b]) => { a.setAttribute('r', 0); b.setAttribute('r', 0); b.classList.remove('bad', 'go'); });
+    this.ev.textContent = ''; this.flag.textContent = '';
+    s.querySelectorAll('.c7fu-c').forEach((c) => c.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c07-map" data-part="0" data-trans="flip" data-title="评估体系的四个环节" data-notes="一套评估体系可以拆成四个环节：<b>什么算成功、任务从何而来、由谁验证、分数如何转化为决策</b>，如图7-1 所示。<br>① 成功的定义：Pass@k 衡量能力上限，Pass^k 衡量业务可靠性；② 任务来源：公开基准用于借鉴手法、粗筛选型，自建业务集覆盖真实任务分布，生产轨迹回流是失败归因的产出；③ 验证方式按任务的可机械验证程度排列：确定性验证器（SWE-bench）、检查项清单（τ²-bench）、Rubric + LLM 评判（开放式任务）、配对比较（Chatbot Arena）；④ 结果的运用：统计显著性 → 失败归因 → 回归任务 → 模型选型与 Harness 迭代，回归任务又沉淀为新用例。支撑设施：可观测性（提供轨迹）、内部评估基础设施（消融 / AB / 特性开关）、仿真环境（通向第八章）。<br>本章先完整解剖一条真实任务，再按这几个环节依次展开。上方路线和卡片里的标签都可以点击跳转。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一套评估体系的<em>四个环节</em></h2></header>
+  <div class="c7mp-route fx fx-up" style="--d:2"><span class="c7mp-rl">本章路线</span></div>
+  <div class="c7mp-stage">
+    <svg class="c7mp-svg" viewBox="0 0 1660 520" width="1660" height="520">
+      <defs><marker id="c7mpar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#a78bfa"/></marker></defs>
+      <path id="c7mpp" class="c7mp-flow" d="M370 40 H430 M800 40 H860 M1230 40 H1290"/>
+      <path class="c7mp-back" d="M1475 392 C 1475 470, 1300 478, 1045 478 S 615 470, 615 400" marker-end="url(#c7mpar)"/>
+      <text class="c7mp-bt" x="1045" y="506">回归任务沉淀为新用例</text>
+      <circle class="c7mp-cm" r="8"><animateMotion dur="4.5s" repeatCount="indefinite" path="M1475 392 C 1475 470, 1300 478, 1045 478 S 615 470, 615 400"/></circle>
+    </svg>
+    <div class="c7mp-cards"></div>
+  </div>
+  <div class="c7mp-sup fx fx-up" style="--d:9"><span class="c7mp-sl">支撑设施</span></div>
+  <div class="src">第七章 · 开篇 · 图7-1</div>
+</section>
+<style>
+.c7mp-route{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:-8px}
+.c7mp-rl,.c7mp-sl{font-size:16px;letter-spacing:.24em;color:var(--text3);margin-right:6px}
+.c7mp-route button,.c7mp-sup button,.c7mp-k button{--c:var(--acc);padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .25s}
+.c7mp-route button:hover,.c7mp-sup button:hover,.c7mp-k button:hover{color:#06101f;background:var(--c);border-color:var(--c)}
+.c7mp-route i{font-style:normal;color:var(--text3)}
+.c7mp-stage{position:relative;height:520px;margin-top:22px}
+.c7mp-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.c7mp-flow{fill:none;stroke:#a78bfa;stroke-width:3;stroke-dasharray:6 8;animation:flow 1s linear infinite;opacity:.8}
+.c7mp-back{fill:none;stroke:#a78bfa;stroke-width:2.5;stroke-dasharray:6 8;opacity:.55;animation:flow 1.4s linear infinite}
+.c7mp-bt{fill:var(--acc);font-size:17px;font-weight:700;text-anchor:middle}
+.c7mp-cm{fill:#fff;filter:drop-shadow(0 0 8px #a78bfa);opacity:0}
+.active .c7mp-cm{opacity:1;transition:opacity 1s 2s}
+.c7mp-cards{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:repeat(4,370px);gap:60px}
+.c7mp-k{--c:var(--acc);height:392px;padding:22px 22px 18px;border-radius:22px;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9)),rgba(12,18,40,.9) 70%);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);display:flex;flex-direction:column;gap:12px;opacity:0;transform:translateY(30px) scale(.96);transition:opacity .7s var(--ease),transform .7s var(--spring),box-shadow .5s;transition-delay:calc(var(--i)*260ms + 300ms)}
+.active .c7mp-k{opacity:1;transform:none}
+.c7mp-k:hover{box-shadow:0 0 40px -8px var(--c)}
+.c7mp-kh{display:flex;align-items:center;gap:12px}
+.c7mp-kh em{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font:800 22px var(--num);font-style:normal;color:#06101f;background:var(--c);box-shadow:0 0 18px var(--c)}
+.c7mp-kh b{font-size:27px;color:var(--c)}
+.c7mp-kq{font-size:17px;color:var(--text3)}
+.c7mp-ki{display:flex;flex-direction:column;gap:9px}
+.c7mp-ki div{padding:9px 13px;border-radius:12px;font-size:18px;line-height:1.45;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.c7mp-ki div small{display:block;font-size:15px;color:var(--text3)}
+.c7mp-ax{font-size:15px;color:var(--text3);text-align:center}
+.c7mp-k .c7mp-go{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
+.c7mp-sup{display:flex;align-items:center;gap:10px;padding:14px 20px;border-radius:16px;border:1px dashed var(--line2);background:rgba(255,255,255,.02)}
+</style>
+<script>
+HOOKS['c07-map'] = {
+  R: [[1, '解剖一条任务'], [2, '成功的定义'], [3, '评估环境'], [4, '评估数据集'], [5, 'LLM 评判'], [6, '归因与排名'], [7, '评估驱动选型'], [8, '从数据到改进'], [9, '内部评估与仿真'], [10, '小结与思考题']],
+  K: [
+    { c: '#f472b6', t: '成功的定义', q: '什么算成功？', it: [['Pass@k', '衡量能力上限'], ['Pass^k', '衡量业务可靠性']], go: [[2, 'Pass@k 与 Pass^k']] },
+    { c: '#60a5fa', t: '任务来源', q: '任务从何而来？', it: [['公开基准', '借鉴手法 · 粗筛选型'], ['自建业务集', '真实任务分布'], ['生产轨迹回流', '失败归因的产出']], go: [[4, '评估数据集']] },
+    { c: '#c084fc', t: '验证方式', q: '由谁验证？', it: [['确定性验证器', 'SWE-bench'], ['检查项清单', 'τ²-bench'], ['Rubric + LLM 评判', '开放式任务'], ['配对比较', 'Chatbot Arena']], ax: '← 按任务的可机械验证程度排列 →', go: [[5, 'LLM 评判'], [6, '配对比较']] },
+    { c: '#fbbf24', t: '结果的运用', q: '分数如何变成决策？', it: [['统计显著性', ''], ['失败归因', ''], ['回归任务', ''], ['模型选型与 Harness 迭代', '']], go: [[8, '显著性'], [6, '归因'], [7, '选型']] },
+  ],
+  init(s) {
+    s.querySelector('.c7mp-route').insertAdjacentHTML('beforeend', this.R.map(([p, n], i) => `${i ? '<i>›</i>' : ''}<button data-p="${p}">${n}</button>`).join(''));
+    s.querySelector('.c7mp-cards').innerHTML = this.K.map((k, i) => `
+      <div class="c7mp-k" style="--c:${k.c};--i:${i}">
+        <div class="c7mp-kh"><em>${i + 1}</em><b>${k.t}</b></div>
+        <div class="c7mp-kq">${k.q}</div>
+        <div class="c7mp-ki">${k.it.map(([a, b]) => `<div>${a}${b ? `<small>${b}</small>` : ''}</div>`).join('')}</div>
+        ${k.ax ? `<div class="c7mp-ax">${k.ax}</div>` : ''}
+        <div class="c7mp-go">${k.go.map(([p, n]) => `<button data-p="${p}" style="--c:${k.c}">${n} →</button>`).join('')}</div>
+      </div>`).join('');
+    s.querySelector('.c7mp-sup').insertAdjacentHTML('beforeend', [[8, '可观测性（提供轨迹）'], [9, '内部评估基础设施（消融 / AB / 特性开关）'], [9, '仿真环境（通向第八章）']].map(([p, n]) => `<button data-p="${p}">${n}</button>`).join(''));
+    s.addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) C7.goPart(b.dataset.p); });
+  },
+};
+</script>

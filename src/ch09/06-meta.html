@@ -1,0 +1,504 @@
+<!-- ================= PART 06 写入参数与更新“更新方法” ================= -->
+<section class="slide chapter" id="c09-d6" data-part="6" data-title="PART 06 · 写入参数与更新“更新方法”" data-notes="知识、指令和程序都建立在一个前提上：目标能力能够被外部符号较完整地表达。这一部分先讲表示性质决定的最后一种载体——模型参数；再讲与“写到哪里”正交的另一条轴：系统正在优化的是某份产物的内容，还是产生、管理和验证这些产物的方法。从单条规则一直扩大到产生更新提案的优化器代码，依次介绍 ACE、MCE、AFlow、Meta-Harness 与 Dream-RSI，最后是实验 9-8：把这本书交给 Hermes，看它能否升级自己。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">写入参数与<br>更新“更新方法”</h1>
+  <div class="ch-s fx fx-up" style="--d:3">经验写到哪里 · 正在优化的是产物，还是产生产物的方法</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">真正决定主要载体的，是能力的表示性质。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c09-param" data-part="6" data-dur="16000" data-title="将经验写入参数" data-notes="知识、指令和程序都建立在一个前提上：目标能力能够被外部符号较完整地表达。医疗影像理解、自然的语音韵律、消除文本的模板化“AI 味”、长程规划等能力却很难压缩成几条规则或工作流，这类能力必须通过后训练写入模型参数。弯引号的作用域判断处在中间地带：文档语法边界可以由程序解析，语境和例外需要 Skill 表达，跨任务的识别习惯才适合通过后训练内化。<br>是否参数化并不由“任务是否长期稳定”单独决定。新影像设备带来的域偏移仍可能需要 LoRA 或持续微调；快速变化的语言风格也可以通过周期性偏好训练适应。稳定性影响的是更新频率和成本，真正决定主要载体的是能力的表示性质。<br>第八章已经完整讨论 SFT、蒸馏和 RL，本节不重复。对持续进化而言，关键是把经过评价的生产轨迹转化为训练数据：高质量示范可以进入 SFT，明确偏好可以形成成对数据，具有可靠环境奖励的交互可以用于 RL。右下角的轨迹分流为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">难以压缩成规则的能力，<em>写入参数</em></h2></header>
+  <div class="g6b-body">
+    <div class="g6b-l fx fx-left" style="--d:2">
+      <div class="g6b-caps"><span class="lbl">很难压缩成几条规则或工作流</span><div><span>医疗影像理解</span><span>自然的语音韵律</span><span>消除模板化“AI 味”</span><span>长程规划</span></div></div>
+      <div class="g6b-q c9-card"><span class="lbl">中间地带：弯引号的作用域判断</span>
+        <div class="g6b-qr" style="--c:var(--c9-prog)"><b>程序</b><span>文档语法边界可以由程序解析</span></div>
+        <div class="g6b-qr" style="--c:var(--c9-inst)"><b>Skill</b><span>语境和例外需要 Skill 表达</span></div>
+        <div class="g6b-qr" style="--c:var(--c9-param)"><b>参数</b><span>跨任务的识别习惯才适合通过后训练内化</span></div>
+      </div>
+      <div class="g6b-st"><b>稳定性 ≠ 载体</b><p>新影像设备的域偏移仍可能需要 LoRA 或持续微调；快速变化的语言风格也可以周期性偏好训练。稳定性影响的是<em>更新频率和成本</em>，真正决定主要载体的是<em>能力的表示性质</em></p></div>
+    </div>
+    <div class="g6b-r panel fx fx-right" style="--d:3">
+      <div class="g6b-h"><b>把经过评价的生产轨迹转化为训练数据</b><span class="c9-sy">示意</span></div>
+      <div class="g6b-src"><svg class="ic"><use href="#i-list"/></svg><span>已评价的生产轨迹</span></div>
+      <div class="g6b-bins">
+        <div data-k="sft"><b>SFT</b><span>高质量示范</span><em>0</em></div>
+        <div data-k="pair"><b>成对偏好</b><span>明确的偏好</span><em>0</em></div>
+        <div data-k="rl"><b>RL</b><span>可靠的环境奖励</span><em>0</em></div>
+      </div>
+      <div class="g6b-drop"></div>
+      <p class="g6b-nt">SFT、蒸馏与 RL 的细节见第八章</p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验写入参数」</div>
+</section>
+<style>
+.g6b-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.g6b-l{display:flex;flex-direction:column;gap:14px}
+.g6b-caps div{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.g6b-caps div span{padding:7px 14px;border-radius:999px;font-size:17px;color:var(--c9-param);border:1px solid color-mix(in srgb,var(--c9-param) 50%,transparent);background:color-mix(in srgb,var(--c9-param) 9%,transparent)}
+.g6b-q{display:flex;flex-direction:column;gap:8px}
+.g6b-qr{display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border-left:4px solid var(--c);background:rgba(255,255,255,.03)}
+.g6b-qr b{font-size:17px;color:var(--c)}
+.g6b-qr span{font-size:16px;color:var(--text2)}
+.g6b-st{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g6b-st b{font-size:18px}
+.g6b-st p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+.g6b-st em{font-style:normal;font-weight:700;color:var(--acc)}
+.g6b-r{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.g6b-h{display:flex;align-items:center;justify-content:space-between}
+.g6b-h b{font-size:19px}
+.g6b-src{display:flex;align-items:center;gap:10px;align-self:center;padding:10px 18px;border-radius:14px;font-size:18px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.g6b-src .ic{font-size:24px;color:var(--acc)}
+.g6b-bins{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:auto}
+.g6b-bins>div{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 10px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c9-param) 45%,transparent);background:color-mix(in srgb,var(--c9-param) 7%,transparent)}
+.g6b-bins b{font-size:20px;color:var(--c9-param)}
+.g6b-bins span{font-size:15px;color:var(--text2)}
+.g6b-bins em{font:800 30px var(--num);font-style:normal;color:var(--text)}
+.g6b-bins>div.hit{animation:pop .4s var(--spring)}
+.g6b-drop{position:absolute;left:0;right:0;top:120px;bottom:150px;pointer-events:none}
+.g6b-dot{position:absolute;width:14px;height:14px;margin-left:-7px;border-radius:50%;transition:left .8s var(--ease),top .8s var(--ease),opacity .3s}
+.g6b-nt{font-size:15px;color:var(--text3);text-align:center}
+</style>
+<script>
+HOOKS['c09-param'] = {
+  K: ['sft', 'pair', 'rl', 'sft', 'rl', 'pair', 'sft', 'rl', 'sft'],
+  C: { sft: '#34d399', pair: '#fbbf24', rl: '#a78bfa' },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const drop = s.querySelector('.g6b-drop'), bins = {};
+    s.querySelectorAll('.g6b-bins>div').forEach((b) => (bins[b.dataset.k] = b));
+    while (ok()) {
+      drop.innerHTML = ''; Object.values(bins).forEach((b) => (b.querySelector('em').textContent = '0'));
+      const n = { sft: 0, pair: 0, rl: 0 };
+      for (const k of this.K) {
+        const d = document.createElement('i'); d.className = 'g6b-dot'; d.style.background = this.C[k]; d.style.left = '50%'; d.style.top = '0px';
+        drop.appendChild(d);
+        await U.wait(ctx, 60); if (!ok()) return;
+        const bx = bins[k], R = drop.getBoundingClientRect(), B = bx.getBoundingClientRect(), sc = U.scale || 1;
+        d.style.left = ((B.left - R.left + B.width / 2) / sc) + 'px'; d.style.top = ((B.top - R.top) / sc + 10) + 'px';
+        await U.wait(ctx, 820); if (!ok()) return;
+        d.style.opacity = 0; n[k]++; bx.querySelector('em').textContent = n[k]; U.restart(bx, 'hit');
+        await U.wait(ctx, 200); if (!ok()) return;
+        d.remove();
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.g6b-drop').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 从更新产物到更新“更新方法” ================= -->
+<section class="slide" id="c09-scale5" data-part="6" data-trans="zoom" data-dur="18000" data-title="五种搜索尺度" data-notes="前面的四种方法讨论了经验最终<b>写到哪里</b>，但持续进化还有另一条正交的轴：系统正在优化的究竟是某份产物的内容，还是产生、管理和验证这些产物的方法。沿这条轴看，优化对象可以逐层扩大为：<b>单条规则或记忆 → 结构化上下文 → 工作流 → Harness 代码 → 产生更新提案的优化器代码</b>。这不是五种新的更新载体，而是五种不同的搜索尺度；知识、Prompt、Skill 和程序都可能出现在其中多个层级。<br>最内层只修改产物内容，例如根据失败轨迹给系统提示增加一条局部规则，或给经验文档补充一个例外条件。这种修改作用面小，容易归因和回滚，应当是默认选择。向外各层分别对应后面几页的例子：结构化上下文（ACE、MCE）、工作流（AFlow）、Harness 代码（Meta-Harness）、产生更新提案的优化器代码（Dream-RSI 的探索策略）。点击任一层查看说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">另一条正交的轴：<em>五种搜索尺度</em></h2>
+  <p class="lead fx fx-up" style="--d:2">不是五种新的更新载体，而是五种不同的搜索尺度</p></header>
+  <div class="g6c-body">
+    <div class="g6c-nest fx fx-scale" style="--d:3"></div>
+    <div class="g6c-info fx fx-right" style="--d:4">
+      <div class="g6c-card c9-card"><em class="g6c-no">1</em><b class="g6c-t"></b><p class="g6c-d"></p><div class="g6c-ex"><span class="lbl">例子</span><span class="g6c-e"></span></div></div>
+      <div class="g6c-def"><b>最内层是默认选择</b><span>作用面小，容易归因和回滚；越往外，作用面越大、反馈越慢</span></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」</div>
+</section>
+<style>
+.g6c-body{display:grid;grid-template-columns:860px 1fr;gap:26px;flex:1;min-height:0}
+.g6c-nest{position:relative}
+.g6c-r{position:absolute;left:50%;bottom:0;transform:translateX(-50%);border-radius:28px 28px 0 0;border:2px solid color-mix(in srgb,var(--c) 55%,transparent);border-bottom:none;background:color-mix(in srgb,var(--c) 6%,transparent);cursor:pointer;transition:all .35s}
+.g6c-r span{position:absolute;left:0;right:0;top:12px;text-align:center;font-size:18px;font-weight:700;color:var(--text2);pointer-events:none;transition:color .3s}
+.g6c-r.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,transparent);box-shadow:0 0 30px color-mix(in srgb,var(--c) 25%,transparent)}
+.g6c-r.on span{color:var(--text)}
+.g6c-info{display:flex;flex-direction:column;gap:16px}
+.g6c-card{display:flex;flex-direction:column;gap:10px;min-height:260px}
+.g6c-no{font:800 44px/1 var(--num);font-style:normal;color:var(--acc)}
+.g6c-t{font-size:25px}
+.g6c-d{font-size:18px;line-height:1.65;color:var(--text2)}
+.g6c-ex{display:flex;flex-direction:column;gap:4px;margin-top:auto}
+.g6c-e{font-size:17px;line-height:1.55;color:var(--text)}
+.g6c-def{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:14px;border-left:4px solid var(--ok);background:linear-gradient(90deg,rgba(52,211,153,.1),transparent)}
+.g6c-def b{font-size:19px}
+.g6c-def span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c09-scale5'] = {
+  L: [
+    ['单条规则或记忆', '只修改产物内容：作用面小，容易归因和回滚，应当是默认选择', '根据失败轨迹给系统提示增加一条局部规则；给经验文档补充一个例外条件', '#2dd4bf'],
+    ['结构化上下文', '把上下文维护成带稳定标识符的条目集合，增量更新，而不是每轮重写', 'ACE：生成、反思、整理模块提出增量条目，确定性合并与去重；MCE 进一步学习“如何管理上下文”', '#fbbf24'],
+    ['工作流', '优化由多个 LLM 调用组成的流程本身', 'AFlow：把工作流表示为代码图，通过执行反馈搜索节点与控制流的组合', '#60a5fa'],
+    ['Harness 代码', '搜索决定信息如何存储、检索和呈现的代码', 'Meta-Harness：Coding Agent 读取待验证 Harness 的源码、分数和轨迹', '#a78bfa'],
+    ['产生更新提案的优化器代码', '优化“如何产生更新提案”：例如探索策略本身', 'Dream-RSI：在历史发现树上回放，修改探索策略代码', '#f472b6'],
+  ],
+  init(s) {
+    const host = s.querySelector('.g6c-nest');
+    host.innerHTML = this.L.slice().reverse().map(([t, , , c], ri) => { const i = 4 - ri, w = 360 + i * 110, h = 140 + i * 92; return `<div class="g6c-r" data-i="${i}" style="--c:${c};width:${w}px;height:${h}px"><span>${i + 1} · ${t}</span></div>`; }).join('');
+    host.querySelectorAll('.g6c-r').forEach((r) => r.addEventListener('click', (e) => { e.stopPropagation(); this.auto = false; this.pick(s, +r.dataset.i); }));
+    this.pick(s, 0);
+  },
+  pick(s, i) {
+    const [t, d, e, c] = this.L[i]; this.i = i;
+    s.querySelectorAll('.g6c-r').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+    s.querySelector('.g6c-no').textContent = i + 1; s.querySelector('.g6c-no').style.color = c;
+    s.querySelector('.g6c-t').textContent = t; s.querySelector('.g6c-d').textContent = d; s.querySelector('.g6c-e').textContent = e;
+  },
+  enter(s, ctx) { this.auto = true; this.pick(s, 0); ctx.every(() => { if (this.auto) this.pick(s, (this.i + 1) % 5); }, 3200); },
+};
+</script>
+
+<section class="slide" id="c09-ace" data-part="6" data-dur="18000" data-title="整份重写的退化与 ACE" data-notes="反复让模型重写整份 Prompt 或记忆会产生另一类退化：为了追求简洁，旧版本中的少数重要细节可能在多轮改写后逐渐消失；相互制约的条件也可能被合并成一句过度抽象的原则。Agentic Context Engineering（ACE）把上下文维护成带稳定标识符的条目集合，由生成、反思和整理模块提出增量更新，再用确定性逻辑合并与去重，而不是每轮重写一个越来越短的文本块。它为本章前文“最小 diff、保留来源”的原则提供了一个具体研究实例。<br>左侧示意两种维护方式在五轮之后的样子：整份重写时，“仅限会员”“周末除外”这类细节被一轮轮抹掉；ACE 的条目带编号和来源，新经验以增量条目加入，重复项被确定性合并。切换右上角开关对比。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每轮重写一遍，<em>细节就悄悄消失</em></h2></div>
+    <div class="g6d-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="rw">整份重写</button><button data-v="ace">ACE 增量条目</button></div></header>
+  <div class="g6d-body">
+    <div class="g6d-doc panel fx fx-left" style="--d:3"><div class="g6d-h"><b class="g6d-tt">退款经验 · 第 1 轮</b><span class="c9-sy">示意</span></div><div class="g6d-txt"></div><div class="g6d-meter"><span>保留的关键细节</span><div class="meter"><i></i></div><em class="g6d-mv">4 / 4</em></div></div>
+    <div class="g6d-r fx fx-right" style="--d:4">
+      <div class="g6d-k c9-card"><b>整份重写的两种退化</b><p>旧版本中少数重要细节在多轮改写后<b>逐渐消失</b>；相互制约的条件被合并成一句<b>过度抽象的原则</b></p></div>
+      <div class="g6d-k c9-card" style="--c:var(--ok)"><b>ACE：Agentic Context Engineering</b><p>上下文是<b>带稳定标识符的条目集合</b>；生成、反思、整理模块提出增量更新，再用<b>确定性逻辑合并与去重</b></p></div>
+      <p class="g6d-nt">它为本章“最小 diff、保留来源”的原则提供了一个具体研究实例</p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」· ACE</div>
+</section>
+<style>
+.g6d-body{display:grid;grid-template-columns:1.25fr 1fr;gap:24px;flex:1;min-height:0}
+.g6d-doc{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.g6d-h{display:flex;align-items:center;justify-content:space-between}
+.g6d-h b{font-size:20px}
+.g6d-txt{flex:1;display:flex;flex-direction:column;gap:8px}
+.g6d-txt p{font-size:18px;line-height:1.65;color:var(--text);animation:upIn .4s var(--spring) both}
+.g6d-txt mark{background:color-mix(in srgb,var(--tool) 30%,transparent);color:var(--text);border-radius:4px;padding:0 3px}
+.g6d-txt del{color:#fda4af;text-decoration-color:var(--bad)}
+.g6d-e{display:grid;grid-template-columns:70px 1fr auto;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;font-size:17px;border:1px solid var(--line);background:rgba(255,255,255,.03);animation:upIn .4s var(--spring) both}
+.g6d-e code{font:600 15px var(--mono);color:var(--acc)}
+.g6d-e small{font-size:15px;color:var(--text3)}
+.g6d-e.new{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.g6d-e.mrg{border-color:color-mix(in srgb,var(--tool) 55%,transparent)}
+.g6d-meter{display:grid;grid-template-columns:auto 1fr 64px;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+.g6d-meter em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+.g6d-r{display:flex;flex-direction:column;gap:14px}
+.g6d-k b{font-size:19px}
+.g6d-k p{margin-top:8px;font-size:17px;line-height:1.65;color:var(--text2)}
+.g6d-k p b{font-size:inherit;color:var(--text)}
+.g6d-nt{margin-top:auto;font-size:16px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c09-ace'] = {
+  RW: [
+    ['退款申请须在 <mark>7 天</mark>内提出，<mark>仅限会员</mark>；<mark>周末提交的</mark>顺延到下一个工作日处理；<mark>超过 500 元</mark>需主管复核。', 4],
+    ['退款须在 <mark>7 天</mark>内提出，<mark>仅限会员</mark>；<mark>超过 500 元</mark>需主管复核。', 3],
+    ['退款须在 <mark>7 天</mark>内提出；大额需复核。', 1],
+    ['及时处理退款，必要时复核。', 0],
+    ['以客户满意为原则处理退款。', 0],
+  ],
+  ACE: [
+    [['R-01', '7 天内可申请退款', '轨迹 #12'], ['R-02', '仅限会员', '轨迹 #12'], ['R-03', '周末提交顺延到下一个工作日', '轨迹 #31'], ['R-04', '超过 500 元需主管复核', '轨迹 #40']],
+    [['R-05', '机票退款另走航司流程', '轨迹 #57', 'new']],
+    [['R-01', '7 天内可申请退款（与新条目合并，来源 +1）', '轨迹 #12 #63', 'mrg']],
+    [['R-06', '退款到账前不得承诺具体日期', '轨迹 #71', 'new']],
+    [],
+  ],
+  init(s) { this.set = U.seg(s.querySelector('.g6d-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  async run(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const txt = s.querySelector('.g6d-txt'), tt = s.querySelector('.g6d-tt'), mv = s.querySelector('.g6d-mv'), mi = s.querySelector('.g6d-meter .meter');
+    const meter = (k) => { mv.textContent = `${k} / 4`; mi.style.setProperty('--c', k === 4 ? 'var(--ok)' : k >= 2 ? 'var(--warn)' : 'var(--bad)'); mi.querySelector('i').style.setProperty('--v', (k / 4) * 100 + '%'); };
+    txt.innerHTML = '';
+    for (let r = 0; r < 5; r++) {
+      tt.textContent = `退款经验 · 第 ${r + 1} 轮`;
+      if (v === 'rw') { txt.innerHTML = `<p>${this.RW[r][0]}</p>`; meter(this.RW[r][1]); }
+      else {
+        for (const [id, t, src, cls] of this.ACE[r]) {
+          const old = [...txt.querySelectorAll('.g6d-e')].find((e) => e.dataset.id === id);
+          const h = `<code>${id}</code><span>${t}</span><small>${src}</small>`;
+          if (old) { old.innerHTML = h; old.className = 'g6d-e ' + (cls || ''); }
+          else txt.insertAdjacentHTML('beforeend', `<div class="g6d-e ${cls || ''}" data-id="${id}">${h}</div>`);
+        }
+        meter(4);
+      }
+      await U.wait(ctx, 1500); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.run(s, 'rw');
+    ctx.every(() => { if (this.auto) this.run(s, this.v === 'rw' ? 'ace' : 'rw'); }, 9000);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-mce" data-part="6" data-trans="rise" data-dur="18000" data-title="学习“如何管理上下文”" data-notes="再向外一层，优化对象不再只是“上下文里有什么”，而是“上下文应怎样被构造”。Meta Context Engineering（MCE）把两者拆成内外两个循环：内层在给定管理方法下优化当前任务的上下文产物，外层则根据多轮执行和验证结果，修改搜索、选择、过滤、格式化这些上下文操作本身。这一区分很重要：修改一条检索规则是在改内容管理机制；让系统比较多种检索与整理机制、保留迁移效果更好的版本，才是在学习“如何管理上下文”。<br>同样的思想可以扩展到工作流和整个 Harness。AFlow 把由多个 LLM 调用组成的工作流表示为代码图，通过执行反馈搜索节点与控制流的组合；Meta-Harness 则让 Coding Agent 读取待验证 Harness 版本的源码、分数和轨迹，搜索决定信息如何存储、检索和呈现的代码。第五章已经说明代码是 Agent 表达系统结构的通用语言；这里的新增之处是：代码不只是一次生成的产物，还可以连同评估历史一起成为持续搜索的对象。<br>这类外层搜索很快会遇到反馈成本问题。探索策略决定从哪个候选继续、何时另开分支、并行投入多少 Worker，以及什么时候停止；它的好坏往往要经过很长的生成—评估链条才能显现。若每个候选策略都必须重新调用 Agent 和评估器，优化探索策略本身可能比完成任务更昂贵。左侧双循环与成本计数为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从“上下文里有什么”到<em>“上下文应怎样被构造”</em></h2></header>
+  <div class="g6e-body">
+    <div class="g6e-loops panel fx fx-left" style="--d:2">
+      <div class="g6e-h"><b>MCE：内外两个循环</b><span class="c9-sy">示意</span></div>
+      <svg class="g6e-svg" viewBox="0 0 560 330">
+        <ellipse class="g6e-o" cx="280" cy="170" rx="260" ry="148"/><ellipse class="g6e-i" cx="280" cy="180" rx="150" ry="78"/>
+        <path id="g6e-po" d="M280 22 A260 148 0 1 1 279.9 22" fill="none"/><path id="g6e-pi" d="M280 102 A150 78 0 1 1 279.9 102" fill="none"/>
+        <circle class="g6e-dot o" r="9"/><circle class="g6e-dot i" r="8"/>
+        <text class="g6e-tl o" x="280" y="52">外层：修改上下文操作本身</text><text class="g6e-ts" x="280" y="76">搜索 · 选择 · 过滤 · 格式化</text>
+        <text class="g6e-tl i" x="280" y="174">内层：优化当前任务的上下文产物</text><text class="g6e-ts" x="280" y="198">在给定的管理方法下</text>
+      </svg>
+      <div class="g6e-cost"><span>外层第 <b class="g6e-n">0</b> 轮</span><span>每轮都要重跑 Agent 与评估器 · 成本 <b class="g6e-c">0</b></span></div>
+    </div>
+    <div class="g6e-r fx fx-right" style="--d:3">
+      <div class="g6e-k"><b>MCE</b><span>修改一条检索规则是在改内容管理机制；比较多种检索与整理机制、保留迁移效果更好的版本，才是在<em>学习“如何管理上下文”</em></span></div>
+      <div class="g6e-k"><b>AFlow</b><span>把多 LLM 调用的工作流表示为<em>代码图</em>，用执行反馈搜索节点与控制流的组合</span></div>
+      <div class="g6e-k"><b>Meta-Harness</b><span>Coding Agent 读取待验证 Harness 的<em>源码、分数和轨迹</em>，搜索决定信息如何存储、检索和呈现的代码</span></div>
+      <div class="g6e-warn"><b>反馈成本</b><p>探索策略决定从哪个候选继续、何时另开分支、并行投入多少 Worker、何时停止；若每个候选策略都要重新调用 Agent 和评估器，<b>优化探索策略可能比完成任务更昂贵</b></p></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」· MCE · AFlow · Meta-Harness</div>
+</section>
+<style>
+.g6e-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.g6e-loops{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.g6e-h{display:flex;align-items:center;justify-content:space-between}
+.g6e-h b{font-size:20px}
+.g6e-svg{width:100%;flex:1;min-height:0}
+.g6e-o{fill:rgba(244,114,182,.05);stroke:#f472b6;stroke-width:2;stroke-dasharray:6 6}
+.g6e-i{fill:rgba(251,191,36,.06);stroke:#fbbf24;stroke-width:2}
+.g6e-dot.o{fill:#f472b6;filter:drop-shadow(0 0 6px #f472b6)}
+.g6e-dot.i{fill:#fbbf24;filter:drop-shadow(0 0 6px #fbbf24)}
+.g6e-tl{font-size:18px;font-weight:700;text-anchor:middle}
+.g6e-tl.o{fill:#f9a8d4}.g6e-tl.i{fill:#fde68a}
+.g6e-ts{font-size:15px;fill:var(--text2);text-anchor:middle}
+.g6e-cost{display:flex;justify-content:space-between;gap:12px;font-size:16px;color:var(--text2)}
+.g6e-cost b{font:800 20px var(--num);color:var(--warn)}
+.g6e-r{display:flex;flex-direction:column;gap:12px}
+.g6e-k{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:baseline;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g6e-k b{font-size:19px;color:var(--acc)}
+.g6e-k span{font-size:16px;line-height:1.6;color:var(--text2)}
+.g6e-k em{font-style:normal;font-weight:700;color:var(--text)}
+.g6e-warn{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px solid rgba(251,146,60,.5);background:rgba(251,146,60,.07)}
+.g6e-warn>b{font-size:18px;color:var(--warn)}
+.g6e-warn p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+.g6e-warn p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c09-mce'] = {
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const po = s.querySelector('#g6e-po'), pi = s.querySelector('#g6e-pi'), dO = s.querySelector('.g6e-dot.o'), dI = s.querySelector('.g6e-dot.i'), n = s.querySelector('.g6e-n'), c = s.querySelector('.g6e-c');
+    let round = 0, cost = 0;
+    n.textContent = '0'; c.textContent = '0';
+    while (ok()) {
+      for (let k = 0; k < 3; k++) { await U.fly(dI, pi, 900, { ctx, alive: ok, linear: true, keep: true }); if (!ok()) return; cost += 1; c.textContent = cost; }
+      await U.fly(dO, po, 2200, { ctx, alive: ok, linear: true, keep: true }); if (!ok()) return;
+      round++; cost += 3; n.textContent = round; c.textContent = cost;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-dream" data-part="6" data-dur="22000" data-title="Dream-RSI：发现树与回放模拟器" data-notes="Dream-RSI 提出了一种不同于“总结历史”的机制：把已经完成的发现过程保存为<b>发现树</b>，再把这棵树当作经验性的<b>回放模拟器</b>（replay simulator）。根节点表示初始工作区；每个子节点保存从某个历史状态继续尝试后得到的工作区快照、候选产物、评估诊断和分数。候选策略通过与在线探索相同的接口，逐步选择要展开的叶节点或从根节点打开新分支；回放器只揭示相应节点中已经记录的结果，不必再次运行底层 Agent 和评估器。<br>回放成立的关键，是在线与离线阶段使用相同的决策接口，并且只向策略逐步揭示当前已经展开的子树。在线阶段，被选中的节点会真正调用底层 Agent 和评估器；离线阶段，相同选择只返回历史中已经记录的后继。候选策略因此可以比较不同的分支、顺序、并行批次和停止时机，又不能偷看在线决策时尚不可见的未来结果。<br>左侧是一棵示意发现树：灰色节点在历史中被展开过，分数已记录；两个示意策略逐步选择要展开的节点，只能看到已经揭示的部分。当某个策略选到历史里从未展开过的分支，回放器无法给出结果——这就是支持域的边界。点击右上角切换策略。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Dream-RSI：把发现树当作<em>回放模拟器</em></h2></div>
+    <div class="g6f-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="a">策略 A：深挖最高分</button><button data-v="b">策略 B：先铺开分支</button></div></header>
+  <div class="g6f-body">
+    <div class="g6f-tree panel fx fx-left" style="--d:3"><div class="g6f-h"><b>一棵历史发现树</b><span class="c9-sy">示意</span></div><svg class="g6f-svg" viewBox="0 0 760 420"></svg><div class="g6f-log"></div></div>
+    <div class="g6f-r fx fx-right" style="--d:4">
+      <div class="g6f-n c9-card"><span class="lbl">每个子节点保存</span><div><span>工作区快照</span><span>候选产物</span><span>评估诊断</span><span>分数</span></div></div>
+      <div class="g6f-io"><div><b>在线</b><span>被选中的节点真正调用底层 Agent 和评估器</span></div><div><b>离线</b><span>相同的选择只返回历史中已经记录的后继</span></div></div>
+      <p class="g6f-key">关键：<b>相同的决策接口</b>，且<b>只逐步揭示已展开的子树</b>——策略能比较分支、顺序、并行批次和停止时机，却不能偷看尚不可见的未来结果</p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」· Dream-RSI</div>
+</section>
+<style>
+#c09-dream .seg button{padding:8px 16px;font-size:17px}
+.g6f-body{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;flex:1;min-height:0}
+.g6f-tree{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.g6f-h{display:flex;align-items:center;justify-content:space-between}
+.g6f-h b{font-size:19px}
+.g6f-svg{width:100%;flex:1;min-height:0}
+.g6f-e{stroke:rgba(255,255,255,.18);stroke-width:2;fill:none;transition:stroke .3s}
+.g6f-e.on{stroke:var(--acc);stroke-width:3}
+.g6f-nd circle{fill:rgba(12,18,40,.95);stroke:rgba(255,255,255,.25);stroke-width:2;transition:all .3s}
+.g6f-nd text{font:700 15px var(--num);fill:var(--text3);text-anchor:middle;dominant-baseline:central;transition:fill .3s}
+.g6f-nd.hid circle{stroke-dasharray:4 4;fill:transparent}
+.g6f-nd.hid text{fill:transparent}
+.g6f-nd.rev circle{stroke:var(--acc);fill:color-mix(in srgb,var(--acc) 22%,rgba(12,18,40,.95))}
+.g6f-nd.rev text{fill:var(--text)}
+.g6f-nd.cur circle{stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 8px var(--acc))}
+.g6f-nd.oos circle{stroke:var(--bad);stroke-dasharray:4 4;fill:rgba(251,113,133,.12)}
+.g6f-nd.oos text{fill:#fda4af}
+.g6f-log{min-height:52px;padding:8px 12px;border-radius:12px;font-size:16px;line-height:1.5;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g6f-log.bad{color:#fda4af;border-color:rgba(251,113,133,.5)}
+.g6f-r{display:flex;flex-direction:column;gap:14px}
+.g6f-n div{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.g6f-n div span{padding:8px 10px;border-radius:10px;font-size:16px;text-align:center;color:var(--text);border:1px solid var(--line2)}
+.g6f-io{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.g6f-io>div{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.g6f-io b{font-size:18px;color:var(--acc)}
+.g6f-io span{font-size:15px;line-height:1.5;color:var(--text2)}
+.g6f-key{margin-top:auto;font-size:17px;line-height:1.65;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.g6f-key b{color:var(--text)}
+</style>
+<script>
+HOOKS['c09-dream'] = {
+  // 节点：[id, 父, x, y, 分数（null = 历史里没展开过）]
+  N: [['r', null, 380, 40, 0.20], ['a', 'r', 170, 150, 0.42], ['b', 'r', 380, 150, 0.35], ['c', 'r', 590, 150, 0.28], ['a1', 'a', 90, 260, 0.61], ['a2', 'a', 230, 260, 0.38], ['b1', 'b', 380, 260, 0.55], ['c1', 'c', 540, 260, null], ['c2', 'c', 650, 260, 0.31], ['a11', 'a1', 90, 370, 0.73], ['b11', 'b1', 330, 370, 0.58], ['b12', 'b1', 450, 370, null]],
+  P: { a: ['r', 'a', 'a1', 'a11'], b: ['r', 'a', 'b', 'c', 'b1', 'c1'] },
+  init(s) {
+    const sv = s.querySelector('.g6f-svg'), by = {};
+    this.N.forEach((n) => (by[n[0]] = n));
+    let h = this.N.filter((n) => n[1]).map(([id, p, x, y]) => `<path class="g6f-e" data-e="${id}" d="M${by[p][2]} ${by[p][3]} L${x} ${y}"/>`).join('');
+    h += this.N.map(([id, , x, y, sc]) => `<g class="g6f-nd hid" data-n="${id}" transform="translate(${x} ${y})"><circle r="26"/><text>${sc == null ? '?' : sc.toFixed(2)}</text></g>`).join('');
+    sv.innerHTML = h;
+    this.set = U.seg(s.querySelector('.g6f-seg'), (v) => { this.auto = false; this.play(s, v); });
+  },
+  async play(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const by = {}; this.N.forEach((n) => (by[n[0]] = n));
+    const g = (id) => s.querySelector(`.g6f-nd[data-n="${id}"]`), log = s.querySelector('.g6f-log');
+    s.querySelectorAll('.g6f-nd').forEach((x) => x.setAttribute('class', 'g6f-nd hid'));
+    s.querySelectorAll('.g6f-e').forEach((x) => x.setAttribute('class', 'g6f-e'));
+    log.className = 'g6f-log'; log.textContent = v === 'a' ? '策略 A：总是展开当前得分最高的叶节点' : '策略 B：先把根下的分支都打开，再挑一条往下走';
+    for (const id of this.P[v]) {
+      await U.wait(ctx, 1100); if (!ok()) return;
+      const n = by[id], el = g(id);
+      s.querySelectorAll('.g6f-nd.cur').forEach((x) => x.setAttribute('class', x.getAttribute('class').replace(' cur', '')));
+      if (n[1]) s.querySelector(`.g6f-e[data-e="${id}"]`).setAttribute('class', 'g6f-e on');
+      if (n[4] == null) { el.setAttribute('class', 'g6f-nd oos cur'); log.className = 'g6f-log bad'; log.textContent = `选中了历史里从未展开过的节点 ${id}：回放器无法给出结果——支持域之外的选择不能回放`; return; }
+      el.setAttribute('class', 'g6f-nd rev cur');
+      log.className = 'g6f-log'; log.textContent = `展开 ${id}：回放器揭示历史记录的分数 ${n[4].toFixed(2)}，不再调用 Agent 和评估器`;
+    }
+    await U.wait(ctx, 900); if (!ok()) return;
+    log.textContent = '策略 A 找到了已记录的最高分 0.73——但这只是在这棵旧树上的成绩';
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.play(s, 'a');
+    ctx.every(() => { if (this.auto) this.play(s, this.v === 'a' ? 'b' : 'a'); }, 9500);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c09-dream3" data-part="6" data-trans="zoom" data-dur="16000" data-title="三阶段递归闭环与三种回放" data-notes="Dream-RSI 形成了三个阶段的递归闭环：<b>在线探索</b>使用当前策略生成新的发现树；<b>构造回放世界</b>把发现树加入历史模拟器池；<b>离线做梦</b>让策略开发 Agent 修改探索策略代码，并按候选质量、执行成本和并行效率比较版本。入选策略重新上线后产生新的树，也扩大下一轮可以回放的经验范围。候选集合保留当前策略，因此新版本至少不会在已有历史的平均回放分数上更差，但这只是历史内的保证。<br>这里的“回放”与前文两种历史复用方式不同：轨迹总结把经验压缩成知识或 Prompt，改变的是 Agent <b>知道什么</b>；浏览器工作流回放让程序在新任务中重复一条已验证路径，改变的是 Agent <b>怎样重复执行</b>；发现树回放则比较 Agent <b>怎样组织探索</b>。它也不是能够预测任意动作后果的完整世界模型，只能重组历史中实际走过的分支，不能保证在旧树上得分更高的策略能迁移到新任务。<br>从本章的分类看，历史回放不是知识、Prompt、程序和参数之外的第五种更新载体，而是一种<b>产生并验证更新提案的新机制</b>。Dream-RSI 最终修改的是探索策略代码，因此产物仍属于程序 / Harness；它的新意在于把过去作为上下文或训练数据的历史，变成可反复交互的离线评估环境，把自我进化推进到“如何分配探索计算”的元策略层。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三阶段递归闭环：<em>在线探索 → 构造回放世界 → 离线做梦</em></h2></header>
+  <div class="g6g-body">
+    <div class="g6g-ring fx fx-scale" style="--d:2"></div>
+    <div class="g6g-r fx fx-right" style="--d:3">
+      <div class="g6g-st"></div>
+      <div class="g6g-g"><b>历史内的保证</b><span>候选集合保留当前策略，新版本至少不会在已有历史的平均回放分数上更差——但只限历史之内</span></div>
+    </div>
+  </div>
+  <div class="g6g-three fx fx-up" style="--d:4">
+    <div><span class="lbl">轨迹总结</span><b>知道什么</b><p>把经验压缩成知识或 Prompt</p></div>
+    <div><span class="lbl">浏览器工作流回放</span><b>怎样重复执行</b><p>在新任务中重复一条已验证路径</p></div>
+    <div class="me"><span class="lbl">发现树回放</span><b>怎样组织探索</b><p>只重组历史中实际走过的分支，不是完整的世界模型</p></div>
+    <div class="nt"><span class="lbl">在本章分类中</span><b>产生并验证更新提案的新机制</b><p>不是第五种载体：产物（探索策略代码）仍属于程序 / Harness</p></div>
+  </div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」· Dream-RSI 的递归闭环</div>
+</section>
+<style>
+.g6g-body{display:grid;grid-template-columns:540px 1fr;gap:26px;flex:1;min-height:0}
+.g6g-ring{width:520px;height:440px;align-self:center}
+.g6g-r{display:flex;flex-direction:column;gap:14px}
+.g6g-st{display:flex;flex-direction:column;gap:10px}
+.g6g-s{display:grid;grid-template-columns:40px 1fr;gap:4px 12px;align-items:start;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.g6g-s em{grid-row:span 2;font:800 26px var(--num);font-style:normal;color:var(--c)}
+.g6g-s b{font-size:20px;color:var(--c)}
+.g6g-s span{font-size:16px;line-height:1.55;color:var(--text2)}
+.g6g-s.on{border-color:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 25%,transparent)}
+.g6g-g{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px solid rgba(251,146,60,.5);background:rgba(251,146,60,.06)}
+.g6g-g b{font-size:18px;color:var(--warn)}
+.g6g-g span{display:block;margin-top:4px;font-size:16px;line-height:1.55;color:var(--text2)}
+.g6g-three{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:14px}
+.g6g-three>div{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.g6g-three b{font-size:19px}
+.g6g-three p{font-size:15px;line-height:1.5;color:var(--text2)}
+.g6g-three .me{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.g6g-three .me b{color:var(--acc)}
+.g6g-three .nt{border-color:color-mix(in srgb,var(--c9-prog) 55%,transparent)}
+.g6g-three .nt b{color:var(--c9-prog);font-size:17px}
+</style>
+<script>
+HOOKS['c09-dream3'] = {
+  S: [['在线探索', '用当前策略生成新的发现树（被选节点真正调用 Agent 和评估器）', '#22d3ee'], ['构造回放世界', '把发现树加入历史模拟器池', '#fbbf24'], ['离线做梦', '策略开发 Agent 修改探索策略代码，按候选质量、执行成本和并行效率比较版本', '#f472b6']],
+  init(s) {
+    this.svg = U.ring(s.querySelector('.g6g-ring'), {
+      size: 440, labelSize: 20, cometDur: 7,
+      nodes: this.S.map(([label, , color]) => ({ label, color })),
+      center: (c) => `<text x="${c}" y="${c - 6}" text-anchor="middle" style="fill:var(--text);font-size:26px;font-weight:800">探索策略</text><text x="${c}" y="${c + 24}" text-anchor="middle" style="fill:var(--text2);font-size:16px">如何分配探索计算</text>`,
+    });
+    s.querySelector('.g6g-st').innerHTML = this.S.map(([b, t, c], i) => `<div class="g6g-s" style="--c:${c}"><em>${i + 1}</em><b>${b}</b><span>${t}</span></div>`).join('');
+  },
+  enter(s, ctx) {
+    let a = 0; const st = [...s.querySelectorAll('.g6g-s')];
+    const tick = () => { this.svg.querySelectorAll('.node,.lab').forEach((e) => e.classList.toggle('on', +e.dataset.i === a)); st.forEach((x, j) => x.classList.toggle('on', j === a)); a = (a + 1) % 3; };
+    tick(); ctx.every(tick, 2200);
+  },
+  reset(s) { s.querySelectorAll('.g6g-s').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-exp8" data-part="6" data-trans="flip" data-dur="22000" data-title="实验 9-8 ★★★：把这本书交给 Hermes" data-notes="<b>实验 9-8 ★★★：把这本书交给 Hermes：它能升级自己吗？实验目的</b>：检验 Agent 能否阅读外部知识、发现自身问题，并在外部审查和测试约束下完成一次自我更新。<b>实验说明</b>：不给 Agent 预设修复目标，而是观察它能否把书中的原则映射到自己的代码，并根据 Reviewer 的退回意见继续修正。稳定版本、验收测试和批准门槛始终位于它的修改权限之外。<b>实验说明了什么</b>：自我修改不是“模型读完资料后直接改代码”，而是“理解原则 → 提出更新提案 → 接受外部检验 → 根据反馈修正”的闭环。一次提案被接受，只能证明更新流程成立，不能自动证明下游能力已经提升。<br>配套仓库 chapter9/hermes-self-evolution 的规范运行（2026-08-02，Hermes commit 85c8956，OpenRouter openai/gpt-5.6-luna，实验思路由读者 Grace 贡献）：Hermes 读完本书十章并检查自身实现，自主选定的题目是“给持久化的轨迹加上有证据的学习信号”。四次全新的独立验收审查依次给出：退回——解析器不认识生产环境里用 XML 包裹的工具结果，测试数据与真实格式不一致；退回——batch 与 sample 两条轨迹写入路径没有带上评价元数据；退回——一个失败结果可能被重复计数，Mini-SWE 的写入路径仍在共享契约之外；接受。每次反馈都交还给同一个 Hermes 会话修正。最终补丁通过 6 个新增行为测试和 38 个相关回归测试，可以干净应用，但尚未合入上游。证据边界写得很清楚：它证明了自主审计、生成提案、在独立拒绝下反复纠错直到被接受；它没有证明下游任务变强——Hermes 设计了逐项关闭功能的消融实验，但这次没有执行。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 9-8 ★★★：把这本书交给 Hermes，<em>它能升级自己吗？</em></h2></header>
+  <div class="c9-xp g6h-xp fx fx-up" style="--d:2">
+    <div class="c9-xp-it"><b>实验目的</b><p>Agent 能否阅读外部知识、发现自身问题，并在<b>外部审查和测试约束</b>下完成一次自我更新</p></div>
+    <div class="c9-xp-it"><b>说明了什么</b><p>理解原则 → 提出更新提案 → 接受外部检验 → 根据反馈修正；一次提案被接受，<b>不能自动证明下游能力已经提升</b></p></div>
+  </div>
+  <div class="g6h-flow fx fx-up" style="--d:3"><span>阅读</span><i>→</i><span>对照</span><i>→</i><span>选题</span><i>→</i><span>修改</span><i>→</i><span>审查</span><i>→</i><span>学习</span><i>→</i><span>再修改</span><em>自主选题：给持久化的轨迹加上有证据的学习信号</em></div>
+  <div class="g6h-rounds fx fx-up" style="--d:4"></div>
+  <div class="g6h-low fx fx-up" style="--d:5">
+    <div class="g6h-ok"><b>6 + 38</b><span>新增行为测试 + 相关回归测试全部通过 · 补丁可干净应用 · 尚未合入上游</span></div>
+    <div class="g6h-bd"><span class="c9-pill" style="--c:var(--warn)">证据边界</span><p>没有证明下游任务变强：消融实验已设计，但这次没有执行</p></div>
+  </div>
+  <div class="g6h-df fx fx-up" style="--d:6"><span class="lbl">Hermes 主动暂缓、没有做的部分</span><span>从单条轨迹自动改写自己</span><span>产品级的消融实验运行器</span><span>没有产物契约的通用多 Agent Reviewer</span></div>
+  <div class="c9-data g6h-rec fx fx-up" style="--d:7">数据：chapter9/hermes-self-evolution · 2026-08-02 · Hermes commit 85c8956 · OpenRouter openai/gpt-5.6-luna · 四次独立验收审查（退回 3 次，接受 1 次）</div>
+  <div class="src">第九章 ·「从更新产物到更新“更新方法”」· 实验 9-8</div>
+</section>
+<style>
+.g6h-xp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g6h-flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+.g6h-flow span{padding:6px 14px;border-radius:999px;font-size:17px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.g6h-flow i{font-style:normal;color:var(--text3)}
+.g6h-flow em{margin-left:auto;font-style:normal;font-size:16px;color:var(--acc)}
+.g6h-rounds{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px}
+.g6h-rd{position:relative;display:flex;flex-direction:column;gap:10px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.3;transition:all .4s;min-height:270px}
+.g6h-rd.on{opacity:1}
+.g6h-rd.rej.on{border-color:rgba(251,113,133,.55)}
+.g6h-rd.acc.on{border-color:rgba(52,211,153,.6);box-shadow:0 0 24px rgba(52,211,153,.25)}
+.g6h-rd>span{font-size:15px;color:var(--text3)}
+.g6h-rd>b{font:800 22px var(--mono)}
+.g6h-rd.rej>b{color:#fda4af}.g6h-rd.acc>b{color:#6ee7b7}
+.g6h-rd p{font-size:17px;line-height:1.6;color:var(--text2)}
+.g6h-rd em{margin-top:auto;font-style:normal;font-size:15px;color:var(--text3)}
+.g6h-low{display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:14px}
+.g6h-ok{display:flex;align-items:center;gap:16px;padding:12px 18px;border-radius:14px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.06)}
+.g6h-ok b{font:800 32px var(--num);color:var(--ok);white-space:nowrap}
+.g6h-ok span{font-size:16px;line-height:1.5;color:var(--text2)}
+.g6h-bd{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:14px;border:1px solid rgba(251,146,60,.45);background:rgba(251,146,60,.06)}
+.g6h-bd p{font-size:16px;line-height:1.5;color:var(--text2)}
+.g6h-df{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.g6h-df span:not(.lbl){padding:5px 12px;border-radius:999px;font-size:16px;color:var(--text2);border:1px dashed var(--line2)}
+.g6h-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c09-exp8'] = {
+  R: [
+    ['rej', 'REJECT', '解析器不认识生产环境里用 XML 包裹的工具结果：测试数据与真实轨迹格式不一致', '交还同一个 Hermes 会话修正'],
+    ['rej', 'REJECT', 'batch 与 sample 两条轨迹写入路径没有带上新的评价元数据：保存路径没有采用同一证据契约', '交还同一个 Hermes 会话修正'],
+    ['rej', 'REJECT', '一个失败结果可能被重复计数；Mini-SWE 的写入路径仍在共享契约之外', '交还同一个 Hermes 会话修正'],
+    ['acc', 'ACCEPT', '第四位全新 Reviewer 接受这份修改提案', '终局验收通过'],
+  ],
+  init(s) { s.querySelector('.g6h-rounds').innerHTML = this.R.map(([c, v, t, e], i) => `<div class="g6h-rd ${c}"><span>第 ${i + 1} 位独立 Reviewer</span><b>${v}</b><p>${t}</p><em>${e}</em></div>`).join(''); },
+  enter(s, ctx) {
+    const rs = [...s.querySelectorAll('.g6h-rd')]; let i = 0;
+    const tick = () => { const k = i % 6; rs.forEach((r, j) => r.classList.toggle('on', j <= k)); i++; };
+    tick(); ctx.every(tick, 1500);
+  },
+  reset(s) { s.querySelectorAll('.g6h-rd').forEach((r) => r.classList.remove('on')); },
+};
+</script>

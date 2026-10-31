@@ -1,0 +1,438 @@
+<!-- ================= PART 02 两朵乌云 ================= -->
+<section class="slide chapter" id="c11-d2" data-part="2" data-title="PART 02 · 两朵乌云" data-notes="1900 年，开尔文说物理学晴朗的天空上还飘着两朵乌云——后来，一朵变成了相对论，另一朵变成了量子力学。今天 Agent 的天空同样称不上晴朗，作者也看到两朵乌云：<br>第一朵，是 Agent 如何流式地、实时地与环境交互；<br>第二朵，是 Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">两朵乌云</h1>
+  <div class="ch-s fx fx-up" style="--d:3">流式地、实时地与环境交互；<br>从成功与失败中持续积累经验</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">1900 年，开尔文说物理学晴朗的天空上还飘着两朵乌云——后来，一朵变成了相对论，另一朵变成了量子力学。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c11-cloud1" data-part="2" data-dur="13000" data-title="第一朵乌云：流式、实时地交互" data-notes="<b>第一朵乌云，是 Agent 如何流式地、实时地与环境交互。</b>今天绝大多数 Agent 仍是按轮次（turn-by-turn）的“请求—应答”模式：你说完一句，它想一整段，再一次性吐出结果。但真实世界不会停下来等它想完——话会被打断，画面在持续变化，邮件在不断到达。一个真正“活着”的 Agent，应该能边听边想、边说边想，能在你话说到一半时就开始规划，也能在没人吩咐时主动发现“这封邮件该处理了”。<br>图中三条泳道共用一根时间轴（示意）：最上面是真实世界里发生的事；中间是按轮次的 Agent——等你说完、想一整段、一次性吐出结果，中途发生的打断、画面变化和新邮件都被错过；最下面是“活着”的 Agent——边听边想、边说边想，接住打断，主动发现该处理的邮件。右上角可以暂停，或拖动滑块逐帧查看。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第一朵乌云：<em>流式地、实时地</em>与环境交互</h2></div>
+    <div class="cl1-ctl fx fx-up" style="--d:2"><button class="btn cl1-play"><svg class="ic"><use href="#i-pause"/></svg><span>暂停</span></button><input class="rng cl1-rng" type="range" min="0" max="1000" value="0"><span class="cap">示意</span></div></header>
+  <p class="lead cl1-lead fx fx-up" style="--d:2">今天绝大多数 Agent 仍是按轮次（turn-by-turn）的“请求—应答”：你说完一句，它想一整段，再一次性吐出结果</p>
+  <div class="cl1-stage fx fx-scale" style="--d:3">
+    <div class="cl1-lane" style="top:14px"><div class="cl1-lb w"><svg class="ic"><use href="#i-globe"/></svg><b>真实世界</b><small>不会停下来等它想完</small></div></div>
+    <div class="cl1-lane" style="top:160px"><div class="cl1-lb a"><svg class="ic"><use href="#i-chat"/></svg><b>按轮次的 Agent</b><small>turn-by-turn</small></div></div>
+    <div class="cl1-lane" style="top:306px"><div class="cl1-lb b"><svg class="ic"><use href="#i-wave"/></svg><b>“活着”的 Agent</b><small>边听边想 · 边说边想</small></div></div>
+    <div class="cl1-items"></div>
+    <i class="cl1-head"></i>
+    <div class="cl1-axis"><span>时间 →</span></div>
+  </div>
+  <p class="tagline cl1-tag fx fx-up" style="--d:5">真实世界不会停下来等它想完：一个真正“活着”的 Agent，应该能<b>边听边想、边说边想</b>，也能在没人吩咐时主动发现该做的事</p>
+  <div class="src">后记 ·「两朵乌云」第一朵</div>
+</section>
+<style>
+#c11-cloud1 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px}
+.cl1-ctl{display:flex;align-items:center;gap:14px;width:540px}
+.cl1-ctl .btn{padding:8px 14px}
+.cl1-lead{margin:0 0 18px;font-size:23px}
+.cl1-stage{position:relative;height:470px;border-radius:22px;border:1px solid var(--line);background:rgba(8,12,30,.55)}
+.cl1-lane{position:absolute;left:0;right:0;height:132px}
+.cl1-lane+.cl1-lane{border-top:1px dashed var(--line)}
+.cl1-lb{position:absolute;left:22px;top:20px;width:210px;display:grid;grid-template-columns:36px 1fr;gap:2px 10px;align-items:center}
+.cl1-lb .ic{grid-row:1/3;font-size:30px}
+.cl1-lb b{font-size:21px}
+.cl1-lb small{font-size:15px;color:var(--text3)}
+.cl1-lb.w .ic{color:var(--tool)}.cl1-lb.a .ic{color:#94a3b8}.cl1-lb.b .ic{color:var(--acc2)}
+.cl1-bk{position:absolute;height:46px;border-radius:12px;overflow:hidden;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:rgba(255,255,255,.02)}
+.cl1-bk i{position:absolute;left:0;top:0;bottom:0;width:0;background:color-mix(in srgb,var(--c) 30%,transparent)}
+.cl1-bk span{position:absolute;inset:0;display:grid;place-items:center;font-size:17px;white-space:nowrap;color:var(--text);z-index:1}
+.cl1-bk.wait{border-style:dashed}
+.cl1-bk.wait i{background:repeating-linear-gradient(90deg,rgba(148,163,184,.16) 0 8px,transparent 8px 16px)}
+.cl1-bk.scr i{background:repeating-linear-gradient(110deg,color-mix(in srgb,var(--c) 30%,transparent) 0 14px,transparent 14px 28px);animation:c11scr 1.2s linear infinite}
+@keyframes c11scr{to{background-position:28px 0}}
+.cl1-mk{position:absolute;width:0;opacity:0;transition:opacity .3s}
+.cl1-mk.on{opacity:1}
+.cl1-mk::before{content:"";position:absolute;left:-1px;top:-6px;width:2px;height:58px;background:var(--c)}
+.cl1-mk em{position:absolute;top:60px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9px;font-style:normal;font-size:16px;white-space:nowrap;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:rgba(8,12,30,.95)}
+.cl1-mk em .ic{font-size:17px}
+.cl1-mk.on em{animation:pop .45s var(--spring) both;transform:translateX(-50%) scale(1)}
+.cl1-head{position:absolute;top:8px;bottom:36px;left:260px;width:2px;background:linear-gradient(transparent,#fff 12%,#fff 88%,transparent);box-shadow:0 0 12px #fff;opacity:.75}
+.cl1-axis{position:absolute;left:260px;right:30px;bottom:10px;height:20px;border-top:1px solid rgba(255,255,255,.2);font-size:15px;color:var(--text3);text-align:right}
+.cl1-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c11-cloud1'] = {
+  T: 9.4,
+  X0: 260, PX: 145,
+  LANES: [14, 160, 306],
+  D: [
+    { l: 0, t0: 0.2, t1: 3.0, txt: '你在说话……', c: '#fbbf24' },
+    { l: 0, at: 3.7, txt: '话被打断', ic: 'zap', c: '#fbbf24' },
+    { l: 0, t0: 4.4, t1: 9.0, txt: '画面在持续变化', c: '#fbbf24', cls: 'scr' },
+    { l: 0, at: 6.3, txt: '新邮件到达', ic: 'mail', c: '#fbbf24' },
+    { l: 1, t0: 0.2, t1: 3.0, txt: '等你说完', c: '#94a3b8', cls: 'wait' },
+    { l: 1, t0: 3.0, t1: 6.9, txt: '想一整段', c: '#94a3b8' },
+    { l: 1, t0: 6.9, t1: 8.3, txt: '一次性吐出结果', c: '#a78bfa' },
+    { l: 1, at: 3.7, txt: '没听到打断', ic: 'x', c: '#fb7185' },
+    { l: 1, at: 5.2, txt: '画面已经变了', ic: 'x', c: '#fb7185' },
+    { l: 1, at: 6.3, txt: '没注意到新邮件', ic: 'x', c: '#fb7185' },
+    { l: 2, t0: 0.4, t1: 3.0, txt: '边听边想', c: '#7dd3fc' },
+    { l: 2, at: 1.5, txt: '话说到一半就开始规划', ic: 'route', c: '#34d399' },
+    { l: 2, t0: 3.0, t1: 9.0, txt: '边说边想', c: '#5eead4' },
+    { l: 2, at: 3.7, txt: '接住打断，随即调整', ic: 'check', c: '#34d399' },
+    { l: 2, at: 6.3, txt: '主动发现：这封邮件该处理了', ic: 'check', c: '#34d399' },
+  ],
+  x(t) { return this.X0 + t * this.PX; },
+  init(s) {
+    s.querySelector('.cl1-items').innerHTML = this.D.map((d, i) => {
+      const top = this.LANES[d.l] + 34;
+      if (d.at != null) return `<div class="cl1-mk" data-k="${i}" style="left:${this.x(d.at)}px;top:${top}px;--c:${d.c}"><em><svg class="ic"><use href="#i-${d.ic}"/></svg>${d.txt}</em></div>`;
+      return `<div class="cl1-bk ${d.cls || ''}" data-k="${i}" style="left:${this.x(d.t0)}px;top:${top}px;width:${(d.t1 - d.t0) * this.PX}px;--c:${d.c}"><i></i><span>${d.txt}</span></div>`;
+    }).join('');
+    this.els = [...s.querySelectorAll('.cl1-items [data-k]')];
+    this.head = s.querySelector('.cl1-head');
+    this.rng = s.querySelector('.cl1-rng');
+    this.btn = s.querySelector('.cl1-play');
+    this.btn.addEventListener('click', () => this.setPlay(!this.playing));
+    this.rng.addEventListener('input', () => { this.setPlay(false); this.t = (this.rng.value / 1000) * this.T; this.draw(); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+  },
+  setPlay(v) {
+    this.playing = v;
+    this.btn.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play');
+    this.btn.querySelector('span').textContent = v ? '暂停' : '继续';
+  },
+  draw() {
+    const t = this.t;
+    this.head.style.left = this.x(Math.min(t, this.T - 0.2)) + 'px';
+    this.els.forEach((el) => {
+      const d = this.D[+el.dataset.k];
+      if (d.at != null) el.classList.toggle('on', t >= d.at);
+      else el.firstElementChild.style.width = Math.max(0, Math.min(1, (t - d.t0) / (d.t1 - d.t0))) * 100 + '%';
+    });
+    const p = (t / this.T) * 100;
+    this.rng.value = Math.round(p * 10);
+    this.rng.style.setProperty('--p', p + '%');
+  },
+  enter(s, ctx) {
+    this.t = 0;
+    this.setPlay(true);
+    this.draw();
+    let last = 0, hold = 0;
+    ctx.raf((now) => {
+      const dt = last ? Math.min(60, now - last) : 0;
+      last = now;
+      if (!this.playing) return;
+      if (this.t >= this.T) { hold += dt; if (hold > 2200) { hold = 0; this.t = 0; } this.draw(); return; }
+      this.t = Math.min(this.T, this.t + dt / 1000);
+      this.draw();
+    });
+  },
+  reset() { this.t = 0; this.draw(); },
+};
+</script>
+
+<section class="slide" id="c11-paths" data-part="2" data-steps="2" data-trans="rise" data-dur="11000" data-title="走向实时的两条路" data-notes="走向这种实时性有两条路，往往并行推进：<br>一是<b>架构上做快慢分离</b>——实时与智能几乎是两条正交的轴，单一模型难以兼顾，于是让前台快模型维持对话节奏、后台慢模型负责深度思考；<br>二是<b>把推理本身做快</b>——当 decode 速度足够高，按轮次的等待就短到近乎消失，turn-by-turn 与“实时”的界限也随之模糊。这条路正被芯片与推理引擎快速推进：小米 MiMo 已让一个 1T 参数模型在单个 8 卡节点上把生成速度推过 1000 token/s（脚注：小米 MiMo-V2.5-Pro-UltraSpeed 通过 FP4 量化、DFlash 并行推测解码与 TileRT 推理系统的模型—系统协同设计，在单个通用 8-GPU 节点上首次把 1T 参数模型的生成速度推过 1000 token/s；见小米 MiMo 官方技术博客，2026），而把整个模型直接固化进芯片的专用方案（如 Taalas HC1）更是把 80 亿参数模型推到约 17000 token/s、响应低于 100 毫秒（脚注：Taalas HC1 将 Llama 3.1 8B 整个模型固化进 6nm 芯片；代价是芯片只能运行被固化的那个模型，模型更新需重新流片；见 Forbes，2026）。当模型每秒能吐出上千个字，“想完再说”和“边想边说”的体验差距就被抹平了。<br>左侧示意图：单一模型只能在“实时”与“智能”的取舍曲线上移动，快慢分离把两者组合到右上角。右侧滑块示意 decode 速度与等待时间的关系（示意回复长度 600 token，等待 = 长度 ÷ 速度；按一字约一 token 粗略示意），两个标记是原书给出的真实数字。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">走向实时的<em>两条路</em></h2></header>
+  <div class="ph-body">
+    <div class="ph-card panel fx fx-left" style="--d:2">
+      <div class="ph-h"><span class="ph-no">路一</span><b>架构上做快慢分离</b></div>
+      <svg class="ph-svg" viewBox="0 0 760 330" width="760" height="330">
+        <defs><marker id="ph-ma" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6c7695"/></marker></defs>
+        <path class="ph-ax" d="M60 300 H730" marker-end="url(#ph-ma)"/><path class="ph-ax" d="M60 300 V24" marker-end="url(#ph-ma)"/>
+        <text class="ph-al" x="726" y="324" text-anchor="end">实时 →</text><text class="ph-al" x="72" y="26">智能 ↑</text>
+        <path id="ph-fr" class="ph-fr" d="M110 64 C 300 80, 560 160, 650 262"/>
+        <text class="ph-fl" x="420" y="150">单一模型的取舍：难以兼顾</text>
+        <circle class="ph-one" r="12"/>
+        <line class="ph-dl" x1="650" y1="262" x2="650" y2="64"/><line class="ph-dl" x1="110" y1="64" x2="650" y2="64"/>
+        <g class="ph-pt s"><circle cx="110" cy="64" r="13"/><text x="128" y="100">后台慢模型 · 负责深度思考</text></g>
+        <g class="ph-pt f"><circle cx="650" cy="262" r="13"/><text x="636" y="240" text-anchor="end">前台快模型 · 维持对话节奏</text></g>
+        <g class="ph-pt c"><circle cx="650" cy="64" r="16"/><text x="636" y="40" text-anchor="end">快慢分离：两者兼得</text></g>
+      </svg>
+      <div class="ph-lanes">
+        <div class="ph-ln"><span>前台快模型</span><div class="ph-tr f"></div></div>
+        <div class="ph-ln"><span>后台慢模型</span><div class="ph-tr s"><i class="ph-blk"><em>深度思考</em></i></div></div>
+      </div>
+      <p class="ph-cap">实时与智能几乎是两条<b>正交的轴</b>，单一模型难以兼顾</p>
+    </div>
+    <div class="ph-card panel fx fx-right" data-step="1">
+      <div class="ph-h"><span class="ph-no">路二</span><b>把推理本身做快</b><span class="cap">示意</span></div>
+      <div class="ph-sl"><span class="lbl">decode 速度</span><div class="ph-rw"><input class="rng ph-rng" type="range" min="0" max="1000" value="0"><i class="ph-tk" style="left:60.6%"><b>1000</b></i><i class="ph-tk" style="left:97.9%"><b>17000</b></i></div><span class="ph-v"><b>10</b> token/s</span></div>
+      <div class="ph-wait"><span>按轮次的等待</span><div class="ph-wb"><i></i></div><span class="ph-wt">60 秒</span></div>
+      <div class="ph-out" data-clip-ok></div>
+      <div class="ph-facts">
+        <div class="ph-f"><b><em>1000 token/s</em>小米 MiMo</b><p>1T 参数模型 · 单个 8 卡节点；MiMo-V2.5-Pro-UltraSpeed 用 FP4 量化、DFlash 并行推测解码与 TileRT 推理系统做模型—系统协同设计</p><small>小米 MiMo 官方技术博客，2026</small></div>
+        <div class="ph-f"><b><em>≈17000 token/s</em>Taalas HC1</b><p>把 Llama 3.1 8B（80 亿参数）整个固化进 6nm 芯片，响应低于 100 毫秒；代价：只能运行被固化的那个模型，更新需重新流片</p><small>Forbes，2026</small></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline ph-tag fx fx-up" data-step="2">两条路往往并行推进：当模型每秒能吐出上千个字，“想完再说”和“边想边说”的<b>体验差距就被抹平了</b></p>
+  <div class="src">后记 ·「两朵乌云」第一朵 · 脚注 mimo、taalas</div>
+</section>
+<style>
+.ph-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:640px}
+.ph-card{padding:20px 26px;display:flex;flex-direction:column;gap:12px}
+.ph-h{display:flex;align-items:center;gap:14px}
+.ph-h b{font-size:27px}
+.ph-h .cap{margin-left:auto}
+.ph-no{padding:4px 14px;border-radius:10px;font-size:18px;font-weight:700;color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.ph-svg{display:block;overflow:visible}
+.ph-ax{fill:none;stroke:rgba(255,255,255,.25);stroke-width:2}
+.ph-al{fill:var(--text3);font-size:16px}
+.ph-fr{fill:none;stroke:rgba(255,255,255,.3);stroke-width:3;stroke-dasharray:8 6}
+.ph-fl{fill:var(--text3);font-size:16px}
+.ph-one{fill:#cbd5e1;filter:drop-shadow(0 0 10px #cbd5e1)}
+.ph-dl{stroke:var(--acc);stroke-width:2;stroke-dasharray:5 6;opacity:.6}
+.ph-pt circle{stroke-width:3;fill:#0a1024}
+.ph-pt text{font-size:17px;font-weight:700}
+.ph-pt.s circle{stroke:#a78bfa}.ph-pt.s text{fill:#c4b5fd}
+.ph-pt.f circle{stroke:#7dd3fc}.ph-pt.f text{fill:#7dd3fc}
+.ph-pt.c circle{stroke:var(--ok);fill:color-mix(in srgb,var(--ok) 30%,#0a1024);filter:drop-shadow(0 0 12px #34d399)}
+.ph-pt.c text{fill:var(--ok)}
+.ph-pt.c{animation:c11ptc 2.4s ease-in-out infinite}
+@keyframes c11ptc{50%{opacity:.55}}
+.ph-lanes{display:flex;flex-direction:column;gap:8px}
+.ph-ln{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.ph-tr{position:relative;height:30px;border-radius:8px;background:rgba(255,255,255,.04);overflow:hidden}
+.ph-tr.f{background:repeating-linear-gradient(90deg,rgba(125,211,252,.55) 0 18px,transparent 18px 40px);background-size:40px 100%;animation:c11fast 1s linear infinite}
+@keyframes c11fast{to{background-position:40px 0}}
+.ph-blk{position:absolute;left:6%;top:4px;bottom:4px;width:62%;border-radius:6px;background:rgba(167,139,250,.35);border:1px solid rgba(167,139,250,.6);display:grid;place-items:center}
+.ph-blk em{font-style:normal;font-size:15px;color:var(--text)}
+.ph-cap{margin-top:auto;font-size:20px;color:var(--text2)}
+.ph-cap b{color:var(--acc)}
+.ph-sl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;margin-top:8px}
+.ph-rw{position:relative;padding:20px 0 26px}
+.ph-tk{position:absolute;top:28px;width:0;height:18px}
+.ph-tk::before{content:"";position:absolute;left:-1px;top:0;width:2px;height:16px;background:var(--warn)}
+.ph-tk b{position:absolute;top:18px;left:0;transform:translateX(-50%);font:700 15px var(--num);color:var(--warn);white-space:nowrap}
+.ph-v{font-size:17px;color:var(--text2);min-width:150px;text-align:right}
+.ph-v b{font:800 30px var(--num);color:var(--acc)}
+.ph-wait{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;font-size:17px;color:var(--text2)}
+.ph-wb{height:16px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.ph-wb i{display:block;height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--bad),var(--warn))}
+.ph-wt{font:700 20px var(--num);color:var(--warn);min-width:96px;text-align:right}
+.ph-out{height:112px;padding:10px 14px;border-radius:12px;font-size:17px;line-height:1.6;color:var(--text);background:rgba(0,0,0,.28);border:1px solid var(--line);overflow:hidden}
+.ph-out::after{content:"▍";color:var(--acc);animation:blink 1s steps(1) infinite}
+.ph-facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto}
+.ph-f{padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+.ph-f b{display:block;font-size:18px}
+.ph-f b em{display:block;font:800 22px var(--num);font-style:normal;color:var(--warn)}
+.ph-f p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:6px}
+.ph-f small{display:block;font-size:15px;color:var(--text3);margin-top:6px}
+.ph-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c11-paths'] = {
+  TXT: '当模型每秒能吐出上千个字，“想完再说”和“边想边说”的体验差距就被抹平了。',
+  LEN: 600,
+  sp(v) { return 10 * Math.pow(2000, v / 1000); },
+  init(s) {
+    this.rng = s.querySelector('.ph-rng');
+    this.rng.addEventListener('input', () => { this.auto = false; this.v = +this.rng.value; this.restartOut(); this.draw(s); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    this.fr = s.querySelector('#ph-fr');
+    this.one = s.querySelector('.ph-one');
+  },
+  restartOut() { this.chars = 0; },
+  draw(s) {
+    const sp = this.sp(this.v), w = this.LEN / sp;
+    s.querySelector('.ph-v b').textContent = sp >= 1000 ? Math.round(sp).toLocaleString('en-US') : Math.round(sp);
+    s.querySelector('.ph-wt').textContent = w >= 1 ? w.toFixed(1) + ' 秒' : Math.round(w * 1000) + ' 毫秒';
+    s.querySelector('.ph-wb i').style.width = Math.min(100, (w / 60) * 100) + '%';
+    this.rng.value = Math.round(this.v);
+    this.rng.style.setProperty('--p', this.v / 10 + '%');
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    this.auto = true;
+    this.v = 0;
+    this.chars = 0;
+    this.draw(s);
+    const out = s.querySelector('.ph-out'), full = this.TXT.repeat(3), L = this.fr.getTotalLength();
+    let last = 0, hold = 0, u = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      // 左：单一模型的点只能在取舍曲线上来回移动
+      u += dt / 4200;
+      const q = (Math.sin(u * Math.PI) + 1) / 2, p = this.fr.getPointAtLength(q * L);
+      this.one.setAttribute('cx', p.x.toFixed(1)); this.one.setAttribute('cy', p.y.toFixed(1));
+      if (this.k < 1) return;
+      // 右：滑块自动从慢到快；输出框按当前速度逐字吐出（1 字约 1 token，示意）
+      if (this.auto) {
+        if (this.v < 1000) { this.v = Math.min(1000, this.v + dt / 7.5); this.draw(s); }
+        else { hold += dt; if (hold > 2600) { hold = 0; this.v = 0; this.chars = 0; this.draw(s); } }
+      }
+      this.chars = Math.min(full.length, this.chars + (this.sp(this.v) * dt) / 1000);
+      out.textContent = full.slice(0, Math.floor(this.chars));
+      if (this.chars >= full.length && !this.auto) this.chars = full.length;
+      if (this.chars >= full.length && this.auto && this.v < 1000) this.chars = 0;
+    });
+  },
+  step(s, ctx, k) { this.k = k; if (k >= 1 && this.auto) { this.v = 0; this.chars = 0; this.draw(s); } },
+  reset(s) { this.v = 0; this.chars = 0; s.querySelector('.ph-out').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c11-cloud2" data-part="2" data-steps="2" data-dur="13000" data-title="第二朵乌云：持续积累经验" data-notes="<b>第二朵乌云，是 Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。</b>今天的模型更像一个记性极好、却学不会新东西的天才：训练时把人类知识背得滚瓜烂熟，上岗后却几乎不再成长——每次任务结束，那些踩过的坑、试出来的窍门，大多随着上下文一起被丢掉。这究竟是不是一个真问题，取决于两种针锋相对的假设。<br>一种是<b>“小世界假设”</b>：一个足够大的模型——比如几万亿参数——本就装得下物理世界里几乎所有重要的通用知识，学一次就够。持这种看法的人（不乏 OpenAI、Anthropic 的研究者）会指出，AI 今天唯独在编程上最强，并不是因为代码对模型有什么特殊，而是因为编程是人类最开放的领域：海量开源代码摆在那里，可供学习；而绝大多数行业压根没有公开的信息与数据。于是前沿实验室真正在做的，是一家家去与各行各业合作，把各自的专业能力“蒸馏”进同一个大模型。按这种观点，瓶颈既不在模型的容量、也不在它学不学得会，而在数据够不够：把数据喂进去、训练一次，问题就解决了。<br>但<b>“大世界假设”</b>指向了单靠“训练一次”补不上的一层：属于某个具体用户、某家具体公司的知识。特定公司的代码规范、做 PPT 的口味、某个客户特有的脾气不在任何训练语料里，而且时时在变；要贴合这个由无数具体情境拼成的“大世界”，模型只能在上岗之后持续学习，没法指望出厂时一次配齐。这正是第三章的记忆与第九章的持续进化在摸索的方向：把经验写成知识文档、指令或程序，还是经过筛选后用于更新模型参数？更进一步，“RSI”（递归自我进化）和“AI for Science”都在推动 Agent 走到没有现成答案的前沿；在那里，它只能从一次次实验的成败中自主学习，而不是事事回头问人。所以，<b>模型最强的能力，终将不是记住，而是学习与适应</b>。<br>按 → 依次看小世界假设、大世界假设和结论；左侧“健忘的天才”、行业方块与情境方块都是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第二朵乌云：从成败中<em>持续积累经验</em></h2></div>
+    <div class="cw-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">“小世界假设”</button><button data-v="1">“大世界假设”</button></div></header>
+  <div class="cw-body">
+    <div class="cw-l panel fx fx-left" style="--d:2">
+      <b class="cw-lt">记性极好、却学不会新东西的天才</b>
+      <div class="cw-ep">
+        <div class="cw-eh"><span class="cw-task">任务 1</span><span class="cw-st">进行中</span></div>
+        <div class="cw-ctx"><span class="lbl">上下文</span><div class="cw-chips"></div><span class="cw-gone">任务结束：随着上下文一起被丢掉</span></div>
+      </div>
+      <p class="cw-lp">训练时把人类知识背得滚瓜烂熟，上岗后却几乎不再成长</p>
+      <p class="cw-q">这究竟是不是一个真问题？<br>取决于两种<b>针锋相对的假设</b> →</p>
+    </div>
+    <div class="cw-r panel fx fx-right" style="--d:3">
+      <div class="cw-v sm">
+        <canvas class="cw-cv" width="2000" height="760"></canvas>
+        <div class="cw-doms"></div>
+        <div class="cw-model"><b>足够大的模型</b><span>比如几万亿参数</span><small>装得下物理世界里几乎所有重要的通用知识</small></div>
+        <p class="cw-cap">编程最强，是因为编程是人类<b>最开放的领域</b>；前沿实验室一家家与各行各业合作，把专业能力“蒸馏”进同一个大模型——瓶颈在<b>数据够不够</b>：喂进去、训练一次就好</p>
+        <span class="cw-who">持这种看法的人不乏 OpenAI、Anthropic 的研究者</span>
+      </div>
+      <div class="cw-v bg">
+        <div class="cw-mos"></div>
+        <div class="cw-mt"><span>由无数具体情境拼成的“大世界”：不在任何训练语料里，而且<b>时时在变</b></span></div>
+        <div class="cw-how">
+          <div class="cw-x"><svg class="ic"><use href="#i-x"/></svg>出厂时一次配齐</div>
+          <div class="cw-ok"><svg class="ic"><use href="#i-refresh"/></svg><b>上岗之后持续学习</b><small>把经验写成知识文档、指令或程序（第三章的记忆、第九章的持续进化）</small><small>还是经过筛选后用于更新模型参数？</small></div>
+          <div class="cw-fr"><svg class="ic"><use href="#i-flask"/></svg><b>RSI（递归自我进化）· AI for Science</b><small>走到没有现成答案的前沿：只能从一次次实验的成败中自主学习，而不是事事回头问人</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline cw-tag fx fx-up" data-step="2">所以，模型最强的能力，终将不是记住，而是<b>学习与适应</b></p>
+  <div class="src">后记 ·「两朵乌云」第二朵</div>
+</section>
+<style>
+#c11-cloud2 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.cw-seg button{font-size:20px;padding:10px 24px}
+.cw-body{display:flex;gap:24px;height:610px}
+.cw-l{width:560px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.cw-lt{font-size:25px;color:var(--acc)}
+.cw-ep{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(8,12,30,.6)}
+.cw-eh{display:flex;justify-content:space-between;align-items:center}
+.cw-task{font:700 20px var(--num)}
+.cw-st{font-size:16px;padding:3px 12px;border-radius:999px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent)}
+.cw-st.end{color:var(--text3);border-color:var(--line2)}
+.cw-ctx{position:relative;height:196px;margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--line2)}
+.cw-chips{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.cw-chips span{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;font-size:17px;animation:upIn .45s var(--ease) both;transition:opacity .9s,translate 1.1s var(--ease),filter .9s}
+.cw-chips span.bad{color:#fecdd3;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.4)}
+.cw-chips span.good{color:#a7f3d0;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.4)}
+.cw-chips span.gone{opacity:0;translate:0 -40px;filter:blur(6px)}
+.cw-chips span.again{color:#fff;background:rgba(251,113,133,.3);border:1px solid var(--bad);animation:shake .5s}
+.cw-gone{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;font-size:17px;color:var(--text3);opacity:0;transition:opacity .4s}
+.cw-ctx.end .cw-gone{opacity:1}
+.cw-lp{font-size:20px;line-height:1.6;color:var(--text)}
+.cw-q{margin-top:auto;font-size:20px;line-height:1.6;color:var(--text2)}
+.cw-q b{color:var(--acc)}
+.cw-r{position:relative;flex:1;overflow:hidden}
+.cw-v{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .6s,visibility .6s}
+#c11-cloud2[data-k="0"] .cw-v.sm,#c11-cloud2[data-k="1"] .cw-v.bg,#c11-cloud2[data-k="2"] .cw-v.bg{opacity:1;visibility:visible}
+.cw-cv{position:absolute;left:0;top:0;width:1000px;height:380px}
+.cw-ind{position:absolute;left:28px;width:250px;height:58px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:10px;font-size:18px;border:1px solid var(--line2);background:rgba(10,16,36,.92);transition:all .45s var(--ease)}
+.cw-ind .ic{font-size:22px;color:var(--text3)}
+.cw-ind small{margin-left:auto;font-size:15px;color:var(--text3)}
+.cw-ind.open{border-color:color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 30%,transparent)}
+.cw-ind.open .ic{color:var(--acc)}
+.cw-ind.code{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.cw-ind.code .ic{color:var(--ok)}
+.cw-model{position:absolute;left:650px;top:40px;width:300px;height:300px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:30px;background:radial-gradient(circle at 35% 30%,rgba(196,181,253,.35),rgba(10,16,36,.9) 70%);border:2px solid #c4b5fd;box-shadow:0 0 60px rgba(196,181,253,.3)}
+.cw-model b{font-size:25px}
+.cw-model span{font:700 18px var(--num);color:#c4b5fd}
+.cw-model small{font-size:15px;line-height:1.45;color:var(--text2)}
+.cw-cap{position:absolute;left:28px;right:28px;top:398px;font-size:19px;line-height:1.6;color:var(--text2)}
+.cw-cap b{color:var(--acc)}
+.cw-who{position:absolute;left:28px;bottom:22px;font-size:16px;color:var(--text3)}
+.cw-mos{position:absolute;left:28px;top:26px;width:520px;display:grid;grid-template-columns:repeat(10,1fr);grid-auto-flow:dense;gap:6px}
+.cw-mos i{height:40px;border-radius:7px;background:hsla(var(--h),60%,60%,.28);border:1px solid hsla(var(--h),60%,70%,.4);transition:background .8s,border-color .8s}
+.cw-mos i.lab{grid-column:span 5;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:17px;color:var(--text);background:hsla(var(--h),60%,55%,.35)}
+.cw-mt{position:absolute;left:28px;top:420px;width:520px;font-size:18px;line-height:1.6;color:var(--text2)}
+.cw-mt b{color:var(--acc)}
+.cw-how{position:absolute;left:580px;right:24px;top:26px;bottom:24px;display:flex;flex-direction:column;gap:14px}
+.cw-how>div{padding:14px 16px;border-radius:14px;display:grid;grid-template-columns:34px 1fr;gap:4px 10px;align-items:start}
+.cw-how .ic{font-size:26px;grid-row:1/4}
+.cw-how b{font-size:20px}
+.cw-how small{font-size:16px;line-height:1.5;color:var(--text2)}
+.cw-x{color:var(--bad);font-size:20px;font-weight:700;border:1px dashed rgba(251,113,133,.5);background:rgba(251,113,133,.06);align-items:center!important}
+.cw-x .ic{grid-row:auto!important}
+.cw-ok{border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.cw-ok .ic{color:var(--ok)}
+.cw-fr{border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent);background:color-mix(in srgb,var(--acc2) 8%,transparent)}
+.cw-fr .ic{color:var(--acc2)}
+.cw-tag{margin-top:18px;font-size:24px}
+</style>
+<script>
+HOOKS['c11-cloud2'] = {
+  IND: [['code', '编程', '海量开源代码'], ['lock', '行业 A', '无公开数据'], ['lock', '行业 B', '无公开数据'], ['lock', '行业 C', '无公开数据'], ['lock', '行业 D', '无公开数据']],
+  init(s) {
+    this.set = U.seg(s.querySelector('.cw-seg'), (v) => DECK.go(DECK.cur, +v));
+    s.querySelector('.cw-doms').innerHTML = this.IND.map(([ic, t, d], i) => `<div class="cw-ind${i ? '' : ' code'}" style="top:${28 + i * 70}px"><svg class="ic"><use href="#i-${ic}"/></svg><b>${t}</b><small>${d}</small></div>`).join('');
+    this.inds = [...s.querySelectorAll('.cw-ind')];
+    // 大世界：许多小方块代表具体情境，其中三块带标签
+    const rnd = U.rand(13), lab = { 0: '特定公司的代码规范', 2: '做 PPT 的口味', 5: '某个客户特有的脾气' };
+    let h = '';
+    for (let i = 0; i < 64; i++) {
+      if (lab[i] !== undefined) h += `<i class="lab" style="--h:${(rnd() * 360) | 0}">${lab[i]}</i>`;
+      else h += `<i style="--h:${(rnd() * 360) | 0}"></i>`;
+    }
+    s.querySelector('.cw-mos').innerHTML = h;
+    this.tiles = [...s.querySelectorAll('.cw-mos i')];
+    this.g = s.querySelector('.cw-cv').getContext('2d');
+  },
+  // 健忘的天才：踩坑、找到窍门 → 任务结束全部丢掉 → 下个任务又踩同一个坑
+  forget(s, ctx) {
+    const chips = s.querySelector('.cw-chips'), task = s.querySelector('.cw-task'), st = s.querySelector('.cw-st'), cx = s.querySelector('.cw-ctx');
+    let n = 1;
+    const cycle = async () => {
+      while (ctx.alive) {
+        chips.innerHTML = ''; cx.classList.remove('end'); st.classList.remove('end'); st.textContent = '进行中';
+        task.textContent = `任务 ${n}`;
+        await U.wait(ctx, 700);
+        if (n > 1) { chips.insertAdjacentHTML('beforeend', '<span class="again">又踩了同一个坑</span>'); await U.wait(ctx, 1200); }
+        chips.insertAdjacentHTML('beforeend', '<span class="bad">踩过的坑：……</span>'); await U.wait(ctx, 900);
+        chips.insertAdjacentHTML('beforeend', '<span class="good">试出来的窍门：……</span>'); await U.wait(ctx, 1300);
+        if (!ctx.alive) return;
+        st.textContent = '任务结束'; st.classList.add('end'); cx.classList.add('end');
+        chips.querySelectorAll('span').forEach((x) => x.classList.add('gone'));
+        await U.wait(ctx, 2000);
+        n = n >= 3 ? 1 : n + 1;
+      }
+    };
+    cycle();
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    s.dataset.k = k;
+    this.set(String(Math.min(1, k)));
+    this.forget(s, ctx);
+    // 小世界：编程（开放）的数据一直流进模型；各行各业的锁被逐个打开，数据被“蒸馏”进去
+    const g = this.g, parts = [];
+    let open = 0, acc = 0, last = 0;
+    this.inds.forEach((x, i) => x.classList.toggle('open', i === 0));
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      if (this.k === 0) {
+        acc += dt;
+        if (acc > 2200) { acc = 0; open = open >= 4 ? 0 : open + 1; this.inds.forEach((x, i) => { x.classList.toggle('open', i <= open); x.querySelector('use').setAttribute('href', i === 0 ? '#i-code' : i <= open ? '#i-unlock' : '#i-lock'); }); }
+        for (let i = 0; i <= open; i++) if (Math.random() < 0.22) parts.push({ x: 280, y: 57 + i * 70, i, u: 0, v: 0.006 + Math.random() * 0.006, c: i ? '#7dd3fc' : '#34d399' });
+      }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 1000, 380);
+      for (let j = parts.length - 1; j >= 0; j--) {
+        const p = parts[j];
+        p.u += p.v * (dt / 16);
+        if (p.u >= 1) { parts.splice(j, 1); continue; }
+        const x = 280 + (800 - 280) * p.u, y = p.y + (190 - p.y) * (p.u * p.u);
+        g.globalAlpha = Math.min(1, (1 - p.u) * 3);
+        g.fillStyle = p.c;
+        g.beginPath(); g.arc(x, y, 3.2, 0, 6.283); g.fill();
+      }
+      g.globalAlpha = 1;
+      // 大世界：情境方块时时在变
+      if (this.k >= 1 && Math.random() < 0.3) { const tl = this.tiles[(Math.random() * this.tiles.length) | 0]; tl.style.setProperty('--h', (Math.random() * 360) | 0); }
+    });
+  },
+  step(s, ctx, k) { this.k = k; s.dataset.k = k; this.set(String(Math.min(1, k))); },
+  reset(s) { s.dataset.k = 0; s.querySelector('.cw-chips').innerHTML = ''; },
+};
+</script>

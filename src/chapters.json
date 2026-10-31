@@ -1,0 +1,24 @@
+{
+  "title": "深入理解 AI Agent",
+  "subtitle": "设计原理与工程实践 · 动画版",
+  "author": "李博杰",
+  "formula": "Agent = LLM + 上下文 + 工具",
+  "movements": [
+    { "name": "第一部分 · 如何构建 Agent", "range": "第一至六章", "color": "#22d3ee" },
+    { "name": "第二部分 · 如何提升 Agent 能力", "range": "第七至十章", "color": "#a78bfa" }
+  ],
+  "chapters": [
+    { "id": "ch00", "no": "引言", "title": "实践在前，命名在后", "sub": "核心公式 · 全书结构 · 如何阅读本书 · 前置知识", "color": "#94a3b8", "icon": "compass", "part": -1 },
+    { "id": "ch01", "no": "第一章", "title": "AI Agent 入门", "sub": "核心公式 · 观察与动作空间 · ReAct 循环 · Harness 工程 · 编排模式 · 护栏 · 设计模式", "color": "#22d3ee", "icon": "robot", "part": 0 },
+    { "id": "ch02", "no": "第二章", "title": "上下文工程", "sub": "API 消息结构 · KV Cache · 提示工程与提示注入 · Agent Skills · 状态栏 · 上下文压缩", "color": "#38bdf8", "icon": "eye", "part": 0 },
+    { "id": "ch03", "no": "第三章", "title": "用户记忆和知识库", "sub": "用户记忆 · RAG 技术栈 · 知识组织 · 智能体化 RAG · 多模态记忆", "color": "#2dd4bf", "icon": "db", "part": 0 },
+    { "id": "ch04", "no": "第四章", "title": "工具", "sub": "MCP · 五类工具 · 多模态感知 · 执行安全", "color": "#fbbf24", "icon": "wrench", "part": 0 },
+    { "id": "ch05", "no": "第五章", "title": "Coding Agent 与通用 Agent", "sub": "Coding Agent + 文件系统 · 代码创造新工具 · Agent 自举", "color": "#fb923c", "icon": "code", "part": 0 },
+    { "id": "ch06", "no": "第六章", "title": "交互：观察与动作空间的扩展", "sub": "异步与事件驱动 · 语音交互 · Computer Use · 机器人操作", "color": "#f472b6", "icon": "wave", "part": 0 },
+    { "id": "ch07", "no": "第七章", "title": "Agent 的评估", "sub": "评估环境 · 数据集 · LLM-as-a-Judge · 评估驱动选型", "color": "#a78bfa", "icon": "scale", "part": 1 },
+    { "id": "ch08", "no": "第八章", "title": "模型后训练", "sub": "预训练 / SFT / RL · 奖励设计 · 样本效率", "color": "#818cf8", "icon": "cpu", "part": 1 },
+    { "id": "ch09", "no": "第九章", "title": "Agent 的持续进化", "sub": "学习信号 · 四种更新载体 · 验证、灰度与回滚", "color": "#c084fc", "icon": "refresh", "part": 1 },
+    { "id": "ch10", "no": "第十章", "title": "多 Agent 协作", "sub": "协作分类框架 · 上下文共享与隔离 · Agent 社会", "color": "#34d399", "icon": "nodes", "part": 1 },
+    { "id": "ch11", "no": "后记", "title": "回到 Agent = LLM + 上下文 + 工具", "sub": "两朵乌云 · 模型与 Agent 的共同演进", "color": "#94a3b8", "icon": "star", "part": -1 }
+  ]
+}

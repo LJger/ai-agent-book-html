@@ -1,0 +1,811 @@
+<!-- ================= PART 01 · Coding 内核 ================= -->
+<section class="slide chapter" id="c05-d1" data-part="1" data-title="PART 01 · Coding 内核" data-notes="<b>代码生成不是少数专门化 Agent 的专利，而是每个通用 Agent 都该具备的基础能力</b>。在当前 SOTA 模型的加持下，具备基本 coding 能力并不需要复杂的架构。<br>这一部分先看一个基础 Coding Agent 需要哪些工具、它们怎样配合，以及为什么说代码是“能创造新工具的工具”；再以 Manus 与 OpenClaw 为例，说明为什么开放任务型通用 Agent 的核心是 Coding Agent 加文件系统，以及这一判断的适用边界。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">Coding 是 Agent 的<br>基础能力</h1>
+  <div class="ch-s fx fx-up" style="--d:3">极简的七工具箱 · 从 Manus 到 OpenClaw 的 Coding 内核</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">代码生成不是少数专门化 Agent 的专利，而是每个通用 Agent 都该具备的基础能力。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c05-seven" data-part="1" data-dur="20000" data-title="七个核心工具" data-notes="考虑一个典型任务：“整理仓库中所有遗留的 TODO 注释，按优先级分类并生成 issue”。完成这件事需要浏览目录结构（ls/glob）、读取代码（read）、修改文件（edit/write）、运行命令（bash）、查找模式（grep/search）。这五类操作覆盖了几乎所有 Coding Agent 的核心动作。<br>为了支持这五类操作，一个基础的 Coding Agent 只需配备七个核心工具：<b>Code Interpreter（代码解释器）</b>、<b>Bash Shell（命令行终端）</b>、<b>读文件工具</b>、<b>写文件工具</b>、<b>编辑文件工具</b>、<b>搜索文件名工具（Glob）</b>、<b>搜索文件内容工具（Grep）</b>。这七个工具构成了一个完整但极简的工具箱，几乎任何 Agent 系统都可以低成本地集成。注意，它是 Coding Agent 特有的基础配置，不同于第四章按调用方向和作用性质划分的五类通用工具（感知 / 执行 / 协作 / 事件触发 / 用户沟通）：七个核心工具主要覆盖感知和执行两类，协作、事件触发、用户沟通仍需要其他工具，但它们不是 Coding Agent 的核心。<br>右边终端回放原书的例子：整理 TODO 清单只用了 Grep 和 Write 两个工具；任务更复杂时，比如“统计每个模块的 TODO 数量并画个柱状图”，Agent 还会用 Code Interpreter 执行 Python 代码来统计和绘图（柱状图为示意）。<br>为什么是七个，不是六个？事实上，一个 Bash Shell 工具就能覆盖大部分操作。OpenAI Codex 的工具集就极为精简：以 shell 作为唯一的通用执行入口，用命令完成目录浏览、文件查找与读取；文件修改交给一个语法受约束的 apply_patch 工具——把编辑表达为结构化补丁而非自由文本命令，从而降低改错文件的概率。但其他一些 Agent 仍然保留单独的文件读写工具。本书的七个工具是为了方便读者理解 Coding Agent 所需的基本能力。右上角切到“Codex 式”看同一任务的两工具写法（命令为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">七个工具，组成一个<em>完整但极简</em>的工具箱</h2></div>
+    <div class="p1a-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="seven">书中七工具</button><button data-v="codex">Codex 式</button></div></header>
+  <div class="p1a-ops fx fx-up" style="--d:2"><span class="p1a-ol">五类核心动作</span></div>
+  <div class="p1a-body">
+    <div class="p1a-left fx fx-left" style="--d:3">
+      <div class="p1a-grid"></div>
+      <div class="p1a-det"><b></b><p></p></div>
+    </div>
+    <div class="p1a-run win fx fx-right" style="--d:4">
+      <div class="win-bar"><i></i><i></i><i></i><span class="p1a-wt"></span><span class="c5-tag demo p1a-cxt">Codex 写法为示意</span></div>
+      <div class="c5-term p1a-term"></div>
+      <div class="p1a-chart"><span class="lbl">charts/todo_by_module.png</span><div class="p1a-bars"></div><span class="c5-tag demo">示意</span></div>
+    </div>
+  </div>
+  <div class="p1a-foot fx fx-up" style="--d:6"><span><b>主要覆盖</b>第四章五类工具中的<em>感知</em>与<em>执行</em></span><span>协作 · 事件触发 · 用户沟通仍需其他工具，但不是 Coding Agent 的核心</span></div>
+  <div class="src">第五章 ·「Coding 是 Agent 的基础能力」</div>
+</section>
+<style>
+#c05-seven .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.p1a-ops{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.p1a-ol{font-size:16px;letter-spacing:.2em;color:var(--text3);margin-right:6px}
+.p1a-op{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;font-size:17px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .35s}
+.p1a-op code{font:15px var(--mono);color:var(--text3)}
+.p1a-op.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 13%,transparent)}
+.p1a-op.on code{color:var(--acc)}
+.p1a-body{display:grid;grid-template-columns:640px 1fr;gap:26px;height:560px}
+.p1a-left{display:flex;flex-direction:column;gap:14px;min-height:0}
+.p1a-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.p1a-t{--c:var(--tool);display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:14px;cursor:pointer;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.78);transition:all .4s var(--ease)}
+.p1a-t>.ic{flex:none;font-size:26px;color:var(--c)}
+.p1a-t b{display:block;font-size:19px;font-family:var(--mono)}
+.p1a-t small{display:block;font-size:15px;color:var(--text3);margin-top:1px}
+.p1a-t.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,rgba(12,18,40,.9));box-shadow:0 0 26px color-mix(in srgb,var(--c) 38%,transparent);translate:0 -2px}
+.p1a-t.sel{border-color:color-mix(in srgb,var(--acc) 70%,transparent)}
+.p1a-t.cx{display:none;grid-column:span 2;--c:#34d399}
+.p1a-t.cx p{font-size:15px;color:var(--text2);margin-top:4px;line-height:1.5}
+.p1a-t .p1a-cov{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.p1a-t .p1a-cov i{font-style:normal;font:13px/1.6 var(--mono);padding:0 7px;border-radius:6px;color:var(--text3);border:1px solid var(--line2)}
+#c05-seven[data-mode=codex] .p1a-t.b7{display:none}
+#c05-seven[data-mode=codex] .p1a-t.cx{display:flex}
+.p1a-det{flex:1;min-height:0;padding:14px 18px;border-radius:14px;border:1px dashed var(--line2);background:rgba(255,255,255,.02)}
+.p1a-det b{display:block;font-size:19px;color:var(--acc)}
+.p1a-det p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+.p1a-run{display:flex;flex-direction:column;min-width:0;position:relative}
+.p1a-run .win-bar span.p1a-wt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}
+.p1a-cxt{display:none}
+#c05-seven[data-mode=codex] .p1a-cxt{display:inline-flex}
+.p1a-term{flex:1;min-height:0;font-size:16px}
+.p1a-chart{position:absolute;right:18px;bottom:16px;width:300px;padding:12px 14px;border-radius:14px;background:rgba(10,16,36,.95);border:1px solid var(--line2);opacity:0;transform:translateY(12px);transition:all .5s var(--ease)}
+.p1a-chart.on{opacity:1;transform:none}
+.p1a-chart .c5-tag{position:absolute;right:10px;top:8px}
+.p1a-bars{display:flex;align-items:flex-end;gap:16px;height:110px;margin-top:10px;padding:0 6px;border-bottom:1px solid var(--line2)}
+.p1a-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;justify-content:flex-end;height:100%}
+.p1a-bar i{width:100%;height:0;border-radius:6px 6px 0 0;background:linear-gradient(var(--acc),color-mix(in srgb,var(--acc) 45%,transparent));transition:height .8s var(--spring)}
+.p1a-bar span{font:15px var(--mono);color:var(--text2)}
+.p1a-bl{display:flex;gap:16px;padding:4px 6px 0}
+.p1a-bl span{flex:1;text-align:center;font:15px var(--mono);color:var(--text3)}
+.p1a-foot{margin-top:18px;display:flex;gap:28px;align-items:center;padding:12px 22px;border-radius:14px;font-size:18px;color:var(--text2);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent);border-left:4px solid var(--acc)}
+.p1a-foot b{color:var(--acc)}
+.p1a-foot em{font-style:normal;color:var(--text);font-weight:700}
+</style>
+<script>
+HOOKS['c05-seven'] = {
+  OPS: [['浏览目录结构', 'ls / glob'], ['读取代码', 'read'], ['修改文件', 'edit / write'], ['运行命令', 'bash'], ['查找模式', 'grep / search']],
+  T7: [
+    { k: 'ci', n: 'Code Interpreter', z: '代码解释器', ic: 'cpu', o: [3], d: '提供隔离的沙盒环境，安全执行 Python 代码。沙盒（sandbox）是与主系统隔离的安全运行空间，代码即使在其中运行出错也不会影响宿主机。' },
+    { k: 'sh', n: 'Bash Shell', z: '命令行终端', ic: 'term', o: [0, 3], d: '在终端中执行命令，如运行测试用例、处理特殊格式文件。' },
+    { k: 'rd', n: 'Read', z: '读文件工具', ic: 'file', o: [1], d: '读取代码、配置、文档、日志等。' },
+    { k: 'wr', n: 'Write', z: '写文件工具', ic: 'save', o: [2], d: '创建新文件或完全重写现有文件。' },
+    { k: 'ed', n: 'Edit', z: '编辑文件工具', ic: 'edit', o: [2], d: '对现有文件进行局部修改，是代码维护和迭代的核心操作。' },
+    { k: 'gl', n: 'Glob', z: '搜索文件名工具', ic: 'folder', o: [0], d: '通过模式匹配快速定位文件系统中的目标文件，例如用 **/*.py 找出项目中所有 Python 文件。' },
+    { k: 'gr', n: 'Grep', z: '搜索文件内容工具', ic: 'search', o: [4], d: '在文件内容中搜索特定的文本模式，例如搜索所有调用了某个函数的代码行。' },
+  ],
+  CX: [
+    { k: 'shell', n: 'shell', z: '唯一的通用执行入口', ic: 'term', o: [0, 1, 3, 4], cov: ['Bash', 'Read', 'Glob', 'Grep', '代码执行'], d: '用命令完成目录浏览、文件查找与读取，也用它运行测试和脚本。' },
+    { k: 'patch', n: 'apply_patch', z: '语法受约束的补丁工具', ic: 'merge', o: [2], cov: ['Write', 'Edit'], d: '把编辑表达为结构化补丁而非自由文本命令，从而降低改错文件的概率。' },
+  ],
+  HITS: ['src/api.py:42: # TODO: add rate limiting', 'src/db.py:15:  # TODO: migrate to PostgreSQL', 'tests/test_api.py:8: # TODO: add edge case tests'],
+  init(s) {
+    s.querySelector('.p1a-ops').insertAdjacentHTML('beforeend', this.OPS.map(([n, c], i) => `<span class="p1a-op" data-o="${i}">${n}<code>${c}</code></span>`).join(''));
+    s.querySelector('.p1a-grid').innerHTML =
+      this.T7.map((t) => `<button class="p1a-t b7" data-k="${t.k}"><svg class="ic"><use href="#i-${t.ic}"/></svg><div><b>${t.n}</b><small>${t.z}</small></div></button>`).join('') +
+      this.CX.map((t) => `<button class="p1a-t cx" data-k="${t.k}"><svg class="ic"><use href="#i-${t.ic}"/></svg><div><b>${t.n}</b><small>${t.z}</small><p>${t.d}</p><div class="p1a-cov">${t.cov.map((c) => `<i>${c}</i>`).join('')}</div></div></button>`).join('');
+    s.querySelector('.p1a-bars').innerHTML = ['api', 'db', 'tests'].map((m) => `<div class="p1a-bar"><span>1</span><i></i></div>`).join('');
+    s.querySelector('.p1a-chart').insertAdjacentHTML('beforeend', `<div class="p1a-bl"><span>api</span><span>db</span><span>tests</span></div>`);
+    this.T = C5.term(s.querySelector('.p1a-term'), { max: 22 });
+    this.setMode = U.seg(s.querySelector('.p1a-seg'), (v) => { this.auto = false; this.mode(s, v); });
+    s.querySelector('.p1a-grid').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-k]');
+      if (!b) return;
+      this.auto = false;
+      this.detail(s, b.dataset.k, true);
+    });
+  },
+  all() { return [...this.T7, ...this.CX]; },
+  // 点亮某个工具卡与它对应的核心动作，并在下方显示说明
+  lit(s, k) {
+    const t = this.all().find((x) => x.k === k);
+    s.querySelectorAll('.p1a-t').forEach((b) => b.classList.toggle('on', b.dataset.k === k));
+    s.querySelectorAll('.p1a-op').forEach((o) => o.classList.toggle('on', !!t && t.o.includes(+o.dataset.o)));
+    if (t) this.detail(s, k);
+  },
+  detail(s, k, sel) {
+    const t = this.all().find((x) => x.k === k);
+    if (!t) return;
+    s.querySelector('.p1a-det b').textContent = `${t.n} · ${t.z}`;
+    s.querySelector('.p1a-det p').textContent = t.d;
+    if (sel) s.querySelectorAll('.p1a-t').forEach((b) => b.classList.toggle('sel', b.dataset.k === k));
+  },
+  mode(s, m) {
+    this.m = m;
+    s.dataset.mode = m;
+    this.setMode(m);
+    this.run(s);
+  },
+  // 两个任务依次回放；codex 模式下同一任务改成 shell + apply_patch 的写法
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    const cx = this.m === 'codex', T = this.T, chart = s.querySelector('.p1a-chart'), wt = s.querySelector('.p1a-wt');
+    const L = (c, t, w, fn) => ({ c, t, w, fn });
+    const lit = (k) => () => this.lit(s, k);
+    T.clear();
+    chart.classList.remove('on');
+    s.querySelectorAll('.p1a-bar i').forEach((i) => (i.style.height = '0'));
+    this.lit(s, null);
+    wt.textContent = '任务 1：帮我把项目里所有 TODO 注释整理成一个清单';
+    const hits = this.HITS.map((h) => L('res', h, 160));
+    let ok1 = await C5.play(T, [
+      L('ag', '需要找到所有包含 TODO 的代码行。', 600),
+      cx ? L('call', `shell("rg -n TODO --glob '**/*.py'")`, 500, lit('shell')) : L('call', 'Grep("TODO", glob="**/*.py")', 500, lit('gr')),
+      ...hits,
+      L('ag', '找到了 3 个 TODO，整理成清单写入文件。', 600),
+      cx ? L('call', 'apply_patch("*** Add File: TODO_LIST.md …")', 500, lit('patch')) : L('call', 'Write("TODO_LIST.md", content="...")', 500, lit('wr')),
+      L('res', cx ? '补丁已应用：新增 TODO_LIST.md' : '文件已创建', 500),
+      L('say', '已整理完毕，共发现 3 个 TODO 项，清单保存在 TODO_LIST.md。', 900),
+      L('dim', cx ? '—— 两个工具：shell 负责查找，apply_patch 负责落盘 ——' : '—— 整个过程只用了 Grep（搜索内容）和 Write（写文件）两个工具 ——', 2200),
+    ], ctx, ok);
+    if (!ok1 || !ok()) return;
+    T.clear();
+    this.lit(s, null);
+    wt.textContent = '任务 2：统计每个模块的 TODO 数量并画个柱状图';
+    ok1 = await C5.play(T, [
+      L('ag', '先搜出全部 TODO，再写段 Python 统计并绘图。', 600),
+      cx ? L('call', `shell("rg -c TODO --glob '**/*.py'")`, 500, lit('shell')) : L('call', 'Grep("TODO", glob="**/*.py", output_mode="count")', 500, lit('gr')),
+      L('res', 'src/api.py:1   src/db.py:1   tests/test_api.py:1', 500),
+      cx ? L('call', 'shell("python plot_todos.py")', 400, lit('shell')) : L('call', 'CodeInterpreter("""counts = {...}; plt.bar(...)""")', 400, lit('ci')),
+      L('res', '已生成 charts/todo_by_module.png', 300, () => {
+        chart.classList.add('on');
+        s.querySelectorAll('.p1a-bar i').forEach((i, j) => ctx.later(() => ok() && (i.style.height = '70px'), 200 + j * 160));
+      }),
+      L('say', '每个模块各有 1 个 TODO，柱状图已保存。', 3200),
+    ], ctx, ok);
+    if (!ok1 || !ok()) return;
+    if (this.auto) this.mode(s, cx ? 'seven' : 'codex');
+    else this.run(s);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.detail(s, 'ci');
+    ctx.later(() => this.mode(s, 'seven'), 700);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.T.clear();
+    s.dataset.mode = 'seven';
+    s.querySelectorAll('.p1a-t,.p1a-op').forEach((b) => b.classList.remove('on', 'sel'));
+    s.querySelector('.p1a-chart').classList.remove('on');
+  },
+};
+</script>
+
+<section class="slide" id="c05-why" data-part="1" data-trans="zoom" data-dur="17000" data-title="代码是能创造新工具的工具" data-notes="为什么每个通用 Agent 都应该具备 coding 能力？因为代码生成不只是写程序，它是一种通用的问题解决手段。遇到数学推理，可以写段代码交给求解器算出精确答案；需要固化业务规则，代码比自然语言描述精确得多；缺少某个工具，可以临时写一个；数据格式变了，动态生成解析逻辑。本章后续会逐一展开这些场景（右侧每一行都可以跳过去）。<br>一个具备基本 coding 能力的 Agent，即使工具箱中只有上述七个简单工具，也能在遇到新需求时动态扩展自己的能力边界。<br>动画里，中间是只带七个基础工具的 Agent，虚线圈是它的能力边界；每来一个新需求，Agent 写出一段代码，它就变成边界上的一个新工具，边界随之扩张（新工具的名字与代码为示意）。点击右侧任一需求可以单独触发。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">代码是<em>能创造新工具的工具</em></h2>
+  <p class="lead fx fx-up" style="--d:2">工具箱里只有七个简单工具，遇到新需求时也能当场扩展能力边界</p></header>
+  <div class="p1b-body">
+    <div class="p1b-stage fx fx-scale" style="--d:3">
+      <svg class="p1b-svg" viewBox="0 0 1120 600" width="1120" height="600">
+        <circle class="p1b-bd" cx="560" cy="300" r="150"/>
+        <circle class="p1b-bd2" cx="560" cy="300" r="150"/>
+        <g class="p1b-paths"></g>
+        <circle class="pk p1b-pk" r="10"/>
+      </svg>
+      <div class="p1b-core"><b>Agent</b><small>七个基础工具</small></div>
+      <div class="p1b-cards"></div>
+      <div class="p1b-new"></div>
+      <span class="p1b-bl">能力边界</span>
+      <span class="c5-tag demo p1b-dm">示意</span>
+    </div>
+    <div class="p1b-side fx fx-right" style="--d:4">
+      <div class="p1b-list"></div>
+      <p class="p1b-tg">即使只有七个简单工具，<b>也能在遇到新需求时动态扩展自己的能力边界</b></p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding 是 Agent 的基础能力」</div>
+</section>
+<style>
+.p1b-body{display:flex;gap:30px;flex:1;min-height:0}
+.p1b-stage{position:relative;width:1120px;height:600px;flex:none}
+.p1b-svg{position:absolute;inset:0;overflow:visible}
+.p1b-bd{fill:color-mix(in srgb,var(--acc) 5%,transparent);stroke:color-mix(in srgb,var(--acc) 70%,transparent);stroke-width:2.5;stroke-dasharray:8 9;animation:flow 1.6s linear infinite}
+.p1b-bd2{fill:none;stroke:var(--acc);stroke-width:2;opacity:0}
+.p1b-bd2.go{animation:p1bPulse 1.1s ease-out}
+@keyframes p1bPulse{0%{opacity:.8}100%{opacity:0;stroke-width:14}}
+.p1b-path{fill:none;stroke:rgba(255,255,255,.12);stroke-width:2;stroke-dasharray:5 8}
+.p1b-path.on{stroke:var(--acc);opacity:.8;animation:flow 1s linear infinite}
+.p1b-pk{fill:#fde68a}
+.p1b-core{position:absolute;left:460px;top:200px;width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 35% 30%,#2a2238,#0b1022 72%);border:2px solid color-mix(in srgb,var(--acc) 70%,transparent);box-shadow:0 0 50px color-mix(in srgb,var(--acc) 30%,transparent)}
+.p1b-core b{font:800 34px var(--num)}
+.p1b-core small{font-size:16px;color:var(--text2);margin-top:2px}
+.p1b-dot{position:absolute;left:50%;top:50%;width:14px;height:14px;margin:-7px;border-radius:50%;background:var(--tool);box-shadow:0 0 10px var(--tool)}
+.p1b-card{--c:var(--acc);position:absolute;width:260px;padding:14px 16px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.88);transition:all .45s var(--ease)}
+.p1b-card b{display:flex;align-items:center;gap:8px;font-size:20px}
+.p1b-card b .ic{color:var(--c);font-size:22px}
+.p1b-card p{font-size:16px;color:var(--text2);margin-top:4px;line-height:1.5}
+.p1b-card.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--c) 35%,transparent)}
+.p1b-tool{--c:var(--acc);position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;pointer-events:none;animation:upIn .6s var(--spring) both}
+.p1b-tool b{font:700 17px var(--mono);padding:5px 12px;border-radius:10px;color:#06101f;background:var(--c);box-shadow:0 0 18px var(--c);white-space:nowrap}
+.p1b-tool code{font:15px var(--mono);color:var(--c);white-space:nowrap;background:rgba(5,9,22,.85);padding:2px 8px;border-radius:7px}
+.p1b-bl{position:absolute;left:560px;top:118px;transform:translateX(-50%);font-size:16px;letter-spacing:.2em;color:var(--acc);transition:top .7s var(--ease)}
+.p1b-dm{position:absolute;right:0;bottom:0}
+.p1b-side{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.p1b-list{display:flex;flex-direction:column;gap:10px}
+.p1b-it{--c:var(--acc);display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.p1b-it b{font-size:19px;color:var(--c)}
+.p1b-it span{font-size:17px;color:var(--text2);line-height:1.5}
+.p1b-it em{font-style:normal;font-size:15px;color:var(--text3);text-decoration:underline;text-underline-offset:3px}
+.p1b-it.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 11%,transparent)}
+.p1b-tg{margin-top:auto;font-size:19px;line-height:1.6;color:var(--text2);padding:14px 16px;border-radius:14px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent)}
+.p1b-tg b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-why'] = {
+  // 四个新需求：卡片位置（中心点）、新工具名与一行代码（示意）、跳转页
+  N: [
+    { t: '遇到数学推理', d: '写段代码交给求解器，算出精确答案', ic: 'sigma', c: '#a78bfa', x: 150, y: 90, tool: 'solve()', code: 'sympy.solve(eq, x)', go: 'c05-math' },
+    { t: '需要固化业务规则', d: '代码比自然语言描述精确得多', ic: 'scale', c: '#c084fc', x: 970, y: 90, tool: 'check_policy()', code: 'if r.any_segment_used: ...', go: 'c05-rules' },
+    { t: '缺少某个工具', d: '临时写一个', ic: 'wrench', c: '#fbbf24', x: 150, y: 510, tool: 'fetch_api()', code: 'requests.get(url, headers=auth)', go: 'c05-adapter' },
+    { t: '数据格式变了', d: '动态生成解析逻辑', ic: 'refresh', c: '#22d3ee', x: 970, y: 510, tool: 'parse_v2()', code: 're.match(PATTERN, line)', go: 'c05-exp510' },
+  ],
+  init(s) {
+    const core = s.querySelector('.p1b-core');
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2 - Math.PI / 2;
+      core.insertAdjacentHTML('beforeend', `<i class="p1b-dot" style="translate:${(Math.cos(a) * 118).toFixed(1)}px ${(Math.sin(a) * 118).toFixed(1)}px"></i>`);
+    }
+    s.querySelector('.p1b-cards').innerHTML = this.N.map((n, i) => `<div class="p1b-card" data-n="${i}" style="--c:${n.c};left:${n.x - 130}px;top:${n.y - 50}px"><b><svg class="ic"><use href="#i-${n.ic}"/></svg>${n.t}</b><p>${n.d}</p></div>`).join('');
+    s.querySelector('.p1b-paths').innerHTML = this.N.map((n, i) => `<path class="p1b-path" data-n="${i}" d="M${n.x} ${n.y} L560 300"/>`).join('');
+    s.querySelector('.p1b-list').innerHTML = this.N.map((n, i) => `<button class="p1b-it" data-i="${i}" style="--c:${n.c}"><b>${n.t}</b><span>${n.d}</span><em data-go="${n.go}">跳到本章对应页面</em></button>`).join('');
+    s.querySelector('.p1b-list').addEventListener('click', (e) => {
+      const g = e.target.closest('[data-go]');
+      if (g) { C5.go(g.dataset.go); return; }
+      const b = e.target.closest('[data-i]');
+      if (b) { this.auto = false; this.one(s, +b.dataset.i, true); }
+    });
+  },
+  setR(s, r) {
+    this.r = r;
+    s.querySelectorAll('.p1b-bd,.p1b-bd2').forEach((c) => c.setAttribute('r', r.toFixed(1)));
+    s.querySelector('.p1b-bl').style.top = (300 - r - 32) + 'px';
+  },
+  grow(s, to) {
+    const ctx = this.ctx, from = this.r, t0 = performance.now(), tk = this.tk;
+    U.restart(s.querySelector('.p1b-bd2'), 'go');
+    ctx.raf((t) => {
+      if (tk !== this.tk) return false;
+      const k = Math.min(1, (t - t0) / 800);
+      this.setR(s, from + (to - from) * U.ease(k));
+      return k < 1;
+    });
+  },
+  // 一个需求到来：卡片亮 → 数据包飞向 Agent → 写出代码 → 新工具落在边界上 → 边界扩张
+  async one(s, i, single) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    if (single) this.clear(s);
+    const n = this.N[i];
+    s.querySelectorAll('.p1b-card').forEach((c) => c.classList.toggle('on', +c.dataset.n === i));
+    s.querySelectorAll('.p1b-it').forEach((c) => c.classList.toggle('on', +c.dataset.i === i));
+    const p = s.querySelector(`.p1b-path[data-n="${i}"]`);
+    p.classList.add('on');
+    await U.fly(s.querySelector('.p1b-pk'), p, 1100, { ctx });
+    if (!ok()) return false;
+    p.classList.remove('on');
+    const to = this.r + 26, dx = n.x - 560, dy = n.y - 300, L = Math.hypot(dx, dy);
+    const x = 560 + (dx / L) * to, y = 300 + (dy / L) * to;
+    s.querySelector('.p1b-new').insertAdjacentHTML('beforeend', `<div class="p1b-tool" style="--c:${n.c};left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><b>${n.tool}</b><code>${C5.esc(n.code)}</code></div>`);
+    this.grow(s, to);
+    await U.wait(ctx, 1500);
+    return ok();
+  },
+  clear(s) {
+    s.querySelector('.p1b-new').innerHTML = '';
+    s.querySelectorAll('.p1b-card,.p1b-it,.p1b-path').forEach((c) => c.classList.remove('on'));
+    this.setR(s, 150);
+  },
+  async loop(s) {
+    const ctx = this.ctx;
+    while (ctx && ctx.alive && this.auto) {
+      this.clear(s);
+      for (let i = 0; i < this.N.length; i++) {
+        if (!this.auto || !(await this.one(s, i))) return;
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.setR(s, 150);
+    ctx.later(() => this.loop(s), 900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c05-manus" data-part="1" data-trans="flip" data-dur="16000" data-title="为什么 Coding 是核心" data-notes="以 Manus、OpenClaw 为代表的通用 Agent 产品，把 Deep Research（深度调研）、Computer Use（电脑操控）和 Coding（代码生成）三大能力融合在一个系统中。那么，为什么说 Coding Agent 是其中的核心，而不是另外两者？<br>因为几乎所有高效的内容生成最终都要落到代码上。PPT、Word 文档本质上是 OOXML（Office Open XML，微软推出的办公文档开放标准）格式的代码；PDF 报告可以通过 Markdown、HTML 或 LaTeX 生成；数据分析和可视化可以由 Python 脚本完成；甚至 GUI 操作中成功的浏览器操作序列也可以被固化为可复用的代码（详见第九章）。Deep Research 的搜索和信息综合可通过代码驱动的 Web 请求和解析实现。Computer Use 虽然通用性更强，但成本、延迟和稳定性远不如直接通过代码或 API 来完成相同操作。<b>代码生成是效率最高、成本最低、可复用性最强的能力基座。</b><br>右侧五种产物会自动轮播，也可以点击，下方显示它在底层对应的代码（代码片段为示意）。右下角的对比条只表示原书的定性判断，不是测量值。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三大能力融为一体，为什么<em>Coding 是核心</em>？</h2>
+  <p class="lead fx fx-up" style="--d:2">几乎所有高效的内容生成，最终都要落到代码上</p></header>
+  <div class="p1c-stage fx fx-up" style="--d:3">
+    <svg class="p1c-svg" viewBox="0 0 1660 360" width="1660" height="360">
+      <g class="p1c-in"></g><g class="p1c-out"></g>
+      <circle class="pk p1c-pk" r="9"/><circle class="pk p1c-pk2" r="9"/>
+    </svg>
+    <div class="p1c-caps"></div>
+    <div class="p1c-hub"><b>代码</b><small>效率最高 · 成本最低<br>可复用性最强</small></div>
+    <div class="p1c-prods"></div>
+  </div>
+  <div class="p1c-low">
+    <div class="p1c-snip win fx fx-left" style="--d:5"><div class="win-bar"><i></i><i></i><i></i><span class="p1c-sn"></span><span class="c5-tag demo">示意</span></div><div class="c5-code p1c-code"></div></div>
+    <div class="p1c-cmp panel fx fx-right" style="--d:6">
+      <div class="p1c-ch"><b>同一个操作</b><span class="c5-tag book">原书定性判断 · 非测量值</span></div>
+      <div class="p1c-rows"></div>
+      <div class="p1c-lg"><span><i style="background:#fb7185"></i>Computer Use</span><span><i style="background:#34d399"></i>代码 / API</span></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「案例：从 Manus 到 OpenClaw——通用 Agent 的 Coding 内核」</div>
+</section>
+<style>
+.p1c-stage{position:relative;width:1660px;height:360px}
+.p1c-svg{position:absolute;inset:0;overflow:visible}
+.p1c-ln{fill:none;stroke:rgba(255,255,255,.13);stroke-width:2.5;transition:stroke .4s,opacity .4s}
+.p1c-ln.on{stroke:var(--c);stroke-dasharray:8 8;animation:flow 1s linear infinite;filter:drop-shadow(0 0 6px var(--c))}
+.p1c-pk,.p1c-pk2{fill:#fff}
+.p1c-cap{--c:var(--acc);position:absolute;left:0;width:330px;height:92px;display:flex;align-items:center;gap:14px;padding:0 18px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.86);transition:all .4s}
+.p1c-cap .ic{font-size:32px;color:var(--c);flex:none}
+.p1c-cap b{display:block;font-size:21px}
+.p1c-cap small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+.p1c-cap.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 13%,rgba(12,18,40,.9));box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.p1c-hub{position:absolute;left:660px;top:70px;width:220px;height:220px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(circle at 35% 30%,#3a2a12,#0c1022 72%);border:2px solid var(--acc);box-shadow:0 0 0 10px color-mix(in srgb,var(--acc) 10%,transparent),0 0 60px color-mix(in srgb,var(--acc) 40%,transparent)}
+.p1c-hub b{font-size:44px;color:var(--acc)}
+.p1c-hub small{font-size:16px;color:var(--text2);line-height:1.5;margin-top:4px}
+.p1c-prod{--c:var(--acc);position:absolute;left:1120px;width:540px;height:56px;display:flex;align-items:center;gap:12px;padding:0 16px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.p1c-prod .ic{font-size:24px;color:var(--c);flex:none}
+.p1c-prod b{font-size:19px;white-space:nowrap}
+.p1c-prod span{margin-left:auto;font-size:15px;color:var(--text3);white-space:nowrap}
+.p1c-prod.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);translate:-8px 0}
+.p1c-prod.on span{color:var(--c)}
+.p1c-low{display:grid;grid-template-columns:1000px 1fr;gap:24px;margin-top:18px;height:234px}
+.p1c-snip{display:flex;flex-direction:column;min-height:0}
+.p1c-snip .win-bar span.p1c-sn{flex:1;font-size:15px}
+.p1c-code{flex:1;min-height:0;font-size:16px;line-height:1.55;padding:12px 14px}
+.p1c-cmp{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.p1c-ch{display:flex;align-items:center;gap:12px}
+.p1c-ch b{font-size:19px}
+.p1c-rows{display:flex;flex-direction:column;gap:9px}
+.p1c-r{display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:center}
+.p1c-r>span{font-size:16px;color:var(--text2)}
+.p1c-bb{display:flex;flex-direction:column;gap:4px}
+.p1c-bb i{display:block;height:9px;border-radius:9px;width:0;transition:width 1s var(--ease)}
+.p1c-bb i:first-child{background:#fb7185}.p1c-bb i:last-child{background:#34d399}
+.p1c-lg{display:flex;gap:18px;font-size:15px;color:var(--text3)}
+.p1c-lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+</style>
+<script>
+HOOKS['c05-manus'] = {
+  CAP: [
+    { n: 'Deep Research', z: '深度调研', ic: 'search', c: '#22d3ee', y: 14 },
+    { n: 'Computer Use', z: '电脑操控', ic: 'cursor', c: '#f472b6', y: 134 },
+    { n: 'Coding', z: '代码生成', ic: 'code', c: '#fbbf24', y: 254 },
+  ],
+  // 产物：来自哪条能力、它在底层是什么代码（片段为示意）
+  P: [
+    { n: 'PPT · Word 文档', w: 'OOXML 格式的代码', ic: 'docs', cap: 2, lang: 'js', code: '<p:sld><p:cSld><p:spTree>\n  <p:sp><p:txBody><a:p><a:r>\n    <a:t>第三季度销售总结</a:t>\n  </a:r></a:p></p:txBody></p:sp>\n</p:spTree></p:cSld></p:sld>' },
+    { n: 'PDF 报告', w: 'Markdown · HTML · LaTeX', ic: 'file', cap: 2, lang: 'py', code: '# 第三季度销售分析\n\n## 结论\n- 华东区收入环比增长\n- 详见 charts/ 下的趋势图\n# → pandoc report.md -o report.pdf' },
+    { n: '数据分析与可视化', w: 'Python 脚本', ic: 'chart', cap: 2, lang: 'py', code: 'df = pd.read_csv("sales.csv")\nmonthly = df.groupby("month")["revenue"].sum()\nmonthly.plot.bar()\nplt.savefig("charts/revenue.png")' },
+    { n: '浏览器操作序列', w: '固化为可复用代码（第九章）', ic: 'browser', cap: 1, lang: 'js', code: 'await page.goto("https://erp.example.com");\nawait page.click("text=导出报表");\nawait page.fill("#month", "2026-09");\nawait page.click("text=下载");' },
+    { n: '搜索与信息综合', w: '代码驱动的 Web 请求和解析', ic: 'globe', cap: 0, lang: 'py', code: 'html = requests.get(url, timeout=10).text\nsoup = BeautifulSoup(html, "html.parser")\ntitles = [h.text for h in soup.select("article h2")]' },
+  ],
+  CMP: [['成本', 0.86, 0.22], ['延迟', 0.9, 0.2], ['稳定性', 0.3, 0.88]],
+  init(s) {
+    s.querySelector('.p1c-caps').innerHTML = this.CAP.map((c, i) => `<div class="p1c-cap" data-c="${i}" style="--c:${c.c};top:${c.y}px"><svg class="ic"><use href="#i-${c.ic}"/></svg><div><b>${c.n}</b><small>${c.z}</small></div></div>`).join('');
+    s.querySelector('.p1c-prods').innerHTML = this.P.map((p, i) => `<button class="p1c-prod" data-i="${i}" style="--c:${this.CAP[p.cap].c};top:${8 + i * 70}px"><svg class="ic"><use href="#i-${p.ic}"/></svg><b>${p.n}</b><span>${p.w}</span></button>`).join('');
+    // 能力 → 代码中枢 → 产物 的连线
+    s.querySelector('.p1c-in').innerHTML = this.CAP.map((c, i) => `<path class="p1c-ln" data-c="${i}" style="--c:${c.c}" d="M330 ${c.y + 46} C 500 ${c.y + 46}, 520 180, 660 180"/>`).join('');
+    s.querySelector('.p1c-out').innerHTML = this.P.map((p, i) => `<path class="p1c-ln" data-o="${i}" style="--c:${this.CAP[p.cap].c}" d="M880 180 C 1000 180, 1000 ${36 + i * 70}, 1120 ${36 + i * 70}"/>`).join('');
+    s.querySelector('.p1c-rows').innerHTML = this.CMP.map(([n]) => `<div class="p1c-r"><span>${n}</span><div class="p1c-bb"><i></i><i></i></div></div>`).join('');
+    s.querySelector('.p1c-prods').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  async show(s, i) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    this.i = i;
+    const p = this.P[i];
+    s.querySelectorAll('.p1c-cap').forEach((c) => c.classList.toggle('on', +c.dataset.c === p.cap));
+    s.querySelectorAll('.p1c-prod').forEach((c) => c.classList.toggle('on', +c.dataset.i === i));
+    s.querySelectorAll('.p1c-ln').forEach((l) => l.classList.toggle('on', +l.dataset.c === p.cap || +l.dataset.o === i));
+    s.querySelector('.p1c-sn').textContent = `${p.n} → ${p.w}`;
+    C5.code(s.querySelector('.p1c-code'), p.code, p.lang);
+    await U.fly(s.querySelector('.p1c-pk'), s.querySelector(`.p1c-ln[data-c="${p.cap}"]`), 900, { ctx });
+    if (!ok()) return;
+    await U.fly(s.querySelector('.p1c-pk2'), s.querySelector(`.p1c-ln[data-o="${i}"]`), 900, { ctx });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    ctx.later(() => {
+      this.show(s, 0);
+      s.querySelectorAll('.p1c-bb').forEach((b, j) => { const [, a, c] = this.CMP[j]; b.children[0].style.width = a * 100 + '%'; b.children[1].style.width = c * 100 + '%'; });
+    }, 800);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.P.length); }, 3600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.on').forEach((e) => e.classList.remove('on'));
+    s.querySelectorAll('.p1c-bb i').forEach((i) => (i.style.width = '0'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-fig51" data-part="1" data-trans="rise" data-dur="20000" data-title="图5-1 OpenClaw 架构中的 Coding Agent 核心" data-notes="<b>图5-1</b> 是 OpenClaw 架构中的 Coding Agent 核心：上层是多平台消息网关（WhatsApp、Telegram、iMessage、Slack、CLI），把自然语言请求送进 Coding Agent 运行时（推理 + 执行核心，七个工具）；旁边是网络搜索模块（Deep Research：Web 请求与解析）和浏览器自动化（Computer Use：Playwright DOM）；下层是文件系统——记忆、知识与能力的中枢（MEMORY.md、按日归档的交互日志、SOUL.md、知识库文件、Git 版本控制）。图底一句：大模型 = 新操作系统，屏蔽智能复杂性，提供统一抽象。<br>用一个具体的执行流来理解这个架构。用户要求 “Help me analyze last quarter's sales data and create a summary report”：<br>① <b>读记忆</b>：Agent 读取 MEMORY.md，发现用户偏好 PDF 格式的报告，数据源是 Google Sheets；② <b>调工具</b>：通过网络搜索模块获取 Google Sheets API 的使用方法，通过代码执行下载数据；③ <b>写代码</b>：用 Python 生成数据分析脚本（pandas 聚合、matplotlib 可视化）；④ <b>生成产物</b>：将分析结果写入 report.pdf，图表写入 charts/ 目录；⑤ <b>更新记忆</b>：在 MEMORY.md 中记录 “User's sales data is in Google Sheets, ID: xxx”，下次无需再问。<br>整个过程中，文件系统是信息流转的枢纽——记忆从文件读取，产物写入文件，经验也保存为文件。右侧五步自动轮播，也可以点击任一步。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图5-1 OpenClaw：<em>Coding Agent 核心 + 文件系统中枢</em></h2></header>
+  <div class="p1d-body">
+    <div class="p1d-stage fx fx-up" style="--d:2">
+      <div class="p1d-gw"><b>多平台消息网关</b><small>用户交互层</small><span>WhatsApp</span><span>Telegram</span><span>iMessage</span><span>Slack</span><span>CLI</span></div>
+      <div class="p1d-rt"><div class="p1d-bh"><b>Coding Agent 运行时</b><small>推理 + 执行核心</small></div><div class="p1d-tools"></div><div class="p1d-code"><span class="c5-tag demo">示意</span><code></code></div></div>
+      <div class="p1d-mod" data-m="web" style="top:118px"><b>网络搜索模块</b><span>Deep Research</span><small>Web 请求 · 解析</small></div>
+      <div class="p1d-mod" data-m="cu" style="top:238px"><b>浏览器自动化</b><span>Computer Use</span><small>Playwright DOM</small></div>
+      <div class="p1d-fs"><div class="p1d-bh"><b>文件系统</b><small>记忆 · 知识 · 能力中枢</small></div><div class="p1d-files"></div><div class="p1d-arts"></div></div>
+      <svg class="p1d-svg" viewBox="0 0 1170 600" width="1170" height="600">
+        <path class="p1d-p" data-p="req" d="M380 70 V112"/>
+        <path class="p1d-p" data-p="web" d="M770 170 H806"/>
+        <path class="p1d-p" data-p="cu" d="M770 290 H806"/>
+        <path class="p1d-p" data-p="up" d="M120 410 C 120 380, 150 356, 150 340"/>
+        <path class="p1d-p" data-p="down" d="M560 340 C 560 368, 640 384, 640 410"/>
+        <path class="p1d-p" data-p="mem" d="M300 340 C 300 372, 120 380, 120 410"/>
+        <text class="p1d-lt" x="392" y="98">自然语言请求</text>
+        <text class="p1d-lt" x="660" y="392">读 / 写文件</text>
+        <circle class="pk p1d-pk" r="9"/>
+      </svg>
+      <div class="p1d-os">大模型 = 新操作系统：屏蔽智能复杂性，提供统一抽象</div>
+    </div>
+    <div class="p1d-side panel fx fx-right" style="--d:3">
+      <div class="p1d-ask"><svg class="ic"><use href="#i-user"/></svg><span>“Help me analyze last quarter's sales data and create a summary report”</span></div>
+      <ol class="sl p1d-sl"></ol>
+      <p class="p1d-cap">文件系统是信息流转的枢纽：记忆从文件读取，产物写入文件，经验也保存为文件</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「案例：从 Manus 到 OpenClaw——通用 Agent 的 Coding 内核」· 图5-1</div>
+</section>
+<style>
+.p1d-body{display:flex;gap:26px;flex:1;min-height:0}
+.p1d-stage{position:relative;width:1170px;height:640px;flex:none}
+.p1d-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.p1d-p{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2.5;stroke-dasharray:6 7}
+.p1d-p.on{stroke:var(--acc);animation:flow 1s linear infinite}
+.p1d-lt{font-size:15px;fill:var(--text3)}
+.p1d-pk{fill:#fde68a}
+.p1d-gw{position:absolute;left:0;top:0;width:1170px;height:70px;display:flex;align-items:center;gap:12px;padding:0 20px;border-radius:16px;border:1px solid color-mix(in srgb,#a78bfa 45%,transparent);background:color-mix(in srgb,#a78bfa 8%,rgba(10,16,36,.9))}
+.p1d-gw b{font-size:20px}
+.p1d-gw small{font-size:15px;color:var(--text3);margin-right:10px}
+.p1d-gw span{padding:5px 13px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2)}
+.p1d-rt{position:absolute;left:0;top:112px;width:770px;height:228px;padding:14px 18px;border-radius:18px;border:2px solid color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 6%,rgba(10,16,36,.92))}
+.p1d-bh{display:flex;align-items:baseline;gap:10px}
+.p1d-bh b{font-size:21px}
+.p1d-bh small{font-size:15px;color:var(--text3)}
+.p1d-tools{margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.p1d-tl{--c:var(--tool);padding:8px 10px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .35s}
+.p1d-tl b{display:block;font:600 16px var(--mono)}
+.p1d-tl small{display:block;font-size:15px;color:var(--text3)}
+.p1d-tl.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 40%,transparent)}
+.p1d-code{position:absolute;right:16px;bottom:12px;display:flex;align-items:center;gap:8px;opacity:0;transition:opacity .4s}
+.p1d-code.on{opacity:1}
+.p1d-code code{font:15px var(--mono);color:#86efac;padding:3px 10px;border-radius:8px;background:rgba(5,9,22,.8)}
+.p1d-mod{position:absolute;left:806px;width:364px;height:104px;padding:12px 16px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.86);transition:all .35s}
+.p1d-mod b{display:block;font-size:19px}
+.p1d-mod span{display:block;font-size:16px;color:var(--acc);margin-top:2px}
+.p1d-mod small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+.p1d-mod.on{border-color:#22d3ee;background:color-mix(in srgb,#22d3ee 12%,rgba(12,18,40,.9));box-shadow:0 0 22px rgba(34,211,238,.35)}
+.p1d-fs{position:absolute;left:0;top:410px;width:1170px;height:178px;padding:12px 18px;border-radius:18px;border:2px solid color-mix(in srgb,#22d3ee 50%,transparent);background:color-mix(in srgb,#22d3ee 6%,rgba(10,16,36,.92))}
+.p1d-files{margin-top:10px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.p1d-f{position:relative;padding:9px 12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .35s}
+.p1d-f b{display:block;font:600 16px var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p1d-f small{display:block;font-size:15px;color:var(--text3)}
+.p1d-f.on{border-color:#22d3ee;background:rgba(34,211,238,.13);box-shadow:0 0 18px rgba(34,211,238,.35)}
+.p1d-f em{display:block;font:15px var(--mono);font-style:normal;color:#fde68a;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:0;opacity:0;transition:all .5s}
+.p1d-f em.on{max-height:30px;opacity:1}
+.p1d-arts{position:absolute;right:18px;top:12px;display:flex;gap:8px}
+.p1d-arts span{font:15px var(--mono);padding:2px 10px;border-radius:8px;color:#06101f;background:#34d399;animation:upIn .5s var(--spring) both}
+.p1d-os{position:absolute;left:0;right:0;top:600px;text-align:center;font-size:18px;color:var(--text2);letter-spacing:.04em}
+.p1d-side{flex:1;padding:18px 20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.p1d-ask{display:flex;gap:10px;padding:12px 14px;border-radius:14px;font-size:16px;line-height:1.55;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3)}
+.p1d-ask .ic{flex:none;font-size:20px;color:var(--tool);margin-top:2px}
+.p1d-sl{gap:4px}
+.p1d-sl li{padding:7px 10px;gap:12px;cursor:pointer}
+.p1d-sl li>span{width:32px;height:32px;font-size:15px}
+.p1d-sl b{font-size:18px}
+.p1d-sl p{font-size:15px;margin-top:2px}
+.p1d-cap{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2);padding:10px 12px;border-left:3px solid #22d3ee;background:rgba(34,211,238,.06);border-radius:0 10px 10px 0}
+</style>
+<script>
+HOOKS['c05-fig51'] = {
+  TL: [['ci', 'Code Interpreter', '代码执行'], ['sh', 'Bash Shell', '系统命令'], ['rd', 'Read File', '读取文件'], ['wr', 'Write File', '写入文件'], ['ed', 'Edit File', '编辑文件'], ['gl', 'Glob', '文件搜索'], ['gr', 'Grep', '内容搜索']],
+  FS: [['mem', 'MEMORY.md', '高层级事实 / 用户偏好'], ['day', 'daily/YYYY-MM-DD.md', '按日归档 / 交互日志'], ['soul', 'SOUL.md', 'Agent 身份与行为规则'], ['kb', '知识库文件', '任务经验 / 自我进化'], ['git', 'Git 版本控制', '记忆回滚 / 历史审计']],
+  ST: [
+    { b: '读记忆', p: '读取 MEMORY.md：偏好 PDF 报告，数据源是 Google Sheets' },
+    { b: '调工具', p: '网络搜索获取 Google Sheets API 用法，代码执行下载数据' },
+    { b: '写代码', p: 'Python 分析脚本：pandas 聚合、matplotlib 可视化' },
+    { b: '生成产物', p: '结果写入 report.pdf，图表写入 charts/' },
+    { b: '更新记忆', p: '记下数据源与 ID，下次无需再问' },
+  ],
+  init(s) {
+    s.querySelector('.p1d-tools').innerHTML = this.TL.map(([k, n, z]) => `<div class="p1d-tl" data-t="${k}"><b>${n}</b><small>${z}</small></div>`).join('');
+    s.querySelector('.p1d-files').innerHTML = this.FS.map(([k, n, z]) => `<div class="p1d-f" data-f="${k}"><b>${n}</b><small>${z}</small>${k === 'mem' ? '<em></em>' : ''}</div>`).join('');
+    s.querySelector('.p1d-sl').innerHTML = this.ST.map((t, i) => `<li data-i="${i}"><span>${i + 1}</span><div><b>${t.b}</b><p>${t.p}</p></div></li>`).join('');
+    s.querySelector('.p1d-sl').addEventListener('click', (e) => { const li = e.target.closest('[data-i]'); if (li) { this.auto = false; this.go(s, +li.dataset.i); } });
+  },
+  on(s, sel, v = true) { s.querySelectorAll(sel).forEach((e) => e.classList.toggle('on', v)); },
+  clearHi(s) { s.querySelectorAll('.p1d-tl,.p1d-mod,.p1d-f,.p1d-p,.p1d-code').forEach((e) => e.classList.remove('on')); },
+  async fly(s, p, ms, rev) {
+    const path = s.querySelector(`.p1d-p[data-p="${p}"]`);
+    path.classList.add('on');
+    await U.fly(s.querySelector('.p1d-pk'), path, ms, { ctx: this.ctx, reverse: rev });
+    path.classList.remove('on');
+  },
+  // 执行一步：高亮对应部件，数据包沿连线流动
+  async go(s, i) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return false;
+    this.i = i;
+    s.querySelectorAll('.p1d-sl li').forEach((li, j) => { li.classList.toggle('cur', j === i); li.classList.toggle('done', j < i); });
+    this.clearHi(s);
+    const code = s.querySelector('.p1d-code code'), mem = s.querySelector('.p1d-f[data-f="mem"] em'), arts = s.querySelector('.p1d-arts');
+    if (i === 0) {
+      arts.innerHTML = '';
+      mem.classList.remove('on');
+      this.on(s, '.p1d-f[data-f="mem"]');
+      this.on(s, '.p1d-tl[data-t="rd"]');
+      await this.fly(s, 'up', 1000);
+    } else if (i === 1) {
+      this.on(s, '.p1d-mod[data-m="web"]');
+      await this.fly(s, 'web', 700);
+      if (!ok()) return false;
+      this.on(s, '.p1d-tl[data-t="ci"]');
+      code.textContent = 'gspread.open_by_key(ID).sheet1.get_all_records()';
+      this.on(s, '.p1d-code');
+    } else if (i === 2) {
+      this.on(s, '.p1d-tl[data-t="wr"]');
+      this.on(s, '.p1d-tl[data-t="ci"]');
+      code.textContent = 'df.groupby("region").sum().plot.bar()  # pandas + matplotlib';
+      this.on(s, '.p1d-code');
+    } else if (i === 3) {
+      this.on(s, '.p1d-tl[data-t="wr"]');
+      await this.fly(s, 'down', 1000);
+      if (!ok()) return false;
+      arts.innerHTML = '<span>report.pdf</span><span>charts/</span>';
+    } else {
+      this.on(s, '.p1d-tl[data-t="ed"]');
+      await this.fly(s, 'mem', 1100);
+      if (!ok()) return false;
+      this.on(s, '.p1d-f[data-f="mem"]');
+      mem.textContent = "+ User's sales data is in Google Sheets, ID: xxx";
+      mem.classList.add('on');
+    }
+    await U.wait(ctx, 2300);
+    return ok();
+  },
+  async loop(s) {
+    while (this.ctx && this.ctx.alive && this.auto) {
+      for (let i = 0; i < this.ST.length; i++) if (!this.auto || !(await this.go(s, i))) return;
+      await U.wait(this.ctx, 1500);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    // 请求从网关进入运行时，然后开始五步
+    ctx.later(async () => { await this.fly(s, 'req', 800); this.loop(s); }, 900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.clearHi(s);
+    s.querySelectorAll('.p1d-sl li').forEach((li) => li.classList.remove('cur', 'done'));
+    s.querySelector('.p1d-arts').innerHTML = '';
+    s.querySelector('.p1d-f[data-f="mem"] em').classList.remove('on');
+  },
+};
+</script>
+
+<section class="slide" id="c05-fs" data-part="1" data-dur="16000" data-title="文件系统作为 Agent 的中枢" data-notes="<b>文件系统作为 Agent 的中枢</b>。在 OpenClaw 的设计中，文件系统远不止是数据存储——它是 Agent 记忆、知识和能力的中枢。Agent 的长期记忆存储在 MEMORY.md（高层级事实和用户偏好）和按日期归档的 Markdown 日志中。<br>选择 Markdown 而非向量数据库的决定看似反直觉，实际上极其有效：用户可以直接打开文件阅读和修改 Agent 的记忆（如果 Agent 记错了某件事，直接删除那一行即可）；Markdown 天然保留时间顺序，避免语义检索中的时间混淆；而且可通过 Git 进行版本控制和回滚。<br>更关键的是，Agent 拥有写文件的能力，这意味着它具备了修改自身外部产物的技术条件。当 Agent 首次执行某个任务并发现了之前不知道的关键信息（例如给某银行打电话时，发现对方要求提供开户行地址才能验证身份），它可以先把发现写入记录。记录何时足以成为可靠知识、指令或程序，仍需结合更多轨迹与结果验证；这是第九章将讨论的持续进化问题。<br>左侧编辑器里的记忆内容与提交记录为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">文件系统作为 Agent 的中枢：<em>记忆就是 Markdown 文件</em></h2>
+  <p class="lead fx fx-up" style="--d:2">长期记忆放在 MEMORY.md 与按日期归档的日志里——选择 Markdown 而非向量数据库，看似反直觉，实际上极其有效</p></header>
+  <div class="p1e-body">
+    <div class="p1e-ed win fx fx-left" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>~/.openclaw/MEMORY.md</span><span class="c5-tag demo p1e-dm">示意</span></div>
+      <div class="p1e-lines"></div>
+      <div class="p1e-git"><span class="lbl">git log</span><div class="p1e-cm"></div></div>
+    </div>
+    <div class="p1e-why fx fx-right" style="--d:4">
+      <div class="p1e-w" data-w="0"><svg class="ic"><use href="#i-eye"/></svg><div><b>可读可改</b><p>用户直接打开文件阅读和修改；Agent 记错了某件事，删掉那一行即可</p></div></div>
+      <div class="p1e-w" data-w="1"><svg class="ic"><use href="#i-clock"/></svg><div><b>保留时间顺序</b><p>Markdown 天然按时间排列，避免语义检索中的时间混淆</p></div></div>
+      <div class="p1e-w" data-w="2"><svg class="ic"><use href="#i-branch"/></svg><div><b>版本控制与回滚</b><p>可通过 Git 进行版本控制和回滚</p></div></div>
+    </div>
+  </div>
+  <div class="p1e-evo fx fx-up" style="--d:6">
+    <span class="p1e-eh">写文件的能力 = 修改自身外部产物的技术条件</span>
+    <div class="p1e-flow"><span class="p1e-n" data-s="0">首次执行时发现新信息<small>银行核身要提供开户行地址</small></span><i>→</i><span class="p1e-n" data-s="1">先写入记录</span><i>→</i><span class="p1e-n q" data-s="2">更多轨迹与结果验证</span><i>→</i><span class="p1e-n" data-s="3">可靠的知识 · 指令 · 程序<small>第九章：持续进化</small></span></div>
+  </div>
+  <div class="src">第五章 ·「案例：从 Manus 到 OpenClaw——通用 Agent 的 Coding 内核」·「文件系统作为 Agent 的中枢」</div>
+</section>
+<style>
+.p1e-body{display:grid;grid-template-columns:900px 1fr;gap:28px;height:440px}
+.p1e-ed{display:flex;flex-direction:column;min-height:0}
+.p1e-ed .win-bar span:nth-child(4){flex:1}
+.p1e-dm{margin-left:auto}
+.p1e-lines{flex:1;min-height:0;padding:14px 18px;font:18px/1.75 var(--mono);color:#cbd5f5}
+.p1e-l{position:relative;display:flex;gap:16px;padding:0 10px;border-radius:7px;transition:all .45s var(--ease);max-height:34px;overflow:hidden}
+.p1e-l i{font-style:normal;color:var(--text3);min-width:22px;text-align:right}
+.p1e-l.h1{color:#f0abfc;font-weight:700}
+.p1e-l.bad{background:rgba(251,113,133,.14);box-shadow:inset 3px 0 0 var(--bad)}
+.p1e-l.bad::after{content:"记错了";position:absolute;right:10px;font:600 15px var(--font);color:var(--bad)}
+.p1e-l.gone{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
+.p1e-l.add{color:#86efac;animation:upIn .5s var(--spring) both}
+.p1e-git{padding:10px 18px 14px;border-top:1px solid var(--line)}
+.p1e-cm{display:flex;flex-direction:column;gap:4px;margin-top:6px;font:15px/1.5 var(--mono)}
+.p1e-cm div{display:flex;gap:12px;color:var(--text2);animation:upIn .4s var(--spring) both}
+.p1e-cm b{color:var(--tool);font-weight:600}
+.p1e-cm .rv{color:#93c5fd}
+.p1e-why{display:flex;flex-direction:column;gap:14px}
+.p1e-w{display:flex;gap:16px;align-items:flex-start;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .45s}
+.p1e-w>.ic{flex:none;font-size:30px;color:var(--acc);margin-top:2px}
+.p1e-w b{font-size:21px}
+.p1e-w p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:4px}
+.p1e-w.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.8));translate:-6px 0}
+.p1e-evo{margin-top:22px;padding:16px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p1e-eh{font-size:18px;color:var(--acc);font-weight:600}
+.p1e-flow{display:flex;align-items:center;gap:12px;margin-top:10px}
+.p1e-flow i{font-style:normal;color:var(--text3);font-size:20px}
+.p1e-n{display:flex;flex-direction:column;padding:8px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line2);background:rgba(12,18,40,.8);transition:all .4s}
+.p1e-n small{font-size:15px;color:var(--text3)}
+.p1e-n.q{border-style:dashed;color:var(--warn)}
+.p1e-n.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.85))}
+</style>
+<script>
+HOOKS['c05-fs'] = {
+  L: [
+    ['h1', '# MEMORY.md'],
+    ['', '- 2026-09-02 用户偏好：报告用 PDF 格式'],
+    ['', '- 2026-09-02 销售数据在 Google Sheets（ID: xxx）'],
+    ['bad', '- 2026-09-05 用户的公司在杭州'],
+    ['', '- 2026-09-11 每周一上午九点发周报'],
+  ],
+  init(s) { this.paint(s); },
+  paint(s) {
+    s.querySelector('.p1e-lines').innerHTML = this.L.map(([c, t], i) => `<div class="p1e-l ${c === 'h1' ? 'h1' : ''}" data-k="${c}"><i>${i + 1}</i><span>${C5.esc(t)}</span></div>`).join('');
+    s.querySelector('.p1e-cm').innerHTML = '';
+    s.querySelectorAll('.p1e-w,.p1e-n').forEach((e) => e.classList.remove('on'));
+  },
+  commit(s, h, msg, cls) { s.querySelector('.p1e-cm').insertAdjacentHTML('beforeend', `<div class="${cls || ''}"><b>${h}</b><span>${msg}</span></div>`); },
+  w(s, i) { s.querySelectorAll('.p1e-w').forEach((e) => e.classList.toggle('on', +e.dataset.w === i)); },
+  // 记错一行 → 用户删掉 → 提交 → 新发现写入记录 → 回滚演示
+  async run(s) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    while (ok()) {
+      this.paint(s);
+      this.commit(s, 'a1f3e07', '记录用户偏好与数据源');
+      await U.wait(ctx, 1400); if (!ok()) return;
+      const bad = s.querySelector('.p1e-l[data-k="bad"]');
+      bad.classList.add('bad');
+      this.w(s, 0);
+      await U.wait(ctx, 2000); if (!ok()) return;
+      bad.classList.add('gone');
+      this.commit(s, 'b72c9d1', '用户删除一条记错的记忆');
+      await U.wait(ctx, 1800); if (!ok()) return;
+      this.w(s, 1);
+      s.querySelector('.p1e-n[data-s="0"]').classList.add('on');
+      s.querySelector('.p1e-lines').insertAdjacentHTML('beforeend', `<div class="p1e-l add"><i>6</i><span>- 2026-09-14 某银行电话核身：需要提供开户行地址</span></div>`);
+      s.querySelector('.p1e-n[data-s="1"]').classList.add('on');
+      this.commit(s, 'c0d4a58', 'Agent 写入新发现（待验证）');
+      await U.wait(ctx, 2200); if (!ok()) return;
+      s.querySelector('.p1e-n[data-s="2"]').classList.add('on');
+      this.w(s, 2);
+      await U.wait(ctx, 1600); if (!ok()) return;
+      this.commit(s, 'git revert c0d4a58', '这条记录被后续轨迹证伪时，可以一键回滚', 'rv');
+      s.querySelector('.p1e-n[data-s="3"]').classList.add('on');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; ctx.later(() => this.run(s), 900); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.paint(s); },
+};
+</script>
+
+<section class="slide" id="c05-scope" data-part="1" data-trans="iris" data-dur="13000" data-title="适用边界：哪些 Agent 以 Coding 为核心架构" data-notes="<b>适用边界：哪些 Agent 以 Coding 为核心架构</b>。“Coding Agent 是通用 Agent 的核心”这一判断主要适用于<b>以开放任务为目标</b>的通用 Agent——深度调研、内容生成、数据处理这类任务边界不确定、产物形态多样的场景。在这些场景中，无法预先枚举所有需要的工具，代码生成作为元能力提供了动态扩展能力边界的最经济路径，因此它是架构的核心。<br>而另一类 Agent——例如垂直领域的客服 Agent——任务空间相对封闭，核心架构围绕固定的业务流程、领域工具和对话策略构建，代码在其中更多是工具箱里的一件工具而非架构中枢。但即便在后者，coding 也是重要的基础能力：精确计算、数据处理、规则校验都离不开它。<br>滑块会自动来回拖动；也可以手动拖动，看“代码”在两种架构里的位置如何变化。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">适用边界：<em>哪些 Agent 以 Coding 为核心架构</em></h2>
+  <p class="lead fx fx-up" style="--d:2">判断的前提是“以开放任务为目标”——任务越开放，越无法预先枚举所需的工具</p></header>
+  <div class="p1f-ctl fx fx-up" style="--d:3">
+    <span class="p1f-end">封闭<small>垂直领域客服</small></span>
+    <input type="range" class="rng p1f-r" min="0" max="100" value="0">
+    <span class="p1f-end r">开放<small>深度调研 · 内容生成 · 数据处理</small></span>
+  </div>
+  <div class="p1f-stage fx fx-scale" style="--d:4">
+    <div class="p1f-lab l"><b>任务空间相对封闭</b><span>核心架构围绕<em>固定的业务流程、领域工具和对话策略</em>构建</span></div>
+    <div class="p1f-lab r"><b>任务边界不确定 · 产物形态多样</b><span>无法预先枚举所有工具，代码生成提供<em>动态扩展能力边界的最经济路径</em></span></div>
+    <div class="p1f-core"><b class="p1f-ct"></b><small class="p1f-cs"></small></div>
+    <div class="p1f-box"><span class="lbl">工具箱</span></div>
+    <div class="p1f-chip p1f-k">代码</div>
+    <div class="p1f-orb"></div>
+  </div>
+  <p class="tagline p1f-tg fx fx-up" style="--d:6">但即便在封闭场景，coding 也是重要的基础能力：<b>精确计算 · 数据处理 · 规则校验</b>都离不开它</p>
+  <div class="src">第五章 ·「案例：从 Manus 到 OpenClaw——通用 Agent 的 Coding 内核」·「适用边界：哪些 Agent 以 Coding 为核心架构」</div>
+</section>
+<style>
+.p1f-ctl{display:flex;align-items:center;gap:22px;padding:0 10px}
+.p1f-end{display:flex;flex-direction:column;font-size:21px;font-weight:700;min-width:220px}
+.p1f-end small{font-size:16px;font-weight:400;color:var(--text3);margin-top:2px}
+.p1f-end.r{text-align:right;min-width:330px}
+.p1f-r{flex:1}
+.p1f-stage{position:relative;height:430px;margin-top:22px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);overflow:hidden}
+.p1f-lab{position:absolute;top:22px;width:520px;display:flex;flex-direction:column;gap:6px;transition:opacity .4s}
+.p1f-lab b{font-size:21px}
+.p1f-lab span{font-size:17px;line-height:1.6;color:var(--text2)}
+.p1f-lab em{font-style:normal;color:var(--acc)}
+.p1f-lab.l{left:28px}
+.p1f-lab.r{right:28px;text-align:right}
+.p1f-core{position:absolute;left:50%;top:230px;width:320px;height:140px;margin:-70px 0 0 -160px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;border-radius:20px;border:2px solid var(--line2);background:rgba(12,18,40,.9);transition:border-color .4s,box-shadow .4s}
+.p1f-core b{font-size:23px}
+.p1f-core small{font-size:16px;color:var(--text3);margin-top:4px;line-height:1.5}
+.p1f-box{position:absolute;left:60px;bottom:28px;width:520px;height:92px;padding:10px 14px;border-radius:16px;border:1px dashed var(--line2);display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px}
+.p1f-box .lbl{width:100%}
+.p1f-box i{font-style:normal;font-size:15px;padding:3px 10px;border-radius:8px;color:var(--text2);border:1px solid var(--line2)}
+.p1f-chip{position:absolute;left:0;top:0;padding:8px 18px;border-radius:12px;font-size:20px;font-weight:700;color:#06101f;background:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 50%,transparent);transform:translate(-50%,-50%);white-space:nowrap}
+.p1f-orb{position:absolute;inset:0;pointer-events:none}
+.p1f-orb i{position:absolute;font-style:normal;font-size:15px;padding:3px 10px;border-radius:8px;color:var(--text2);border:1px solid var(--line2);background:rgba(12,18,40,.9);transform:translate(-50%,-50%);transition:opacity .4s}
+.p1f-tg{margin-top:22px;font-size:22px}
+</style>
+<script>
+HOOKS['c05-scope'] = {
+  BOX: ['订单查询', '退款办理', '工单转接', 'FAQ 检索'],
+  ORB: ['搜索', '读写文件', '浏览器', '画图', '解析新格式', '调新 API'],
+  init(s) {
+    s.querySelector('.p1f-box').insertAdjacentHTML('beforeend', this.BOX.map((t) => `<i>${t}</i>`).join('') + '<i class="p1f-slot" style="visibility:hidden">代码</i>');
+    s.querySelector('.p1f-orb').innerHTML = this.ORB.map((t) => `<i>${t}</i>`).join('');
+    const r = s.querySelector('.p1f-r');
+    r.addEventListener('input', () => { this.auto = false; this.set(s, +r.value); });
+  },
+  // v：0 = 封闭（代码在工具箱里），100 = 开放（代码在架构中心，其余能力环绕）
+  set(s, v) {
+    const r = s.querySelector('.p1f-r'), t = v / 100, e = t * t * (3 - 2 * t);
+    r.value = v;
+    r.style.setProperty('--p', v + '%');
+    const slot = s.querySelector('.p1f-slot'), stage = s.querySelector('.p1f-stage');
+    const sx = slot.offsetLeft + s.querySelector('.p1f-box').offsetLeft + slot.offsetWidth / 2, sy = slot.offsetTop + s.querySelector('.p1f-box').offsetTop + slot.offsetHeight / 2;
+    const cx = stage.offsetWidth / 2, cy = 230;
+    const k = s.querySelector('.p1f-k');
+    k.style.left = (sx + (cx - sx) * e).toFixed(1) + 'px';
+    k.style.top = (sy + (cy - sy) * e).toFixed(1) + 'px';
+    k.style.fontSize = (17 + 15 * e).toFixed(1) + 'px';
+    const core = s.querySelector('.p1f-core');
+    core.style.opacity = (1 - e).toFixed(2);
+    s.querySelector('.p1f-ct').textContent = '业务流程 · 领域工具 · 对话策略';
+    s.querySelector('.p1f-cs').textContent = '代码是工具箱里的一件工具';
+    s.querySelector('.p1f-lab.l').style.opacity = (1 - e * 0.75).toFixed(2);
+    s.querySelector('.p1f-lab.r').style.opacity = (0.25 + e * 0.75).toFixed(2);
+    s.querySelector('.p1f-box').style.opacity = (1 - e * 0.7).toFixed(2);
+    s.querySelectorAll('.p1f-orb i').forEach((o, i) => {
+      const a = (i / this.ORB.length) * Math.PI * 2 - Math.PI / 2, R = 120 + 30 * e;
+      o.style.left = (cx + Math.cos(a) * R * 1.9).toFixed(1) + 'px';
+      o.style.top = (cy + Math.sin(a) * R * 0.75).toFixed(1) + 'px';
+      o.style.opacity = Math.max(0, (e - 0.35) / 0.65).toFixed(2);
+    });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.set(s, 0);
+    const t0 = performance.now() + 900;
+    ctx.raf((t) => {
+      if (!this.auto) return false;
+      const ph = Math.max(0, t - t0) / 6000;
+      this.set(s, Math.round((0.5 - 0.5 * Math.cos(ph * Math.PI * 2)) * 100));
+    });
+  },
+  reset(s) { this.auto = false; this.set(s, 0); },
+};
+</script>

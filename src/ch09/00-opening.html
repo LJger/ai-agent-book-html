@@ -1,0 +1,733 @@
+<!-- ================= 第九章共享样式与工具（后续各页复用 .c9-* 类与 window.C9） ================= -->
+<style>
+:root{--c9-know:#2dd4bf;--c9-inst:#fbbf24;--c9-prog:#60a5fa;--c9-param:#a78bfa;--c9-res:#34d399;--c9-proc:#60a5fa;--c9-qual:#a78bfa;--c9-bnd:#fb923c;--c9-ret:#38bdf8;--c9-safe:#fb7185}
+.c9-sh{display:flex!important;align-items:flex-end;justify-content:space-between;gap:30px}
+.c9-sy{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:8px;font-size:15px;line-height:1.5;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);background:color-mix(in srgb,var(--warn) 7%,transparent);white-space:nowrap}
+.c9-data{font-size:15px;line-height:1.5;color:var(--text3)}
+/* 实验页：目的 / 说明 / 说明了什么 */
+.c9-xp{display:flex;flex-direction:column;gap:10px}
+.c9-xp-it{display:grid;grid-template-columns:132px 1fr;gap:12px;align-items:start;padding:11px 16px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.c9-xp-it>b{font-size:16px;line-height:1.75;letter-spacing:.06em;color:var(--acc)}
+.c9-xp-it>p{font-size:17px;line-height:1.65;color:var(--text2)}
+.c9-xp-it>p b{color:var(--text)}
+/* 通用卡片与小标签 */
+.c9-card{--c:var(--acc);position:relative;padding:16px 20px;border-radius:16px;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 9%,rgba(12,18,40,.88)),rgba(12,18,40,.88) 70%);border:1px solid color-mix(in srgb,var(--c) 32%,transparent)}
+.c9-pill{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font-size:15px;line-height:1.5;color:var(--c,var(--text2));border:1px solid color-mix(in srgb,var(--c,#94a3b8) 45%,transparent);background:color-mix(in srgb,var(--c,#94a3b8) 10%,transparent);white-space:nowrap}
+.c9-kv{display:flex;gap:10px;align-items:baseline}
+.c9-big{font:800 44px/1 var(--num);color:var(--c,var(--acc))}
+</style>
+<script>
+window.C9 = {
+  // 自动轮播：delay 毫秒后显示第 0 项，之后每 ms 毫秒前进一项；h.auto 置为 false（用户点击）后停止
+  auto(h, ctx, n, ms, show, delay = 900) {
+    h.auto = true;
+    h.i = -1;
+    ctx.later(() => show(0), delay);
+    ctx.every(() => { if (h.auto) show(((h.i ?? -1) + 1) % n); }, ms);
+  },
+  // 令牌：返回新的令牌值，异步动画每次 await 之后比对
+  tk(h) { return (h.tk = (h.tk || 0) + 1); },
+  // 跳到某个部分的第一页
+  goPart(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+  esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
+};
+</script>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c09-cover" data-part="0" data-title="封面" data-notes="第九章讨论一个问题：模型上岗之后，能否像新员工一样从日常工作中不断长进？就目前而言，模型本身的持续学习能力仍远远不够。因此本章把“学习”构建成<b>模型外围的一套自主系统</b>，本书称之为<b>持续进化</b>，以区别于模型权重层面的持续学习：记录运行证据，验证结果与过程，从多条轨迹中提取共性，再决定应更新<b>知识、指令、程序还是模型参数</b>。所有修改先形成待验证版本，经过回归测试和安全检查后，才能改变下一轮运行。<br>右侧轨道图：绕 Agent 运行的四颗卫星就是四种更新载体；外圈是每一次更新都要经过的验证、灰度与回滚。">
+  <div class="c9cv-orbit fx fx-scale" style="--d:4"></div>
+  <div class="c9cv-text">
+    <div class="c9cv-tag fx fx-up"><i></i>深入理解 AI Agent · 第九章</div>
+    <h1 class="c9cv-title"><span class="split">Agent 的</span><span class="split" data-off="7" data-grad="#c084fc,#f472b6,#818cf8">持续进化</span></h1>
+    <p class="c9cv-sub fx fx-up" style="--d:12">从运行轨迹中获得学习信号，把经验写成<br>知识、指令、程序与参数，再经验证、灰度与回滚</p>
+    <div class="c9cv-meta fx fx-up" style="--d:14"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c9cv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c09-cover{justify-content:center;padding-left:150px}
+.c9cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c9cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c9cv-title{margin-top:30px;font-size:136px;line-height:1.1;font-weight:800;letter-spacing:.01em}
+.c9cv-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.c9cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c9cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c9cv-orbit{position:absolute;right:110px;top:50%;width:720px;height:720px;margin-top:-372px}
+.c9cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c9cv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c09-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.c9cv-orbit'), {
+      size: 720, core: 'Agent', coreColor: '#c084fc', outer: '验证 · 灰度 · 回滚 · VERIFY · CANARY · ROLLBACK',
+      sats: [
+        { label: '知识', color: '#2dd4bf', rx: 0.36, ry: 0.15, tilt: -24, dur: 13, phase: 0 },
+        { label: '指令', color: '#fbbf24', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.3 },
+        { label: '程序', color: '#60a5fa', rx: 0.3, ry: 0.2, tilt: 88, dur: 11, phase: 0.62 },
+        { label: '参数', color: '#a78bfa', rx: 0.38, ry: 0.11, tilt: 8, dur: 18, phase: 0.85 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c09-paradox" data-part="0" data-steps="2" data-dur="11000" data-title="能力悖论：一万次之后仍重犯旧错" data-notes="今天的 Agent 面临一个鲜明的<b>能力悖论</b>：它可以零样本解决从未见过的复杂任务，却可能在处理了一万次相似任务之后，第二天仍然犯下第一天的错误。模型上岗之后，能否像新员工一样从日常工作中不断长进？<b>能否自主从经验中学习</b>（所谓<b>持续学习</b>，continual learning），正在成为 Agent 从“会完成任务”走向“能够可靠工作”的关键能力，也是下一代模型的核心研究课题。<br>按 → 第二步：今天的“持续学习”概念与早年“学了新任务就忘掉旧任务”的持续学习研究不是同一个问题。遗忘只是其中一个子问题，更难的是<b>没有人告诉模型，今天这一天的经历里哪些是做对的，哪些是做错的</b>。就目前而言，模型本身的持续学习能力仍远远不够。<br>第三步：原因在于，部署后的模型并不会因为一次推理自动改变参数。第二章讨论的上下文学习、状态维护和压缩，能让 Agent 在<b>当前任务内</b>适应；但上下文结束后，这种变化不会自然进入下一次任务。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">能零样本解决新难题，<em>却在一万次后重犯旧错</em></h2></header>
+  <div class="pd9-cols">
+    <div class="pd9-col fx fx-up" style="--d:2">
+      <div class="pd9-h"><span class="pd9-n">1</span><b>能力悖论</b></div>
+      <div class="pd9-ok"><svg class="ic"><use href="#i-spark"/></svg>零样本解决从未见过的复杂任务</div>
+      <div class="pd9-days">
+        <div class="pd9-day"><span class="pd9-dl">第 1 天</span><div class="pd9-dots"></div><b class="pd9-cnt">0</b></div>
+        <div class="pd9-day"><span class="pd9-dl">第 2 天</span><div class="pd9-dots"></div><b class="pd9-cnt">0</b></div>
+      </div>
+      <div class="pd9-same"><svg class="ic"><use href="#i-repeat"/></svg><span>一万次相似任务之后，第二天仍然犯下第一天的错误</span></div>
+      <p class="pd9-q">能否<b>自主从经验中学习</b>（<b>持续学习</b>，continual learning），正在成为从“会完成任务”走向“能够可靠工作”的关键能力，也是下一代模型的核心研究课题</p>
+    </div>
+    <div class="pd9-col fx fx-up" data-step="1">
+      <div class="pd9-h"><span class="pd9-n">2</span><b>此“持续学习”非彼“持续学习”</b></div>
+      <div class="pd9-box">
+        <span class="lbl">早年的研究</span><b>学了新任务就忘掉旧任务</b>
+        <div class="pd9-bars"><div><span>旧任务 A</span><div class="meter" style="--c:var(--ctx)"><i class="pd9-ma"></i></div></div><div><span>新任务 B</span><div class="meter" style="--c:var(--tool)"><i class="pd9-mb"></i></div></div></div>
+        <span class="c9-sy">示意</span>
+      </div>
+      <div class="pd9-box pd9-hard">
+        <span class="lbl">今天更难的问题</span><b>遗忘只是子问题——没有人告诉模型，今天哪些做对了、哪些做错了</b>
+        <div class="pd9-traj"></div>
+      </div>
+      <p class="pd9-q">就目前而言，模型本身的持续学习能力<b>仍远远不够</b></p>
+    </div>
+    <div class="pd9-col fx fx-up" data-step="2">
+      <div class="pd9-h"><span class="pd9-n">3</span><b>只能在当前任务内适应</b></div>
+      <div class="pd9-win" data-clip-ok>
+        <div class="pd9-wh"><span class="pd9-task">任务 1 · 进行中</span><span class="pd9-th">θ 不变</span></div>
+        <div class="pd9-blocks"></div>
+        <div class="pd9-end">上下文结束，适应随之消失</div>
+      </div>
+      <div class="pd9-ch2"><span class="c9-pill" style="--c:var(--ctx)">上下文学习</span><span class="c9-pill" style="--c:var(--ctx)">状态维护</span><span class="c9-pill" style="--c:var(--ctx)">压缩</span><span class="c9-data">第二章</span></div>
+      <p class="pd9-q">部署后的模型<b>不会因为一次推理自动改变参数</b>；任务内的变化不会自然进入下一次任务</p>
+    </div>
+  </div>
+  <div class="src">第九章 ·「Agent 的持续进化」开篇</div>
+</section>
+<style>
+.pd9-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;flex:1;min-height:0;margin-bottom:6px}
+.pd9-col{display:flex;flex-direction:column;gap:16px;padding:24px 26px;border-radius:22px;background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.02) 60%);border:1px solid var(--line)}
+.pd9-h{display:flex;align-items:center;gap:12px}
+.pd9-h b{font-size:26px}
+.pd9-n{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;font:800 18px var(--num);color:#0b1020;background:var(--acc);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 60%,transparent)}
+.pd9-ok{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;font-size:20px;color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.pd9-days{display:flex;flex-direction:column;gap:12px}
+.pd9-day{display:grid;grid-template-columns:70px 1fr 74px;align-items:center;gap:10px}
+.pd9-dl{font-size:16px;color:var(--text3)}
+.pd9-dots{display:grid;grid-template-columns:repeat(20,1fr);gap:4px}
+.pd9-dots i{height:12px;border-radius:3px;background:rgba(255,255,255,.08);transition:background .25s}
+.pd9-dots i.on{background:color-mix(in srgb,var(--ok) 70%,transparent)}
+.pd9-dots i.err{background:var(--bad);box-shadow:0 0 10px var(--bad)}
+.pd9-cnt{font:700 18px var(--num);color:var(--text2);text-align:right}
+.pd9-same{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;font-size:18px;line-height:1.5;color:var(--text3);border:1px dashed var(--line2);transition:all .5s var(--ease)}
+.pd9-same .ic{font-size:22px;flex:none}
+.pd9-same.on{color:#fecdd3;border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--bad) 30%,transparent)}
+.pd9-q{margin-top:auto;font-size:18px;line-height:1.65;color:var(--text2)}
+.pd9-q b{color:var(--acc)}
+.pd9-box{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.pd9-box>b{font-size:19px;line-height:1.5}
+.pd9-box .c9-sy{align-self:flex-start}
+.pd9-hard{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.pd9-bars{display:flex;flex-direction:column;gap:8px}
+.pd9-bars>div{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:10px;font-size:15px;color:var(--text3)}
+.pd9-traj{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.pd9-traj span{display:grid;place-items:center;height:40px;border-radius:10px;font:700 17px var(--num);color:var(--text3);background:rgba(255,255,255,.04);border:1px dashed var(--line2);transition:all .35s}
+.pd9-traj span.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.pd9-traj span.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+.pd9-win{position:relative;height:300px;border-radius:16px;border:2px solid color-mix(in srgb,var(--ctx) 45%,transparent);background:rgba(5,9,22,.6);padding:14px;display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.pd9-wh{display:flex;justify-content:space-between;align-items:center;font-size:16px}
+.pd9-task{color:var(--ctx);font-weight:700}
+.pd9-th{padding:2px 10px;border-radius:8px;color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);font-family:var(--num)}
+.pd9-blocks{display:flex;flex-direction:column;gap:8px}
+.pd9-blocks div{padding:9px 12px;border-radius:10px;font-size:16px;color:var(--text);background:color-mix(in srgb,var(--ctx) 12%,transparent);border:1px solid color-mix(in srgb,var(--ctx) 35%,transparent);animation:upIn .5s var(--spring) both;transition:opacity .6s,translate .8s var(--ease)}
+.pd9-blocks div.gone{opacity:0;translate:0 60px}
+.pd9-end{position:absolute;left:14px;right:14px;bottom:14px;padding:9px;border-radius:10px;text-align:center;font-size:16px;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 55%,transparent);opacity:0;transition:opacity .5s}
+.pd9-end.on{opacity:1}
+.pd9-ch2{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+</style>
+<script>
+HOOKS['c09-paradox'] = {
+  BL: ['从工具报错中改对了参数格式', '记住了这位用户的偏好', '压缩出一段进度摘要'],
+  init(s) {
+    s.querySelectorAll('.pd9-dots').forEach((d) => (d.innerHTML = '<i></i>'.repeat(40)));
+    s.querySelector('.pd9-traj').innerHTML = '<span>?</span>'.repeat(8);
+  },
+  // 第 1 列：两天的任务依次点亮，同一位置的错误在第二天重现
+  async days(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const rows = [...s.querySelectorAll('.pd9-day')], same = s.querySelector('.pd9-same');
+    const ERR = 13;
+    rows.forEach((r) => { r.querySelectorAll('i').forEach((i) => (i.className = '')); r.querySelector('.pd9-cnt').textContent = '0'; });
+    same.classList.remove('on');
+    for (let d = 0; d < 2; d++) {
+      const dots = rows[d].querySelectorAll('i'), cnt = rows[d].querySelector('.pd9-cnt');
+      for (let j = 0; j < 40; j++) {
+        await U.wait(ctx, 55);
+        if (!ok()) return;
+        dots[j].className = j === ERR ? 'err' : 'on';
+        cnt.textContent = ((j + 1) * 250).toLocaleString('en-US');
+        if (d === 1 && j === ERR) same.classList.add('on');
+      }
+      await U.wait(ctx, 500);
+      if (!ok()) return;
+    }
+    await U.wait(ctx, 2600);
+    if (ok()) this.days(s, ctx);
+  },
+  // 第 2 列：旧任务被新任务挤掉；一天的轨迹没有对错标签
+  bars(s, ctx) {
+    const a = s.querySelector('.pd9-ma'), b = s.querySelector('.pd9-mb'), tr = [...s.querySelectorAll('.pd9-traj span')];
+    let ph = 0;
+    const tick = () => {
+      ph = 1 - ph;
+      a.style.setProperty('--v', ph ? '34%' : '82%');
+      b.style.setProperty('--v', ph ? '86%' : '12%');
+      tr.forEach((t, i) => {
+        const r = (i * 7 + ph * 3) % 5;
+        t.className = r === 0 ? 'ok' : r === 1 ? 'bad' : '';
+        t.textContent = r === 0 ? '✓?' : r === 1 ? '✗?' : '?';
+      });
+    };
+    tick();
+    ctx.every(tick, 2200);
+  },
+  // 第 3 列：任务内积累的适应，任务结束后全部消失
+  async win(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const box = s.querySelector('.pd9-blocks'), task = s.querySelector('.pd9-task'), end = s.querySelector('.pd9-end');
+    for (let n = 1; ; n++) {
+      box.innerHTML = '';
+      end.classList.remove('on');
+      task.textContent = `任务 ${n} · 进行中`;
+      for (const t of this.BL) {
+        await U.wait(ctx, 1000);
+        if (!ok()) return;
+        box.insertAdjacentHTML('beforeend', `<div>${t}</div>`);
+      }
+      await U.wait(ctx, 1400);
+      if (!ok()) return;
+      task.textContent = `任务 ${n} · 结束`;
+      end.classList.add('on');
+      box.querySelectorAll('div').forEach((d, i) => ctx.later(() => d.classList.add('gone'), i * 160));
+      await U.wait(ctx, 1800);
+      if (!ok()) return;
+      task.textContent = `任务 ${n + 1} · 从零开始`;
+      await U.wait(ctx, 1000);
+      if (!ok()) return;
+    }
+  },
+  enter(s, ctx) {
+    C9.tk(this);
+    ctx.later(() => this.days(s, ctx), 700);
+    this.bars(s, ctx);
+    this.win(s, ctx);
+  },
+  reset(s) {
+    C9.tk(this);
+    s.querySelectorAll('.pd9-dots i').forEach((i) => (i.className = ''));
+    s.querySelector('.pd9-blocks').innerHTML = '';
+  },
+};
+</script>
+
+<section class="slide" id="c09-save" data-part="0" data-trans="zoom" data-dur="14000" data-title="保存经历不等于从经历中学习" data-notes="把对话存进记忆也不等于学会了新的行为：原始轨迹可能很长，其中<b>既有有效策略，也有偶然成功、错误归因和不可信输入</b>。<br>这里有一个容易混淆的区别：<b>保存经历不等于从经历中学习</b>。把一百条轨迹放进长上下文或向量库，可以帮助模型在需要时找回某个案例，却不会自动完成跨案例比较——哪些步骤在成功轨迹中反复出现，哪些做法只在旧版接口上有效，某次成功究竟来自正确策略还是环境偶然。<b>学习发生在系统主动完成“评价、对照、归纳、验证”之后，而不是发生在日志写入磁盘的那一刻。</b><br>第三章的用户记忆主要沉淀“用户与世界是什么样的”，本章的经验学习则要进一步沉淀“在什么条件下应该怎样行动”；<b>前者让 Agent 记得更多，后者才让它从聪明变得熟练。</b><br>右上角开关在“只保存”和“主动学习”之间切换，默认自动轮换。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">保存经历<em>不等于</em>从经历中学习</h2></div>
+    <div class="sv9-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="keep">只保存</button><button data-v="learn">主动学习</button></div></header>
+  <div class="sv9-body">
+    <div class="sv9-pile panel fx fx-left" style="--d:3">
+      <div class="sv9-ph"><b>100 条原始轨迹</b><span class="c9-sy">示意</span></div>
+      <div class="sv9-grid"></div>
+      <div class="sv9-leg"><span style="--c:var(--ok)">有效策略</span><span style="--c:var(--tool)">偶然成功</span><span style="--c:var(--warn)">错误归因</span><span style="--c:var(--bad)">不可信输入</span></div>
+      <p class="sv9-pc">保存时它们混在一起；只有<b>评价</b>之后才分得清</p>
+    </div>
+    <div class="sv9-mid">
+      <div class="sv9-flow fx fx-up" style="--d:4">
+        <div class="sv9-keep"><div class="sv9-db"><svg class="ic"><use href="#i-db"/></svg><div><b>长上下文 / 向量库</b><small>日志写入磁盘</small></div></div>
+          <svg class="ic sv9-ar"><use href="#i-arrow"/></svg>
+          <div class="sv9-hit"><svg class="ic"><use href="#i-search"/></svg><div><b>需要时找回某个案例</b><small class="sv9-hn">检索：第 — 号轨迹</small></div></div></div>
+        <div class="sv9-learn"></div>
+      </div>
+      <div class="sv9-qs fx fx-up" style="--d:5">
+        <div class="sv9-qh">跨案例比较：<span class="sv9-qst">不会自动完成</span></div>
+        <div class="sv9-q" data-q="0"><i>?</i><span>哪些步骤在成功轨迹中反复出现？</span><em></em></div>
+        <div class="sv9-q" data-q="1"><i>?</i><span>哪些做法只在旧版接口上有效？</span><em></em></div>
+        <div class="sv9-q" data-q="2"><i>?</i><span>某次成功来自正确策略，还是环境偶然？</span><em></em></div>
+      </div>
+    </div>
+    <div class="sv9-out fx fx-right" style="--d:6">
+      <div class="sv9-card sv9-c3"><span class="lbl">第三章 · 用户记忆</span><b>用户与世界是什么样的</b><p>让 Agent <em>记得更多</em></p></div>
+      <div class="sv9-card sv9-c9"><span class="lbl">本章 · 经验学习</span><b>在什么条件下应该怎样行动</b><p>让它<em>从聪明变得熟练</em></p>
+        <div class="sv9-rule"><span class="c9-sy">示意</span><code>条件：接口 v2 起<br>做法：先查询状态，再提交修改<br>来源：12 条成功 · 3 条失败轨迹</code></div></div>
+    </div>
+  </div>
+  <p class="tagline sv9-tag fx fx-up" style="--d:8">学习发生在系统主动完成<b>评价、对照、归纳、验证</b>之后，而不是发生在日志写入磁盘的那一刻</p>
+  <div class="src">第九章 ·「Agent 的持续进化」开篇 · 与第三章用户记忆的区别</div>
+</section>
+<style>
+.sv9-body{display:grid;grid-template-columns:430px 1fr 440px;gap:26px;flex:1;min-height:0}
+.sv9-pile{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.sv9-ph{display:flex;justify-content:space-between;align-items:center}
+.sv9-ph b{font-size:22px}
+.sv9-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:7px}
+.sv9-grid i{aspect-ratio:1;border-radius:6px;background:rgba(148,163,184,.28);transition:background .5s,box-shadow .5s,opacity .5s}
+.sv9-grid i.k-ok{background:var(--ok)}.sv9-grid i.k-luck{background:var(--tool)}.sv9-grid i.k-mis{background:var(--warn)}.sv9-grid i.k-inj{background:var(--bad)}
+.sv9-grid i.hit{box-shadow:0 0 0 3px #fff,0 0 18px #fff}
+.sv9-grid i.dim{opacity:.25}
+.sv9-leg{display:flex;flex-wrap:wrap;gap:8px 14px}
+.sv9-leg span{display:inline-flex;align-items:center;gap:7px;font-size:15px;color:var(--text2)}
+.sv9-leg span::before{content:"";width:12px;height:12px;border-radius:4px;background:var(--c)}
+.sv9-pc{font-size:17px;line-height:1.6;color:var(--text2);margin-top:auto}
+.sv9-pc b{color:var(--acc)}
+.sv9-mid{display:flex;flex-direction:column;gap:20px;min-width:0}
+.sv9-flow{position:relative;height:200px}
+.sv9-keep,.sv9-learn{position:absolute;inset:0;display:flex;align-items:center;gap:18px;transition:opacity .6s var(--ease),translate .6s var(--ease)}
+#c09-save[data-m=learn] .sv9-keep,#c09-save[data-m=keep] .sv9-learn{opacity:0;translate:0 16px;pointer-events:none}
+.sv9-db,.sv9-hit{flex:1;display:flex;align-items:center;gap:14px;padding:18px 20px;border-radius:18px;background:rgba(12,18,40,.88);border:1px solid var(--line2)}
+.sv9-db .ic,.sv9-hit .ic{font-size:36px;color:var(--ctx);flex:none}
+.sv9-db b,.sv9-hit b{display:block;font-size:21px}
+.sv9-db small,.sv9-hit small{display:block;font-size:16px;color:var(--text3);margin-top:4px}
+.sv9-hit.on{border-color:var(--ctx);box-shadow:0 0 30px color-mix(in srgb,var(--ctx) 35%,transparent)}
+.sv9-ar{font-size:30px;color:var(--text3);flex:none}
+.sv9-learn{gap:10px}
+.sv9-st{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border-radius:16px;background:rgba(12,18,40,.88);border:1px solid var(--line2);transition:all .45s var(--ease)}
+.sv9-st .ic{font-size:30px;color:var(--text3);transition:color .4s}
+.sv9-st b{font-size:22px}
+.sv9-st small{font-size:15px;color:var(--text3);text-align:center;line-height:1.4}
+.sv9-st.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 13%,rgba(12,18,40,.9));box-shadow:0 0 28px color-mix(in srgb,var(--acc) 35%,transparent);translate:0 -4px}
+.sv9-st.on .ic{color:var(--acc)}
+.sv9-sa{color:var(--text3);font-size:20px;flex:none}
+.sv9-qs{display:flex;flex-direction:column;gap:10px;padding:18px 20px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.sv9-qh{font-size:18px;color:var(--text2)}
+.sv9-qst{font-weight:700;color:var(--bad)}
+#c09-save[data-m=learn] .sv9-qst{color:var(--ok)}
+.sv9-q{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;font-size:19px;background:rgba(255,255,255,.03);border:1px solid var(--line);transition:all .45s var(--ease)}
+.sv9-q i{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 16px var(--num);font-style:normal;color:var(--bad);border:2px solid color-mix(in srgb,var(--bad) 60%,transparent)}
+.sv9-q em{font-style:normal;font-size:15px;color:var(--text3)}
+.sv9-q.done{border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.sv9-q.done i{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.sv9-q.done em{color:var(--ok)}
+.sv9-out{display:flex;flex-direction:column;gap:16px}
+.sv9-card{padding:16px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.8);transition:all .5s var(--ease)}
+.sv9-card b{display:block;font-size:22px;margin-top:6px}
+.sv9-card p{font-size:18px;color:var(--text2);margin-top:6px}
+.sv9-card em{font-style:normal;color:var(--acc);font-weight:700}
+.sv9-c9{flex:1;display:flex;flex-direction:column}
+#c09-save[data-m=learn] .sv9-c9{border-color:color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 0 36px -8px color-mix(in srgb,var(--acc) 50%,transparent)}
+.sv9-rule{margin-top:auto;display:flex;flex-direction:column;gap:8px;opacity:.25;transition:opacity .6s}
+.sv9-rule.on{opacity:1}
+.sv9-rule .c9-sy{align-self:flex-start}
+.sv9-rule code{display:block;padding:10px 14px;border-radius:12px;font:16px/1.7 var(--mono);color:#cbd5f5;background:rgba(5,9,22,.8);border:1px solid var(--line2)}
+.sv9-tag{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c09-save'] = {
+  ST: [['评价', 'scale', '逐条判定成败'], ['对照', 'compare', '成功 vs 失败'], ['归纳', 'merge', '提炼共性'], ['验证', 'check', '新任务上检验']],
+  init(s) {
+    // 100 条示意轨迹的真实类型：保存时看不出来，评价后才显现
+    const R = U.rand(9), K = [];
+    for (let i = 0; i < 100; i++) { const r = R(); K.push(r < 0.52 ? 'k-ok' : r < 0.7 ? 'k-luck' : r < 0.88 ? 'k-mis' : 'k-inj'); }
+    this.K = K;
+    s.querySelector('.sv9-grid').innerHTML = K.map(() => '<i></i>').join('');
+    s.querySelector('.sv9-learn').innerHTML = this.ST.map(([b, ic, t], i) => `${i ? '<svg class="ic sv9-sa"><use href="#i-right"/></svg>' : ''}<div class="sv9-st"><svg class="ic"><use href="#i-${ic}"/></svg><b>${b}</b><small>${t}</small></div>`).join('');
+    this.set = U.seg(s.querySelector('.sv9-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  async mode(s, m) {
+    const tk = C9.tk(this), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    s.dataset.m = m;
+    this.set(m);
+    const cells = [...s.querySelectorAll('.sv9-grid i')], qs = [...s.querySelectorAll('.sv9-q')], sts = [...s.querySelectorAll('.sv9-st')];
+    const hit = s.querySelector('.sv9-hit'), rule = s.querySelector('.sv9-rule');
+    cells.forEach((c) => (c.className = ''));
+    qs.forEach((q) => { q.classList.remove('done'); q.querySelector('em').textContent = ''; });
+    sts.forEach((x) => x.classList.remove('on'));
+    hit.classList.remove('on');
+    rule.classList.remove('on');
+    s.querySelector('.sv9-qst').textContent = m === 'keep' ? '不会自动完成' : '由主动学习回答';
+    if (!ctx) return;
+    if (m === 'keep') {
+      // 检索只能找回某个案例
+      for (let r = 0; r < 3; r++) {
+        await U.wait(ctx, 1300);
+        if (!ok()) return;
+        const j = [37, 62, 8][r];
+        cells.forEach((c, i) => (c.className = i === j ? 'hit' : ''));
+        hit.classList.add('on');
+        s.querySelector('.sv9-hn').textContent = `检索：找回第 ${j + 1} 号轨迹`;
+      }
+      return;
+    }
+    const step = async (i, fn) => {
+      await U.wait(ctx, 1500);
+      if (!ok()) return false;
+      sts.forEach((x, j) => x.classList.toggle('on', j === i));
+      fn();
+      return true;
+    };
+    if (!(await step(0, () => cells.forEach((c, i) => (c.className = this.K[i]))))) return;
+    if (!(await step(1, () => {
+      cells.forEach((c, i) => c.classList.toggle('dim', this.K[i] === 'k-inj'));
+      qs[0].classList.add('done'); qs[0].querySelector('em').textContent = '对照';
+    }))) return;
+    if (!(await step(2, () => {
+      cells.forEach((c, i) => c.classList.toggle('dim', this.K[i] !== 'k-ok'));
+      qs[1].classList.add('done'); qs[1].querySelector('em').textContent = '归纳';
+      rule.classList.add('on');
+    }))) return;
+    await step(3, () => { qs[2].classList.add('done'); qs[2].querySelector('em').textContent = '验证'; });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'keep');
+    let m = 'keep';
+    ctx.every(() => { if (this.auto) { m = m === 'keep' ? 'learn' : 'keep'; this.mode(s, m); } }, 7600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.dataset.m = ''; },
+};
+</script>
+
+<section class="slide" id="c09-why" data-part="0" data-trans="flip" data-dur="15000" data-title="为什么在模型外围构建学习系统" data-notes="那么，为什么不让模型在每次任务后直接训练自己？因为<b>生产环境很少提供干净的学习信号</b>。用户满意不意味着合规；局部参数更新还可能造成能力遗忘、策略漂移或安全退化。若允许模型依据未经验证的反馈直接修改自身参数，错误经验和提示注入就可能被固化，并在后续任务中持续放大。另一方面，基础模型的周期性训练可以提升通用能力，却无法及时吸收每个 Agent 每天遇到的私有规则、工具变化和局部经验。<br>因此，在模型自身尚不能可靠地持续学习时，必须先把“学习”构建成模型外围的一套自主系统，本书称之为<b>持续进化</b>，以区别于模型权重层面的持续学习：记录运行证据，验证结果与过程，从多条轨迹中提取共性，再决定应更新知识、指令、程序还是模型参数。<b>所有修改先形成待验证版本，经过回归测试和安全检查后，才能改变下一轮运行。</b><br>三条路线自动轮播，也可以点击右上角切换。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">为什么不让模型<em>直接训练自己</em>？</h2></div>
+    <div class="wy9-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">任务后直接训练</button><button data-v="1">周期性训练基础模型</button><button data-v="2">持续进化</button></div></header>
+  <div class="wy9-stage fx fx-scale" style="--d:3">
+    <div class="wy9-sc" data-s="0">
+      <div class="wy9-in"><span class="lbl">未经验证的反馈</span>
+        <div class="wy9-fb" style="--c:var(--tool)">用户很满意<small>但这是一笔违规退款</small></div>
+        <div class="wy9-fb" style="--c:var(--bad)">网页里的提示注入<small>被当成了“经验”</small></div>
+        <div class="wy9-fb" style="--c:var(--warn)">错误归因<small>成功其实来自环境偶然</small></div>
+      </div>
+      <div class="wy9-theta"><div class="wy9-orb">θ</div><b>θ ← θ + Δθ</b><span>依据未经验证的反馈直接修改参数</span></div>
+      <div class="wy9-chart"><svg viewBox="0 0 560 300" width="560" height="300">
+        <line x1="40" y1="260" x2="540" y2="260" class="wy9-ax"/><line x1="40" y1="20" x2="40" y2="260" class="wy9-ax"/>
+        <text x="290" y="290" class="wy9-at">后续任务 →</text><text x="20" y="140" class="wy9-at" transform="rotate(-90 20 140)">错误的影响</text>
+        <path class="wy9-line" d="M40 250 C 200 246, 300 230, 380 190 S 500 60, 540 30"/>
+        <circle class="wy9-pt" r="7"/>
+        <text x="300" y="210" class="wy9-lt">被固化</text><text x="470" y="80" class="wy9-lt">持续放大</text>
+      </svg><span class="c9-sy">示意</span></div>
+      <div class="wy9-risk"><span>能力遗忘</span><span>策略漂移</span><span>安全退化</span></div>
+    </div>
+    <div class="wy9-sc" data-s="1">
+      <div class="wy9-tl">
+        <div class="wy9-tr"><span class="lbl">基础模型</span><div class="wy9-rel"><b>训练周期</b><b>训练周期</b></div></div>
+        <div class="wy9-tr"><span class="lbl">每个 Agent 每天</span><div class="wy9-ticks"></div></div>
+      </div>
+      <div class="wy9-p2">
+        <div class="c9-card" style="--c:var(--ok)"><b>可以提升通用能力</b><p>一次训练惠及所有任务</p></div>
+        <div class="c9-card" style="--c:var(--bad)"><b>却无法及时吸收</b><p>私有规则 · 工具变化 · 局部经验</p><div class="wy9-wait">尚未被吸收：<b class="wy9-wn">0</b> 条<span class="c9-sy">示意</span></div></div>
+      </div>
+    </div>
+    <div class="wy9-sc" data-s="2">
+      <div class="wy9-def"><b>持续进化</b><span>在模型外围构建的自主学习系统，区别于模型权重层面的<em>持续学习</em></span></div>
+      <div class="wy9-pipe"></div>
+      <div class="wy9-gate"><svg class="ic"><use href="#i-shield"/></svg>所有修改先形成<b>待验证版本</b>，经过<b>回归测试</b>和<b>安全检查</b>后，才能改变下一轮运行</div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「Agent 的持续进化」开篇</div>
+</section>
+<style>
+.wy9-stage{position:relative;flex:1;min-height:0;border-radius:24px;background:rgba(10,16,36,.5);border:1px solid var(--line)}
+.wy9-sc{position:absolute;inset:0;padding:28px 34px;opacity:0;translate:0 18px;transition:opacity .6s var(--ease),translate .6s var(--ease);pointer-events:none}
+.wy9-sc.on{opacity:1;translate:0 0;pointer-events:auto}
+.wy9-sc[data-s="0"]{display:grid;grid-template-columns:420px 300px 1fr;grid-template-rows:1fr auto;gap:22px 30px;align-items:center}
+.wy9-in{display:flex;flex-direction:column;gap:12px}
+.wy9-fb{--c:var(--warn);padding:12px 16px;border-radius:14px;font-size:20px;font-weight:600;color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);opacity:.35;translate:-20px 0;transition:all .5s var(--ease)}
+.wy9-fb small{display:block;font-size:16px;font-weight:400;color:var(--text2);margin-top:3px}
+.wy9-fb.on{opacity:1;translate:0 0}
+.wy9-theta{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.wy9-orb{width:130px;height:130px;border-radius:50%;display:grid;place-items:center;font:800 60px var(--num);color:var(--llm);background:radial-gradient(circle at 30% 25%,#2a1f4d,#0a1024 70%);border:2px solid var(--llm);box-shadow:0 0 40px color-mix(in srgb,var(--llm) 40%,transparent)}
+.wy9-orb.hit{animation:shake .5s}
+.wy9-theta b{font:700 24px var(--num)}
+.wy9-theta span{font-size:17px;color:var(--warn);line-height:1.5}
+.wy9-chart{position:relative}
+.wy9-chart .c9-sy{position:absolute;right:6px;top:0}
+.wy9-ax{stroke:rgba(255,255,255,.25);stroke-width:2}
+.wy9-at{fill:var(--text3);font-size:16px;text-anchor:middle}
+.wy9-line{fill:none;stroke:var(--bad);stroke-width:4;stroke-linecap:round;stroke-dasharray:640;stroke-dashoffset:640;filter:drop-shadow(0 0 6px var(--bad))}
+.wy9-line.on{transition:stroke-dashoffset 3s linear;stroke-dashoffset:0}
+.wy9-pt{fill:#fff;opacity:0}
+.wy9-lt{fill:#fecdd3;font-size:18px;font-weight:700}
+.wy9-risk{grid-column:1/-1;display:flex;gap:16px;justify-content:center}
+.wy9-risk span{padding:9px 22px;border-radius:999px;font-size:19px;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+.wy9-sc[data-s="1"]{display:flex;flex-direction:column;gap:30px}
+.wy9-tl{display:flex;flex-direction:column;gap:18px;padding:22px 24px;border-radius:18px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.wy9-tr{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:16px}
+.wy9-rel{display:grid;grid-template-columns:1fr 1fr;gap:60px}
+.wy9-rel b{height:46px;border-radius:12px;display:grid;place-items:center;font-size:18px;color:var(--llm);background:color-mix(in srgb,var(--llm) 14%,transparent);border:1px solid color-mix(in srgb,var(--llm) 45%,transparent)}
+.wy9-ticks{display:grid;grid-template-columns:repeat(60,1fr);gap:3px;height:46px;align-items:end}
+.wy9-ticks i{height:var(--h);border-radius:2px;background:var(--c);opacity:0;transition:opacity .3s}
+.wy9-ticks i.on{opacity:.9}
+.wy9-p2{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.wy9-p2 .c9-card b{font-size:26px;color:var(--c)}
+.wy9-p2 .c9-card p{font-size:20px;color:var(--text2);margin-top:8px}
+.wy9-wait{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:18px;color:var(--text2)}
+.wy9-wn{font:800 32px var(--num);color:var(--bad)}
+.wy9-sc[data-s="2"]{display:flex;flex-direction:column;gap:26px;justify-content:center}
+.wy9-def{display:flex;align-items:baseline;gap:22px}
+.wy9-def b{font-size:40px;background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.wy9-def span{font-size:22px;color:var(--text2)}
+.wy9-def em{font-style:normal;color:var(--llm)}
+.wy9-pipe{display:flex;align-items:stretch;gap:8px}
+.wy9-n{flex:1;display:flex;flex-direction:column;gap:6px;padding:14px 12px;border-radius:16px;background:rgba(12,18,40,.88);border:1px solid var(--line2);transition:all .45s var(--ease)}
+.wy9-n .ic{font-size:28px;color:var(--text3)}
+.wy9-n b{font-size:19px;line-height:1.35}
+.wy9-n small{font-size:15px;color:var(--text3);line-height:1.4}
+.wy9-n.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 13%,rgba(12,18,40,.9));box-shadow:0 0 26px color-mix(in srgb,var(--acc) 35%,transparent);translate:0 -4px}
+.wy9-n.on .ic{color:var(--acc)}
+.wy9-k4{display:flex;flex-wrap:wrap;gap:4px}
+.wy9-k4 i{font-style:normal;font-size:15px;padding:1px 7px;border-radius:6px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.wy9-gate{display:flex;align-items:center;gap:14px;padding:16px 22px;border-radius:16px;font-size:21px;color:var(--text2);background:color-mix(in srgb,var(--ok) 8%,transparent);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+.wy9-gate .ic{font-size:30px;color:var(--ok)}
+.wy9-gate b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c09-why'] = {
+  P: [
+    ['doc', '记录运行证据', '可追溯的轨迹'],
+    ['scale', '验证结果与过程', '结果 · 过程 · 质量'],
+    ['merge', '从多条轨迹提取共性', '跨轨迹对照'],
+    ['route', '决定更新哪里', 'K4'],
+    ['flask', '形成待验证版本', '不服务真实流量'],
+    ['shield', '回归测试与安全检查', '边界集 · 保留集'],
+    ['refresh', '改变下一轮运行', '新版本上线'],
+  ],
+  init(s) {
+    const k4 = '<span class="wy9-k4"><i style="--c:var(--c9-know)">知识</i><i style="--c:var(--c9-inst)">指令</i><i style="--c:var(--c9-prog)">程序</i><i style="--c:var(--c9-param)">参数</i></span>';
+    s.querySelector('.wy9-pipe').innerHTML = this.P.map(([ic, b, t]) => `<div class="wy9-n"><svg class="ic"><use href="#i-${ic}"/></svg><b>${b}</b>${t === 'K4' ? k4 : `<small>${t}</small>`}</div>`).join('');
+    const R = U.rand(5), C = ['var(--c9-know)', 'var(--c9-inst)', 'var(--c9-prog)'];
+    s.querySelector('.wy9-ticks').innerHTML = Array.from({ length: 60 }, () => `<i style="--h:${(10 + R() * 34) | 0}px;--c:${C[(R() * 3) | 0]}"></i>`).join('');
+    this.set = U.seg(s.querySelector('.wy9-seg'), (v) => { this.auto = false; this.show(s, +v); });
+  },
+  show(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx;
+    this.i = i;
+    this.set(String(i));
+    s.querySelectorAll('.wy9-sc').forEach((x) => x.classList.toggle('on', +x.dataset.s === i));
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    if (i === 0) {
+      const fb = [...s.querySelectorAll('.wy9-fb')], line = s.querySelector('.wy9-line'), orb = s.querySelector('.wy9-orb');
+      fb.forEach((f) => f.classList.remove('on'));
+      line.classList.remove('on');
+      fb.forEach((f, j) => ctx.later(() => { if (ok()) { f.classList.add('on'); U.restart(orb, 'hit'); } }, 400 + j * 700));
+      ctx.later(() => { if (ok()) { void line.getBoundingClientRect(); line.classList.add('on'); } }, 2600);
+    } else if (i === 1) {
+      const ticks = [...s.querySelectorAll('.wy9-ticks i')], wn = s.querySelector('.wy9-wn');
+      ticks.forEach((t) => t.classList.remove('on'));
+      wn.textContent = '0';
+      ticks.forEach((t, j) => ctx.later(() => { if (ok()) { t.classList.add('on'); wn.textContent = (j + 1) * 3; } }, 300 + j * 75));
+    } else {
+      const ns = [...s.querySelectorAll('.wy9-n')];
+      ns.forEach((n) => n.classList.remove('on'));
+      ns.forEach((n, j) => ctx.later(() => { if (ok()) ns.forEach((x, q) => x.classList.toggle('on', q <= j)); }, 300 + j * 650));
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    C9.auto(this, ctx, 3, 7000, (i) => this.show(s, i), 200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.wy9-sc').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-loop" data-part="0" data-trans="zoom" data-dur="14000" data-title="持续进化的总体闭环（图9-1）" data-notes="前面的章节已经给出了这套系统所需的主要部件：第二章处理任务内状态，第三章提供知识基础设施，第五章赋予 Agent 创造工具和修改系统的元能力，第七章建立评估与验证，第八章说明如何更新模型参数。第九章的任务，是把这些部件组织成<b>图9-1</b>所示的持续进化闭环：执行任务（用户、环境与工具交互）→ 记录轨迹（动作、结果与反馈）→ 形成信号（结果、过程、质量）→ 生成候选更新（知识、指令、程序、参数）→ 验证与发布（回归、灰度与回滚）→ 新的 Agent 进入下一轮运行。<br>持续进化必须以<b>可追溯的运行经验</b>为基础，能够<b>改变后续行为</b>，并<b>经过验证</b>，确保没有造成明显退化。<b>只有改变后续行为且通过验证的更新，才构成持续进化。</b><br>下方的章节标签会依次点亮，也可以点击，查看各章部件落在闭环的哪个环节。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从运行经验到<em>新版本 Agent</em></h2>
+  <p class="lead fx fx-up" style="--d:2">把前面各章的部件组织成一个闭环</p></header>
+  <div class="lo9-stage fx fx-scale" style="--d:3">
+    <div class="lo9-n" data-n="run" style="left:0;top:58px;width:250px"><svg class="ic"><use href="#i-play"/></svg><b>执行任务</b><small>用户、环境与工具交互</small><span class="lo9-v">Agent v<em>1</em></span></div>
+    <div class="lo9-n" data-n="log" style="left:330px;top:58px;width:250px"><svg class="ic"><use href="#i-history"/></svg><b>记录轨迹</b><small>动作、结果与反馈</small></div>
+    <div class="lo9-n acc" data-n="sig" style="left:660px;top:58px;width:250px"><svg class="ic"><use href="#i-scale"/></svg><b>形成信号</b><small>结果 · 过程 · 质量</small></div>
+    <div class="lo9-n acc lo9-up" data-n="upd" style="left:990px;top:30px;width:330px"><b>生成候选更新</b>
+      <div class="lo9-k"><span data-k="know" style="--c:var(--c9-know)">知识</span><span data-k="inst" style="--c:var(--c9-inst)">指令</span><span data-k="prog" style="--c:var(--c9-prog)">程序</span><span data-k="param" style="--c:var(--c9-param)">参数</span></div></div>
+    <div class="lo9-n" data-n="rel" style="left:1400px;top:58px;width:260px"><svg class="ic"><use href="#i-shield"/></svg><b>验证与发布</b><small>回归、灰度与回滚</small></div>
+    <svg class="lo9-svg" viewBox="0 0 1660 400" width="1660" height="400">
+      <defs><marker id="lo9m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker></defs>
+      <path class="lo9-p" d="M250 128 H328" marker-end="url(#lo9m)"/>
+      <path class="lo9-p" d="M580 128 H658" marker-end="url(#lo9m)"/>
+      <path class="lo9-p" d="M910 128 H988" marker-end="url(#lo9m)"/>
+      <path class="lo9-p" d="M1320 128 H1398" marker-end="url(#lo9m)"/>
+      <path class="lo9-back" d="M1530 200 V300 H125 V202" marker-end="url(#lo9m)"/>
+      <path id="lo9-route" class="lo9-route" d="M125 128 H1530 V300 H125 V128"/>
+      <text x="828" y="290" class="lo9-bt">新的 Agent 进入下一轮运行</text>
+      <circle class="lo9-pk" r="10"/>
+    </svg>
+    <div class="lo9-crit">
+      <span><svg class="ic"><use href="#i-history"/></svg>以可追溯的运行经验为基础</span>
+      <span><svg class="ic"><use href="#i-refresh"/></svg>能够改变后续行为</span>
+      <span><svg class="ic"><use href="#i-check"/></svg>经过验证，确保没有明显退化</span>
+    </div>
+  </div>
+  <div class="lo9-chs fx fx-up" style="--d:6"><span class="lbl">前面各章的部件</span></div>
+  <div class="src">第九章 ·「Agent 的持续进化」开篇 · 图9-1</div>
+</section>
+<style>
+.lo9-stage{position:relative;width:1660px;height:400px}
+.lo9-n{--c:var(--acc);position:absolute;height:140px;padding:16px 20px;border-radius:18px;display:flex;flex-direction:column;gap:4px;background:rgba(12,18,40,.9);border:1px solid var(--line2);transition:all .45s var(--ease);z-index:2}
+.lo9-n.acc{background:color-mix(in srgb,var(--acc) 7%,rgba(12,18,40,.92));border-color:color-mix(in srgb,var(--acc) 35%,transparent)}
+.lo9-n .ic{font-size:28px;color:var(--acc)}
+.lo9-n b{font-size:24px}
+.lo9-n small{font-size:17px;color:var(--text3)}
+.lo9-up{height:196px}
+.lo9-k{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.lo9-k span{height:52px;border-radius:12px;display:grid;place-items:center;font-size:20px;font-weight:600;color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:all .4s}
+.lo9-k span.on,.lo9-k span.pass{background:color-mix(in srgb,var(--c) 26%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 50%,transparent)}
+.lo9-k span.on{outline:2px solid #fff;outline-offset:2px}
+.lo9-n.on{border-color:var(--acc);box-shadow:0 0 34px color-mix(in srgb,var(--acc) 40%,transparent);translate:0 -4px}
+.lo9-n.lit{border-color:#fff;box-shadow:0 0 0 3px color-mix(in srgb,#fff 35%,transparent),0 0 40px color-mix(in srgb,var(--acc) 50%,transparent)}
+.lo9-v{position:absolute;right:14px;top:14px;padding:2px 10px;border-radius:8px;font:700 16px var(--num);color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+.lo9-v em{font-style:normal}
+.lo9-svg{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:1}
+.lo9-p{fill:none;stroke:#94a3b8;stroke-width:2.5}
+.lo9-back{fill:none;stroke:#94a3b8;stroke-width:2.5;stroke-dasharray:8 7;animation:flow 1.4s linear infinite}
+.lo9-route{fill:none;stroke:none}
+.lo9-bt{fill:var(--acc);font-size:22px;font-weight:700;text-anchor:middle}
+.lo9-pk{fill:#fff;filter:drop-shadow(0 0 10px var(--acc));opacity:0}
+.lo9-crit{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:16px;z-index:2}
+.lo9-crit span{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;font-size:18px;color:var(--text2);border:1px solid var(--line2);background:rgba(12,18,40,.85)}
+.lo9-crit .ic{color:var(--acc)}
+.lo9-chs{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:30px;flex-wrap:wrap}
+.lo9-chs button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 16px;border-radius:14px;border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .3s}
+.lo9-chs button b{font-size:17px;color:var(--acc)}
+.lo9-chs button span{font-size:16px;color:var(--text2)}
+.lo9-chs button.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);box-shadow:0 0 20px color-mix(in srgb,var(--acc) 30%,transparent)}
+</style>
+<script>
+HOOKS['c09-loop'] = {
+  CH: [
+    ['第二章', '任务内状态', ['run'], []],
+    ['第三章', '知识基础设施', ['upd'], ['know']],
+    ['第五章', '创造工具、修改系统的元能力', ['upd'], ['prog']],
+    ['第七章', '评估与验证', ['sig', 'rel'], []],
+    ['第八章', '更新模型参数', ['upd'], ['param']],
+  ],
+  init(s) {
+    const box = s.querySelector('.lo9-chs');
+    box.insertAdjacentHTML('beforeend', this.CH.map(([c, t], i) => `<button data-i="${i}"><b>${c}</b><span>${t}</span></button>`).join(''));
+    box.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.pick(s, +b.dataset.i); } });
+  },
+  pick(s, i) {
+    this.i = i;
+    const [, , ns, ks] = this.CH[i];
+    s.querySelectorAll('.lo9-chs button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelectorAll('.lo9-n').forEach((n) => n.classList.toggle('lit', ns.includes(n.dataset.n)));
+    s.querySelectorAll('.lo9-k span').forEach((k) => k.classList.toggle('on', ks.includes(k.dataset.k)));
+  },
+  // 数据包绕闭环一圈：经过各节点时点亮；回到起点时版本号加一
+  async lap(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const dot = s.querySelector('.lo9-pk'), path = s.querySelector('#lo9-route'), L = path.getTotalLength();
+    const ns = [...s.querySelectorAll('.lo9-n')], v = s.querySelector('.lo9-v em');
+    const X = [125, 455, 785, 1155, 1530];
+    const t0 = performance.now(), dur = 8200;
+    await new Promise((res) => {
+      const f = (now) => {
+        if (!ok()) return res();
+        const t = Math.min(1, (now - t0) / dur), p = path.getPointAtLength(t * L);
+        dot.setAttribute('cx', p.x.toFixed(1));
+        dot.setAttribute('cy', p.y.toFixed(1));
+        dot.style.opacity = 1;
+        const onTop = p.y < 140;
+        ns.forEach((n, j) => n.classList.toggle('on', onTop && Math.abs(p.x - X[j]) < 90));
+        const near = onTop && Math.abs(p.x - X[3]) < 90, q0 = near ? Math.min(3, Math.floor(((p.x - X[3] + 90) / 180) * 4)) : -1;
+        s.querySelectorAll('.lo9-k span').forEach((x, q) => x.classList.toggle('pass', q === q0));
+        if (t < 1) requestAnimationFrame(f); else res();
+      };
+      requestAnimationFrame(f);
+    });
+    if (!ok()) return;
+    v.textContent = +v.textContent + 1;
+    ns.forEach((n) => n.classList.remove('on'));
+    U.restart(ns[0], 'on');
+    await U.wait(ctx, 900);
+    if (ok()) { ns[0].classList.remove('on'); this.lap(s, ctx); }
+  },
+  enter(s, ctx) {
+    C9.tk(this);
+    s.querySelector('.lo9-v em').textContent = '1';
+    ctx.later(() => this.lap(s, ctx), 1200);
+    C9.auto(this, ctx, this.CH.length, 3200, (i) => this.pick(s, i), 1600);
+  },
+  reset(s) {
+    C9.tk(this);
+    s.querySelectorAll('.lo9-n,.lo9-k span,.lo9-chs button').forEach((x) => x.classList.remove('on', 'lit', 'pass'));
+    s.querySelector('.lo9-pk').style.opacity = 0;
+  },
+};
+</script>
+
+<section class="slide" id="c09-map" data-part="0" data-title="本章导览" data-notes="本章首先讨论<b>如何判断一次运行究竟好在哪里、错在哪里</b>（PART 01：学习信号）；然后<b>比较四种更新方法及其适用边界</b>（PART 02–05：先看能力的表示性质决定写到哪里，再分别展开知识、指令、程序三种载体），PART 06 讲写入参数，以及沿另一条正交的轴更新“更新方法”本身；接下来讨论这些更新<b>如何在长期运行中被验证、发布、修订与淘汰</b>（PART 07–09：双循环与分层评估、闭环的边界与安全、睡眠学习）。<br>右侧任一部分都可以点击直接跳转。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：<em>判断 → 更新 → 长期运行</em></h2></header>
+  <div class="mp9-body">
+    <div class="mp9-ring fx fx-scale" style="--d:2"></div>
+    <div class="mp9-list fx fx-left" style="--d:3"></div>
+  </div>
+  <div class="src">第九章 ·「Agent 的持续进化」开篇 · 本章结构</div>
+</section>
+<style>
+.mp9-body{display:grid;grid-template-columns:640px 1fr;gap:40px;align-items:center;flex:1;min-height:0}
+.mp9-ring{width:640px;height:640px;margin-top:-20px}
+.mp9-ring .mpc1{fill:var(--text);font-size:34px;font-weight:800;text-anchor:middle}
+.mp9-ring .mpc2{fill:var(--text3);font-size:17px;letter-spacing:.2em;text-anchor:middle}
+.mp9-list{display:flex;flex-direction:column;gap:14px}
+.mp9-g{display:flex;flex-direction:column;gap:6px}
+.mp9-gh{display:flex;align-items:baseline;gap:12px;font-size:17px;color:var(--text3);letter-spacing:.08em}
+.mp9-gh b{font-size:21px;color:var(--text);letter-spacing:0}
+.mp9-it{--c:var(--acc);display:grid;grid-template-columns:76px 300px 1fr 28px;align-items:center;gap:14px;padding:9px 16px;border-radius:13px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s var(--ease)}
+.mp9-it em{font:700 16px var(--num);font-style:normal;color:var(--c)}
+.mp9-it b{font-size:19px}
+.mp9-it span{font-size:16px;color:var(--text3)}
+.mp9-it .ic{color:var(--text3)}
+.mp9-it:hover,.mp9-it.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent)}
+.mp9-it.on b{color:var(--c)}
+.mp9-it.on .ic{color:var(--c)}
+</style>
+<script>
+HOOKS['c09-map'] = {
+  G: [
+    ['判断', '一次运行好在哪里、错在哪里', [1]],
+    ['更新', '经验写到哪里、怎样写', [2, 3, 4, 5, 6]],
+    ['长期运行', '验证、发布、修订与淘汰', [7, 8, 9]],
+  ],
+  D: {
+    1: '三层验证与可学习的诊断信号',
+    2: '能力的表示性质决定写到哪里',
+    3: '从已评价轨迹到经验文档',
+    4: '最小 diff，边界集与保留集',
+    5: '工作流、自我修改与确认门禁',
+    6: '五种搜索尺度、发现树回放',
+    7: '双循环、灰度回滚、分层评估',
+    8: '开放任务的边界、三道安全边界',
+    9: '整合、遗忘与能力保鲜',
+  },
+  init(s) {
+    const P = window.DECK_CFG.parts;
+    this.svg = U.ring(s.querySelector('.mp9-ring'), {
+      size: 640, labelSize: 21, cometDur: 12,
+      nodes: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((p) => ({ label: P[p].short, color: P[p].acc })),
+      center: (c) => `<text class="mpc1" x="${c}" y="${c - 4}">持续进化</text><text class="mpc2" x="${c}" y="${c + 30}">一条闭环 · 九个部分</text>`,
+    });
+    s.querySelector('.mp9-list').innerHTML = this.G.map(([g, t, ps]) => `<div class="mp9-g"><div class="mp9-gh"><b>${g}</b>${t}</div>${ps.map((p) => `<button class="mp9-it" data-i="${p - 1}" style="--c:${P[p].acc}"><em>${P[p].k}</em><b>${P[p].n}</b><span>${this.D[p]}</span><svg class="ic"><use href="#i-arrow"/></svg></button>`).join('')}</div>`).join('');
+    s.querySelector('.mp9-list').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) C9.goPart(+b.dataset.i + 1); });
+    s.querySelector('.mp9-list').addEventListener('mouseover', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+    this.svg.querySelectorAll('.node').forEach((n) => { n.style.cursor = 'pointer'; n.addEventListener('click', () => C9.goPart(+n.dataset.i + 1)); });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.mp9-it').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    this.svg.querySelectorAll('.node,.lab').forEach((x) => { const on = +x.dataset.i === i; x.classList.toggle('on', on); x.classList.toggle('dim', !on); });
+  },
+  enter(s, ctx) { C9.auto(this, ctx, 9, 2600, (i) => this.show(s, i), 1600); },
+  reset(s) { s.querySelectorAll('.on,.dim').forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>

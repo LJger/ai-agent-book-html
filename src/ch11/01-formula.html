@@ -1,0 +1,224 @@
+<!-- ================= PART 01 回到公式 ================= -->
+<section class="slide chapter" id="c11-d1" data-part="1" data-title="PART 01 · 回到公式" data-notes="本书开篇提出了一个公式：<b>Agent = LLM + 上下文 + 工具</b>。全书十章，都在这三个词里展开。<br>这一部分先看十章如何围绕这个公式展开：第一章建立公式的三层理解与编排光谱，随后沿“构建—评估与进化—协作”逐步展开；再看为什么这三个层次不是相互独立的书架，以及第九章为何成为全书的汇合点。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">回到公式</h1>
+  <div class="ch-s fx fx-up" style="--d:3">全书十章，都在这三个词里展开</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">本书开篇提出了一个公式：Agent = LLM + 上下文 + 工具。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c11-recap" data-part="1" data-steps="3" data-dur="11000" data-title="十章都在三个词里展开" data-notes="本书开篇提出了一个公式：<b>Agent = LLM + 上下文 + 工具</b>。全书十章，都在这三个词里展开。<br><b>第一章</b>建立公式的三层理解——实现层、直觉层、学术层，并给出从工作流到自主 Agent 的编排光谱。随后的章节沿“构建—评估与进化—协作”逐步展开：<br>• <b>构建 Agent（第二至六章）。</b>上下文工程决定 Agent 在一次任务中看到什么，记忆与知识库把信息扩展到多次会话；工具定义它能做什么，代码生成则提供创造新工具与新系统的元能力；交互一章再把观察与动作空间从文本回合制推向语音、GUI 与物理世界。<br>• <b>评估与进化（第七至九章）。</b>评估把表现变成可信信号，后训练把高维能力写入模型参数，持续进化再把生产经验转化为知识、指令、程序或参数的受控更新。<br>• <b>协作（第十章）。</b>多 Agent 协作进一步改变上下文、工具与责任的组织方式。<br>按 → 逐层展开；每张章节卡下方的标签表示它主要展开公式里的哪个部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">全书十章，都在<em>三个词</em>里展开</h2></header>
+  <div class="rc-f fx fx-up" style="--d:2"><span>Agent</span><i>=</i><span class="rc-w" data-w="llm" style="--c:var(--llm)">LLM</span><i>+</i><span class="rc-w" data-w="ctx" style="--c:var(--ctx)">上下文</span><i>+</i><span class="rc-w" data-w="tool" style="--c:var(--tool)">工具</span></div>
+  <div class="rc-rows">
+    <div class="rc-row fx fx-up" style="--d:3">
+      <div class="rc-lb"><b>第一章</b><span>公式的三层理解 · 编排光谱</span></div>
+      <div class="rc-one">
+        <div class="rc-lay"><span><em>实现层</em>LLM + 上下文 + 工具</span><span><em>直觉层</em>大脑 + 眼睛 + 手脚</span><span><em>学术层</em>策略 · 观察空间 · 动作空间</span></div>
+        <div class="rc-spec"><span>工作流</span><div class="rc-bar"><i></i></div><span>自主 Agent</span></div>
+      </div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="1">
+      <div class="rc-lb"><b>构建 Agent（第二至六章）</b><span>看到什么 · 能做什么</span></div>
+      <div class="rc-cs n5"></div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="2">
+      <div class="rc-lb"><b>评估与进化（第七至九章）</b><span>可信信号 · 写入参数 · 受控更新</span></div>
+      <div class="rc-cs n3"></div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="3">
+      <div class="rc-lb"><b>协作（第十章）</b><span>组织方式的改变</span></div>
+      <div class="rc-cs n1"></div>
+    </div>
+  </div>
+  <p class="rc-note fx fx-up" style="--d:5">第一章之后，随后的章节沿 <b>构建 → 评估与进化 → 协作</b> 逐步展开</p>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 开篇第 1–4 段</div>
+</section>
+<style>
+.rc-f{display:flex;align-items:center;justify-content:center;gap:16px;font:800 46px var(--num);margin-top:-8px}
+.rc-f>i{font-style:normal;color:var(--text3);font-weight:400}
+.rc-w{padding:2px 20px;border-radius:14px;color:var(--c);font-family:var(--font);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent);transition:box-shadow .5s,background .5s,transform .5s var(--spring)}
+.rc-w.lit{background:color-mix(in srgb,var(--c) 20%,transparent);box-shadow:0 0 34px color-mix(in srgb,var(--c) 50%,transparent);transform:translateY(-4px)}
+.rc-rows{display:flex;flex-direction:column;gap:12px;margin-top:22px}
+.rc-row{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:stretch}
+.rc-lb{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:12px 18px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent)}
+.rc-lb b{font-size:22px;line-height:1.35}
+.rc-lb span{font-size:16px;color:var(--text2)}
+.rc-one{display:grid;grid-template-columns:1fr 520px;gap:18px;align-items:center;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.rc-lay{display:flex;gap:10px}
+.rc-lay span{flex:1;padding:8px 12px;border-radius:12px;font-size:17px;line-height:1.4;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line2)}
+.rc-lay em{display:block;font-style:normal;font-size:15px;color:var(--acc);margin-bottom:2px}
+.rc-spec{display:flex;align-items:center;gap:12px;font-size:17px;color:var(--text2);white-space:nowrap}
+.rc-bar{position:relative;flex:1;height:10px;border-radius:10px;background:linear-gradient(90deg,#93c5fd,#c4b5fd,#5eead4)}
+.rc-bar i{position:absolute;top:50%;left:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;box-shadow:0 0 14px #fff;animation:c11spec 5s ease-in-out infinite alternate}
+@keyframes c11spec{to{left:100%}}
+.rc-cs{display:grid;gap:12px}
+.rc-cs.n5{grid-template-columns:repeat(5,1fr)}
+.rc-cs.n3{grid-template-columns:repeat(3,1fr)}
+.rc-cs.n1{grid-template-columns:1fr}
+.rc-c{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);display:flex;flex-direction:column;gap:6px}
+.rc-ch{display:flex;align-items:baseline;gap:8px}
+.rc-ch em{font:800 18px var(--num);font-style:normal;color:var(--acc)}
+.rc-ch b{font-size:19px}
+.rc-c p{font-size:16px;line-height:1.45;color:var(--text2);flex:1}
+.rc-tg{display:flex;gap:6px;flex-wrap:wrap}
+.rc-tg i{font-style:normal;font-size:15px;padding:1px 9px;border-radius:999px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.rc-cs.n1 .rc-c{flex-direction:row;align-items:center;gap:20px}
+.rc-cs.n1 .rc-c p{flex:none;font-size:18px}
+.rc-note{margin-top:16px;text-align:center;font-size:20px;color:var(--text2)}
+.rc-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c11-recap'] = {
+  TG: { llm: ['模型参数', 'var(--llm)'], ctx: ['上下文', 'var(--ctx)'], tool: ['工具', 'var(--tool)'], sig: ['可信信号', '#e2e8f0'], resp: ['责任', 'var(--pink)'] },
+  C: [
+    [['02', '上下文工程', '决定 Agent 在一次任务中看到什么', ['ctx']], ['03', '记忆与知识库', '把信息扩展到多次会话', ['ctx']], ['04', '工具', '定义它能做什么', ['tool']], ['05', '代码生成', '提供创造新工具与新系统的元能力', ['tool']], ['06', '交互', '把观察与动作空间从文本回合制推向语音、GUI 与物理世界', ['ctx', 'tool']]],
+    [['07', '评估', '把表现变成可信信号', ['sig']], ['08', '后训练', '把高维能力写入模型参数', ['llm']], ['09', '持续进化', '把生产经验转化为知识、指令、程序或参数的受控更新', ['ctx', 'tool', 'llm']]],
+    [['10', '多 Agent 协作', '进一步改变上下文、工具与责任的组织方式', ['ctx', 'tool', 'resp']]],
+  ],
+  LIT: [['llm', 'ctx', 'tool'], ['ctx', 'tool'], ['llm'], ['ctx', 'tool']],
+  init(s) {
+    const box = [...s.querySelectorAll('.rc-cs')];
+    this.C.forEach((row, r) => {
+      box[r].innerHTML = row.map(([n, t, p, tg]) => `<div class="rc-c"><div class="rc-ch"><em>${n}</em><b>${t}</b></div><p>${p}</p><div class="rc-tg">${tg.map((k) => `<i style="--c:${this.TG[k][1]}">${this.TG[k][0]}</i>`).join('')}</div></div>`).join('');
+    });
+  },
+  apply(s, k) { s.querySelectorAll('.rc-w').forEach((w) => w.classList.toggle('lit', this.LIT[k].includes(w.dataset.w))); },
+  enter(s, ctx, k) { ctx.later(() => this.apply(s, k), 600); },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.querySelectorAll('.rc-w').forEach((w) => w.classList.remove('lit')); },
+};
+</script>
+
+<section class="slide" id="c11-hub" data-part="1" data-trans="zoom" data-dur="14000" data-title="第九章：全书的汇合点" data-notes="这三个层次并不是相互独立的书架。<b>第九章尤其依赖前文的全部基础</b>：没有轨迹和知识系统，经验无处保存；没有代码能力，Agent 无法修改工具与 Harness；没有评估，系统更无法判断一次修改究竟是进步还是退化。它由此成为全书从“怎样构建 Agent”转向“怎样让 Agent 长期变好”的汇合点。<br>中间是一次“持续进化”的示意流水线：一段生产中的经验，要先被保存，再被用来修改工具与 Harness，最后经过评估判断，才能变成下一版本的能力。三个开关对应三项基础——不操作时会依次关掉其中一项，看经验在哪一步卡住；也可以自己点开关。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不是独立的书架：<em>第九章是汇合点</em></h2></header>
+  <div class="hb-shelf fx fx-up" style="--d:2">
+    <div class="hb-sh"><b>构建</b><span>第二至六章</span><div class="hb-bk"><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i></div></div>
+    <div class="hb-sh"><b>评估与进化</b><span>第七至九章</span><div class="hb-bk"><i>7</i><i>8</i><i class="h">9</i></div></div>
+    <div class="hb-sh"><b>协作</b><span>第十章</span><div class="hb-bk"><i>10</i></div></div>
+    <p class="hb-q">三个层次并不是相互独立的书架——<b>第九章尤其依赖前文的全部基础</b></p>
+  </div>
+  <div class="hb-pipe fx fx-scale" style="--d:3">
+    <svg class="hb-svg" viewBox="0 0 1660 330" width="1660" height="330">
+      <path class="hb-line" d="M220 150 H1430"/>
+      <path class="hb-run" d="M220 150 H1430"/>
+      <circle class="pk hb-k" r="13" style="fill:#5eead4;--c:#5eead4"/>
+    </svg>
+    <div class="hb-end a"><svg class="ic"><use href="#i-history"/></svg><b>生产中的经验</b><small>踩过的坑 · 试出来的窍门</small></div>
+    <div class="hb-g" data-g="0" style="left:330px"><span class="hb-gn">① 保存</span><b>轨迹和知识系统</b><button class="tgl on" data-i="0"><i></i>具备</button><p class="hb-x">经验无处保存</p></div>
+    <div class="hb-g" data-g="1" style="left:690px"><span class="hb-gn">② 修改</span><b>代码能力</b><small>修改工具与 Harness</small><button class="tgl on" data-i="1"><i></i>具备</button><p class="hb-x">Agent 无法修改工具与 Harness</p></div>
+    <div class="hb-g" data-g="2" style="left:1050px"><span class="hb-gn">③ 判断</span><b>评估</b><small>是进步还是退化</small><button class="tgl on" data-i="2"><i></i>具备</button><p class="hb-x">无法判断一次修改究竟是进步还是退化</p></div>
+    <div class="hb-end b"><svg class="ic"><use href="#i-trend"/></svg><b>下一版本</b><small>Agent 长期变好</small></div>
+    <span class="hb-tag">第九章 · Agent 的持续进化</span>
+    <span class="hb-sx cap">示意</span>
+  </div>
+  <p class="tagline hb-t fx fx-up" style="--d:5">第九章由此成为全书从“<b>怎样构建 Agent</b>”转向“<b>怎样让 Agent 长期变好</b>”的汇合点</p>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 开篇第 5 段</div>
+</section>
+<style>
+.hb-shelf{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:stretch}
+.hb-sh{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.hb-sh b{font-size:22px}
+.hb-sh span{font-size:16px;color:var(--text3)}
+.hb-bk{margin-left:auto;display:flex;gap:5px;align-items:flex-end}
+.hb-bk i{width:30px;height:46px;border-radius:5px 5px 3px 3px;display:grid;place-items:end center;padding-bottom:4px;font:700 15px var(--num);font-style:normal;color:#06101f;background:linear-gradient(#a5b4fc,#7dd3fc)}
+.hb-bk i:nth-child(2n){height:40px;background:linear-gradient(#c4b5fd,#93c5fd)}
+.hb-bk i.h{background:linear-gradient(#5eead4,#34d399);box-shadow:0 0 16px #5eead4}
+.hb-q{grid-column:1/-1;text-align:center;font-size:20px;color:var(--text2)}
+.hb-q b{color:var(--acc)}
+.hb-pipe{position:relative;height:330px;margin-top:16px;border-radius:22px;border:1px solid var(--line);background:rgba(8,12,30,.5)}
+.hb-svg{position:absolute;inset:0;overflow:visible}
+.hb-line{fill:none;stroke:rgba(255,255,255,.12);stroke-width:14;stroke-linecap:round}
+.hb-run{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:6 10;opacity:.5;animation:flow 1s linear infinite}
+.hb-k{opacity:0}
+.hb-end{position:absolute;top:84px;width:200px;height:132px;padding:14px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;border:1.5px solid var(--line2);background:rgba(10,16,36,.94);transition:box-shadow .4s,border-color .4s}
+.hb-end.a{left:24px}.hb-end.b{right:24px}
+.hb-end .ic{font-size:34px;color:var(--acc)}
+.hb-end b{font-size:21px}
+.hb-end small{font-size:15px;color:var(--text3)}
+.hb-end.win{border-color:var(--ok);box-shadow:0 0 40px color-mix(in srgb,var(--ok) 45%,transparent)}
+.hb-end.b .ic{color:var(--ok)}
+.hb-g{position:absolute;top:56px;width:260px;height:188px;padding:14px 16px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;border:1.5px solid var(--line2);background:rgba(10,16,36,.94);transition:border-color .35s,box-shadow .35s}
+.hb-gn{font-size:16px;color:var(--text3);letter-spacing:.1em}
+.hb-g b{font-size:21px}
+.hb-g small{font-size:15px;color:var(--text2)}
+.hb-g .tgl{margin-top:auto;font-size:16px;padding:5px 12px 5px 8px}
+.hb-g.pass{border-color:var(--ok);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 35%,transparent)}
+.hb-g.fail{border-color:var(--bad);box-shadow:0 0 30px color-mix(in srgb,var(--bad) 45%,transparent);animation:shake .5s}
+.hb-g.off{border-style:dashed;opacity:.85}
+.hb-x{position:absolute;left:-10px;right:-10px;top:200px;padding:8px 10px;border-radius:12px;font-size:17px;line-height:1.4;color:var(--bad);background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.45);opacity:0;transform:translateY(-6px);transition:all .35s var(--ease)}
+.hb-g.fail .hb-x{opacity:1;transform:none}
+.hb-tag{position:absolute;left:50%;top:14px;transform:translateX(-50%);padding:5px 16px;border-radius:999px;font-size:17px;font-weight:700;color:#06101f;background:linear-gradient(90deg,#5eead4,#a5b4fc)}
+.hb-sx{position:absolute;right:16px;top:12px}
+.hb-t{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c11-hub'] = {
+  X: [220, 460, 820, 1180, 1430],
+  SC: [[1, 1, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0]],
+  init(s) {
+    this.gs = [...s.querySelectorAll('.hb-g')];
+    this.k = s.querySelector('.hb-k');
+    this.win = s.querySelector('.hb-end.b');
+    this.on = [1, 1, 1];
+    // 每一段用一条独立路径，便于数据包停在某个关口
+    const svg = s.querySelector('.hb-svg');
+    this.seg = [];
+    for (let i = 0; i < 4; i++) {
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M${this.X[i]} 150 H${this.X[i + 1]}`);
+      p.setAttribute('fill', 'none');
+      svg.appendChild(p);
+      this.seg.push(p);
+    }
+    s.querySelectorAll('.hb-g .tgl').forEach((b) => b.addEventListener('click', () => {
+      const i = +b.dataset.i;
+      this.auto = false;
+      this.on[i] = this.on[i] ? 0 : 1;
+      this.paint(s);
+      this.run(s);
+    }));
+  },
+  paint() {
+    this.gs.forEach((g, i) => {
+      const t = g.querySelector('.tgl');
+      t.classList.toggle('on', !!this.on[i]);
+      t.lastChild.textContent = this.on[i] ? '具备' : '缺失';
+      g.classList.toggle('off', !this.on[i]);
+    });
+  },
+  // 一次持续进化：经验依次经过保存、修改、判断三个关口
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    this.gs.forEach((g) => g.classList.remove('pass', 'fail'));
+    this.win.classList.remove('win');
+    await U.wait(ctx, 400);
+    for (let i = 0; i < 4; i++) {
+      if (!ok()) return;
+      await U.fly(this.k, this.seg[i], 820, { ctx, keep: true, linear: i > 0 && i < 3 });
+      if (!ok()) return;
+      if (i === 3) { this.k.style.opacity = 0; this.win.classList.add('win'); return; }
+      const g = this.gs[i];
+      if (!this.on[i]) { g.classList.add('fail'); this.k.style.fill = '#fb7185'; await U.wait(ctx, 300); if (ok()) { this.k.style.opacity = 0; this.k.style.fill = '#5eead4'; } return; }
+      g.classList.add('pass');
+      await U.wait(ctx, 250);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.n = 0;
+    this.on = [1, 1, 1];
+    this.paint(s);
+    this.run(s);
+    ctx.every(() => {
+      if (this.auto) { this.n = (this.n + 1) % this.SC.length; this.on = [...this.SC[this.n]]; this.paint(s); }
+      this.run(s);
+    }, 4800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.on = [1, 1, 1]; this.paint(s); this.gs.forEach((g) => g.classList.remove('pass', 'fail')); this.win.classList.remove('win'); this.k.style.opacity = 0; },
+};
+</script>

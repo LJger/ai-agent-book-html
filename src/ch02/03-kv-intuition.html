@@ -1,0 +1,686 @@
+<!-- ================= PART 03 KV Cache 的直觉与注意力 ================= -->
+<section class="slide chapter" id="c02-d3" data-part="3" data-title="PART 03 · KV Cache 的直觉与注意力" data-notes="这一部分进入<b>KV Cache 友好的上下文设计</b>：先建立 KV Cache 的直觉，用一个真实感很强的故事说明为什么一行代码能让延迟和账单翻倍，再给出三条即使跳过原理也要记住的结论；最后用实验 2-2 看懂注意力机制——它是理解 KV Cache 为什么有效、以及为什么对上下文设计有严格要求的基础。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:86px">KV Cache 友好的<br>上下文设计</h1>
+  <div class="ch-s fx fx-up" style="--d:3">全书技术密度最高的部分之一：先建立直觉，再看注意力</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">开发者写下的一行看似无害的代码，可能让整条推理链路慢一个量级。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c02-kvintuit" data-part="3" data-dur="18000" data-title="KV Cache 的直觉" data-notes="先把 <b>KV Cache</b> 的直觉建立起来。模型每生成一个 token，都要回头看一遍前文所有 token 的中间计算结果。如果每轮都从头算一次，开销会随上下文长度爆炸式增长。KV Cache 的做法是：把前文的中间计算结果缓存下来，下一轮只需要计算新增 token 的部分。<br><b>前提是要复用的上下文 token 前缀保持不变</b>——若 token 序列从某个位置开始不同，首个不同 token 及其后的 KV 状态需要重新计算；此前位置的 KV 状态不受这次改动影响。<br>顺带说明：讲到跨请求的“缓存命中”时，在 API 服务商的语境下叫 <b>Prompt Cache</b>——它是构建在推理引擎 KV Cache 之上的跨请求缓存，两个层级的完整辨析见 PART 05。<br>演示依次播放：无缓存（每步都重算全部前文）→ 有 KV Cache（只算新 token）→ 在中间改动一个 token（其后全部失效）。计数按“每个 token 的 K、V 算一次记 1”，只为示意增长趋势。可以切换模式，或直接点击任一 token 模拟改动。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">KV Cache：把算过的<em>中间结果</em>存起来</h2>
+    <p class="lead fx fx-up" style="--d:2">前提：要复用的 token 前缀保持不变</p></div>
+    <div class="ki-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="none">无缓存</button><button data-v="cache">有 KV Cache</button><button data-v="edit">改动一个 token</button></div></header>
+  <div class="ki-stage panel fx fx-scale" style="--d:3">
+    <div class="ki-lab"><span class="ki-mode"></span><span class="ki-hint"></span></div>
+    <div class="ki-row"></div>
+    <i class="ki-beam"></i>
+    <div class="ki-legend"><span class="ki-lg c">已缓存的 K/V：直接复用</span><span class="ki-lg n">本步新计算</span><span class="ki-lg r">失效，需要重算</span></div>
+  </div>
+  <div class="ki-meters fx fx-up" style="--d:4">
+    <div class="ki-m"><span>无缓存：每一步都重算全部前文</span><b class="ki-a">0</b><div class="meter" style="--c:var(--bad)"><i class="ki-ba"></i></div></div>
+    <div class="ki-m"><span>有 KV Cache：每一步只算新 token</span><b class="ki-b">0</b><div class="meter" style="--c:var(--ok)"><i class="ki-bb"></i></div></div>
+    <p class="cap">累计 K/V 计算次数（示意计数：每个 token 算一次记 1）。跨请求的“缓存命中”在 API 服务商语境下叫 Prompt Cache，见 PART 05</p>
+  </div>
+  <div class="src">第二章 ·「KV Cache 友好的上下文设计」</div>
+</section>
+<style>
+#c02-kvintuit .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.ki-stage{position:relative;height:330px;padding:22px 26px}
+.ki-lab{display:flex;gap:16px;align-items:baseline;font-size:20px}
+.ki-mode{font-weight:700;color:var(--acc)}
+.ki-hint{font-size:18px;color:var(--text2)}
+.ki-row{position:absolute;left:26px;top:110px;display:flex;gap:8px}
+.ki-t{--c:var(--line2);position:relative;width:86px;height:104px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;cursor:pointer;border:1px solid var(--c);background:rgba(10,16,36,.92);transition:border-color .3s,background .3s,box-shadow .3s;animation:upIn .4s var(--spring) both}
+.ki-t b{font-size:20px}
+.ki-kv{display:flex;gap:5px}
+.ki-kv i{width:26px;height:20px;border-radius:5px;font:700 15px/20px var(--mono);font-style:normal;text-align:center;color:#06101f;background:rgba(255,255,255,.12);transition:background .3s}
+.ki-t.cached{--c:color-mix(in srgb,var(--ok) 55%,transparent)}
+.ki-t.cached .ki-kv i{background:var(--ok)}
+.ki-t.calc{--c:var(--tool);background:color-mix(in srgb,var(--tool) 16%,rgba(10,16,36,.92));box-shadow:0 0 22px color-mix(in srgb,var(--tool) 45%,transparent)}
+.ki-t.calc .ki-kv i{background:var(--tool)}
+.ki-t.stale{--c:var(--bad);background:color-mix(in srgb,var(--bad) 14%,rgba(10,16,36,.92))}
+.ki-t.stale .ki-kv i{background:var(--bad)}
+.ki-t.mod b{color:var(--bad);text-decoration:underline}
+.ki-beam{position:absolute;top:96px;height:132px;width:0;border-radius:16px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--tool) 30%,transparent));opacity:0;transition:opacity .2s;pointer-events:none}
+.ki-legend{position:absolute;left:26px;bottom:20px;display:flex;gap:26px}
+.ki-lg{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text2)}
+.ki-lg::before{content:"";width:16px;height:12px;border-radius:3px}
+.ki-lg.c::before{background:var(--ok)}.ki-lg.n::before{background:var(--tool)}.ki-lg.r::before{background:var(--bad)}
+.ki-meters{display:grid;grid-template-columns:1fr 1fr;gap:16px 30px;margin-top:22px}
+.ki-m{display:grid;grid-template-columns:1fr auto;gap:8px 16px;align-items:center;padding:16px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ki-m span{font-size:19px;color:var(--text2)}
+.ki-m b{font:800 32px var(--num)}
+.ki-m:first-child b{color:var(--bad)}.ki-m:nth-child(2) b{color:var(--ok)}
+.ki-m .meter{grid-column:1/-1}
+.ki-meters .cap{grid-column:1/-1}
+</style>
+<script>
+HOOKS['c02-kvintuit'] = {
+  W: ['用户', '问', '：', '北京', '今天', '天气', '怎么样', '？', '助手', '：', '北京', '今天', '晴', '，', '23°C', '。'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.ki-seg'), (v) => { this.auto = false; this.go(s, v); });
+    s.querySelector('.ki-row').addEventListener('click', (e) => { const t = e.target.closest('.ki-t'); if (t) { this.auto = false; this.go(s, 'edit', +t.dataset.i); } });
+  },
+  tok(i) { return `<div class="ki-t" data-i="${i}"><b>${this.W[i]}</b><span class="ki-kv"><i>K</i><i>V</i></span></div>`; },
+  meters(s, n) {
+    const a = (n * (n + 1)) / 2, b = n, max = (this.W.length * (this.W.length + 1)) / 2;
+    s.querySelector('.ki-a').textContent = a; s.querySelector('.ki-b').textContent = b;
+    s.querySelector('.ki-ba').style.setProperty('--v', (a / max) * 100 + '%');
+    s.querySelector('.ki-bb').style.setProperty('--v', (b / max) * 100 + '%');
+  },
+  beam(s, from, to, on) {
+    const b = s.querySelector('.ki-beam'), ts = s.querySelectorAll('.ki-t');
+    if (!on || !ts.length) { b.style.opacity = 0; return; }
+    const l = ts[from].offsetLeft + 26 - 6, r = ts[to].offsetLeft + 26 + ts[to].offsetWidth + 6;
+    b.style.left = l + 'px'; b.style.width = r - l + 'px'; b.style.opacity = 1;
+  },
+  label(s, m, h) { s.querySelector('.ki-mode').textContent = m; s.querySelector('.ki-hint').textContent = h; },
+  async go(s, mode, at) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.set(mode);
+    this.mode = mode;
+    const row = s.querySelector('.ki-row'), N = this.W.length;
+    if (!ctx) return;
+    if (mode === 'edit') {
+      // 全部已缓存 → 改动第 k 个 token → 其后全部失效 → 从 k 起重算
+      const k = at ?? 6;
+      row.innerHTML = this.W.map((w, i) => this.tok(i)).join('');
+      const ts = [...row.children];
+      ts.forEach((t) => t.classList.add('cached'));
+      this.meters(s, N);
+      this.label(s, '改动一个 token', `第 ${k + 1} 个 token 被改动：之前的 K/V 不受影响，从它开始全部失效`);
+      await U.wait(ctx, 900); if (!ok()) return;
+      ts[k].classList.add('mod');
+      ts.forEach((t, i) => { if (i >= k) { t.classList.remove('cached'); t.classList.add('stale'); } });
+      await U.wait(ctx, 1600); if (!ok()) return;
+      for (let i = k; i < N; i++) {
+        ts[i].classList.remove('stale'); ts[i].classList.add('calc');
+        await U.wait(ctx, 160); if (!ok()) return;
+        ts[i].classList.remove('calc'); ts[i].classList.add('cached');
+      }
+      this.label(s, '改动一个 token', `重算了 ${N - k} 个 token；变动点越靠前，要重算的越多`);
+      if (this.auto) { await U.wait(ctx, 2600); if (ok()) this.go(s, 'none'); }
+      return;
+    }
+    row.innerHTML = '';
+    this.meters(s, 0);
+    this.label(s, mode === 'none' ? '无缓存' : '有 KV Cache', mode === 'none' ? '每生成一个 token，都把前文全部重新算一遍' : '前文的 K/V 已在缓存里，只算新增的那一个');
+    for (let n = 1; n <= N; n++) {
+      row.insertAdjacentHTML('beforeend', this.tok(n - 1));
+      const ts = [...row.children];
+      if (mode === 'none') {
+        ts.forEach((t) => { t.classList.remove('cached'); t.classList.add('calc'); });
+        this.beam(s, 0, n - 1, true);
+      } else {
+        ts.forEach((t, i) => { t.classList.toggle('cached', i < n - 1); t.classList.toggle('calc', i === n - 1); });
+        this.beam(s, n - 1, n - 1, true);
+      }
+      this.meters(s, n);
+      await U.wait(ctx, 420); if (!ok()) return;
+      ts.forEach((t) => { t.classList.remove('calc'); if (mode === 'cache') t.classList.add('cached'); });
+      this.beam(s, 0, 0, false);
+      await U.wait(ctx, 120); if (!ok()) return;
+    }
+    if (this.auto) { await U.wait(ctx, 1800); if (ok()) this.go(s, mode === 'none' ? 'cache' : 'edit'); }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.go(s, 'none'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.ki-row').innerHTML = ''; this.beam(s, 0, 0, false); },
+};
+</script>
+
+<section class="slide" id="c02-story" data-part="3" data-steps="2" data-trans="zoom" data-dur="11000" data-title="一行时间戳引发的事故" data-notes="理解了这一点，下面这个故事就一目了然。某团队的客服 Agent 每天处理 10 万次对话，原本一切正常。某天工程师为了让 Agent“知道”当前时间，在系统提示词里加了一行 Current time: {{now}}，把时间戳实时注入进去。第二天监控告警：所有对话的首 token 延迟从 0.5 秒涨到 3-5 秒，月度推理账单几乎翻了一倍。代码看起来完全没问题，模型也没换——问题出在哪里？<br>答案是：那一行时间戳使每次请求的 token 序列<b>从时间戳所在位置开始不同</b>，因此该位置及其后的 KV 状态无法复用。由于系统提示词位于上下文前部，模型往往仍需重新计算它之后的大部分输入 token 所对应的键值对（“键（Key）”与“值（Value）”是注意力机制的两类向量，实验 2-2 会直观演示它们的作用）。这种“无形成本”在 Agent 系统里反复出现——开发者写下的一行看似无害的代码，可能让整条推理链路慢一个量级。<br>按 → 依次看：改动 → 告警 → 原因。最后一步可以切换时间戳的位置：写进系统提示词时，变动点之后几乎全部失效；作为新消息追加到末尾时，只有末尾那一点是新的（token 数量为示意）。监控曲线的形状同样是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一行时间戳，让延迟和账单<em>一起翻倍</em></h2></div>
+    <div class="sy-seg seg" data-step="2"><i class="knob"></i><button data-v="sys">时间写进系统提示词</button><button data-v="end">作为新消息追加到末尾</button></div></header>
+  <div class="sy-body">
+    <div class="sy-dash panel fx fx-left" style="--d:2">
+      <div class="sy-dh"><svg class="ic"><use href="#i-chart"/></svg><b>客服 Agent · 监控面板</b><span class="sy-al"><svg class="ic"><use href="#i-bell"/></svg>告警</span></div>
+      <div class="sy-k"><span>每天对话量</span><b>10 万次</b></div>
+      <div class="sy-k sy-lat"><span>首 token 延迟</span><b><em class="v0">0.5 秒</em><em class="v1">3–5 秒</em></b></div>
+      <div class="sy-k sy-bill"><span>月度推理账单</span><b><em class="v0">平稳</em><em class="v1">几乎翻倍</em></b></div>
+      <svg class="sy-ch" viewBox="0 0 460 150" width="460" height="150"><path class="sy-ax" d="M0 140 H460"/><path class="sy-ln" d="M0 118 L60 120 L120 117 L180 119 L240 118 L250 40 L300 30 L360 38 L420 26 L460 34"/><line class="sy-dv" x1="244" y1="0" x2="244" y2="140"/><text x="252" y="148">改动上线</text></svg>
+      <p class="cap">曲线形状为示意</p>
+    </div>
+    <div class="sy-right">
+      <div class="sy-code win fx fx-right" style="--d:3">
+        <div class="win-bar"><i></i><i></i><i></i><span>system_prompt.txt · diff</span></div>
+        <pre class="code sy-pre"><span class="ln">You are a customer service agent for …</span><span class="ln sy-add"><span class="t-g">+ Current time: {{now}}</span></span><span class="ln">Rules: verify identity before refunds …</span><span class="ln">…</span></pre>
+        <p class="sy-ok">代码看起来完全没问题，模型也没换——问题出在哪里？</p>
+      </div>
+      <div class="sy-why panel" data-step="2">
+        <div class="sy-wh"><b>两次相邻请求的 token 序列</b><span class="sy-st"></span></div>
+        <div class="sy-r"><span class="sy-rl">10:30:45</span><div class="sy-ts" data-r="0"></div></div>
+        <div class="sy-r"><span class="sy-rl">10:31:02</span><div class="sy-ts" data-r="1"></div></div>
+        <div class="sy-meter"><span>第二次请求需重算</span><div class="meter" style="--c:var(--bad)"><i class="sy-mv"></i></div><b class="sy-pc"></b></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「KV Cache 友好的上下文设计」时间戳案例</div>
+</section>
+<style>
+#c02-story .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-story .sy-seg{opacity:0;pointer-events:none;transition:opacity .5s}
+#c02-story .sy-seg.on{opacity:1;pointer-events:auto}
+.sy-body{display:flex;gap:28px;height:620px}
+.sy-dash{width:540px;flex:none;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.sy-dh{display:flex;align-items:center;gap:10px;font-size:21px}
+.sy-dh>.ic{font-size:26px;color:var(--acc)}
+.sy-al{margin-left:auto;display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:16px;color:#fff;background:var(--bad);opacity:0;transition:opacity .4s}
+#c02-story[data-k="1"] .sy-al,#c02-story[data-k="2"] .sy-al{opacity:1;animation:blink 1s steps(1) 3}
+.sy-k{display:flex;justify-content:space-between;align-items:baseline;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);transition:border-color .5s,background .5s}
+.sy-k span{font-size:19px;color:var(--text2)}
+.sy-k b{font:800 30px var(--num)}
+.sy-k em{font-style:normal}
+.sy-k .v1{display:none;color:var(--bad)}
+#c02-story[data-k="1"] .sy-k .v0,#c02-story[data-k="2"] .sy-k .v0{display:none}
+#c02-story[data-k="1"] .sy-k .v1,#c02-story[data-k="2"] .sy-k .v1{display:inline}
+#c02-story[data-k="1"] .sy-lat,#c02-story[data-k="1"] .sy-bill,#c02-story[data-k="2"] .sy-lat,#c02-story[data-k="2"] .sy-bill{border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.sy-ch{overflow:visible;margin-top:6px}
+.sy-ax{stroke:var(--line2);stroke-width:1.5}
+.sy-ln{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:900;stroke-dashoffset:900;transition:stroke-dashoffset 1.6s var(--ease)}
+.sy-dv{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:4 5}
+.sy-ch text{fill:var(--warn);font-size:14px}
+#c02-story.go .sy-ln{stroke-dashoffset:658}
+#c02-story[data-k="1"] .sy-ln,#c02-story[data-k="2"] .sy-ln{stroke-dashoffset:0;stroke:var(--bad)}
+.sy-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.sy-pre{font-size:19px;line-height:1.8}
+.sy-add{opacity:0;background:color-mix(in srgb,var(--ok) 14%,transparent);transition:opacity .6s}
+#c02-story.go .sy-add{opacity:1}
+.sy-ok{padding:0 26px 18px;font-size:18px;color:var(--warn)}
+.sy-why{flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:14px;opacity:0;transform:translateY(16px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+.sy-why.on{opacity:1;transform:none}
+.sy-wh{display:flex;align-items:baseline;gap:14px;font-size:19px}
+.sy-st{font-size:16px;color:var(--text2)}
+.sy-r{display:flex;align-items:center;gap:12px}
+.sy-rl{flex:none;width:82px;font:600 15px var(--mono);color:var(--text3)}
+.sy-ts{display:flex;gap:4px;flex-wrap:nowrap}
+.sy-t{width:26px;height:34px;border-radius:5px;background:color-mix(in srgb,var(--ok) 28%,transparent);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);transition:background .4s,border-color .4s}
+.sy-t.ts{background:color-mix(in srgb,var(--tool) 45%,transparent);border-color:var(--tool)}
+.sy-t.bad{background:color-mix(in srgb,var(--bad) 40%,transparent);border-color:var(--bad)}
+.sy-meter{display:flex;align-items:center;gap:14px;font-size:17px;color:var(--text2)}
+.sy-meter .meter{flex:1}
+.sy-pc{font:800 22px var(--num);color:var(--bad);min-width:110px;text-align:right}
+</style>
+<script>
+HOOKS['c02-story'] = {
+  N: 28,
+  init(s) { this.set = U.seg(s.querySelector('.sy-seg'), (v) => { this.auto = false; this.pos(s, v); }); },
+  // 时间戳在第 3 个位置（系统提示词里）或最后一个位置（末尾追加）
+  pos(s, v) {
+    this.v = v;
+    this.set(v);
+    const at = v === 'sys' ? 2 : this.N - 1;
+    s.querySelectorAll('.sy-ts').forEach((r) => {
+      r.innerHTML = Array.from({ length: this.N }, (_, i) => `<i class="sy-t${i === at ? ' ts' : ''}${+r.dataset.r === 1 && i >= at ? ' bad' : ''}"></i>`).join('');
+    });
+    const n = this.N - at, pct = Math.round((n / this.N) * 100);
+    s.querySelector('.sy-mv').style.setProperty('--v', pct + '%');
+    s.querySelector('.sy-pc').textContent = `${n} / ${this.N} 个`;
+    s.querySelector('.sy-st').textContent = v === 'sys' ? '时间戳在前部：从它开始，后面全部不同' : '时间戳在末尾：前面全部相同，缓存照常命中';
+  },
+  apply(s, k) {
+    s.dataset.k = k;
+    s.classList.remove('go'); void s.offsetWidth; s.classList.add('go');
+    if (k >= 2) this.pos(s, 'sys');
+  },
+  enter(s, ctx, k) {
+    this.auto = true;
+    this.apply(s, k);
+    ctx.every(() => { if (this.auto && +s.dataset.k >= 2) this.pos(s, this.v === 'sys' ? 'end' : 'sys'); }, 3200);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.dataset.k = 0; s.classList.remove('go'); },
+};
+</script>
+
+<section class="slide" id="c02-three" data-part="3" data-steps="3" data-trans="flip" data-title="技术门槛提示：三条核心结论" data-notes="<b>技术门槛提示</b>：KV Cache 涉及 Transformer 注意力机制的内部原理，是全书技术密度最高的部分之一。如果不熟悉这些底层机制，<b>可以跳过原理细节，只需记住以下三条核心结论</b>：<br>1. <b>系统提示词和工具定义一旦确定就不要改。</b>任何改动，哪怕多一个空格，都可能改变 token 序列，使首个不同 token 及其后的缓存无法复用；改动越靠前，延迟和成本影响通常越大（具体幅度视模型与配置而定）。<br>2. <b>动态信息永远追加到末尾</b>——时间戳、用户状态等变化的内容，作为新消息追加到对话末尾，而不是修改已有的系统提示词。<br>3. <b>使用标准 API 格式，不要自行拼接消息</b>：结构化消息会被 Chat Template 翻译成模型训练时见过的固定 token 序列；自行用字符串拼成“USER: ... ASSISTANT: ...”的根本问题是偏离了这种训练格式，会削弱模型的多步思考能力。至于缓存，它只认 token 字节序列，只要拼出的前缀字节级稳定，照样能命中；但若拼接方式不稳定（如每次向前缀注入动态内容），缓存也会随之失效。<br>这三条结论背后的直觉其实很简单：大模型在处理上下文时，会把前面已经处理过的内容缓存起来，下次只需要处理新增的部分。记住这三条，即使跳过后面的技术细节，也能正确设计 Agent 的上下文结构。按 → 依次翻开，也可以直接点击卡片。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">跳过原理也要记住的<em>三条核心结论</em></h2>
+  <p class="lead fx fx-up" style="--d:2">技术门槛提示：后面的原理是全书技术密度最高的部分之一，可以先只记结论</p></header>
+  <div class="tr3-cards">
+    <div class="flip tr3-c fx fx-up" data-i="0" style="--d:3;--c:#fb7185"><div class="flip-in">
+      <div class="flip-f"><span class="tr3-n">1</span><svg class="ic tr3-ic"><use href="#i-lock"/></svg><b>系统提示词和工具定义<br>一旦确定就不要改</b><span class="tr3-h">点击翻面</span></div>
+      <div class="flip-b"><b class="tr3-bh">哪怕多一个空格</b><p>任何改动都可能改变 token 序列，使<b>首个不同 token 及其后</b>的缓存无法复用</p><p>改动越靠前，延迟和成本影响通常越大（具体幅度视模型与配置而定）</p><div class="tr3-demo"><span class="tr3-ok">You are a helpful</span><span class="tr3-bad">␣</span><span class="tr3-red">assistant…</span></div></div>
+    </div></div>
+    <div class="flip tr3-c fx fx-up" data-i="1" style="--d:4;--c:#34d399"><div class="flip-in">
+      <div class="flip-f"><span class="tr3-n">2</span><svg class="ic tr3-ic"><use href="#i-download"/></svg><b>动态信息<br>永远追加到末尾</b><span class="tr3-h">点击翻面</span></div>
+      <div class="flip-b"><b class="tr3-bh">时间戳、用户状态……</b><p>变化的内容作为<b>新消息</b>追加到对话末尾，而不是修改已有的系统提示词</p><div class="tr3-stack"><span>system</span><span>tools</span><span>…历史…</span><span class="nw">+ 新消息：当前时间 10:31</span></div></div>
+    </div></div>
+    <div class="flip tr3-c fx fx-up" data-i="2" style="--d:5;--c:#60a5fa"><div class="flip-in">
+      <div class="flip-f"><span class="tr3-n">3</span><svg class="ic tr3-ic"><use href="#i-code"/></svg><b>使用标准 API 格式<br>不要自行拼接消息</b><span class="tr3-h">点击翻面</span></div>
+      <div class="flip-b"><b class="tr3-bh">根本问题：偏离训练格式</b><p>结构化消息由 Chat Template 翻译成训练时见过的固定 token 序列；拼成 <code>USER: … ASSISTANT: …</code> 会<b>削弱多步思考能力</b></p><p>缓存只认字节：拼接稳定照样命中，不稳定（向前缀注入动态内容）才失效</p></div>
+    </div></div>
+  </div>
+  <p class="tagline tr3-tag fx fx-up" style="--d:6">背后的直觉：模型会把<b>已经处理过的内容缓存起来</b>，下次只需要处理新增的部分</p>
+  <div class="src">第二章 ·「KV Cache 友好的上下文设计」· 技术门槛提示</div>
+</section>
+<style>
+.tr3-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;height:500px}
+.tr3-c .flip-f{align-items:center;justify-content:center;text-align:center;gap:18px;border-color:color-mix(in srgb,var(--c) 40%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.9)),rgba(12,18,40,.9) 70%)}
+.tr3-c .flip-b{border-color:color-mix(in srgb,var(--c) 55%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 14%,rgba(8,14,32,.96)),rgba(8,14,32,.96) 70%);padding:28px 30px;gap:14px}
+.tr3-n{font:800 70px var(--num);color:transparent;-webkit-text-stroke:2px var(--c);line-height:1}
+.tr3-ic{font-size:58px;color:var(--c)}
+.tr3-c .flip-f b{font-size:31px;line-height:1.45}
+.tr3-h{font-size:15px;color:var(--text3);letter-spacing:.2em}
+.tr3-bh{font-size:25px;color:var(--c)}
+.tr3-c .flip-b p{font-size:20px;line-height:1.65}
+.tr3-c .flip-b p b{color:var(--c)}
+.tr3-c code{font:17px var(--mono);color:var(--warn)}
+.tr3-demo{margin-top:auto;font:18px var(--mono);padding:12px 14px;border-radius:12px;background:rgba(0,0,0,.3)}
+.tr3-ok{color:var(--ok)}.tr3-bad{color:#fff;background:var(--bad);padding:0 4px;border-radius:4px;margin:0 2px}.tr3-red{color:var(--bad)}
+.tr3-stack{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.tr3-stack span{padding:7px 12px;border-radius:9px;font:16px var(--mono);color:var(--text2);background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.tr3-stack .nw{color:var(--ok);border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+.tr3-tag{margin-top:28px;font-size:24px}
+</style>
+<script>
+HOOKS['c02-three'] = {
+  init(s) {
+    this.cards = [...s.querySelectorAll('.tr3-c')];
+    this.cards.forEach((c) => c.addEventListener('click', () => c.classList.toggle('flipped')));
+  },
+  apply(k) { this.cards.forEach((c, i) => c.classList.toggle('flipped', i < k)); },
+  enter(s, ctx, k) { this.apply(k); },
+  step(s, ctx, k) { this.apply(k); },
+  reset() { this.apply(0); },
+};
+</script>
+
+<section class="slide" id="c02-qkv" data-part="3" data-trans="rise" data-dur="15000" data-title="实验 2-2 ★：Query、Key、Value" data-notes="<b>实验 2-2 ★：注意力机制可视化</b>。在讲 KV Cache 之前，先通过实验直观理解模型内部的注意力机制——它是理解 KV Cache 为什么有效、以及为什么对上下文设计有严格要求的基础。<br><b>什么是注意力机制？</b>假设模型正在处理“北京 的 天气 怎么样”这句话，当读到“怎么样”时，模型需要决定：前面哪些词对理解“怎么样”最重要？注意力机制通过三个向量完成这个“找重点”的过程（<b>表2-1</b>）：<br><b>Query（查询）</b>：当前词发出的“搜索请求”——“怎么样”问：哪个词和我最相关？<br><b>Key（键）</b>：每个词的“标签”，用于被搜索匹配——“北京”的标签偏向“地名”，“天气”的标签偏向“气象”。<br><b>Value（值）</b>：每个词的“内容”，匹配成功后被提取——匹配到“天气”后，提取它的语义信息。<br>简单来说，每个新词都在问“前面哪些词跟我最相关？”，通过打分找到最相关的词，然后重点参考它的信息来理解当前语境。更具体地说，计算过程分三步：首先，“怎么样”生成自己的 Query 向量（一串数字，代表“我在找什么”）；然后，Query 与每个词的 Key 做点积（可以理解为“匹配度打分”——两组数字逐位相乘再加起来，结果越大说明越匹配），得到注意力权重；最后，用这些权重对所有词的 Value 加权求和——打分高的词贡献多，打分低的词贡献少，就像考试按权重算总分一样，最终合成出一个综合理解。<br>右下的向量数字只是为了演示“逐位相乘再相加”而虚构的示意值。把鼠标移到表格的某一行上，句子里对应的部分会高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-2 ★：注意力，就是一次<em>“找重点”</em></h2>
+  <p class="lead fx fx-up" style="--d:2">读到“怎么样”时，前面哪些词对理解它最重要？</p></header>
+  <div class="qk-body">
+    <div class="qk-tbl panel fx fx-left" style="--d:3">
+      <div class="qk-r qk-h"><span>向量</span><span>含义</span><span>在这个例子中</span></div>
+      <div class="qk-r" data-i="0" style="--c:#fbbf24"><b>Query（查询）</b><span>当前词发出的“搜索请求”</span><span>“怎么样”问：哪个词和我最相关？</span></div>
+      <div class="qk-r" data-i="1" style="--c:#22d3ee"><b>Key（键）</b><span>每个词的“标签”，用于被搜索匹配</span><span>“北京”的标签偏向“地名”，“天气”的标签偏向“气象”</span></div>
+      <div class="qk-r" data-i="2" style="--c:#a78bfa"><b>Value（值）</b><span>每个词的“内容”，匹配成功后被提取</span><span>匹配到“天气”后，提取它的语义信息</span></div>
+      <p class="qk-cap">表2-1 · 每个新词都在问“前面哪些词跟我最相关？”——打分找到最相关的词，重点参考它的信息</p>
+    </div>
+    <div class="qk-vis fx fx-right" style="--d:4">
+      <div class="qk-sent">
+        <div class="qk-w" data-w="0"><span class="qk-tag">地名</span><b>北京</b><span class="qk-val">城市</span></div>
+        <div class="qk-w" data-w="1"><span class="qk-tag">　</span><b>的</b><span class="qk-val">助词</span></div>
+        <div class="qk-w" data-w="2"><span class="qk-tag">气象</span><b>天气</b><span class="qk-val">晴雨冷暖</span></div>
+        <div class="qk-w q" data-w="3"><span class="qk-ask">哪个词和我最相关？</span><b>怎么样</b><span class="qk-val">　</span></div>
+      </div>
+      <div class="qk-pipe panel">
+        <div class="qk-s" data-s="0"><em>①</em><div><b>生成 Query</b><p>“怎么样”的 Query：一串数字，代表“我在找什么”</p><code>q = [0.9, 0.1, 0.8]</code></div></div>
+        <div class="qk-s" data-s="1"><em>②</em><div><b>与每个 Key 做点积 = 匹配度打分</b><p>两组数字逐位相乘再加起来，越大越匹配</p><code>q·k<sub>天气</sub> = 0.9×0.8 + 0.1×0.2 + 0.8×0.9 = 1.46</code><code>q·k<sub>北京</sub> = 0.9×0.3 + 0.1×0.9 + 0.8×0.2 = 0.52</code></div></div>
+        <div class="qk-s" data-s="2"><em>③</em><div><b>按权重对 Value 加权求和</b><p>打分高的贡献多、低的贡献少——像考试按权重算总分</p></div></div>
+        <span class="qk-sx">向量数值为示意</span>
+      </div>
+    </div>
+  </div>
+  <div class="src">第二章 · 实验 2-2「什么是注意力机制？」· 表2-1</div>
+</section>
+<style>
+.qk-body{display:flex;gap:28px;height:610px}
+.qk-tbl{width:820px;flex:none;padding:10px 0;display:flex;flex-direction:column}
+.qk-r{--c:var(--line2);display:grid;grid-template-columns:190px 250px 1fr;gap:18px;align-items:center;padding:24px 26px;border-left:4px solid transparent;transition:all .4s var(--ease)}
+.qk-r+.qk-r{border-top:1px solid var(--line)}
+.qk-h{font-size:16px;color:var(--text3);letter-spacing:.12em;padding-top:12px;padding-bottom:12px}
+.qk-r b{font-size:23px;color:var(--c)}
+.qk-r span{font-size:19px;line-height:1.55;color:var(--text2)}
+.qk-h span{font-size:16px}
+.qk-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+.qk-r.on span{color:var(--text)}
+.qk-cap{margin-top:auto;padding:16px 26px 8px;font-size:18px;line-height:1.6;color:var(--acc)}
+.qk-vis{flex:1;min-width:0;display:flex;flex-direction:column;gap:18px}
+.qk-sent{display:flex;justify-content:center;gap:14px;padding-top:26px}
+.qk-w{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px}
+.qk-w b{min-width:110px;text-align:center;padding:14px 16px;border-radius:14px;font-size:26px;border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:all .4s}
+.qk-w.q b{border-color:var(--tool);color:var(--tool)}
+.qk-tag,.qk-val,.qk-ask{font-size:16px;padding:3px 10px;border-radius:8px;opacity:0;transition:opacity .4s}
+.qk-tag{color:var(--ctx);border:1px solid color-mix(in srgb,var(--ctx) 50%,transparent)}
+.qk-val{color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 50%,transparent)}
+.qk-ask{position:absolute;top:-30px;white-space:nowrap;color:#06101f;background:var(--tool);font-weight:600}
+.qk-w:not([data-w="0"]):not([data-w="2"]) .qk-tag,.qk-w:not([data-w="0"]):not([data-w="2"]) .qk-val{visibility:hidden}
+#c02-qkv[data-r="0"] .qk-ask,#c02-qkv[data-r="1"] .qk-tag,#c02-qkv[data-r="2"] .qk-val{opacity:1}
+#c02-qkv[data-r="0"] .qk-w.q b{box-shadow:0 0 28px color-mix(in srgb,var(--tool) 50%,transparent);background:color-mix(in srgb,var(--tool) 14%,rgba(12,18,40,.9))}
+#c02-qkv[data-r="1"] .qk-w b{border-color:color-mix(in srgb,var(--ctx) 55%,transparent)}
+#c02-qkv[data-r="2"] .qk-w[data-w="2"] b{border-color:var(--llm);box-shadow:0 0 28px color-mix(in srgb,var(--llm) 45%,transparent)}
+.qk-pipe{flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:10px;position:relative}
+.qk-s{display:flex;gap:14px;padding:12px 14px;border-radius:14px;border:1px solid transparent;opacity:.4;transition:all .45s var(--ease)}
+.qk-s em{flex:none;font:800 24px var(--num);font-style:normal;color:var(--acc)}
+.qk-s b{font-size:20px}
+.qk-s p{font-size:17px;color:var(--text2);margin:2px 0 4px}
+.qk-s code{display:block;font:16px/1.6 var(--mono);color:#cbd5f5}
+.qk-s.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.qk-sx{position:absolute;right:18px;bottom:12px;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c02-qkv'] = {
+  init(s) {
+    s.querySelectorAll('.qk-r[data-i]').forEach((r) => r.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +r.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    s.dataset.r = i;
+    s.querySelectorAll('.qk-r[data-i]').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+    s.querySelectorAll('.qk-s').forEach((x) => x.classList.toggle('on', +x.dataset.s === i));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 700);
+    ctx.every(() => { if (this.auto) this.show(s, ((this.i ?? -1) + 1) % 3); }, 3400);
+  },
+  reset(s) { this.i = null; s.dataset.r = ''; s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-attn" data-part="3" data-trans="zoom" data-dur="14000" data-title="注意力打分与因果三角" data-notes="<b>图2-6</b> 的上半部分展示了“怎么样”对前面每个词的匹配结果：与“天气”的匹配度最高（0.55），与“北京”有一定关联（0.35），与“的”几乎无关（0.05），余下的约 0.05 权重分配给“怎么样”自身——<b>所有权重加起来等于 1</b>。最终输出主要来自“天气”的信息，这完全符合直觉。<br><b>注意力热力图</b>就是把每个词对前面所有词的注意力权重排成一个矩阵（图2-6 下半部分）：每一行是一个 Query（当前正在处理的词），每一列是一个 Key（被关注的词），格子颜色越深表示注意力越集中。注意热力图呈三角形——因为模型是从左到右逐个生成的，每个词只能看到自己和前面的词，不能“偷看”还没生成的内容。<br><b>为什么 Key 和 Value 需要缓存？</b>观察热力图可以发现：每生成一个新词，它的 Query 都要与前面<b>所有</b>词的 Key 做匹配，再用所有词的 Value 加权求和。如果每次都从头计算所有 K 和 V，计算量会随上下文长度不断增长。KV Cache 就是把已算过的 K 和 V 缓存起来，让新词直接复用——这就是后文要讲的核心优化。<br>热力图的四行会自动轮流演示，也可以点击任一行，右侧显示这个词的打分与加权结果。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">注意力打分：所有权重加起来<em>恰好等于 1</em></h2></header>
+  <div class="at-body">
+    <div class="at-hm panel fx fx-left" style="--d:2">
+      <div class="at-hh"><span>Key →</span></div>
+      <div class="at-grid"></div>
+      <p class="cap">每行一个 Query，每列一个 Key；颜色越亮注意力越集中。<br>上三角为空：不能看到还没生成的词</p>
+    </div>
+    <div class="at-r fx fx-right" style="--d:3">
+      <div class="at-q panel">
+        <div class="at-qh"><span class="lbl">当前 Query</span><b class="at-qw"></b><span class="at-sum">权重合计 <b>1.00</b></span></div>
+        <div class="at-bars"></div>
+        <div class="at-mix"><span class="lbl">对 Value 加权求和 → 这个位置的输出</span><div class="at-mb"></div><p class="at-mt"></p></div>
+      </div>
+      <div class="at-why"><svg class="ic"><use href="#i-db"/></svg><div><b>为什么 Key 和 Value 需要缓存？</b><p>每生成一个新词，它的 Query 都要与前面<b>所有</b>词的 Key 匹配、再对所有 Value 加权求和。每次从头算所有 K 和 V，计算量随上下文不断增长——把它们缓存起来，新词直接复用。</p></div></div>
+    </div>
+  </div>
+  <div class="src">第二章 · 实验 2-2 · 图2-6</div>
+</section>
+<style>
+.at-body{display:flex;gap:30px;height:640px}
+.at-hm{width:640px;flex:none;padding:20px 24px;display:flex;flex-direction:column;gap:10px}
+.at-hh{padding-left:110px;font-size:16px;color:var(--text3)}
+.at-grid{display:grid;grid-template-columns:100px repeat(4,1fr);gap:6px}
+.at-cl{display:grid;place-items:center;font-size:19px;color:var(--text2)}
+.at-rl{display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:19px;color:var(--text2);cursor:pointer;border-radius:10px;transition:background .3s,color .3s}
+.at-rl.on{color:#06101f;background:var(--tool);font-weight:700}
+.at-c{position:relative;height:96px;border-radius:10px;display:grid;place-items:center;font:700 19px var(--num);cursor:pointer;transition:box-shadow .3s,outline-color .3s;outline:2px solid transparent}
+.at-c.na{background:repeating-linear-gradient(135deg,rgba(255,255,255,.03) 0 6px,transparent 6px 12px);border:1px dashed var(--line);cursor:default}
+.at-c.on{outline-color:#fff;box-shadow:0 0 20px rgba(255,255,255,.35)}
+.at-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:20px}
+.at-q{padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.at-qh{display:flex;align-items:baseline;gap:14px}
+.at-qw{font-size:28px;color:var(--tool)}
+.at-sum{margin-left:auto;font-size:17px;color:var(--text2)}
+.at-sum b{font:800 22px var(--num);color:var(--ok)}
+.at-bars{display:flex;flex-direction:column;gap:10px}
+.at-b{display:grid;grid-template-columns:90px 1fr 70px;gap:14px;align-items:center;font-size:19px}
+.at-b span{color:var(--text2);text-align:right}
+.at-b .meter{height:20px}
+.at-b b{font:700 20px var(--num)}
+.at-b.na{opacity:.3}
+.at-mix{display:flex;flex-direction:column;gap:8px}
+.at-mb{display:flex;height:30px;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.at-mb i{height:100%;transition:width .6s var(--ease)}
+.at-mt{font-size:18px;color:var(--text2)}
+.at-mt b{color:var(--acc)}
+.at-why{display:flex;gap:16px;align-items:flex-start;padding:18px 22px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent)}
+.at-why>.ic{font-size:32px;color:var(--acc);flex:none}
+.at-why b{font-size:21px}
+.at-why p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:4px}
+.at-why p b{font-size:18px;color:var(--text)}
+</style>
+<script>
+HOOKS['c02-attn'] = {
+  W: ['北京', '的', '天气', '怎么样'],
+  C: ['#22d3ee', '#94a3b8', '#a78bfa', '#fbbf24'],
+  // 图2-6 下半部分的热力图（行 = Query，列 = Key）
+  M: [[1.0], [0.3, 0.7], [0.2, 0.1, 0.7], [0.35, 0.05, 0.55, 0.05]],
+  init(s) {
+    const g = s.querySelector('.at-grid');
+    let h = '<span></span>' + this.W.map((w) => `<span class="at-cl">${w}</span>`).join('');
+    this.M.forEach((row, r) => {
+      h += `<span class="at-rl" data-i="${r}">${this.W[r]}</span>`;
+      for (let c = 0; c < 4; c++) {
+        if (c > r) { h += '<span class="at-c na"></span>'; continue; }
+        const v = row[c];
+        h += `<span class="at-c" data-i="${r}" data-c="${c}" style="background:rgba(56,189,248,${(0.1 + v * 0.85).toFixed(2)});color:${v > 0.45 ? '#06101f' : 'var(--text)'}">${v.toFixed(2)}</span>`;
+      }
+    });
+    g.innerHTML = h;
+    g.addEventListener('click', (e) => { const c = e.target.closest('[data-i]'); if (c) { this.auto = false; this.show(s, +c.dataset.i); } });
+    s.querySelector('.at-bars').innerHTML = this.W.map((w, i) => `<div class="at-b" data-b="${i}"><span>${w}</span><div class="meter" style="--c:${this.C[i]}"><i></i></div><b>0.00</b></div>`).join('');
+    s.querySelector('.at-mb').innerHTML = this.W.map((w, i) => `<i style="background:${this.C[i]};width:0"></i>`).join('');
+  },
+  show(s, r) {
+    this.r = r;
+    const row = this.M[r];
+    s.querySelectorAll('.at-rl').forEach((x) => x.classList.toggle('on', +x.dataset.i === r));
+    s.querySelectorAll('.at-c[data-i]').forEach((x) => x.classList.toggle('on', +x.dataset.i === r));
+    s.querySelector('.at-qw').textContent = `“${this.W[r]}”`;
+    s.querySelectorAll('.at-b').forEach((b, i) => {
+      const v = row[i];
+      b.classList.toggle('na', v === undefined);
+      b.querySelector('i').style.setProperty('--v', ((v || 0) * 100) + '%');
+      b.querySelector('b').textContent = v === undefined ? '—' : v.toFixed(2);
+    });
+    s.querySelectorAll('.at-mb i').forEach((m, i) => (m.style.width = ((row[i] || 0) * 100) + '%'));
+    const top = row.indexOf(Math.max(...row));
+    s.querySelector('.at-mt').innerHTML = r === 0 ? '第一个词只能看自己：权重 1.00 全给自己' : `输出主要来自<b>“${this.W[top]}”</b>的信息；${r === 3 ? '与“北京”有一定关联，与“的”几乎无关' : '它看不到后面的词'}`;
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 3), 600);
+    ctx.every(() => { if (this.auto) this.show(s, (this.r + 1) % 4); }, 3000);
+  },
+  reset(s) { s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-heat" data-part="3" data-dur="18000" data-title="真实热力图里的四个模式" data-notes="理解了注意力机制的基本原理后，通过 attention_visualization 实验观察真实模型的注意力分布（<b>图2-7</b>，原图为实验截图，这里按其中的模式用示意数据重画）。图中每一行是模型生成的一个 token，每一列是它能看到的一个 token：左边大片是系统提示词与工具定义，右侧是模型自己生成的思考和回答；因为因果约束，右上方是空的。<br>注意力热力图揭示了几个关键模式：<br>1. <b>注意力储存池</b>：序列的第一个 token 往往吸收了异常高的注意力权重，有时超过总注意力的 70%。模型将这个位置用作“注意力储存池”（Attention Sink），存放那些不需要分配到其他具体 token 上的多余注意力权重——就像一个公共的回收站。这是一种系统性的现象，并非模型缺陷（下一页解释数学原因）。<br>2. <b>思考的三角形模式</b>：模型思维链（&lt;think&gt; 标签内）展现出三角形状的自注意力模式——生成新的思考内容时频繁“回看”之前的思考内容和工具定义。<br>3. <b>输出的三角形模式</b>：思考结束后的输出过程展现出另一个三角形，模型用思考过程作为提示来输出回答。<br>4. <b>位置偏好</b>（Position Bias，见 Liu 等人的《Lost in the Middle》）：模型对上下文开头和结尾的信息分配了更高的注意力，中间部分则更容易被忽视。因此，在设计上下文时，把最关键的信息放在开头或结尾是一项重要的实践原则。<br>四个标签会自动轮换并在图上圈出对应区域，也可以手动点击。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">真实模型的热力图里，藏着<em>四个模式</em></h2></div>
+    <div class="hm-tabs tabs fx fx-up" style="--d:2"><button data-i="0">注意力储存池</button><button data-i="1">思考的三角形</button><button data-i="2">输出的三角形</button><button data-i="3">位置偏好</button></div></header>
+  <div class="hm-body">
+    <div class="hm-wrap panel fx fx-left" style="--d:2">
+      <div class="hm-ax-x"><span style="width:62.5%">系统提示词 + 工具定义（Key）</span><span style="width:25%">思考</span><span style="width:12.5%">输出</span></div>
+      <div class="hm-box">
+        <canvas class="hm-cv" width="2080" height="880"></canvas>
+        <svg class="hm-ov" viewBox="0 0 1040 440" width="1040" height="440" preserveAspectRatio="none"></svg>
+        <i class="hm-scan"></i>
+      </div>
+      <div class="hm-ax-y"><span>思考</span><span>输出</span></div>
+      <div class="hm-cb"><span>Attention Weight</span><i></i><b>0</b><b>0.91</b><em>示意数据：按图2-7 的模式重画</em></div>
+    </div>
+    <div class="hm-card glass fx fx-right" style="--d:3">
+      <span class="hm-n"></span>
+      <b class="hm-t"></b>
+      <p class="hm-d"></p>
+      <div class="runbar hm-bar"><i></i></div>
+    </div>
+  </div>
+  <div class="src">第二章 · 实验 2-2 · 图2-7 · 位置偏好见 Liu et al.《Lost in the Middle》</div>
+</section>
+<style>
+#c02-heat .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.hm-tabs button{font-size:18px}
+.hm-body{display:flex;gap:26px;height:620px}
+.hm-wrap{position:relative;width:1150px;flex:none;padding:20px 24px 16px 70px}
+.hm-ax-x{display:flex;font-size:15px;color:var(--text3);margin-bottom:6px}
+.hm-ax-x span{text-align:center;border-bottom:1px solid var(--line2);padding-bottom:4px}
+.hm-box{position:relative;width:1040px;height:440px;border-radius:6px;overflow:hidden;background:#0b0f24}
+.hm-cv{position:absolute;inset:0;width:1040px;height:440px}
+.hm-ov{position:absolute;inset:0;overflow:visible}
+.hm-reg{fill:rgba(255,255,255,.06);stroke:#fff;stroke-width:3;stroke-dasharray:8 6;opacity:0;transition:opacity .5s;animation:flow 1.2s linear infinite}
+.hm-reg.on{opacity:1}
+.hm-scan{position:absolute;left:0;right:0;height:2px;background:rgba(255,255,255,.55);box-shadow:0 0 10px #fff;top:0}
+.hm-ax-y{position:absolute;left:18px;top:52px;height:440px;display:flex;flex-direction:column;font-size:15px;color:var(--text3)}
+.hm-ax-y span{writing-mode:vertical-rl;text-align:center;border-right:1px solid var(--line2);padding-right:4px}
+.hm-ax-y span:first-child{height:66.7%}.hm-ax-y span:last-child{height:33.3%}
+.hm-cb{display:flex;align-items:center;gap:12px;margin-top:14px;font-size:15px;color:var(--text3)}
+.hm-cb i{width:220px;height:14px;border-radius:4px;background:linear-gradient(90deg,#440154,#3b528b,#21918c,#5ec962,#fde725)}
+.hm-cb b{font:600 15px var(--num);color:var(--text2)}
+.hm-cb em{margin-left:auto;font-style:normal;color:var(--warn)}
+.hm-card{flex:1;min-width:0;padding:28px 30px;display:flex;flex-direction:column;gap:14px}
+.hm-n{font:800 64px var(--num);color:transparent;-webkit-text-stroke:2px var(--acc);line-height:1}
+.hm-t{font-size:30px;color:var(--acc)}
+.hm-d{font-size:20px;line-height:1.7}
+.hm-card.sw .hm-t,.hm-card.sw .hm-d,.hm-card.sw .hm-n{animation:swIn .5s var(--ease) both}
+.hm-bar{margin-top:auto}
+</style>
+<script>
+HOOKS['c02-heat'] = {
+  P: 150, G: 90, TH: 60,
+  T: [
+    { t: '注意力储存池', d: '第一个 token 往往吸收异常高的注意力，有时超过总注意力的 70%。模型把它当作“注意力储存池”（Attention Sink），存放不需要分配给具体 token 的多余权重——一种系统性现象，并非模型缺陷。' },
+    { t: '思考的三角形模式', d: '模型在 &lt;think&gt; 里生成新的思考内容时，会频繁“回看”之前的思考内容和工具定义，形成三角形状的自注意力模式。' },
+    { t: '输出的三角形模式', d: '思考结束后，输出过程形成另一个三角形：模型把刚才的思考过程当作提示，据此写出回答。' },
+    { t: '位置偏好（Position Bias）', d: '模型对上下文开头和结尾的信息分配更高的注意力，中间部分更容易被忽视（Lost in the Middle）。设计上下文时，把最关键的信息放在开头或结尾。' },
+  ],
+  // viridis 近似色表
+  col(t) {
+    const S = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
+    const x = Math.max(0, Math.min(1, t)) * 4, i = Math.min(3, Math.floor(x)), f = x - i;
+    return S[i].map((v, k) => Math.round(v + (S[i + 1][k] - v) * f));
+  },
+  init(s) {
+    const cv = s.querySelector('.hm-cv'), g = cv.getContext('2d'), P = this.P, G = this.G, W = P + G;
+    const cw = cv.width / W, ch = cv.height / G, rnd = U.rand(7);
+    g.fillStyle = '#0b0f24';
+    g.fillRect(0, 0, cv.width, cv.height);
+    for (let r = 0; r < G; r++) {
+      const T = P + r;
+      for (let c = 0; c <= T; c++) {
+        const q = rnd();
+        let v = 0.003 * (0.5 + q);
+        if (c === 0) v = 0.6 + 0.25 * q;
+        else if (c < P) {
+          if (c < 6) v += 0.02;
+          if (c >= 12 && c < 112 && r < this.TH && (c % 9 < 3)) v += 0.02 * (0.4 + q);
+          if (c >= P - 14) v += 0.05 * q;
+        } else {
+          const d = T - c;
+          if (r < this.TH) v = 0.01 + 0.3 * Math.exp(-d / 7) + 0.03 * q;
+          else if (c < P + this.TH) v = 0.03 + 0.08 * q;
+          else v = 0.02 + 0.35 * Math.exp(-d / 5) + 0.03 * q;
+        }
+        const [R, Gc, B] = this.col(Math.sqrt(Math.min(1, v / 0.91)));
+        g.fillStyle = `rgb(${R},${Gc},${B})`;
+        g.fillRect(c * cw, r * ch, Math.ceil(cw), Math.ceil(ch));
+      }
+    }
+    // 四个区域（坐标与 1040×440 的覆盖层一致）
+    const X = (c) => (c / W) * 1040, Y = (r) => (r / G) * 440;
+    const reg = [
+      `M0 0 H${X(4)} V440 H0 Z`,
+      `M${X(P)} 0 L${X(P + this.TH)} ${Y(this.TH)} L${X(P)} ${Y(this.TH)} Z`,
+      `M${X(P + this.TH)} ${Y(this.TH)} L${X(W)} 440 L${X(P + this.TH)} 440 Z`,
+      `M0 0 H${X(8)} V440 H0 Z M${X(P - 14)} 0 H${X(P)} V440 H${X(P - 14)} Z`,
+    ];
+    s.querySelector('.hm-ov').innerHTML = reg.map((d, i) => `<path class="hm-reg" data-g="${i}" d="${d}"/>`).join('');
+    s.querySelector('.hm-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.hm-tabs button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelectorAll('.hm-reg').forEach((r) => r.classList.toggle('on', +r.dataset.g === i));
+    const c = s.querySelector('.hm-card');
+    c.querySelector('.hm-n').textContent = i + 1;
+    c.querySelector('.hm-t').textContent = this.T[i].t;
+    c.querySelector('.hm-d').innerHTML = this.T[i].d;
+    U.restart(c, 'sw');
+    const bar = c.querySelector('.hm-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) { bar.style.setProperty('--dur', '4.2s'); bar.classList.add('run'); }
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 4400);
+    const sc = s.querySelector('.hm-scan'), t0 = performance.now();
+    ctx.raf((t) => { sc.style.top = (((t - t0) / 6000) % 1) * 438 + 'px'; });
+  },
+  reset(s) { s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-sink" data-part="3" data-trans="flip" data-dur="15000" data-title="注意力储存池与上下文学习" data-notes="为什么会出现<b>注意力储存池</b>？背后的数学原因是：注意力机制有一个硬性约束——所有注意力权重加起来必须恰好等于 100%（这由一个叫 softmax 的数学函数保证），模型无法表达“不关注任何东西”。即使当前词与前面所有词都不太相关，这些权重也必须分配到某个地方。于是模型必须为这部分“剩余权重”找一个稳定的容器，序列开头的固定位置便成了最自然的选择。这是 softmax 在处理大量 token 时所表现出的数学特性的必然结果。换句话说，模型学会了把那些“无处安放”的剩余权重集中倾倒到第一个 token 上，就像一个公共的回收站。<br>左侧是一个示意的 softmax 演示：拖动滑块改变当前词与前文的相关程度——相关时权重集中在“天气”上；都不相关时，权重并不会消失，而是被首 token 吸走。右侧是配套仓库的真实测量（Qwen3-0.6B，2026-07-30）：同一句“北京 的 天气 怎么样”，第 0 层首 token 平均只吸收约 15% 的注意力，第 13 层约 74%，最后一层约 83%；在一段 580 个 token 的“思考 + 回答”生成序列上，最后一层也有约 73%——与原书“有时超过总注意力的 70%”一致。<br>这个实验说明，<b>模型的长思维链能力和工具调用能力都高度依赖上下文学习（In-Context Learning）能力</b>——所谓上下文学习，是指模型不需要重新训练，仅凭输入中给出的指令和示例就能适应新任务的能力。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“无处安放”的权重，去了<em>第一个 token</em></h2></header>
+  <div class="sk-body">
+    <div class="sk-demo panel fx fx-left" style="--d:2">
+      <div class="sk-h"><b>softmax：权重之和必须恰好 100%</b><span class="cap">示意</span></div>
+      <div class="sk-rng"><span>当前词与前文的相关程度</span><input class="rng sk-r" type="range" min="0" max="100" value="100"><b class="sk-rv"></b></div>
+      <div class="sk-bars"></div>
+      <div class="sk-sum">合计 <b>100%</b><span class="sk-note"></span></div>
+    </div>
+    <div class="sk-real panel fx fx-right" style="--d:3">
+      <div class="sk-h"><b>真实测量：首 token 吸收的注意力占比</b></div>
+      <p class="sk-sub">Qwen3-0.6B（28 层 · 16 头取平均）· “北京 的 天气 怎么样”</p>
+      <div class="sk-col"></div>
+      <p class="sk-x">580 token 的“思考 + 回答”生成序列，最后一层：<b>73.2%</b></p>
+      <p class="cap">数据：配套仓库 chapter2/attention_visualization 运行记录（2026-07-30）</p>
+    </div>
+  </div>
+  <p class="tagline sk-tag fx fx-up" style="--d:5"><b>模型的长思维链能力和工具调用能力，都高度依赖上下文学习（In-Context Learning）能力</b>——不重新训练，仅凭输入里的指令和示例适应新任务</p>
+  <div class="src">第二章 · 实验 2-2「注意力储存池」· 数据：配套仓库 chapter2/attention_visualization</div>
+</section>
+<style>
+.sk-body{display:flex;gap:28px;height:560px}
+.sk-demo{width:860px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.sk-h{display:flex;align-items:baseline;justify-content:space-between;font-size:21px}
+.sk-rng{display:flex;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+.sk-rng .rng{flex:1}
+.sk-rv{font:700 18px var(--num);color:var(--acc);min-width:110px;text-align:right}
+.sk-bars{display:flex;flex-direction:column;gap:12px}
+.sk-b{display:grid;grid-template-columns:120px 1fr 80px;gap:14px;align-items:center}
+.sk-b span{font-size:19px;color:var(--text2);text-align:right}
+.sk-b .meter{height:24px}
+.sk-b .meter i{transition:width .25s linear}
+.sk-b b{font:700 20px var(--num)}
+.sk-b.sink span{color:var(--bad)}
+.sk-sum{margin-top:auto;display:flex;align-items:baseline;gap:14px;font-size:19px;color:var(--text2);padding-top:12px;border-top:1px dashed var(--line2)}
+.sk-sum b{font:800 26px var(--num);color:var(--ok)}
+.sk-note{margin-left:auto;font-size:18px;color:var(--warn)}
+.sk-real{flex:1;min-width:0;padding:22px 26px;display:flex;flex-direction:column;gap:12px}
+.sk-sub{font-size:17px;color:var(--text3)}
+.sk-col{flex:1;display:flex;align-items:flex-end;justify-content:space-around;gap:20px;padding:10px 10px 0;border-bottom:1px solid var(--line2)}
+.sk-c{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.sk-c b{font:800 28px var(--num);color:var(--acc)}
+.sk-c i{width:90px;height:0;border-radius:12px 12px 0 0;background:linear-gradient(180deg,#fde725,#21918c);transition:height 1.1s var(--ease)}
+.sk-c span{font-size:17px;color:var(--text2);padding-bottom:10px}
+.sk-x{font-size:18px;color:var(--text2)}
+.sk-x b{font:800 22px var(--num);color:var(--acc)}
+.sk-tag{margin-top:20px;font-size:21px}
+</style>
+<script>
+HOOKS['c02-sink'] = {
+  K: [
+    { w: '首 token', hi: 2.0, lo: 2.0, sink: 1 },
+    { w: '北京', hi: 1.0, lo: -1.0 },
+    { w: '的', hi: -1.0, lo: -1.2 },
+    { w: '天气', hi: 3.0, lo: -0.8 },
+    { w: '怎么样', hi: 0.5, lo: -1.0 },
+  ],
+  R: [['第 0 层', 14.7], ['第 13 层', 73.9], ['最后一层', 83.2]],
+  init(s) {
+    s.querySelector('.sk-bars').innerHTML = this.K.map((k, i) => `<div class="sk-b${k.sink ? ' sink' : ''}"><span>${k.w}</span><div class="meter" style="--c:${k.sink ? 'var(--bad)' : 'var(--acc)'}"><i></i></div><b>0%</b></div>`).join('');
+    s.querySelector('.sk-col').innerHTML = this.R.map(([l, v]) => `<div class="sk-c"><b>0%</b><i data-v="${v}"></i><span>${l}</span></div>`).join('');
+    const r = s.querySelector('.sk-r');
+    r.addEventListener('input', () => { this.auto = false; this.calc(s, +r.value / 100); });
+  },
+  // softmax：分数越高权重越大，但总和恒为 100%
+  calc(s, a) {
+    const r = s.querySelector('.sk-r');
+    r.value = Math.round(a * 100);
+    r.style.setProperty('--p', a * 100 + '%');
+    s.querySelector('.sk-rv').textContent = a > 0.66 ? '相关' : a > 0.33 ? '一般' : '都不太相关';
+    const sc = this.K.map((k) => k.lo + (k.hi - k.lo) * a), ex = sc.map(Math.exp), sum = ex.reduce((x, y) => x + y, 0);
+    const w = ex.map((e) => e / sum);
+    s.querySelectorAll('.sk-b').forEach((b, i) => { b.querySelector('i').style.setProperty('--v', w[i] * 100 + '%'); b.querySelector('b').textContent = Math.round(w[i] * 100) + '%'; });
+    s.querySelector('.sk-note').textContent = w[0] > 0.6 ? '与谁都不相关，权重被首 token 吸走' : '权重集中在真正相关的词上';
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.calc(s, 1);
+    s.querySelectorAll('.sk-c').forEach((c, i) => ctx.later(() => {
+      const bar = c.querySelector('i'), v = +bar.dataset.v;
+      bar.style.height = (v / 100) * 300 + 'px';
+      U.count(c.querySelector('b'), v, { dec: 1, suffix: '%', dur: 1100, ctx });
+    }, 600 + i * 350));
+    const t0 = performance.now();
+    ctx.raf((t) => { if (this.auto) this.calc(s, 0.5 + 0.5 * Math.cos(((t - t0) / 5200) * Math.PI * 2)); });
+  },
+  reset(s) { s.querySelectorAll('.sk-c i').forEach((i) => (i.style.height = '0')); s.querySelectorAll('.sk-c b').forEach((b) => (b.textContent = '0%')); },
+};
+</script>

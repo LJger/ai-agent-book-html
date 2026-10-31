@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#34d399", "acc2": "#22d3ee" },
+    { "n": "分类框架", "k": "PART 01", "short": "分类", "acc": "#2dd4bf", "acc2": "#60a5fa" },
+    { "n": "何时优于单 Agent", "k": "PART 02", "short": "何时用", "acc": "#a3e635", "acc2": "#34d399" },
+    { "n": "共享上下文", "k": "PART 03", "short": "共享", "acc": "#22d3ee", "acc2": "#a78bfa" },
+    { "n": "数据平面与控制平面", "k": "PART 04", "short": "双平面", "acc": "#60a5fa", "acc2": "#2dd4bf" },
+    { "n": "对等协作", "k": "PART 05", "short": "对等", "acc": "#fbbf24", "acc2": "#a3e635" },
+    { "n": "管理者模式", "k": "PART 06", "short": "管理者", "acc": "#818cf8", "acc2": "#22d3ee" },
+    { "n": "去中心化与 A2A", "k": "PART 07", "short": "去中心", "acc": "#f472b6", "acc2": "#a78bfa" },
+    { "n": "失败模式", "k": "PART 08", "short": "失败", "acc": "#fb7185", "acc2": "#fb923c" },
+    { "n": "Agent 社会", "k": "PART 09", "short": "社会", "acc": "#4ade80", "acc2": "#fbbf24" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#34d399", "acc2": "#22d3ee" }
+  ]
+}

@@ -1,0 +1,294 @@
+<!-- ================= PART 03 评估环境 ================= -->
+<section class="slide chapter" id="c07-d3" data-part="3" data-title="PART 03 · 评估环境" data-notes="「评估环境」。明确了指标口径，接下来的问题是在哪里测。评估环境是一套能够重复运行的装置：给定同一个初始状态，同一个 Agent 应当得到可比较的结果。这一部分先以 telecom 任务为参照拆出五个组成要素，再对比两类核心范式——人机交互型与工具调用型评估环境。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">评估环境</h1>
+  <div class="ch-s fx fx-up" style="--d:3">一套能够重复运行的装置：同一个初始状态，可比较的结果</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">五个要素缺其一，评估便无法构成可重复的循环。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c07-five" data-part="3" data-trans="zoom" data-title="评估环境的五个组成要素" data-notes="回到前面解剖的那条 telecom 任务。以它为参照，一个可重复运行的评估环境所需的组成部分已经完备。<br><b>数据集（Dataset）</b>即任务文件本身：初始状态、给 Agent 的工单、给模拟器的行为规范与验收标准打包为一条记录，一条记录即一个用例。<br><b>环境状态（Environment State）</b>是任务执行中的可变信息：数据库中的客户、线路、套餐与账单，加上设备侧的飞行模式、漫游、省流开关与剩余流量。它必须可重置，initialization_actions 即重置脚本。真实性要求状态变化符合业务逻辑，可控性要求每次运行前都能回到同一起点。<br><b>工具接口（Tools）</b>分属两侧。Agent 可调用查询客户、查询用量、充值流量、转接人工等运营商侧操作；用户可调用设备侧的各项开关。两套工具均为原子操作，不存在“解决用户的上网问题”这类高层抽象——抽象层次过高会使评估退化为对单次函数调用的考察，规划与推理环节被工具本身吸收。<br><b>评分标准（Rubric）</b>即 evaluation_criteria 的四层检查，加上 reward_basis 这一聚合规则。<br><b>执行协议（Interaction Protocol）</b>规定交互顺序与终止条件。此处的正常终止信号为模拟用户输出 ###STOP###，此外还有轮数上限，以及模拟用户因耐心耗尽而主动结束对话——沟通效率过低本身即计为失败。<br>五个要素缺其一，评估便无法构成可重复的循环。后文考察其他基准时，仍以这五项作为对照框架。环上的五个节点自动轮播，也可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">评估环境的<em>五个组成要素</em></h2>
+  <p class="lead fx fx-up" style="--d:2">以 telecom 任务为参照：缺其一，评估便无法构成可重复的循环</p></header>
+  <div class="c7fv-body">
+    <div class="c7fv-ring fx fx-scale" style="--d:3"></div>
+    <div class="c7fv-card panel fx fx-right" style="--d:4">
+      <div class="c7fv-top"><em class="c7fv-no">1</em><div><b class="c7fv-n"></b><span class="c7fv-en"></span></div></div>
+      <p class="c7fv-def"></p>
+      <div class="c7fv-tel"><span class="c7fv-tl">telecom 里是什么</span><div class="c7fv-tb"></div></div>
+      <div class="c7fv-x"></div>
+      <div class="runbar"><i></i></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「五个组成要素」</div>
+</section>
+<style>
+.c7fv-body{display:flex;gap:30px;align-items:center}
+.c7fv-ring{width:600px;height:600px;flex:none;margin-right:16px}
+.c7fv-ring .c7fv-c1{fill:var(--text);font-size:26px;font-weight:800;text-anchor:middle}
+.c7fv-ring .c7fv-c2{fill:var(--text3);font-size:16px;letter-spacing:.16em;text-anchor:middle}
+.c7fv-ring .node,.c7fv-ring .lab{cursor:pointer}
+.c7fv-card{--c:var(--acc);flex:1;height:600px;padding:28px 34px;display:flex;flex-direction:column;gap:16px;border-color:color-mix(in srgb,var(--c) 40%,transparent);transition:border-color .5s}
+.c7fv-card.sw>*{animation:swIn .5s var(--ease) both}
+.c7fv-top{display:flex;align-items:center;gap:16px}
+.c7fv-no{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font:800 28px var(--num);font-style:normal;color:#06101f;background:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 60%,transparent)}
+.c7fv-n{display:block;font-size:34px;color:var(--c)}
+.c7fv-en{font:600 18px var(--num);color:var(--text3);letter-spacing:.06em}
+.c7fv-def{font-size:21px;line-height:1.65;color:var(--text)}
+.c7fv-tel{padding:14px 18px;border-radius:14px;background:color-mix(in srgb,var(--c) 8%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.c7fv-tl{display:block;font-size:15px;letter-spacing:.16em;color:var(--text3);margin-bottom:8px}
+.c7fv-tb{display:flex;flex-wrap:wrap;gap:8px}
+.c7fv-tb span{padding:6px 12px;border-radius:10px;font-size:17px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.c7fv-tb code{font:16px var(--mono);color:var(--c)}
+.c7fv-x{flex:1;min-height:0;font-size:19px;line-height:1.6;color:var(--text2)}
+.c7fv-x b{color:var(--c)}
+.c7fv-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+.c7fv-cmp>div{padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.c7fv-cmp>div>b{display:block;font-size:17px;margin-bottom:8px}
+.c7fv-cmp .ok>b{color:var(--ok)}.c7fv-cmp .bad>b{color:var(--bad)}
+.c7fv-cmp ol{display:flex;flex-direction:column;gap:5px}
+.c7fv-cmp li{font:15px/1.4 var(--mono);color:var(--text2);padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.04);opacity:0;animation:upIn .4s var(--ease) forwards;animation-delay:calc(var(--i)*260ms + 300ms)}
+.c7fv-cmp small{display:block;margin-top:8px;font-size:15px;color:var(--text3);line-height:1.5}
+.c7fv-card .runbar i{background:var(--c)}
+</style>
+<script>
+HOOKS['c07-five'] = {
+  E: [
+    { n: '数据集', en: 'Dataset', c: '#60a5fa', d: '即任务文件本身：初始状态、给 Agent 的工单、给模拟器的行为规范与验收标准打包为一条记录，<b>一条记录即一个用例</b>。', t: ['<code>tasks_small.json</code> 中的一条任务', 'ticket', 'user_scenario', 'initial_state', 'evaluation_criteria'], x: '后文考察其他基准时，仍以这五项作为对照框架。' },
+    { n: '环境状态', en: 'Environment State', c: '#34d399', d: '任务执行中的可变信息。它<b>必须可重置</b>：真实性要求状态变化符合业务逻辑，可控性要求每次运行前都能回到同一起点。', t: ['数据库：客户、线路、套餐、账单', '设备侧：飞行模式、漫游、省流开关、剩余流量', '<code>initialization_actions</code> = 重置脚本'], x: '同一个初始状态 + 同一个 Agent → 可比较的结果。' },
+    { n: '工具接口', en: 'Tools', c: '#fbbf24', d: '分属两侧，且<b>均为原子操作</b>，不存在“解决用户的上网问题”这类高层抽象。', t: ['Agent：查询客户 · 查询用量 · 充值流量 · 转接人工', '用户：设备侧的各项开关'], x: 'tools' },
+    { n: '评分标准', en: 'Rubric', c: '#c084fc', d: '即 <code>evaluation_criteria</code> 的四层检查，加上 <code>reward_basis</code> 这一聚合规则。', t: ['env_assertions', 'actions', 'communicate_info', 'nl_assertions', 'reward_basis'], x: '本题只采信 env_assertions，其余各层照常记录但不计入奖励。' },
+    { n: '执行协议', en: 'Interaction Protocol', c: '#f472b6', d: '规定交互顺序与终止条件。<b>沟通效率过低本身即计为失败</b>。', t: ['正常终止：模拟用户输出 <code>###STOP###</code>', '轮数上限', '模拟用户耐心耗尽，主动结束对话'], x: '配套运行的 5 题全部以 user_stop 正常结束。' },
+  ],
+  init(s) {
+    this.svg = U.ring(s.querySelector('.c7fv-ring'), {
+      size: 600, labelSize: 21, labelGap: 18, cometDur: 8, nodes: this.E.map((e) => ({ label: e.n, color: e.c })),
+      center: (c) => `<text class="c7fv-c1" x="${c}" y="${c - 4}">可重复的循环</text><text class="c7fv-c2" x="${c}" y="${c + 28}">RESET · RUN · SCORE</text>`,
+    });
+    this.svg.querySelectorAll('.node,.lab').forEach((n) => n.addEventListener('click', () => { this.auto = false; this.show(s, +n.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    const e = this.E[i], card = s.querySelector('.c7fv-card');
+    this.svg.querySelectorAll('.node,.lab').forEach((x) => { const on = +x.dataset.i === i; x.classList.toggle('on', on); x.classList.toggle('dim', !on); });
+    card.style.setProperty('--c', e.c);
+    card.querySelector('.c7fv-no').textContent = i + 1;
+    card.querySelector('.c7fv-n').textContent = e.n;
+    card.querySelector('.c7fv-en').textContent = e.en;
+    card.querySelector('.c7fv-def').innerHTML = e.d;
+    card.querySelector('.c7fv-tb').innerHTML = e.t.map((t) => `<span>${t}</span>`).join('');
+    card.querySelector('.c7fv-x').innerHTML = e.x === 'tools'
+      ? `<div class="c7fv-cmp"><div class="ok"><b>原子工具：考察规划与推理</b><ol><li style="--i:0">check_status_bar()</li><li style="--i:1">toggle_airplane_mode()</li><li style="--i:2">toggle_roaming()</li><li style="--i:3">run_speed_test()</li></ol><small>Agent 必须自己决定查什么、改什么、按什么顺序</small></div><div class="bad"><b>高层抽象：退化为单次调用</b><ol><li style="--i:0">fix_internet_problem()</li></ol><small>抽象层次过高，规划与推理环节被工具本身吸收（反例，示意）</small></div></div>`
+      : e.x;
+    U.restart(card, 'sw');
+    const rb = card.querySelector('.runbar');
+    rb.style.setProperty('--dur', '5.2s');
+    rb.classList.remove('run');
+    if (this.auto) { void rb.offsetWidth; rb.classList.add('run'); }
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 5, 5400, (i) => this.show(s, i), 700); },
+  reset(s) { this.i = null; this.svg.querySelectorAll('.node,.lab').forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c07-verif" data-part="3" data-trans="flip" data-title="工具调用型环境与 Verifiers" data-notes="telecom 这类任务必须设置交互对象，五个要素中的用户模拟部分不可或缺。另有一大类任务并不存在对话对方：代码生成、数据分析、数学求解等任务中，Agent 自始至终只与工具交互，正确性由能否通过执行验证决定，既不需要人工标注，也不需要模型评判。这类环境省去了用户模拟器，其余四个要素依然存在，只是形态更简单：环境状态是文件系统或数据库，评分标准是一段测试代码，执行协议退化为“持续调用工具，直至给出答案或耗尽轮次”。<br>Verifiers 框架按两个维度对这类环境分层：任务是否需要保持跨轮状态，是否需要隔离。SingleTurnEnv 适用于问一道数学题后直接验证答案；ToolEnv 适用于搜索多个网页后综合回答再验证最终结果；StatefulToolEnv 适用于修改数据库记录后验证状态变化；SandboxEnv 适用于在沙盒中运行代码后检查输出文件。表7-1 汇总了这四类环境，便于按任务状态、工具调用和隔离需求进行选择。<br>该框架支持并行采样与轨迹缓存，每次评估的完整轨迹（观察、行动、奖励）均会保存，便于后续分析与回放。此外，工具的执行效果取决于当前状态，因此失败时应返回清晰的错误信息而非单一的失败标志，使 Agent 能够据此调整策略。<br>右上三个开关描述任务属性，表格会高亮对应的环境类型；不操作时自动轮换。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">没有对话对方时：<em>工具调用型环境</em></h2>
+  <p class="lead fx fx-up" style="--d:2">省去用户模拟器，其余四个要素依然存在，只是形态更简单</p></header>
+  <div class="c7vf-body">
+    <div class="c7vf-l">
+      <div class="c7vf-four panel fx fx-left" style="--d:3">
+        <div class="c7vf-fr gone"><b>用户模拟器</b><span>省去</span></div>
+        <div class="c7vf-fr"><b>环境状态</b><span>文件系统或数据库</span></div>
+        <div class="c7vf-fr"><b>评分标准</b><span>一段测试代码</span></div>
+        <div class="c7vf-fr"><b>执行协议</b><span>持续调用工具，直至给出答案或耗尽轮次</span></div>
+        <p>代码生成、数据分析、数学求解：正确性由能否通过执行验证决定，<b>既不需要人工标注，也不需要模型评判</b></p>
+      </div>
+      <div class="c7vf-err panel fx fx-left" style="--d:5">
+        <b>失败时返回清晰的错误信息</b>
+        <div class="c7vf-ec"><span class="bad">false</span><span class="good">FileNotFoundError: data/sales.csv</span></div>
+        <p>工具的执行效果取决于当前状态；清晰的错误让 Agent 能据此调整策略 <span class="c7-tag">示意</span></p>
+      </div>
+    </div>
+    <div class="c7vf-r panel fx fx-right" style="--d:4">
+      <div class="c7vf-q"><span>任务需要……</span><button class="tgl" data-q="0"><i></i>跨轮保持状态</button><button class="tgl" data-q="1"><i></i>多轮调用工具</button><button class="tgl" data-q="2"><i></i>隔离执行</button></div>
+      <div class="c7vf-tb">
+        <div class="c7vf-tr h"><span>环境类型</span><span>状态保持</span><span>工具调用</span><span>典型用例</span></div>
+        <div class="c7vf-tr" data-r="0"><code>SingleTurnEnv</code><span>无</span><span>无</span><span>单轮问答、数学题</span></div>
+        <div class="c7vf-tr" data-r="1"><code>ToolEnv</code><span>无</span><span>多轮</span><span>搜索+信息综合</span></div>
+        <div class="c7vf-tr" data-r="2"><code>StatefulToolEnv</code><span>有</span><span>多轮</span><span>修改数据库记录</span></div>
+        <div class="c7vf-tr" data-r="3"><code>SandboxEnv</code><span>有+隔离</span><span>多轮</span><span>代码执行与测试</span></div>
+      </div>
+      <div class="c7vf-ex"><svg class="ic"><use href="#i-lightbulb"/></svg><span></span></div>
+      <div class="c7vf-cache"><svg class="ic"><use href="#i-history"/></svg><span>并行采样与轨迹缓存：每次评估的完整轨迹（观察、行动、奖励）都会保存，便于后续分析与回放</span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「人机交互型与工具调用型评估环境」· 表7-1 Verifiers 环境类型对比</div>
+</section>
+<style>
+.c7vf-body{display:flex;gap:24px}
+.c7vf-l{width:600px;flex:none;display:flex;flex-direction:column;gap:18px}
+.c7vf-four{padding:20px 24px;display:flex;flex-direction:column;gap:10px}
+.c7vf-fr{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:center;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.c7vf-fr b{font-size:19px}
+.c7vf-fr span{font-size:18px;color:var(--text2)}
+.c7vf-fr.gone{border-style:dashed;opacity:.6}
+.c7vf-fr.gone b{text-decoration:line-through;color:var(--text3)}
+.c7vf-fr.gone span{color:var(--bad)}
+.c7vf-four p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:4px}
+.c7vf-four p b{color:var(--acc)}
+.c7vf-err{padding:18px 24px;display:flex;flex-direction:column;gap:10px}
+.c7vf-err>b{font-size:20px;color:var(--acc)}
+.c7vf-ec{display:flex;gap:12px;flex-wrap:wrap}
+.c7vf-ec span{font:16px var(--mono);padding:6px 12px;border-radius:8px}
+.c7vf-ec .bad{color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);text-decoration:line-through}
+.c7vf-ec .good{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+.c7vf-err p{font-size:17px;line-height:1.55;color:var(--text2)}
+.c7vf-r{flex:1;padding:22px 28px;display:flex;flex-direction:column;gap:16px}
+.c7vf-q{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.c7vf-q>span{font-size:18px;color:var(--text3);margin-right:4px}
+.c7vf-tb{display:flex;flex-direction:column;border-radius:16px;border:1px solid var(--line);overflow:hidden}
+.c7vf-tr{display:grid;grid-template-columns:230px 150px 130px 1fr;gap:12px;align-items:center;padding:15px 22px;font-size:20px;border-left:4px solid transparent;transition:all .45s var(--ease)}
+.c7vf-tr+.c7vf-tr{border-top:1px solid var(--line)}
+.c7vf-tr.h{font-size:16px;color:var(--text3);letter-spacing:.1em;background:rgba(255,255,255,.03)}
+.c7vf-tr code{font:700 19px var(--mono);color:var(--text)}
+.c7vf-tr span{color:var(--text2)}
+.c7vf-tr.on{border-left-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.c7vf-tr.on code{color:var(--acc)}
+.c7vf-tr.on span{color:var(--text)}
+.c7vf-ex{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-radius:14px;font-size:19px;line-height:1.55;background:color-mix(in srgb,var(--acc) 8%,transparent);border:1px solid color-mix(in srgb,var(--acc) 32%,transparent)}
+.c7vf-ex .ic{flex:none;margin-top:4px;color:var(--acc)}
+.c7vf-cache{margin-top:auto;display:flex;gap:12px;align-items:flex-start;font-size:17px;line-height:1.55;color:var(--text2)}
+.c7vf-cache .ic{flex:none;margin-top:3px;color:var(--acc);font-size:22px}
+</style>
+<script>
+HOOKS['c07-verif'] = {
+  X: ['问一道数学题后直接验证答案', '搜索多个网页后综合回答，再验证最终结果', '修改数据库记录后验证状态变化', '在沙盒中运行代码后检查输出文件'],
+  // 三个属性 → 环境类型；打开靠后的属性时自动补齐前置条件
+  Q: [[0, 0, 0], [0, 1, 0], [1, 1, 0], [1, 1, 1]],
+  init(s) {
+    this.tg = [...s.querySelectorAll('.c7vf-q .tgl')];
+    this.tg.forEach((b, j) => b.addEventListener('click', () => {
+      this.auto = false;
+      const q = this.tg.map((x) => x.classList.contains('on'));
+      const on = !q[j];
+      q[j] = on;
+      if (on) { if (j === 2) q[0] = q[1] = true; if (j === 0) q[1] = true; }
+      else { if (j === 1) q[0] = q[2] = false; if (j === 0) q[2] = false; }
+      this.apply(s, q[2] ? 3 : q[0] ? 2 : q[1] ? 1 : 0);
+    }));
+  },
+  apply(s, r) {
+    this.i = r;
+    this.Q[r].forEach((v, j) => this.tg[j].classList.toggle('on', !!v));
+    s.querySelectorAll('.c7vf-tr[data-r]').forEach((t) => t.classList.toggle('on', +t.dataset.r === r));
+    s.querySelector('.c7vf-ex span').textContent = '适用场景：' + this.X[r];
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 4, 3600, (i) => this.apply(s, i), 700); },
+  reset(s) { this.i = null; this.tg.forEach((b) => b.classList.remove('on')); s.querySelectorAll('.c7vf-tr').forEach((t) => t.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c07-two" data-part="3" data-trans="rise" data-title="工具调用型与人机交互型评估环境" data-notes="两类环境的结构对比见<b>图7-2</b>。<br>左边是工具调用型（以 Verifiers 为例）：Agent（LLM）调用工具执行环境，例如 run_python 定义一个斐波那契函数，工具返回执行结果；随后由可执行验证器断言 fib(10) == 55、fib(0) == 0，全部通过则 reward = 1.0。它的特点是无需人工或 LLM 评判。<br>右边是人机交互型（以 τ-bench 为例）：用户模拟器说“我的航班有问题”，Agent 通过工具查询订单（lookup_booking），再在对话中处理用户的诉求；结束后做双重验证——① 数据库：订单状态是否已变为 cancelled；② 对话：是否告知了退款金额与到账时间。双重均通过才得 1 分。它的特点是渐进式信息透露 + 状态验证。<br><b>工具调用型评估考察的是可观测状态变更的正确性，人机交互型评估考察的则是沟通策略的合理性——前者验证行动，后者验证引导。</b>图中的代码与对话内容取自原图。上方开关可以聚焦一侧。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">前者<em>验证行动</em>，后者<em>验证引导</em></h2></div>
+    <div class="c7tw-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="both">并排</button><button data-v="tool">工具调用型</button><button data-v="hci">人机交互型</button></div></header>
+  <div class="c7tw-body">
+    <div class="c7tw-p tool panel fx fx-left" style="--d:3">
+      <div class="c7tw-h"><b>工具调用型</b><span>Verifiers</span></div>
+      <div class="c7tw-st">
+        <div class="nd c7tw-n a1" style="--c:var(--llm)"><svg class="ic"><use href="#i-brain"/></svg><div><b>Agent（LLM）</b></div></div>
+        <div class="nd c7tw-n e1" style="--c:var(--tool)"><svg class="ic"><use href="#i-term"/></svg><div><b>工具执行环境</b></div></div>
+        <div class="c7tw-msg m1"><code>run_python("def fib(n): ...")</code></div>
+        <div class="c7tw-msg m2"><code>→ {"result": [1,1,2,3,5,8]}</code></div>
+        <div class="c7tw-ver v1"><b>可执行验证器</b><code data-l="0">assert fib(10) == 55  # PASS</code><code data-l="1">assert fib(0) == 0    # PASS</code><em>reward = 1.0（全部通过）</em></div>
+        <svg class="c7tw-svg" viewBox="0 0 760 480" width="760" height="480"><path class="c7tw-l" d="M240 70 H520"/><path class="c7tw-l" d="M520 112 H240"/><path class="c7tw-l" d="M640 140 V280"/><circle class="c7tw-k t1" r="9"/><circle class="c7tw-k t2" r="9"/><circle class="c7tw-k t3" r="9"/></svg>
+      </div>
+      <div class="c7tw-f">特点：无需人工 / LLM 评判</div>
+    </div>
+    <div class="c7tw-p hci panel fx fx-right" style="--d:4">
+      <div class="c7tw-h"><b>人机交互型</b><span>τ-bench</span></div>
+      <div class="c7tw-st">
+        <div class="nd c7tw-n u2" style="--c:var(--tool)"><svg class="ic"><use href="#i-user"/></svg><div><b>用户模拟器</b></div></div>
+        <div class="nd c7tw-n a2" style="--c:var(--llm)"><svg class="ic"><use href="#i-brain"/></svg><div><b>Agent（LLM）</b></div></div>
+        <div class="c7tw-msg m3"><span>“我的航班有问题”</span></div>
+        <div class="c7tw-msg m4"><code>lookup_booking("BK-98712")</code><code>→ {"status":"confirmed","flight":"UA123"}</code></div>
+        <div class="c7tw-ver v2"><b>双重验证</b><code data-l="0">① DB: booking.status == "cancelled"</code><code data-l="1">② 对话: 包含 "退款$150"、"3-5个工作日到账"</code><em>reward = 0/1（双重均通过）</em></div>
+        <svg class="c7tw-svg" viewBox="0 0 760 480" width="760" height="480"><path class="c7tw-l" d="M240 70 H520"/><path class="c7tw-l" d="M640 112 V170"/><path class="c7tw-l" d="M640 240 V280"/><circle class="c7tw-k h1" r="9"/><circle class="c7tw-k h2" r="9"/><circle class="c7tw-k h3" r="9"/></svg>
+      </div>
+      <div class="c7tw-f">特点：渐进式信息透露 + 状态验证</div>
+    </div>
+  </div>
+  <p class="tagline c7tw-tag fx fx-up" style="--d:6">工具调用型考察<b>可观测状态变更的正确性</b>；人机交互型考察<b>沟通策略的合理性</b></p>
+  <div class="src">第七章 ·「人机交互型与工具调用型评估环境」· 图7-2（代码与对话取自原图）</div>
+</section>
+<style>
+#c07-two .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.c7tw-body{display:flex;gap:24px}
+.c7tw-p{flex:1;padding:18px 22px 16px;display:flex;flex-direction:column;gap:10px;transition:opacity .5s,filter .5s,border-color .5s}
+#c07-two[data-f=tool] .c7tw-p.hci,#c07-two[data-f=hci] .c7tw-p.tool{opacity:.32;filter:saturate(.3)}
+#c07-two[data-f=tool] .c7tw-p.tool,#c07-two[data-f=hci] .c7tw-p.hci{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.c7tw-h{display:flex;align-items:baseline;gap:12px}
+.c7tw-h b{font-size:24px;color:var(--acc)}
+.c7tw-h span{font:600 17px var(--num);color:var(--text3)}
+.c7tw-st{position:relative;width:760px;height:480px;align-self:center}
+.c7tw-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.c7tw-n{position:absolute;top:30px;width:240px;padding:12px 18px}
+.c7tw-n b{font-size:20px}
+.c7tw-n.a1,.c7tw-n.u2{left:0}.c7tw-n.e1,.c7tw-n.a2{left:520px}
+.c7tw-msg{position:absolute;display:flex;flex-direction:column;gap:6px;opacity:.35;transition:opacity .4s}
+.c7tw-msg.on{opacity:1}
+.c7tw-msg code{font:15px var(--mono);padding:5px 10px;border-radius:8px;background:rgba(0,0,0,.35);border:1px solid var(--line);color:var(--text)}
+.c7tw-msg span{font-size:18px;padding:6px 12px;border-radius:10px;background:color-mix(in srgb,var(--tool) 12%,transparent);border:1px solid color-mix(in srgb,var(--tool) 40%,transparent)}
+.c7tw-msg.m1{left:250px;top:20px}.c7tw-msg.m2{left:252px;top:122px}
+.c7tw-msg.m3{left:262px;top:22px}.c7tw-msg.m4{left:330px;top:170px;align-items:flex-end}
+.c7tw-ver{position:absolute;left:60px;right:0;top:280px;padding:16px 20px;border-radius:16px;display:flex;flex-direction:column;gap:8px;border:2px solid color-mix(in srgb,var(--env) 45%,transparent);background:color-mix(in srgb,var(--env) 6%,rgba(10,16,36,.7))}
+.c7tw-ver b{font-size:19px;color:var(--env)}
+.c7tw-ver code{font:16px var(--mono);color:var(--text3);transition:color .4s}
+.c7tw-ver code.on{color:var(--ok)}
+.c7tw-ver em{font-style:normal;font:700 18px var(--mono);color:var(--text3);transition:color .4s}
+.c7tw-ver em.on{color:var(--ok)}
+.c7tw-l{fill:none;stroke:rgba(255,255,255,.18);stroke-width:2.5;stroke-dasharray:6 8;animation:flow 1s linear infinite}
+.c7tw-k{opacity:0;fill:#fff;filter:drop-shadow(0 0 8px var(--acc))}
+.c7tw-f{font-size:18px;color:var(--text2);padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.04);align-self:flex-start}
+.c7tw-tag{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c07-two'] = {
+  init(s) {
+    this.set = U.seg(s.querySelector('.c7tw-seg'), (v) => { this.manual = true; this.focus(s, v); });
+    const P = (q) => [...s.querySelectorAll(q + ' .c7tw-l')], K = (q) => [...s.querySelectorAll(q + ' .c7tw-k')];
+    this.E = { tp: P('.c7tw-p.tool'), tk: K('.c7tw-p.tool'), hp: P('.c7tw-p.hci'), hk: K('.c7tw-p.hci') };
+  },
+  focus(s, v) { this.f = v; this.set(v); s.dataset.f = v; },
+  async side(s, which, ok) {
+    const ctx = this.ctx, E = this.E, q = (x) => s.querySelector(`.c7tw-p.${which} ${x}`);
+    const msgs = [...s.querySelectorAll(`.c7tw-p.${which} .c7tw-msg`)], codes = [...s.querySelectorAll(`.c7tw-p.${which} .c7tw-ver code`)], em = q('.c7tw-ver em');
+    msgs.forEach((m) => m.classList.remove('on')); codes.forEach((c) => c.classList.remove('on')); em.classList.remove('on');
+    const P = which === 'tool' ? E.tp : E.hp, K = which === 'tool' ? E.tk : E.hk;
+    msgs[0].classList.add('on');
+    await U.fly(K[0], P[0], 900, { ctx }); if (!ok()) return;
+    if (which === 'hci') q('.a2').classList.add('on');
+    msgs[1].classList.add('on');
+    await U.fly(K[1], P[1], 800, { ctx }); if (!ok()) return;
+    await U.fly(K[2], P[2], 700, { ctx }); if (!ok()) return;
+    for (const c of codes) { c.classList.add('on'); await U.wait(ctx, 500); if (!ok()) return; }
+    em.classList.add('on');
+    if (which === 'hci') q('.a2').classList.remove('on');
+  },
+  async loop(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      if (this.f !== 'hci') { await this.side(s, 'tool', ok); if (!ok()) return; await U.wait(ctx, 900); }
+      if (!ok()) return;
+      if (this.f !== 'tool') { await this.side(s, 'hci', ok); if (!ok()) return; await U.wait(ctx, 900); }
+      if (!this.manual) this.focus(s, this.f === 'both' ? 'tool' : this.f === 'tool' ? 'hci' : 'both');
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.manual = false; this.focus(s, 'both'); ctx.later(() => this.loop(s), 1000); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.c7tw-msg,.c7tw-ver code,.c7tw-ver em,.c7tw-n').forEach((e) => e.classList.remove('on'));
+    delete s.dataset.f;
+  },
+};
+</script>

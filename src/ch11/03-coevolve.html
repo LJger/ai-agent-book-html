@@ -1,0 +1,468 @@
+<!-- ================= PART 03 模型与 Agent 的共同演进 ================= -->
+<section class="slide chapter" id="c11-d3" data-part="3" data-title="PART 03 · 模型与 Agent 的共同演进" data-notes="这两朵乌云，都不是靠某一次模型升级就能凭空吹散的。要理解它们最终会怎样被跨越，得先看清一件事：<b>模型和 Agent，从来不是上下游，而是一起往前走的。</b><br>这一部分依次看：harness 里的兜底逻辑与模型之间自我强化的飞轮；第一章悬下的问题——模型会不会最终吃掉 Harness；同时握住两端的人为什么转得最快、飞轮为什么是护城河；以及这对站在飞轮不同端的人分别意味着什么。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">模型与 Agent 的<br>共同演进</h1>
+  <div class="ch-s fx fx-up" style="--d:3">两朵乌云都不是靠某一次模型升级就能凭空吹散的</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型和 Agent，从来不是上下游，而是一起往前走的。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c11-flywheel" data-part="3" data-trans="zoom" data-dur="14000" data-title="自我强化的飞轮" data-notes="回头看那些 harness 里层层叠叠的兜底逻辑——<b>多级上下文压缩、失败数千次才熔断的重试、悲观地默认“不安全”的权限判断</b>——每一段看似丑陋的“屎山”，记录的都是模型此刻还做不稳的地方。当下一代模型把这些约束内化，对应的代码就可以删掉；而模型之所以能内化，又正是因为 Agent 早已在真实业务里替它把这些坑趟了一遍，沉淀成了下一轮训练的信号。<br>用户提出真实的难题，应用层用 harness 把模型暂时做不好的事补上，这些补救再反过来变成模型下一次迭代的训练信号。<b>这是一个自我强化的飞轮。</b><br>左侧光点每转一圈经过四站；每当经过“下一代模型内化约束”，右侧就删掉一段兜底代码，飞轮也越转越快。右侧代码与删除顺序都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一个<em>自我强化</em>的飞轮</h2></header>
+  <div class="fw-body">
+    <div class="fw-stage fx fx-scale" style="--d:2">
+      <svg class="fw-svg" viewBox="0 0 700 600" width="700" height="600">
+        <circle class="fw-ring" cx="350" cy="300" r="200"/>
+        <circle class="fw-run" cx="350" cy="300" r="200"/>
+        <circle class="fw-dot" r="14"/>
+      </svg>
+      <div class="fw-core"><b>飞轮</b><span class="fw-lap">第 1 圈</span><small>越转越快</small></div>
+      <div class="fw-st" style="left:350px;top:100px;--c:#fbbf24"><em>①</em><b>用户提出真实的难题</b></div>
+      <div class="fw-st" style="left:550px;top:300px;--c:#60a5fa"><em>②</em><b>应用层用 harness 补上</b><small>模型暂时做不好的事</small></div>
+      <div class="fw-st" style="left:350px;top:500px;--c:#5eead4"><em>③</em><b>补救变成训练信号</b><small>Agent 在真实业务里替模型趟坑</small></div>
+      <div class="fw-st" style="left:150px;top:300px;--c:#c4b5fd"><em>④</em><b>下一代模型内化约束</b><small>对应的代码可以删掉</small></div>
+    </div>
+    <div class="fw-r">
+      <div class="win fw-win fx fx-right" style="--d:3">
+        <div class="win-bar"><i></i><i></i><i></i><span>harness 里层层叠叠的兜底逻辑</span><span class="cap fw-sx">示意</span></div>
+        <div class="fw-code">
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 多级上下文压缩</span></div><div class="ln"><span class="t-k">if</span> tokens &gt; L1: ctx = summarize(ctx)</div><div class="ln"><span class="t-k">if</span> tokens &gt; L2: ctx = drop_oldest(ctx)</div><em class="fw-del">已内化 · 删除</em></div>
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 失败数千次才熔断的重试</span></div><div class="ln"><span class="t-k">for</span> i <span class="t-k">in</span> range(MAX_RETRY):</div><div class="ln">&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">if</span> step(): <span class="t-k">break</span></div><em class="fw-del">已内化 · 删除</em></div>
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 悲观地默认“不安全”的权限判断</span></div><div class="ln"><span class="t-k">def</span> allowed(cmd):</div><div class="ln">&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">return</span> cmd <span class="t-k">in</span> WHITELIST</div><em class="fw-del">已内化 · 删除</em></div>
+        </div>
+      </div>
+      <p class="fw-cap fx fx-up" style="--d:4">每一段看似丑陋的<b>“屎山”</b>，记录的都是<b>模型此刻还做不稳的地方</b></p>
+      <div class="fw-why fx fx-up" style="--d:5"><svg class="ic"><use href="#i-refresh"/></svg><p>模型之所以能内化，正是因为 Agent 早已在真实业务里<b>替它把这些坑趟了一遍</b>，沉淀成了下一轮训练的信号</p></div>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 1 段</div>
+</section>
+<style>
+.fw-body{display:grid;grid-template-columns:700px 1fr;gap:40px;align-items:start}
+.fw-stage{position:relative;width:700px;height:600px}
+.fw-svg{position:absolute;inset:0;overflow:visible}
+.fw-ring{fill:none;stroke:rgba(255,255,255,.1);stroke-width:18}
+.fw-run{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:10 14;opacity:.6}
+.fw-dot{fill:#fff;filter:drop-shadow(0 0 12px var(--acc)) drop-shadow(0 0 4px #fff)}
+.fw-core{position:absolute;left:250px;top:200px;width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:radial-gradient(circle,rgba(94,234,212,.18),rgba(8,12,30,.6) 70%);border:1px solid var(--line2)}
+.fw-core b{font-size:30px}
+.fw-lap{font:700 20px var(--num);color:var(--acc)}
+.fw-core small{font-size:15px;color:var(--text3)}
+.fw-st{position:absolute;width:236px;translate:-50% -50%;padding:10px 14px;border-radius:16px;text-align:center;display:flex;flex-direction:column;gap:2px;border:1.5px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(10,16,36,.95);transition:box-shadow .35s,border-color .35s,scale .35s var(--spring)}
+.fw-st em{font-style:normal;font:700 17px var(--num);color:var(--c)}
+.fw-st b{font-size:19px;line-height:1.3}
+.fw-st small{font-size:15px;color:var(--text3)}
+.fw-st.hit{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 50%,transparent);scale:1.06}
+.fw-r{display:flex;flex-direction:column;gap:20px}
+.fw-win .win-bar span{font-size:16px}
+.fw-sx{margin-left:auto}
+.fw-code{padding:14px 18px;display:flex;flex-direction:column;gap:10px;font:17px/1.65 var(--mono)}
+.fw-blk{position:relative;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.02);max-height:130px;overflow:hidden;transition:max-height .6s var(--ease) .5s,padding .6s var(--ease) .5s,opacity .6s .5s,background .3s,border-color .3s}
+.fw-blk .ln{white-space:pre}
+.fw-del{position:absolute;right:12px;top:10px;font-style:normal;font:700 15px var(--font);color:var(--bad);opacity:0;transition:opacity .3s}
+.fw-blk.del{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.5);max-height:0;padding:0 12px;opacity:0}
+.fw-blk.del .ln{text-decoration:line-through;text-decoration-color:var(--bad)}
+.fw-blk.del .fw-del{opacity:1}
+.fw-cap{font-size:23px;line-height:1.6;color:var(--text2)}
+.fw-cap b{color:var(--acc)}
+.fw-why{display:flex;gap:14px;align-items:flex-start;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent);background:color-mix(in srgb,var(--acc2) 8%,transparent)}
+.fw-why .ic{flex:none;font-size:30px;color:var(--acc2);animation:spin 6s linear infinite}
+.fw-why p{font-size:20px;line-height:1.6}
+.fw-why b{color:var(--acc2)}
+</style>
+<script>
+HOOKS['c11-flywheel'] = {
+  init(s) {
+    this.dot = s.querySelector('.fw-dot');
+    this.run = s.querySelector('.fw-run');
+    this.sts = [...s.querySelectorAll('.fw-st')];
+    this.blks = [...s.querySelectorAll('.fw-blk')];
+    this.lapEl = s.querySelector('.fw-lap');
+  },
+  draw(u) {
+    const a = u * Math.PI * 2 - Math.PI / 2;
+    this.dot.setAttribute('cx', (350 + 200 * Math.cos(a)).toFixed(1));
+    this.dot.setAttribute('cy', (300 + 200 * Math.sin(a)).toFixed(1));
+  },
+  enter(s, ctx) {
+    // u：本圈进度（从顶部顺时针），每经过一站点亮它；经过第④站删掉一段兜底代码
+    let u = 0, lap = 0, last = 0, off = 0, prev = -1;
+    const restart = () => { lap = 0; this.blks.forEach((b) => b.classList.remove('del')); };
+    restart();
+    this.lapEl.textContent = '第 1 圈';
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      const sp = (1 + lap * 0.45) / 4200;
+      u += dt * sp;
+      if (u >= 1) {
+        u -= 1;
+        lap += 1;
+        if (lap > 3) restart();
+        this.lapEl.textContent = `第 ${lap + 1} 圈`;
+      }
+      off -= dt * sp * 1256;
+      this.run.style.strokeDashoffset = off.toFixed(1);
+      this.draw(u);
+      const st = Math.floor(u * 4 + 0.08) % 4;
+      if (st !== prev) {
+        prev = st;
+        const el = this.sts[st];
+        el.classList.add('hit');
+        ctx.later(() => el.classList.remove('hit'), 700);
+        if (st === 3 && this.blks[lap]) this.blks[lap].classList.add('del');
+      }
+    });
+  },
+  reset() { this.blks.forEach((b) => b.classList.remove('del')); this.sts.forEach((x) => x.classList.remove('hit')); },
+};
+</script>
+
+<section class="slide" id="c11-eat" data-part="3" data-steps="2" data-trans="rise" data-dur="13000" data-title="模型会不会吃掉 Harness？" data-notes="这个飞轮，也回答了第一章悬下的那个问题：<b>模型会不会最终吃掉 Harness？</b>本书的观点是：<b>会，但不是一次性吃掉，而是一层一层地吃，并且没有吃完的那一天。</b><br>模型每稳定内化一种能力，对应的 Harness 层就可以删掉——第六章的交互模型就是这样一个例子：打断、插话这些曾经要靠外挂 harness 才能拼出的行为，如今被直接做进了模型内部。<br>但这个“吃”永远不会完结。一是训练以月计，模型等得起，业务等不起；二是模型无法内化真实业务中所有的约束与偏好，总有一层最新的边界需要外部逻辑兜底；三是每一代模型都会打开新的能力前沿，而前沿处恰恰是模型最做不稳的地方。所以 <b>Harness 不会消失，它只是随着模型，不断向新的前沿迁移。</b><br>这也正是《苦涩的教训》在 Agent 时代的读法：通用方法终将胜出，但“终将”二字里的每一段路，都是 Harness 铺出来的。<br>左侧能力塔是示意：底部模型一代代向上内化 Harness 层，顶部的能力前沿又不断长出新的一层，Harness 的层数始终吃不完。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型会不会最终<em>吃掉 Harness</em>？</h2></header>
+  <div class="et-body">
+    <div class="et-stage panel fx fx-left" style="--d:2">
+      <div class="et-fr"><span>能力前沿 · 模型最做不稳的地方</span></div>
+      <div class="et-layers"></div>
+      <div class="et-base"><b>模型</b><span class="et-gen">第 1 代</span><small>每一代稳定内化一种能力</small></div>
+      <div class="et-meta"><span>Harness 层数</span><b class="et-n">5</b><small>被吃掉一层，前沿又长出一层</small></div>
+      <span class="cap et-sx">示意</span>
+    </div>
+    <div class="et-r">
+      <div class="et-ans fx fx-up" style="--d:3"><span class="lbl">本书的观点</span><p><b>会，但不是一次性吃掉，而是一层一层地吃，并且没有吃完的那一天。</b></p></div>
+      <div class="et-c6 fx fx-up" style="--d:4"><svg class="ic"><use href="#i-mic"/></svg><div><b>例子：第六章的交互模型</b><p>打断、插话这些曾经要靠外挂 harness 才能拼出的行为，如今被直接做进了模型内部</p></div></div>
+      <div class="et-why" data-step="1">
+        <span class="lbl">为什么永远吃不完</span>
+        <div class="et-y fx fx-up" style="--d:1"><em>一</em><svg class="ic"><use href="#i-calendar"/></svg><p>训练以月计：<b>模型等得起，业务等不起</b></p></div>
+        <div class="et-y fx fx-up" style="--d:2"><em>二</em><svg class="ic"><use href="#i-scale"/></svg><p>模型无法内化真实业务中<b>所有的约束与偏好</b>，总有一层最新的边界需要外部逻辑兜底</p></div>
+        <div class="et-y fx fx-up" style="--d:3"><em>三</em><svg class="ic"><use href="#i-flag"/></svg><p>每一代模型都会打开<b>新的能力前沿</b>，而前沿处恰恰是模型最做不稳的地方</p></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline et-tag fx fx-up" data-step="2">Harness 不会消失，只是随着模型不断<b>向新的前沿迁移</b>。《苦涩的教训》在 Agent 时代的读法：通用方法终将胜出，但“终将”二字里的每一段路，<b>都是 Harness 铺出来的</b></p>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 2 段</div>
+</section>
+<style>
+.et-body{display:grid;grid-template-columns:720px 1fr;gap:32px;height:610px}
+.et-stage{position:relative;overflow:hidden}
+.et-fr{position:absolute;left:24px;right:24px;top:20px;padding-bottom:8px;border-bottom:2px dashed var(--warn);font-size:17px;color:var(--warn)}
+.et-fr span{animation:blink 2.4s ease-in-out infinite}
+.et-layers{position:absolute;left:40px;width:440px;top:0;bottom:0}
+.et-l{position:absolute;left:0;right:0;height:58px;padding:0 18px;border-radius:12px;display:flex;align-items:center;gap:12px;font-size:19px;border:1.5px solid rgba(96,165,250,.5);background:rgba(96,165,250,.12);transition:bottom .6s var(--ease),opacity .5s,background .5s,border-color .5s,filter .5s}
+.et-l .ic{font-size:22px;color:var(--har)}
+.et-l small{margin-left:auto;font-size:15px;color:var(--text3)}
+.et-l.fr{border-color:var(--warn);background:rgba(251,191,36,.12);box-shadow:0 0 22px rgba(251,191,36,.25)}
+.et-l.fr .ic{color:var(--warn)}
+.et-l.m{border-color:#c4b5fd;background:rgba(167,139,250,.32)}
+.et-l.m .ic{color:#c4b5fd}
+.et-l.new{animation:c11drop .6s var(--spring) both}
+@keyframes c11drop{from{opacity:0;translate:0 -40px}}
+.et-l.gone{opacity:0;filter:blur(6px)}
+.et-base{position:absolute;left:40px;width:440px;bottom:24px;height:104px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:linear-gradient(180deg,rgba(167,139,250,.45),rgba(124,58,237,.25));border:2px solid #c4b5fd;box-shadow:0 0 40px rgba(167,139,250,.3)}
+.et-base b{font-size:24px}
+.et-gen{font:700 19px var(--num);color:#e9d5ff}
+.et-base small{font-size:15px;color:var(--text2)}
+.et-base.pulse{animation:c11base .8s ease-out}
+@keyframes c11base{30%{box-shadow:0 0 70px rgba(196,181,253,.8)}}
+.et-meta{position:absolute;right:26px;bottom:24px;width:160px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.et-meta span{font-size:16px;color:var(--text3)}
+.et-meta b{font:800 64px var(--num);color:var(--har);line-height:1}
+.et-meta small{font-size:15px;color:var(--text2);line-height:1.45}
+.et-sx{position:absolute;right:26px;top:58px}
+.et-r{display:flex;flex-direction:column;gap:16px}
+.et-ans{padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.et-ans p{margin-top:6px;font-size:25px;line-height:1.55}
+.et-ans b{color:var(--acc)}
+.et-c6{display:flex;gap:16px;align-items:flex-start;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.et-c6 .ic{flex:none;font-size:30px;color:#c4b5fd}
+.et-c6 b{font-size:19px}
+.et-c6 p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:4px}
+.et-why{display:flex;flex-direction:column;gap:10px}
+.et-y{display:grid;grid-template-columns:34px 30px 1fr;gap:12px;align-items:center;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.et-y em{font-style:normal;font-size:22px;font-weight:800;color:var(--warn)}
+.et-y .ic{font-size:26px;color:var(--warn)}
+.et-y p{font-size:18px;line-height:1.5}
+.et-y b{color:var(--warn)}
+.et-tag{margin-top:18px;font-size:21px;line-height:1.6}
+</style>
+<script>
+HOOKS['c11-eat'] = {
+  INIT: [['wave', '打断、插话（外挂 harness 拼出）'], ['compress', '多级上下文压缩'], ['repeat', '失败数千次才熔断的重试'], ['lock', '悲观的权限判断'], ['flag', '最新的业务边界']],
+  NEW: [['flag', '新能力前沿的兜底'], ['flag', '新的业务约束与偏好'], ['flag', '新前沿上做不稳的事']],
+  H: 58, GAP: 8, B0: 138,
+  init(s) {
+    this.box = s.querySelector('.et-layers');
+    this.base = s.querySelector('.et-base');
+    this.genEl = s.querySelector('.et-gen');
+    this.nEl = s.querySelector('.et-n');
+  },
+  mk(ic, t, cls) {
+    const el = document.createElement('div');
+    el.className = 'et-l ' + cls;
+    el.innerHTML = `<svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span><small></small>`;
+    this.box.appendChild(el);
+    return el;
+  },
+  layout() {
+    this.L.forEach((l, i) => {
+      l.el.style.bottom = this.B0 + i * (this.H + this.GAP) + 'px';
+      l.el.classList.toggle('fr', i === this.L.length - 1 && !l.m);
+    });
+    this.nEl.textContent = this.L.filter((l) => !l.m).length;
+  },
+  start() {
+    this.box.innerHTML = '';
+    this.gen = 1; this.nn = 0; this.ph = 0;
+    this.genEl.textContent = '第 1 代';
+    this.L = this.INIT.map(([ic, t]) => ({ el: this.mk(ic, t, ''), m: false }));
+    this.layout();
+  },
+  // 交替两拍：①最底层被模型内化，前沿长出新一层；②已内化的层并入模型，新一代诞生
+  tick(ctx) {
+    if (this.ph === 0) {
+      const b = this.L[0];
+      b.m = true; b.el.classList.add('m'); b.el.querySelector('small').textContent = '已内化';
+      const [ic, t] = this.NEW[this.nn++ % this.NEW.length];
+      this.L.push({ el: this.mk(ic, t, 'new'), m: false });
+    } else {
+      const b = this.L.shift();
+      b.el.classList.add('gone');
+      ctx.later(() => b.el.remove(), 600);
+      this.gen += 1;
+      this.genEl.textContent = `第 ${this.gen} 代`;
+      U.restart(this.base, 'pulse');
+      if (this.gen > 6) { ctx.later(() => this.start(), 900); this.ph = 0; return; }
+    }
+    this.ph = 1 - this.ph;
+    this.layout();
+  },
+  enter(s, ctx) {
+    this.start();
+    ctx.every(() => this.tick(ctx), 1800);
+  },
+  reset() { this.box.innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c11-ends" data-part="3" data-steps="2" data-dur="12000" data-title="握住两端的人与护城河" data-notes="而飞轮转得最快的地方，是<b>同时握住两端的人</b>。Anthropic 用 Claude Code 做的，正是让自家模型和自家 harness 互相喂养、共同进化：模型知道 harness 会怎样调用它，harness 也清楚模型的边界在哪，两端的每一次改动都能立刻反馈给对方。<br>曾有人做过一个实验，不换模型、只改 harness，任务准确率就从 <b>52.8%</b> 跳到 <b>66.5%</b>。这既说明 harness 今天的杠杆有多大，也提醒你：它之所以有这么大杠杆，恰恰是因为模型还没走到那一步。<br>也正因如此，<b>这条飞轮本身，就是这个时代最深的一条护城河</b>：真实业务、反馈数据与模型迭代咬合得越紧，别人越难从外部追上。<br>左侧三个齿轮是示意：真实业务、反馈数据与模型迭代互相咬合转动。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">飞轮转得最快的地方：<em>同时握住两端的人</em></h2></header>
+  <div class="ge-body">
+    <div class="ge-stage fx fx-scale" style="--d:2">
+      <svg class="ge-svg" viewBox="0 0 680 560" width="680" height="560"></svg>
+      <span class="cap ge-sx">示意</span>
+    </div>
+    <div class="ge-r">
+      <div class="ge-cc panel fx fx-right" style="--d:3">
+        <div class="ge-h"><svg class="ic"><use href="#i-term"/></svg><b>Anthropic · Claude Code</b><span>自家模型 ⇄ 自家 harness，互相喂养、共同进化</span></div>
+        <div class="ge-ex">
+          <div class="ge-e m"><svg class="ic"><use href="#i-brain"/></svg><b>模型</b><small>知道 harness 会怎样调用它</small></div>
+          <div class="ge-ar"><i></i><i></i><span>每一次改动都能<br>立刻反馈给对方</span></div>
+          <div class="ge-e h"><svg class="ic"><use href="#i-wrench"/></svg><b>harness</b><small>清楚模型的边界在哪</small></div>
+        </div>
+      </div>
+      <div class="ge-exp panel" data-step="1">
+        <div class="ge-xh"><span class="lbl">曾有人做过一个实验</span><b>不换模型、只改 harness</b></div>
+        <div class="ge-bars">
+          <div class="ge-b"><span>改动前</span><div class="ge-bt"><i style="--w:52.8%"></i></div><b data-count="52.8" data-dec="1" data-suffix="%">0</b></div>
+          <div class="ge-b n"><span>只改 harness</span><div class="ge-bt"><i style="--w:66.5%"></i></div><b data-count="66.5" data-dec="1" data-suffix="%" data-delay="700">0</b></div>
+        </div>
+        <div class="ge-two"><p><svg class="ic"><use href="#i-zap"/></svg>说明 harness 今天的<b>杠杆有多大</b></p><p><svg class="ic"><use href="#i-alert"/></svg>也提醒你：之所以有这么大杠杆，<b>恰恰是因为模型还没走到那一步</b></p></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline ge-tag fx fx-up" data-step="2">这条飞轮本身，就是这个时代<b>最深的一条护城河</b>：真实业务、反馈数据与模型迭代咬合得越紧，别人越难从外部追上</p>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 3 段</div>
+</section>
+<style>
+.ge-body{display:grid;grid-template-columns:680px 1fr;gap:36px;height:600px}
+.ge-stage{position:relative}
+.ge-svg{position:absolute;inset:0;overflow:visible}
+.ge-g path{stroke-width:2.5;transform-box:view-box}
+.ge-g .sp{animation:spin linear infinite}
+.ge-lb{text-anchor:middle;dominant-baseline:central}
+.ge-lb.t{font-size:24px;font-weight:800;fill:var(--text)}
+.ge-lb.s{font-size:15px;fill:var(--text2)}
+.ge-sx{position:absolute;left:10px;bottom:6px}
+.ge-r{display:flex;flex-direction:column;gap:20px}
+.ge-cc{padding:18px 24px}
+.ge-h{display:grid;grid-template-columns:36px 1fr;gap:2px 12px;align-items:center}
+.ge-h .ic{grid-row:1/3;font-size:32px;color:var(--acc)}
+.ge-h b{font-size:23px}
+.ge-h span{font-size:17px;color:var(--text2)}
+.ge-ex{display:grid;grid-template-columns:1fr 230px 1fr;align-items:center;gap:12px;margin-top:16px}
+.ge-e{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.ge-e.m{--c:var(--llm)}.ge-e.h{--c:var(--har)}
+.ge-e .ic{font-size:32px;color:var(--c)}
+.ge-e b{font-size:20px}
+.ge-e small{font-size:16px;color:var(--text2)}
+.ge-ar{position:relative;height:96px;display:flex;align-items:flex-end;justify-content:center}
+.ge-ar span{font-size:15px;line-height:1.4;color:var(--text3);text-align:center}
+.ge-ar i{position:absolute;left:8px;right:8px;height:2px;background:linear-gradient(90deg,transparent,var(--acc),transparent);background-size:50% 100%;background-repeat:no-repeat}
+.ge-ar i:nth-child(1){top:14px;animation:c11arR 1.4s linear infinite}
+.ge-ar i:nth-child(2){top:30px;animation:c11arL 1.4s linear infinite}
+@keyframes c11arR{from{background-position:-100% 0}to{background-position:200% 0}}
+@keyframes c11arL{from{background-position:200% 0}to{background-position:-100% 0}}
+.ge-exp{padding:18px 24px;display:flex;flex-direction:column;gap:14px}
+.ge-xh{display:flex;align-items:baseline;gap:16px}
+.ge-xh b{font-size:23px}
+.ge-bars{display:flex;flex-direction:column;gap:12px}
+.ge-b{display:grid;grid-template-columns:130px 1fr 110px;gap:14px;align-items:center;font-size:18px;color:var(--text2)}
+.ge-b>b{font:800 30px var(--num);color:var(--text);text-align:right}
+.ge-b.n>b{color:var(--ok)}
+.ge-bt{height:26px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+.ge-bt i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#64748b,#94a3b8);transition:width 1.6s var(--ease) .35s}
+.ge-b.n .ge-bt i{background:linear-gradient(90deg,var(--acc),var(--ok));transition-delay:1.05s}
+.ge-exp.on .ge-bt i{width:var(--w)}
+.ge-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ge-two p{display:flex;gap:10px;align-items:flex-start;font-size:17px;line-height:1.5;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ge-two .ic{flex:none;font-size:22px;color:var(--warn);margin-top:2px}
+.ge-two b{color:var(--warn)}
+.ge-tag{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c11-ends'] = {
+  // 三个互相咬合的齿轮：节圆半径与齿数成比例，转一圈的时间与齿数成比例
+  G: [
+    { x: 230, y: 330, r: 150, n: 20, c: '#5eead4', t: '真实业务', s: '用户提出真实的难题', ic: 'users', rev: false },
+    { x: 425, y: 166, r: 105, n: 14, c: '#7dd3fc', t: '反馈数据', s: '补救沉淀成信号', ic: 'chart', rev: true },
+    { x: 497, y: 363, r: 105, n: 14, c: '#c4b5fd', t: '模型迭代', s: '下一代内化约束', ic: 'brain', rev: false },
+  ],
+  gear(cx, cy, r, n) {
+    const ro = r + 9, ri = r - 9, pts = [], f = (v) => v.toFixed(1);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, w = Math.PI / n;
+      [[a - w * 0.5, ri], [a - w * 0.28, ro], [a + w * 0.28, ro], [a + w * 0.5, ri]].forEach(([b, rr]) => pts.push(`${f(cx + rr * Math.cos(b))} ${f(cy + rr * Math.sin(b))}`));
+    }
+    return `M${pts.join('L')}Z M${f(cx + r * 0.35)} ${cy}A${f(r * 0.35)} ${f(r * 0.35)} 0 1 0 ${f(cx - r * 0.35)} ${cy}A${f(r * 0.35)} ${f(r * 0.35)} 0 1 0 ${f(cx + r * 0.35)} ${cy}`;
+  },
+  init(s) {
+    let h = '';
+    this.G.forEach((g, i) => {
+      h += `<g class="ge-g"><path class="sp" d="${this.gear(g.x, g.y, g.r, g.n)}" fill-rule="evenodd" style="fill:color-mix(in srgb,${g.c} 16%,#0a1024);stroke:${g.c};transform-origin:${g.x}px ${g.y}px;animation-duration:${g.n * 1.1}s;animation-direction:${g.rev ? 'reverse' : 'normal'};${i === 1 ? `rotate:${180 / g.n}deg` : ''}"/></g>`;
+    });
+    this.G.forEach((g) => {
+      h += `<text class="ge-lb t" x="${g.x}" y="${g.y - 12}" style="fill:${g.c}">${g.t}</text><text class="ge-lb s" x="${g.x}" y="${g.y + 18}">${g.s}</text>`;
+    });
+    s.querySelector('.ge-svg').innerHTML = h;
+  },
+};
+</script>
+
+<section class="slide" id="c11-side" data-part="3" data-trans="flip" data-dur="14000" data-title="你站在飞轮的哪一端" data-notes="这对你意味着什么，取决于你站在飞轮的哪一端。<br>如果你在<b>造模型</b>，护城河就是把这条飞轮转起来——让真实场景的反馈尽快回流到训练里。<br>如果你在<b>模型之上造应用</b>，harness 是你短期最锋利的技术杠杆，但要清醒：模型每内化一层约束，就会顺手抹平一批只靠 harness 建立的优势。应用层真正长久的护城河，往往在技术之外——独占的数据、稳固的渠道、用户的信任、网络效应，以及必须由人与 Agent 协作的物理世界场景等。<b>把 harness 用来争取时间，把这段时间用来构筑技术之外的壁垒，才是稳妥的打法。</b><br>页面会在两端之间自动切换，也可以点击右上角选择。造应用一侧的“水位”动画是示意：模型能力的水位上升，淹没只靠 harness 建立的优势。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">你站在飞轮的<em>哪一端</em>？</h2></div>
+    <div class="sd-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">我在造模型</button><button data-v="1">我在模型之上造应用</button></div></header>
+  <div class="sd-body fx fx-up" style="--d:3">
+    <div class="sd-v m">
+      <div class="sd-moat"><svg class="ic"><use href="#i-shield"/></svg><div><span class="lbl">护城河</span><b>把这条飞轮转起来</b><p>让真实场景的反馈<b>尽快回流到训练里</b></p></div></div>
+      <div class="sd-loop">
+        <svg class="sd-svg" viewBox="0 0 1560 300" width="1560" height="300">
+          <path class="sd-p" d="M200 110 H1360"/>
+          <path class="sd-p back" d="M1360 190 C 1360 290, 200 290, 200 190"/>
+        </svg>
+        <div class="sd-n" style="left:200px;--c:#5eead4"><svg class="ic"><use href="#i-globe"/></svg><b>真实场景</b></div>
+        <div class="sd-n" style="left:587px;--c:#7dd3fc"><svg class="ic"><use href="#i-inbox"/></svg><b>反馈</b></div>
+        <div class="sd-n" style="left:973px;--c:#a5b4fc"><svg class="ic"><use href="#i-gpu"/></svg><b>训练</b></div>
+        <div class="sd-n" style="left:1360px;--c:#c4b5fd"><svg class="ic"><use href="#i-brain"/></svg><b>新模型</b></div>
+        <span class="sd-bk">回到真实场景，开始下一圈</span>
+      </div>
+    </div>
+    <div class="sd-v a">
+      <div class="sd-l panel">
+        <div class="sd-lh"><span class="lbl">短期</span><b>harness：最锋利的技术杠杆</b></div>
+        <div class="sd-tank">
+          <div class="sd-adv"></div>
+          <div class="sd-water"><span>模型能力的水位</span></div>
+        </div>
+        <p class="sd-warn"><svg class="ic"><use href="#i-alert"/></svg>要清醒：模型每内化一层约束，就会<b>顺手抹平一批只靠 harness 建立的优势</b></p>
+        <span class="cap sd-sx">示意</span>
+      </div>
+      <div class="sd-rr">
+        <div class="sd-lh"><span class="lbl">长久</span><b>真正的护城河，往往在技术之外</b></div>
+        <div class="sd-chips"></div>
+        <div class="sd-play"><svg class="ic"><use href="#i-hourglass"/></svg><p>稳妥的打法：<b>把 harness 用来争取时间</b>，把这段时间用来<b>构筑技术之外的壁垒</b></p></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 4 段</div>
+</section>
+<style>
+#c11-side .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.sd-seg button{font-size:20px;padding:10px 24px}
+.sd-body{position:relative;height:660px}
+.sd-v{position:absolute;inset:0;opacity:0;visibility:hidden;translate:0 20px;transition:opacity .6s,visibility .6s,translate .6s var(--ease)}
+#c11-side[data-v="0"] .sd-v.m,#c11-side[data-v="1"] .sd-v.a{opacity:1;visibility:visible;translate:0 0}
+.sd-moat{display:flex;gap:22px;align-items:center;margin:20px auto 0;width:980px;padding:24px 34px;border-radius:22px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.sd-moat>.ic{flex:none;font-size:64px;color:var(--acc)}
+.sd-moat b{display:block;font-size:34px;margin-top:4px}
+.sd-moat p{font-size:22px;color:var(--text2);margin-top:6px}
+.sd-moat p b{display:inline;font-size:inherit;color:var(--acc)}
+.sd-loop{position:relative;width:1560px;height:300px;margin:40px auto 0}
+.sd-svg{position:absolute;inset:0;overflow:visible}
+.sd-p{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:8 10;animation:flow .6s linear infinite;filter:drop-shadow(0 0 6px var(--acc))}
+.sd-p.back{stroke:var(--acc2);filter:drop-shadow(0 0 6px var(--acc2))}
+.sd-n{position:absolute;top:110px;translate:-50% -50%;width:220px;padding:16px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px solid var(--c);background:rgba(10,16,36,.95);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.sd-n .ic{font-size:32px;color:var(--c)}
+.sd-n b{font-size:23px}
+.sd-bk{position:absolute;left:50%;top:252px;translate:-50% 0;font-size:18px;color:var(--text3)}
+.sd-v.a{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.sd-l{position:relative;padding:20px 26px;display:flex;flex-direction:column;gap:14px}
+.sd-lh{display:flex;align-items:baseline;gap:14px}
+.sd-lh b{font-size:24px}
+.sd-tank{position:relative;height:360px;border-radius:16px;border:1px solid var(--line2);background:rgba(8,12,30,.6);overflow:hidden}
+.sd-adv{position:absolute;inset:16px 16px 16px 16px;display:flex;flex-direction:column-reverse;gap:10px}
+.sd-adv i{height:58px;border-radius:12px;display:flex;align-items:center;padding:0 16px;gap:10px;font-style:normal;font-size:18px;border:1.5px solid rgba(96,165,250,.55);background:rgba(96,165,250,.14);transition:opacity .5s,filter .5s,border-color .5s}
+.sd-adv i.sunk{opacity:.25;filter:blur(1.5px);border-color:transparent}
+.sd-adv i .ic{color:var(--har);font-size:22px}
+.sd-water{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,rgba(196,181,253,.55),rgba(124,58,237,.35));border-top:2px solid #c4b5fd;box-shadow:0 -6px 30px rgba(196,181,253,.4)}
+.sd-water span{position:absolute;right:14px;top:6px;font-size:16px;font-weight:700;color:#f5f3ff}
+.sd-warn{display:flex;gap:10px;align-items:flex-start;font-size:19px;line-height:1.55}
+.sd-warn .ic{flex:none;font-size:24px;color:var(--warn);margin-top:3px}
+.sd-warn b{color:var(--warn)}
+.sd-sx{position:absolute;right:24px;top:24px}
+.sd-rr{display:flex;flex-direction:column;gap:16px;padding:20px 6px}
+.sd-chips{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sd-c{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:16px;font-size:20px;border:1.5px solid color-mix(in srgb,var(--ok) 35%,transparent);background:color-mix(in srgb,var(--ok) 7%,transparent);transition:border-color .4s,box-shadow .4s,background .4s}
+.sd-c .ic{flex:none;font-size:28px;color:var(--ok)}
+.sd-c.wide{grid-column:1/-1}
+.sd-c.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 35%,transparent)}
+.sd-play{margin-top:auto;display:flex;gap:16px;align-items:center;padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.sd-play .ic{flex:none;font-size:40px;color:var(--acc);animation:c11hg 3s ease-in-out infinite}
+@keyframes c11hg{40%,60%{transform:rotate(180deg)}100%{transform:rotate(180deg)}}
+.sd-play p{font-size:21px;line-height:1.6}
+.sd-play b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c11-side'] = {
+  MOAT: [['db', '独占的数据'], ['route', '稳固的渠道'], ['shield', '用户的信任'], ['network', '网络效应'], ['arm', '必须由人与 Agent 协作的物理世界场景等', 'wide']],
+  ADV: ['只靠 harness 的优势 A', '只靠 harness 的优势 B', '只靠 harness 的优势 C', '只靠 harness 的优势 D', '只靠 harness 的优势 E'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.sd-seg'), (v) => { this.auto = false; this.show(s, +v); });
+    s.querySelector('.sd-chips').innerHTML = this.MOAT.map(([ic, t, c]) => `<div class="sd-c ${c || ''}"><svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span></div>`).join('');
+    s.querySelector('.sd-adv').innerHTML = this.ADV.map((t) => `<i><svg class="ic"><use href="#i-wrench"/></svg>${t}</i>`).join('');
+    this.advs = [...s.querySelectorAll('.sd-adv i')];
+    this.chips = [...s.querySelectorAll('.sd-c')];
+    this.water = s.querySelector('.sd-water');
+  },
+  show(s, v) { this.v = v; s.dataset.v = v; this.set(String(v)); this.t = 0; },
+  enter(s, ctx) {
+    this.auto = true;
+    this.show(s, 0);
+    let last = 0, sw = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      if (this.auto) { sw += dt; if (sw > 7000) { sw = 0; this.show(s, 1 - this.v); } }
+      if (this.v !== 1) return;
+      // 水位：模型能力上涨，逐层淹没只靠 harness 建立的优势；护城河卡片轮流点亮
+      this.t += dt;
+      const h = Math.min(328, (this.t / 6000) * 328);
+      this.water.style.height = h + 'px';
+      this.advs.forEach((a, i) => a.classList.toggle('sunk', h > 16 + i * 68 + 40));
+      const c = Math.floor(this.t / 1200) % this.chips.length;
+      this.chips.forEach((x, i) => x.classList.toggle('on', i === c));
+      if (this.t > 7500 && !this.auto) this.t = 0;
+    });
+  },
+  reset(s) { s.dataset.v = 0; this.water.style.height = 0; this.advs.forEach((a) => a.classList.remove('sunk')); this.chips.forEach((x) => x.classList.remove('on')); },
+};
+</script>

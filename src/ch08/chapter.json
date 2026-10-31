@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#818cf8", "acc2": "#c084fc" },
+    { "n": "四阶段全景", "k": "PART 01", "short": "全景", "acc": "#818cf8", "acc2": "#22d3ee" },
+    { "n": "经典 RL 到现代 Agent（选读）", "k": "PART 02", "short": "经典 RL", "acc": "#34d399", "acc2": "#818cf8" },
+    { "n": "预训练基础与 Mid-training", "k": "PART 03", "short": "底座", "acc": "#60a5fa", "acc2": "#818cf8" },
+    { "n": "SFT 与数据合成", "k": "PART 04", "short": "SFT", "acc": "#38bdf8", "acc2": "#a78bfa" },
+    { "n": "选择决策与单轮 RL", "k": "PART 05", "short": "单轮 RL", "acc": "#a78bfa", "acc2": "#f472b6" },
+    { "n": "RL 算法与在轨训练", "k": "PART 06", "short": "算法", "acc": "#c084fc", "acc2": "#818cf8" },
+    { "n": "环境、多轮与工具", "k": "PART 07", "short": "环境", "acc": "#2dd4bf", "acc2": "#818cf8" },
+    { "n": "奖励设计", "k": "PART 08", "short": "奖励", "acc": "#fbbf24", "acc2": "#818cf8" },
+    { "n": "蒸馏与问题案例", "k": "PART 09", "short": "蒸馏", "acc": "#f472b6", "acc2": "#818cf8" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#818cf8", "acc2": "#c084fc" }
+  ]
+}

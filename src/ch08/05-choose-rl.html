@@ -1,0 +1,357 @@
+<!-- ================= 第 5 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d5" data-part="5" data-title="PART 05 · 选择决策与单轮 RL" data-notes="「何时选择 Mid-training、SFT 与 RL」与「单轮强化学习：记忆与泛化的对照」。四阶段全景讲清了三种训练的机制，这一部分先给出实操诊断：<b>先判断缺的是底座、协议，还是策略，不要把“模型做不好”统一归因成需要 RL</b>（图8-11、表8-4、四步决策顺序）。然后建立关于 RL 算法的最小直觉（策略梯度、PPO、GRPO），用两个单轮实验看 RL 学到了什么：实验 8-10 AdaptThink 学会何时不思考；实验 8-11 GeneralPoints 量化“SFT 记忆、RL 泛化”（图8-12）。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:92px">选择决策与单轮 RL</h1>
+  <div class="ch-s fx fx-up" style="--d:3">缺底座、缺协议，还是缺策略？</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">不要把“模型做不好”统一归因成需要 RL。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<!-- ================= 图8-11 ================= -->
+<section class="slide" id="c08-fig811" data-part="5" data-steps="3" data-trans="zoom" data-title="图8-11 SFT→RL 两阶段训练流程" data-notes="图8-11 是 SFT→RL 两阶段训练流程，Mid-training 位于这两个行为对齐阶段之前。<br><b>阶段一：SFT 固化格式</b>——目标是输出可解析（JSON / 工具调用），数据是数千条高质量示范，停止条件是“格式稳定、能力初具”；警告：过度训练会让模型塌缩到训练分布。<br><b>阶段二：RL 塑形策略</b>——目标是最大化任务奖励（准确率 / 成功率），前提是输出格式稳定、奖励可计算；突破在于发现超越 SFT 示范的新策略。格式稳定 + 策略泛化 = 部署就绪。<br><b>为什么不能跳过 SFT 直接 RL？</b>基础模型输出无结构 → 无法解析 JSON → 奖励函数返回 NaN → 梯度全零 → 训练完全失败。SFT: max Σ log P(y|x)（拟合训练分布）；RL: max E[R(τ)]（优化任务目标）。当“无论增加多少示范，新场景仍不佳”时，就是转向 RL 的临界点。<br>需要强调原书在前文给出的边界：“必须先 SFT”只在输出格式或基本行为尚未建立时成立；足够强、已经有非零成功率的基模可以跳过 SFT，DeepSeek-R1-Zero 就是这种情形。按 → 逐步看两个阶段和失败链。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-11 SFT 固化格式，<em>RL 塑形策略</em></h2></header>
+  <div class="c8f11-row">
+    <div class="c8f11-mid fx fx-up" style="--d:2"><span class="lbl">之前</span><b>Mid-training</b><small>补知识与基础能力</small></div>
+    <div class="c8f11-s fx fx-up" style="--d:3"><span class="lbl">阶段一 · SFT 固化格式</span><p>目标：输出可解析（JSON / 工具调用）<br>数据：数千条高质量示范<br>停止：<b>格式稳定，能力初具</b></p><div class="c8f11-m"><span>格式稳定度</span><i><em class="c8f11-a"></em></i></div><small class="w">过度训练 → 塌缩到训练分布</small></div>
+    <div class="c8f11-s fx fx-up" data-step="1"><span class="lbl">阶段二 · RL 塑形策略</span><p>目标：最大化任务奖励<br>前提：格式稳定 → <b>奖励可计算</b><br>突破：发现超越示范的新策略</p><div class="c8f11-m"><span>任务奖励</span><i><em class="c8f11-b"></em></i></div><small class="g">格式稳定 + 策略泛化 = 部署就绪</small></div>
+  </div>
+  <div class="c8f11-fail fx fx-up" data-step="2"><span class="lbl">为什么不能跳过 SFT 直接 RL？</span><div class="c8f11-ch"><span>输出无结构</span><i></i><span>无法解析 JSON</span><i></i><span>奖励返回 NaN</span><i></i><span>梯度全零</span><i></i><span class="x">训练完全失败</span></div></div>
+  <div class="c8f11-edge fx fx-up" data-step="3"><b>边界</b>：只在格式或基本行为<b>尚未建立</b>时成立——足够强、已有非零成功率的基模可以跳过 SFT（DeepSeek-R1-Zero）。转向 RL 的临界点：<b>无论增加多少示范，新场景仍不佳</b></div>
+  <div class="src">第八章 ·「何时选择 Mid-training、SFT 与 RL」· 图8-11 SFT→RL 两阶段训练流程</div>
+</section>
+<style>
+.c8f11-row{display:grid;grid-template-columns:240px 1fr 1fr;gap:16px}
+.c8f11-mid,.c8f11-s{display:flex;flex-direction:column;gap:8px;padding:18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.8)}
+.c8f11-mid{justify-content:center;border-style:dashed}.c8f11-mid b{font-size:22px}.c8f11-mid small{font-size:15px;color:var(--text3)}
+.c8f11-s p{font-size:16px;line-height:1.7;color:var(--text2)}.c8f11-s p b{color:var(--text)}
+.c8f11-m{display:grid;grid-template-columns:100px 1fr;gap:10px;align-items:center;font-size:15px;color:var(--text3)}
+.c8f11-m i{height:16px;border-radius:6px;background:rgba(255,255,255,.05);overflow:hidden}
+.c8f11-m em{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width 2s var(--ease)}
+#c08-fig811.k0 .c8f11-a,#c08-fig811.k1 .c8f11-a{width:85%}#c08-fig811.k1 .c8f11-b{width:80%}
+.c8f11-s small{font-size:15px}.c8f11-s small.w{color:var(--warn)}.c8f11-s small.g{color:#6ee7b7}
+.c8f11-fail{margin-top:16px;padding:14px 18px;border-radius:16px;border:1px solid rgba(251,113,133,.45);background:rgba(251,113,133,.05)}
+.c8f11-ch{display:flex;align-items:center;gap:8px;margin-top:8px}
+.c8f11-ch span{font-size:17px;padding:7px 14px;border-radius:10px;border:1px solid var(--line2)}.c8f11-ch span.x{border-color:#fb7185;color:#fda4af}
+.c8f11-ch i{flex:1;height:2px;background:#fb7185}
+.c8f11-edge{margin-top:14px;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8f11-edge b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-fig811'] = {
+  step(s, ctx, k) { s.classList.toggle('k0', k === 0); s.classList.toggle('k1', k >= 1); },
+  enter(s, ctx, k) { ctx.later(() => this.step(s, ctx, k), 300); },
+  reset(s) { s.classList.remove('k0', 'k1'); },
+};
+</script>
+
+<!-- ================= 表8-4 ================= -->
+<section class="slide" id="c08-t84" data-part="5" data-trans="rise" data-dur="24000" data-title="表8-4 Mid-training、SFT 与 RL 的选择准则" data-notes="表8-4 按“观察到的现象 → 主要缺口 → 优先方法 → 进入下一阶段的门槛”组织：<br>① 领域概念、语言或基础操作不会；合理采样下 pass@k 仍接近 0——知识与能力不在基模的有效支持中——<b>Mid-training</b>（动态事实则用 RAG）——门槛：领域留出集改善，通用保留集可接受，目标任务开始出现可验证的正确或部分正确轨迹。<br>② 偶尔能做对，但格式、工具 schema、语气或固定流程不稳定——行为协议没有固化——<b>SFT</b> 或约束解码——门槛：解析成功率稳定，关键动作和输出协议可被验证器可靠评分。<br>③ 已有非零成功率和可靠奖励，但好策略概率低、长程决策或 OOD 泛化不足——概率质量分配与策略优化——<b>RL</b>——门槛：奖励与真实目标一致；rollout 组内有足够奖励差异；独立测试集随训练改善。<br>④ 只有少量稳定示范，尚无可交互环境——可模仿数据有、在线反馈无——<b>SFT / RFT / 离线偏好优化</b>——门槛：先建立基线与评估，再判断是否值得建设 RL 环境。<br>点击某一行高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表8-4 从<em>症状</em>出发选方法</h2></header>
+  <div class="c8-tb c8t4-tb fx fx-up" style="--d:2"><div class="c8-tr c8-th"><span>观察到的现象</span><span>主要缺口</span><span>优先方法</span><span>进入下一阶段的门槛</span></div></div>
+  <div class="src">第八章 ·「何时选择 Mid-training、SFT 与 RL」· 表8-4 Mid-training、SFT 与 RL 的选择准则（观察到的现象 / 主要缺口 / 优先方法 / 进入下一阶段的门槛）</div>
+</section>
+<style>
+.c8t4-tb .c8-tr{grid-template-columns:1.3fr 1fr .8fr 1.4fr;font-size:16px;line-height:1.5;cursor:pointer}
+.c8t4-tb .c8-tr b{font-size:18px;color:var(--acc)}
+</style>
+<script>
+HOOKS['c08-t84'] = {
+  R: [['领域概念、语言或基础操作不会；合理采样下 pass@k 仍接近 0', '知识与能力不在基模的有效支持中', 'Mid-training<small>；动态事实则用 RAG</small>', '领域留出集改善，通用保留集可接受，目标任务开始出现可验证的正确或部分正确轨迹', '#60a5fa'], ['偶尔能做对，但格式、工具 schema、语气或固定流程不稳定', '行为协议没有固化', 'SFT<small> 或约束解码</small>', '解析成功率稳定，关键动作和输出协议可被验证器可靠评分', '#38bdf8'], ['已有非零成功率和可靠奖励，但好策略概率低、长程决策或 OOD 泛化不足', '概率质量分配与策略优化', 'RL', '奖励与真实目标一致；rollout 组内有足够奖励差异；独立测试集随训练改善', '#a78bfa'], ['只有少量稳定示范，尚无可交互环境', '可模仿数据有、在线反馈无', 'SFT / RFT / 离线偏好优化', '先建立基线与评估，再判断是否值得建设 RL 环境', '#f472b6']],
+  init(s) {
+    const tb = s.querySelector('.c8t4-tb');
+    this.R.forEach(([a, b, c, d, col], i) => tb.insertAdjacentHTML('beforeend', `<div class="c8-tr" data-i="${i}" style="--c:${col}"><span>${a}</span><span>${b}</span><b style="color:${col}">${c}</b><span>${d}</span></div>`));
+    tb.querySelectorAll('.c8-tr[data-i]').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.pick(s, +r.dataset.i); }));
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c8t4-tb .c8-tr[data-i]').forEach((r, j) => { r.classList.toggle('on', j === i); r.classList.toggle('dim', j !== i); }); },
+  enter(s, ctx) { C8.auto(this, ctx, 4, 4000, (i) => this.pick(s, i), 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8t4-tb .c8-tr').forEach((r) => r.classList.remove('on', 'dim')); },
+};
+</script>
+
+<!-- ================= 实际决策顺序 ================= -->
+<section class="slide" id="c08-decide" data-part="5" data-trans="flip" data-dur="24000" data-title="实际决策顺序" data-notes="实际决策可以按以下顺序进行：<br>1. <b>先排除不需要改权重的方案。</b>Prompt、工具、代码约束、上下文管理能解决行为问题时不必训练；事实需要频繁更新、引用或删除时优先 RAG。<br>2. <b>在目标留出集上测能力支持。</b>不只看贪心的 pass@1，还要在固定采样配置下看 pass@k、部分进展率、格式解析率，并人工审计失败原因。若 pass@k 仍近零且失败集中在知识 / 基础能力，先做 Mid-training，重新评估后再决定后续步骤。<br>3. <b>用 SFT 立协议，不拿它硬塞知识库。</b>当模型“会做但不会按要求做”时，用高质量示范固化 JSON schema、工具调用、术语用法、流程和风格。少量事实可以随示范学入参数，但大量事实知识不应让少数 QA 对承担。<br>4. <b>只在有探索空间时上 RL。</b>当前策略已经能产生可评分、偶尔成功的 rollout，奖励又能忠实反映部署目标时，RL 才适合把低概率成功策略推高、探索示范外路径。pass@k 近零时先补 Mid-training / SFT 或设计可达的课程与部分奖励；<b>全零 rollout 上直接加 PPO / GRPO 通常只会消耗采样预算</b>。<br>这个流程不是要求每个项目都依次跑完三种训练。强基模可能直接进入 RL，格式型任务可能只需 SFT，稳定领域知识可能只做 Mid-training 后再复用原有对齐能力。<b>关键是每一步都有可测的进入条件，而不是把“Mid-training → SFT → RL”当作仪式化流水线。</b><br>左侧诊断器的三个滑块是示意输入，结论按上面四步规则给出。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每一步都有<em>可测的进入条件</em></h2></header>
+  <div class="c8dc-body">
+    <div class="c8dc-l panel fx fx-left" style="--d:2"><span class="c8-sx">诊断器 · 示意</span>
+      <label><span>Prompt / 工具 / RAG 能解决吗</span><button class="tgl c8dc-p"><i></i></button></label>
+      <label><span>留出集 pass@k</span><input type="range" class="rng c8dc-k" min="0" max="100" value="3"><b class="c8dc-kv">3%</b></label>
+      <label><span>格式解析率</span><input type="range" class="rng c8dc-f" min="0" max="100" value="40"><b class="c8dc-fv">40%</b></label>
+      <label><span>失败主要原因</span><div class="c8dc-c seg"><i class="knob"></i><button data-v="k">知识 / 基础能力</button><button data-v="s">策略 / 长程决策</button></div></label>
+      <div class="c8dc-out"><span class="lbl">下一步</span><b class="c8dc-v">—</b><p class="c8dc-x"></p></div>
+    </div>
+    <div class="c8dc-r fx fx-right" style="--d:3">
+      <div class="c8dc-s" data-i="0"><em>1</em><b>先排除不需要改权重的方案</b></div>
+      <div class="c8dc-s" data-i="1"><em>2</em><b>在目标留出集上测能力支持</b><span>pass@k、部分进展率、格式解析率 + 人工审计</span></div>
+      <div class="c8dc-s" data-i="2"><em>3</em><b>用 SFT 立协议，不拿它硬塞知识库</b></div>
+      <div class="c8dc-s" data-i="3"><em>4</em><b>只在有探索空间时上 RL</b><span>全零 rollout 上直接加 PPO / GRPO 只会消耗采样预算</span></div>
+      <p class="c8dc-nt">不是仪式化流水线：强基模可直接 RL，格式型任务可能只需 SFT，稳定领域知识可能只做 Mid-training</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「何时选择 Mid-training、SFT 与 RL」</div>
+</section>
+<style>
+.c8dc-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8dc-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.c8dc-l label{display:grid;grid-template-columns:220px 1fr 70px;gap:14px;align-items:center;font-size:16px;color:var(--text2)}
+.c8dc-l label .seg{grid-column:2/4}.c8dc-l label .seg button{font-size:15px}
+.c8dc-l label b{font:700 18px var(--num);text-align:right;color:var(--text)}
+.c8dc-out{margin-top:auto;padding:14px 18px;border-radius:14px;border:1px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.c8dc-v{display:block;font-size:26px;margin-top:4px}.c8dc-x{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}
+.c8dc-r{display:flex;flex-direction:column;gap:8px}
+.c8dc-s{display:grid;grid-template-columns:40px 1fr;gap:4px 12px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .35s,background .35s}
+.c8dc-s em{grid-row:1/3;font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.c8dc-s b{font-size:18px}.c8dc-s span{font-size:15px;color:var(--text3)}
+.c8dc-s.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.85))}
+.c8dc-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c08-decide'] = {
+  init(s) {
+    const q = (x) => s.querySelector(x); this.q = q;
+    this.cause = 'k';
+    this.seg = U.seg(q('.c8dc-c'), (v) => { this.manual = true; this.cause = v; this.calc(); });
+    q('.c8dc-p').addEventListener('click', (e) => { this.manual = true; e.currentTarget.classList.toggle('on'); this.calc(); });
+    ['.c8dc-k', '.c8dc-f'].forEach((k) => q(k).addEventListener('input', () => { this.manual = true; this.calc(); }));
+    this.seg('k');
+  },
+  calc() {
+    const q = this.q, p = q('.c8dc-p').classList.contains('on'), k = +q('.c8dc-k').value, f = +q('.c8dc-f').value;
+    q('.c8dc-kv').textContent = k + '%'; q('.c8dc-fv').textContent = f + '%';
+    let st, v, x;
+    if (p) { st = 0; v = '不必训练'; x = 'Prompt、工具、代码约束、上下文管理能解决行为问题；事实频繁更新、需要引用或删除 → RAG'; }
+    else if (k < 5 && this.cause === 'k') { st = 1; v = '先做 Mid-training'; x = 'pass@k 近零且失败集中在知识 / 基础能力：先补底座，重新评估后再决定'; }
+    else if (f < 90) { st = 2; v = '先做 SFT'; x = '会做但不会按要求做：用高质量示范固化 schema、工具调用、术语、流程——奖励才可计算'; }
+    else if (k < 5) { st = 3; v = '先设计课程 / 部分奖励'; x = 'pass@k 近零时直接 RL，GRPO 一组 rollout 全为 0，组内优势消失，只会消耗采样预算'; }
+    else { st = 3; v = '可以上 RL'; x = '已有可评分、偶尔成功的 rollout；确认奖励忠实反映部署目标后，把低概率成功策略推高'; }
+    q('.c8dc-v').textContent = v; q('.c8dc-x').textContent = x;
+    document.querySelectorAll('#c08-decide .c8dc-s').forEach((e, j) => e.classList.toggle('on', j === st));
+  },
+  enter(s, ctx) {
+    this.manual = false; this.calc();
+    const demo = [[0, 3, 40, 'k'], [0, 30, 40, 's'], [0, 30, 95, 's'], [0, 2, 95, 's'], [1, 30, 95, 's']]; let n = 0;
+    ctx.every(() => { if (this.manual) return; const [p, k, f, c] = demo[n++ % demo.length]; this.q('.c8dc-p').classList.toggle('on', !!p); this.q('.c8dc-k').value = k; this.q('.c8dc-f').value = f; this.cause = c; this.seg(c); this.calc(); }, 3200);
+  },
+  reset() {},
+};
+</script>
+
+<!-- ================= RL 最小直觉 ================= -->
+<section class="slide" id="c08-rlmin" data-part="5" data-trans="zoom" data-dur="26000" data-title="RL 的最小直觉：策略梯度、PPO 与 GRPO" data-notes="“单轮”指任务在一次交互中完成：模型接收输入、产出输出、获得奖励，无需维护跨步骤的状态。这种简化设定让我们能够聚焦于 SFT 与 RL 在学习机制上的根本差异：相同任务、相同基础模型、相同计算预算，唯一的变量是训练方法。<br>本章的 RL 训练大多基于<b>策略梯度</b>：让模型对同一个问题多生成几条回答，奖励高的回答就提高它出现的概率、奖励低的就降低——“<b>奖励高的方向多走，奖励低的方向少走</b>”。为抑制单次更新把模型带偏，主流的 <b>PPO</b> 算法会在概率比超出指定区间时裁掉代理目标中的额外收益；它会抑制大幅更新，但不是对策略变化的硬约束（“带价值网络的 PPO”即指此，价值网络用来估计基线、算出更细的优势）。另一种 <b>GRPO</b> 则不训练价值网络，而是用“同一问题的多条回答互相比较”来判断每条的相对好坏。<br>右侧伪代码省略采样并行、KL 正则和优化器细节。GRPO：对每个 prompt 采 G 条 rollout，验证器给奖励，组内归一化得到优势，更新策略。PPO：计算折扣回报，价值网络给出基线，优势 = 回报 − 价值；概率比 ratio = exp(当前 log_prob − old_policy log_prob)，policy_loss = −mean(min(ratio·A, clip(ratio, 1−ε, 1+ε)·A))，再加价值损失。GRPO 的“相对”来自同一 prompt 的组内比较；PPO 中的 old_policy 是生成这批 rollout 时冻结的策略快照。两者都仍依赖可靠环境与奖励。<br>左侧动画（示意）：同题四个回答，奖励高的概率上升、低的下降。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">奖励高的方向多走，<em>奖励低的方向少走</em></h2></div>
+    <div class="c8rm-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="g">GRPO</button><button data-v="p">PPO</button></div></header>
+  <div class="c8rm-body">
+    <div class="c8rm-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span>
+      <div class="c8rm-q"><span class="lbl">同一问题</span>48 ÷ 4 + 3 = ?</div>
+      <div class="c8rm-as"></div>
+      <p class="c8rm-nt">组内均值作基线：高于均值 → 优势为正 → 概率上升</p>
+    </div>
+    <pre class="c8-code c8rm-code fx fx-right" style="--d:4"></pre>
+  </div>
+  <div class="src">第八章 ·「单轮强化学习：记忆与泛化的对照」</div>
+</section>
+<style>
+.c8rm-seg button{font-size:16px}
+.c8rm-body{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;flex:1;min-height:0}
+.c8rm-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.c8rm-q{font-size:20px;margin-top:20px}
+.c8rm-as{display:flex;flex-direction:column;gap:10px}
+.c8rm-a{display:grid;grid-template-columns:1fr 60px 70px 160px;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.c8rm-a span{font-size:16px}
+.c8rm-a em{font:700 16px var(--num);font-style:normal;text-align:center}
+.c8rm-a em.ok{color:#6ee7b7}.c8rm-a em.no{color:#fda4af}
+.c8rm-a u{font:15px var(--num);text-decoration:none;color:var(--text3);text-align:center}
+.c8rm-a i{height:20px;border-radius:5px;background:var(--acc);transition:width 1s var(--ease)}
+.c8rm-nt{margin-top:auto;font-size:15px;color:var(--text3)}
+.c8rm-code{font-size:16px;overflow:hidden}
+</style>
+<script>
+HOOKS['c08-rlmin'] = {
+  A: [['48÷4=12，12+3=15', 1, 0.2], ['48÷4=12，再加 3 得 15', 1, 0.15], ['48÷7=…，约 10', 0, 0.35], ['先算 4+3=7，48÷7…', 0, 0.3]],
+  C: {
+    g: ['for prompt in batch:', '    group = [rollout(policy, env.reset(prompt)) for _ in range(G)]', '    rewards = [verify(trajectory) for trajectory in group]', '    advantages = normalize_within_group(rewards)       # GRPO baseline', '    update(policy, group, advantages)'],
+    p: ['for trajectory in rollouts:', '    returns = discounted_returns(trajectory.rewards)', '    values = value_model(trajectory.states)', '    advantages = returns - stop_gradient(values)', '    ratio = exp(policy.log_prob(trajectory.actions)', '                - old_policy.log_prob(trajectory.actions))', '    policy_loss = -mean(min(', '        ratio * advantages,', '        clip(ratio, 1 - epsilon, 1 + epsilon) * advantages', '    ))', '    value_loss = mean((value_model(trajectory.states) - returns) ** 2)', 'update(policy, value_model, policy_loss + value_coef * value_loss)'],
+  },
+  init(s) {
+    s.querySelector('.c8rm-as').innerHTML = this.A.map(([t, r, p]) => `<div class="c8rm-a"><span>${t}</span><em class="${r ? 'ok' : 'no'}">R=${r}</em><u>—</u><i style="width:${p * 300}px"></i></div>`).join('');
+    this.seg = U.seg(s.querySelector('.c8rm-seg'), (v) => { this.manual = true; this.code(s, v); });
+  },
+  code(s, v) { s.querySelector('.c8rm-code').innerHTML = this.C[v].map((l) => `<span class="ln">${l.replace(/</g, '&lt;')}</span>`).join(''); this.v = v; },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, as = s.querySelectorAll('.c8rm-a');
+    while (ok()) {
+      if (!this.manual) { const v = this.v === 'g' ? 'p' : 'g'; this.seg(v); this.code(s, v); }
+      let p = this.A.map((a) => a[2]);
+      as.forEach((a, i) => { a.querySelector('i').style.width = p[i] * 300 + 'px'; a.querySelector('u').textContent = '—'; });
+      const lns = s.querySelectorAll('.c8rm-code .ln');
+      for (let it = 0; it < 3 && ok(); it++) {
+        for (let l = 0; l < lns.length; l++) { lns.forEach((x, j) => x.classList.toggle('hl', j === l)); await U.wait(ctx, 380); if (!ok()) return; }
+        const mean = this.A.reduce((a, b) => a + b[1], 0) / 4;
+        p = p.map((x, i) => x * Math.exp(0.9 * (this.A[i][1] - mean))); const z = p.reduce((a, b) => a + b, 0); p = p.map((x) => x / z);
+        as.forEach((a, i) => { a.querySelector('i').style.width = p[i] * 300 + 'px'; const A = this.A[i][1] - mean; a.querySelector('u').textContent = (A > 0 ? '+' : '') + A.toFixed(2); });
+      }
+      await U.wait(ctx, 2500);
+    }
+  },
+  enter(s, ctx) { this.manual = false; this.v = 'p'; this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 实验 8-10 ================= -->
+<section class="slide" id="c08-exp810" data-part="5" data-trans="rise" data-dur="28000" data-title="实验 8-10 ★★：AdaptThink——学会“何时不思考”" data-notes="<b>实验 8-10 ★★：AdaptThink——学会“何时不思考”。</b>大型思考模型（如 OpenAI o1、DeepSeek-R1）对所有问题都会生成冗长的思维链，在简单问题上造成不必要的开销。实验首先验证了一个直觉：<b>NoThinking 模式</b>（通过 &lt;think&gt;&lt;/think&gt; 跳过思考）在简单问题上性能相当甚至更好，只有面对困难问题时 Thinking 的优势才显现出来。<br>AdaptThink 通过 RL 训练模型自适应地选择模式。两个核心组件：<b>约束优化目标</b>——鼓励 NoThinking 的同时确保整体性能不下降；<b>重要性采样策略</b>——平衡 Thinking / NoThinking 样本，解决初始模型几乎总选 Thinking 带来的<b>冷启动</b>问题（这里特指训练初期模型几乎只产生 Thinking 样本、NoThinking 分支样本极少而学不起来的问题；与 DeepSeek-R1 用少量示范数据做“冷启动 SFT”是不同语境下的用法）。“重要性采样”是统计学常用的方法——在采样分布偏向某一类样本时，通过给样本加权来“纠正”分布，让学习信号能够公平覆盖所有类别；PPO、DAPO 等 RL 算法都会反复用到这一思想。<br>本书对这次历史训练的规范记录是 checkpoint-free 训练报告。公开 W&B 主运行 wubbn5tj 使用 8×H100 80GB；step 0→300 时，MATH500 准确率 0.8100→0.8180（+0.80 pp）、响应长度 4911.46→1576.62（−67.90%）；GSM8K 0.796816→0.818802（+2.20 pp）、1025.24→477.33（−53.44%）；AIME mean@16 0.314583→0.310417（−0.42 pp）、12119.51→6402.23（−47.17%）。对应 NoThinking 比例为 83.80%、84.15%、56.25%，说明数据集汇总层面存在与难度一致的路由信号，<b>但不能称为逐题“完美难度感知”，也不能声称准确率普遍提升</b>。<br>在 step 300 之后，训练继续运行到 step 410，累计 36.92 小时，随后 W&B 状态变为 crashed；配置的 10 epochs / 3,140 steps 并未完成。step 300 的 checkpoint 不随书分发，也没有独立回执证明其评估成功。历史源码提交为 9e588202…；未来复现固定到其直接子提交 0033ad172…，训练脚本生成的路径与评估脚本硬编码的路径不兼容，需手工修正。<br>AdaptThink 可与 Prompt 蒸馏互补，形成“<b>快—慢双系统</b>”：蒸馏降低需要思考的任务比例，AdaptThink 优化剩余任务的触发策略，共同提高思考效率。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-10 <span class="c8-star">★★</span>：长度砍掉一半以上，<em>准确率基本持平</em></h2></div>
+    <div class="c8ea-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">MATH500</button><button data-v="1">GSM8K</button><button data-v="2">AIME</button></div></header>
+  <div class="c8ea-body">
+    <div class="c8ea-l panel fx fx-left" style="--d:3">
+      <div class="c8ea-cmp"><div><span class="lbl">准确率 step 0 → 300</span><b class="c8ea-acc">—</b><em class="c8ea-dacc"></em></div><div><span class="lbl">平均响应长度</span><b class="c8ea-len">—</b><em class="c8ea-dlen"></em></div></div>
+      <div class="c8ea-bars"><div><span>step 0</span><i class="c8ea-b0"></i></div><div><span>step 300</span><i class="c8ea-b1"></i></div></div>
+      <div class="c8ea-nt"><span>NoThinking 比例</span><div class="c8ea-pie"></div><b class="c8ea-p">—</b><small>难题（AIME）上 Thinking 更多：汇总层面的路由信号，不是逐题“完美难度感知”</small></div>
+    </div>
+    <div class="c8ea-r fx fx-right" style="--d:4">
+      <div class="c8ea-two"><div><b>约束优化目标</b><span>鼓励 NoThinking，同时确保整体性能不下降</span></div><div><b>重要性采样</b><span>平衡两类样本，解决初始几乎总选 Thinking 的<b>冷启动</b></span></div></div>
+      <div class="c8-card c8ea-crash"><b>训练记录如实说明</b><p>step 300 后继续到 <b>step 410 时 crashed</b>（累计 36.92 小时），配置的 3,140 steps 未完成；step 300 的 checkpoint 不随书分发，评估脚本路径需手工修正</p></div>
+      <p class="c8ea-sys"><b>快—慢双系统</b>：Prompt 蒸馏降低需要思考的任务比例，AdaptThink 优化剩余任务的触发策略</p>
+      <p class="c8-data">chapter8/AdaptThink/TRAINING_REPORT.md；W&B 运行 wubbn5tj，8×H100 80GB，DeepSeek-R1-Distill-Qwen-1.5B</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「单轮强化学习：记忆与泛化的对照」· 实验 8-10</div>
+</section>
+<style>
+.c8ea-seg button{font-size:16px}
+.c8ea-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8ea-l{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+.c8ea-cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.c8ea-cmp div{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border-radius:12px;border:1px solid var(--line)}
+.c8ea-cmp b{font:800 26px var(--num)}.c8ea-cmp em{font-style:normal;font:700 17px var(--num)}
+.c8ea-bars{display:flex;flex-direction:column;gap:8px}
+.c8ea-bars div{display:grid;grid-template-columns:80px 1fr;gap:10px;align-items:center;font-size:15px;color:var(--text3)}
+.c8ea-bars i{height:30px;border-radius:7px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;transition:width 1s var(--ease)}
+.c8ea-nt{display:grid;grid-template-columns:auto 80px auto;gap:10px 16px;align-items:center;font-size:16px}
+.c8ea-pie{width:80px;height:80px;border-radius:50%}
+.c8ea-nt b{font:800 28px var(--num);color:#6ee7b7}
+.c8ea-nt small{grid-column:1/-1;font-size:15px;color:var(--text3);line-height:1.5}
+.c8ea-r{display:flex;flex-direction:column;gap:12px}
+.c8ea-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8ea-two div{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.c8ea-two b{font-size:17px}.c8ea-two span{font-size:15px;line-height:1.5;color:var(--text2)}.c8ea-two span b{font-size:15px}
+.c8ea-crash{border-color:rgba(251,191,36,.45)}.c8ea-crash>b{font-size:16px;color:var(--warn)}
+.c8ea-crash p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c8ea-crash p b{color:var(--text)}
+.c8ea-sys{font-size:15px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8ea-sys b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp810'] = {
+  D: [['MATH500', 0.81, 0.818, 4911.46, 1576.62, 83.8], ['GSM8K', 0.796816, 0.818802, 1025.24, 477.33, 84.15], ['AIME mean@16', 0.314583, 0.310417, 12119.51, 6402.23, 56.25]],
+  init(s) { this.seg = U.seg(s.querySelector('.c8ea-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  show(s, k) {
+    const [, a0, a1, l0, l1, p] = this.D[k], q = (x) => s.querySelector(x), da = (a1 - a0) * 100, dl = (l1 / l0 - 1) * 100;
+    q('.c8ea-acc').textContent = `${(a0 * 100).toFixed(1)}% → ${(a1 * 100).toFixed(1)}%`;
+    const e1 = q('.c8ea-dacc'); e1.textContent = `${da >= 0 ? '+' : ''}${da.toFixed(2)} pp`; e1.style.color = da >= 0 ? '#6ee7b7' : '#fda4af';
+    q('.c8ea-len').textContent = `${Math.round(l0)} → ${Math.round(l1)}`;
+    const e2 = q('.c8ea-dlen'); e2.textContent = `${dl.toFixed(2)}%`; e2.style.color = '#6ee7b7';
+    const mx = 12200; q('.c8ea-b0').style.width = (l0 / mx) * 100 + '%'; q('.c8ea-b1').style.width = (l1 / mx) * 100 + '%';
+    q('.c8ea-pie').style.background = `conic-gradient(#34d399 ${p}%, rgba(167,139,250,.5) 0)`;
+    q('.c8ea-p').textContent = p.toFixed(2) + '%';
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 3, 4500, (i) => { this.i = i; this.seg(String(i)); this.show(s, i); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 实验 8-11 设计 ================= -->
+<section class="slide" id="c08-gp" data-part="5" data-trans="flip" data-dur="24000" data-title="实验 8-11 ★★：GeneralPoints 的设计 · 图8-12" data-notes="<b>实验 8-11 ★★：GeneralPoints——单轮 RL 的“记忆与泛化”对照。</b>GeneralPoints 是 Chu 等人提出的算术思考卡牌游戏，专门用于评估模型的泛化能力。任务目标类似“24 点”游戏：使用四张卡牌上的数字，通过加减乘除运算，每个数字恰好用一次，凑出目标数字 24。实验设计了纯文本 GP-L 与图像 GP-VL 两个变体，使我们能在同一框架下分别考察规则泛化与视觉泛化。<br><b>规则变体</b>：训练时 J/Q/K 都计为 10，测试时分别计为 11/12/13，确保测试集出现训练未见的数字组合，严格评估泛化能力。<b>视觉变体</b>：训练用黑色花色（♠♣），测试用红色花色（♥♦），评估视觉外观变化下的鲁棒性。基于 Llama-3.2-Vision-11B，遵循标准后训练流程：先 SFT 初始化使其具备基本指令遵循能力，然后在相同计算预算下分别扩展 SFT 与 RL 训练（RL 部分采用带价值网络的 PPO 算法），用单一规则（J/Q/K = 10）数据训练，在分布内（ID）与分布外（OOD）测试集上评估。<br>图8-12 的例子：输入“用 [7, J, 3, 5] 计算 24”，训练分布下输出“(J−7)×(5+3) = 3×8 = 24”；OOD 时 J = 11，同样的式子 (11−7)×(5+3) = 32 ≠ 24。切换按钮看两种变体。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-11 <span class="c8-star">★★</span>：图8-12 训练时 J = 10，<em>测试时 J = 11</em></h2></div>
+    <div class="c8gpd-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="tr">训练分布</button><button data-v="rl">规则 OOD</button><button data-v="vi">视觉 OOD</button></div></header>
+  <div class="c8gpd-body">
+    <div class="c8gpd-l panel fx fx-left" style="--d:3">
+      <div class="c8gpd-cards"></div>
+      <div class="c8gpd-eq"><span class="lbl">“用 [7, J, 3, 5] 计算 24”</span><b class="c8gpd-x">—</b><em class="c8gpd-r"></em></div>
+    </div>
+    <div class="c8gpd-r fx fx-right" style="--d:4">
+      <div class="c8gpd-v"><div><b>GP-L 纯文本</b><span>训练 J/Q/K = 10 · 测试 J = 11、Q = 12、K = 13</span></div><div><b>GP-VL 视觉—语言</b><span>输入扑克牌图像：视觉编码器 → 数字识别 → 思考<br>训练 ♠♣ 黑色花色 · 测试 ♥♦ 红色花色</span></div></div>
+      <div class="c8-card"><b class="c8gpd-k">Llama-3.2-Vision-11B · 同等计算预算</b><div class="c8gpd-p"><span>SFT 初始化</span><i></i><div><span class="a">扩展 SFT：max Σ log P(y|x)</span><span class="b">扩展 RL（带价值网络的 PPO）：max E[R(τ)]</span></div></div></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「单轮强化学习：记忆与泛化的对照」· 实验 8-11 · 图8-12 GeneralPoints 实验架构</div>
+</section>
+<style>
+.c8gpd-seg button{font-size:15px}
+.c8gpd-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8gpd-l{padding:20px 24px;display:flex;flex-direction:column;gap:20px}
+.c8gpd-cards{display:flex;gap:18px;justify-content:center}
+.c8gpd-c{width:130px;height:180px;border-radius:14px;background:#f8fafc;color:#0f172a;display:flex;flex-direction:column;justify-content:space-between;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.4);transition:transform .6s}
+.c8gpd-c b{font-size:36px;font-weight:800}.c8gpd-c em{font-style:normal;font-size:44px;align-self:flex-end}
+.c8gpd-c.red{color:#dc2626}
+.c8gpd-c small{font-size:15px;color:#64748b}
+.c8gpd-eq{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04)}
+.c8gpd-x{font:700 26px var(--num)}.c8gpd-r{font-style:normal;font-size:17px}
+.c8gpd-r.ok{color:#6ee7b7}.c8gpd-r.no{color:#fda4af}
+.c8gpd-v{display:flex;flex-direction:column;gap:10px}
+.c8gpd-v div{display:flex;flex-direction:column;gap:4px;padding:14px 16px;border-radius:14px;border:1px solid var(--line)}
+.c8gpd-v b{font-size:18px;color:var(--acc)}.c8gpd-v span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8gpd-k{display:block;font-size:16px;color:var(--acc);margin-bottom:8px}
+.c8gpd-p{display:flex;align-items:center;gap:8px}
+.c8gpd-p>span{font-size:15px;padding:6px 10px;border-radius:9px;border:1px solid var(--line2)}
+.c8gpd-p>i{width:24px;height:2px;background:var(--acc)}
+.c8gpd-p div{display:flex;flex-direction:column;gap:6px}
+.c8gpd-p div span{font-size:15px;padding:6px 10px;border-radius:9px}
+.c8gpd-p .a{background:rgba(56,189,248,.12)}.c8gpd-p .b{background:rgba(167,139,250,.15)}
+</style>
+<script>
+HOOKS['c08-gp'] = {
+  D: {
+    tr: [['7', '♠'], ['J', '♣', '= 10'], ['3', '♠'], ['5', '♣']], rl: [['7', '♠'], ['J', '♣', '= 11'], ['3', '♠'], ['5', '♣']], vi: [['7', '♥'], ['J', '♦', '= 10'], ['3', '♥'], ['5', '♦']],
+  },
+  X: { tr: ['(J − 7) × (5 + 3) = 3 × 8 = 24', '训练分布：J 当 10，式子成立', 'ok'], rl: ['(11 − 7) × (5 + 3) = 32 ≠ 24', '规则 OOD：仍按“J = 10”的固定模式算就错了，要重新计算', 'no'], vi: ['(J − 7) × (5 + 3) = 24', '视觉 OOD：数字规则没变，但花色外观变了——先要认对牌', 'ok'] },
+  init(s) { this.seg = U.seg(s.querySelector('.c8gpd-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    s.querySelector('.c8gpd-cards').innerHTML = this.D[v].map(([n, su, x]) => `<div class="c8gpd-c ${'♥♦'.includes(su) ? 'red' : ''}"><b>${n}</b>${x ? `<small>${x}</small>` : '<small></small>'}<em>${su}</em></div>`).join('');
+    const [eq, r, c] = this.X[v]; s.querySelector('.c8gpd-x').textContent = eq; const e = s.querySelector('.c8gpd-r'); e.textContent = r; e.className = 'c8gpd-r ' + c;
+  },
+  enter(s, ctx) { const k = ['tr', 'rl', 'vi']; C8.auto(this, ctx, 3, 4200, (i) => { this.i = i; this.seg(k[i]); this.show(s, k[i]); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 实验 8-11 结果 ================= -->
+<section class="slide" id="c08-gp2" data-part="5" data-trans="zoom" data-dur="26000" data-title="实验 8-11 ★★：记忆与泛化的结果" data-notes="结果在这一受控设置中显示出明显差异。<b>规则 OOD</b>：RL 在 GP-L 上 +3.5%（11.5%→15.0%），SFT <b>下降</b> 8.1%（11.5%→3.4%）；GP-VL 上 RL +3.0%，SFT 下降 5.6%。<b>视觉 OOD</b>：RL 在 GP-VL 上 <b>+17.6%</b>（23.6%→41.2%），SFT 下降 9.9%（23.6%→13.7%）。<br>追踪视觉识别准确率后发现：RL 通过结果导向的优化改善了底层视觉编码器，且这种改善与整体性能提升高度相关；而 SFT 因为过度拟合思考过程中的 token 模式，忽视了对视觉 token 的学习，导致识别准确率反而下降。<br>实验还说明，在本实验的设定下（Llama-3.2-Vision-11B 这个量级的基础模型，加上严格的结构化输出要求），RL 需要先用 SFT 初始化：未经 SFT 直接做端到端 RL 完全失败，因为基础模型无法产生结构化输出，奖励根本无法计算。注意<b>这是特定设定下的结论而非普适规律</b>：足够强的基础模型可以跳过 SFT 直接 RL 成功（DeepSeek-R1-Zero）。另一个值得关注的发现是，在这个实验中，<b>验证迭代次数越多，测得的泛化越好</b>：10 次 +5.99% vs 1 次 +0.48%，表明增加测试阶段的计算量是其泛化提升的重要因素。<br>为什么 SFT 性能下降而 RL 更好？一种与观察相符的解释是：有限的 SFT 数据强化了“遇到 J/Q/K 就当 10 用”的固定模式；测试时 J = 11，模型仍按 10 计算。结果导向的 RL 分支则更可能强化“重新计算直到得到正确答案”的策略。<b>这解释了本实验中的“记忆”与“泛化”对照，但不是说 SFT 必然只能记忆，或 RL 必然学会通用算法。</b><br>本实验的核心贡献，是在有限的 GeneralPoints 设置中系统量化了 SFT 的过拟合倾向与 RL 更好的分布外表现，并在纯语言和视觉—语言两个变体中观察到同一模式：<b>SFT 稳定格式，RL 在此基础上探索策略，两者形成互补</b>。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">分布外：SFT <em>一致下降</em>，RL <em>一致提升</em></h2></header>
+  <div class="c8g2-body">
+    <div class="c8g2-ch panel fx fx-left" style="--d:2"><div class="c8g2-bars"></div><div class="c8g2-lg"><span class="b"><i></i>SFT Init 基线</span><span class="s"><i></i>扩展 SFT</span><span class="r"><i></i>扩展 RL</span></div><p class="c8g2-nt">GP-VL 规则 OOD 只给出变化量：SFT −5.6%，RL +3.0%</p></div>
+    <div class="c8g2-r fx fx-right" style="--d:3">
+      <div class="c8-card"><b class="c8g2-k">视觉识别准确率</b><p>RL 的结果导向优化<b>改善了底层视觉编码器</b>，且与整体提升高度相关；SFT 过拟合思考 token 模式，忽视视觉 token，识别准确率反而下降</p></div>
+      <div class="c8-card"><b class="c8g2-k">测试阶段计算量</b><div class="c8g2-it"><div><span>验证迭代 1 次</span><i style="--v:8%"></i><b>+0.48%</b></div><div><span>验证迭代 10 次</span><i style="--v:100%"></i><b>+5.99%</b></div></div></div>
+      <p class="c8g2-lim">限定：这是特定设定下的结论。不是说 SFT 必然只能记忆、RL 必然学会通用算法；该设定下未经 SFT 直接 RL 完全失败，强基模（R1-Zero）则可以跳过</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「单轮强化学习：记忆与泛化的对照」· 实验 8-11 · 图8-12</div>
+</section>
+<style>
+.c8g2-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c8g2-ch{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8g2-bars{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end;border-bottom:1px solid var(--line2);padding:0 30px}
+.c8g2-g{display:flex;flex-direction:column;align-items:center;gap:8px;height:100%;justify-content:flex-end}
+.c8g2-g>div{display:flex;gap:12px;align-items:flex-end;height:100%}
+.c8g2-g i{position:relative;width:70px;height:0;border-radius:7px 7px 0 0;transition:height 1.1s var(--ease)}
+.c8g2-g i.b{background:#94a3b8}.c8g2-g i.s{background:#38bdf8}.c8g2-g i.r{background:#a78bfa}
+.c8g2-g i b{position:absolute;top:-26px;left:50%;translate:-50% 0;font:700 17px var(--num);white-space:nowrap}
+.c8g2-g>span{font-size:17px;font-weight:700}
+.c8g2-lg{display:flex;gap:16px}.c8g2-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c8g2-lg i{width:14px;height:14px;border-radius:3px}.c8g2-lg .b i{background:#94a3b8}.c8g2-lg .s i{background:#38bdf8}.c8g2-lg .r i{background:#a78bfa}
+.c8g2-nt{font-size:15px;color:var(--text3)}
+.c8g2-r{display:flex;flex-direction:column;gap:12px}
+.c8g2-k{display:block;font-size:17px;color:var(--acc);margin-bottom:6px}
+.c8g2-r .c8-card p{font-size:15px;line-height:1.55;color:var(--text2)}.c8g2-r .c8-card p b{color:var(--text)}
+.c8g2-it{display:flex;flex-direction:column;gap:6px}
+.c8g2-it div{display:grid;grid-template-columns:120px 1fr 70px;gap:10px;align-items:center;font-size:15px}
+.c8g2-it i{height:18px;border-radius:5px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c8g2-it i::after{content:"";position:absolute;inset:0;width:var(--v);background:var(--acc)}
+.c8g2-it b{font-family:var(--num);text-align:right;color:#6ee7b7}
+.c8g2-lim{font-size:15px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--warn)}
+</style>
+<script>
+HOOKS['c08-gp2'] = {
+  D: [['规则 OOD · GP-L', 11.5, 3.4, 15.0], ['视觉 OOD · GP-VL', 23.6, 13.7, 41.2]],
+  init(s) { s.querySelector('.c8g2-bars').innerHTML = this.D.map(([n, b, sf, r]) => `<div class="c8g2-g"><div><i class="b"><b>${b}%</b></i><i class="s"><b>${sf}%</b></i><i class="r"><b>${r}%</b></i></div><span>${n}</span></div>`).join(''); },
+  enter(s, ctx) { ctx.later(() => s.querySelectorAll('.c8g2-g').forEach((g, i) => { const H = g.querySelector('div').clientHeight - 40; g.querySelectorAll('i').forEach((x, j) => (x.style.height = (this.D[i][j + 1] / 45) * H + 'px')); }), 500); },
+  reset(s) { s.querySelectorAll('.c8g2-g i').forEach((x) => (x.style.height = 0)); },
+};
+</script>

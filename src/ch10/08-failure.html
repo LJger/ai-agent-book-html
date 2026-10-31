@@ -1,0 +1,659 @@
+<!-- ================= PART 08 多 Agent 协作的失败模式 ================= -->
+<section class="slide chapter" id="c10-d8" data-part="8" data-title="PART 08 · 失败模式" data-notes="多 Agent 系统在引入协作能力的同时，也引入了单 Agent 不存在的新型失败模式。本部分先看 2025 年论文《Why Do Multi-Agent LLM Systems Fail?》的系统性研究：14 种失败模式、三大类，以及为什么简单修复效果有限；再用分布式容错的语言区分崩溃故障与拜占庭故障；然后逐一讨论实践中尤为常见的六种失败模式：共享文件系统的并发冲突、错误的级联放大、同质趋同、互相扯皮、循环失控，以及发生在人身上的理解债与认知投降。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">多 Agent 协作的<br>失败模式</h1>
+  <div class="ch-s fx fx-up" style="--d:3">引入协作能力的同时，也引入了单 Agent 不存在的新型失败</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">Agent 的故障天生是拜占庭式的——它很少径直停止运行，而是继续给出看似可信的错误结论。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<section class="slide" id="c10-mast" data-part="8" data-trans="zoom" data-dur="15000" data-title="Why Do Multi-Agent LLM Systems Fail?" data-notes="2025 年的论文《Why Do Multi-Agent LLM Systems Fail?》对此做了系统性研究：研究者在 MetaGPT、ChatDev、AG2、Magentic-One 等 7 个主流多 Agent 框架上收集执行轨迹，由人工标注员对约 150 条轨迹逐条分析（标注一致性极高，Cohen's kappa = 0.88，表明不同标注者对失败模式的判断高度一致），最终归纳出 <b>14 种独特的失败模式</b>，分为三大类：<br>• <b>系统设计缺陷</b>：Agent 之间的接口定义不清、角色职责重叠、工具配置错误等架构层面的问题；<br>• <b>Agent 间对齐失败</b>：多个 Agent 对任务目标的理解不一致、传递的信息被下游 Agent 误解、或者多个 Agent 的操作在逻辑上相互矛盾；<br>• <b>任务验证缺失</b>：系统缺乏有效机制来确认任务是否真正完成——Agent 声称“已完成”但实际结果不符合要求。<br>即使采用简单的修复措施，效果也十分有限（例如 ChatDev 框架仅提升了 15.6%）。研究者因此认为这些不是简单的工程 bug，而是当前多 Agent 架构的<b>根本性设计缺陷</b>：单纯修补某个环节不足以解决问题，需要从系统设计层面重新思考。<br>上方的轨迹扫描动画为示意；数字取自原书。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Why Do Multi-Agent LLM Systems Fail?<em>14 种独特的失败模式</em></h2></header>
+  <div class="ma-kpi fx fx-up" style="--d:2">
+    <div><b data-count="7">0</b><span>主流多 Agent 框架</span><small>MetaGPT · ChatDev · AG2 · Magentic-One 等</small></div>
+    <div><b data-count="150" data-prefix="约 ">0</b><span>条轨迹逐条人工标注</span><small>执行轨迹</small></div>
+    <div><b data-count="0.88" data-dec="2">0</b><span>Cohen's kappa</span><small>标注者判断高度一致</small></div>
+    <div><b data-count="14">0</b><span>种独特的失败模式</span><small>分为三大类</small></div>
+  </div>
+  <div class="ma-scan fx fx-up" style="--d:3"><canvas class="ma-cv" width="3320" height="120"></canvas><span class="k10-sim ma-sim">示意</span></div>
+  <div class="ma-cards fx fx-up" style="--d:4">
+    <div class="ma-c" style="--c:#60a5fa"><svg class="ic"><use href="#i-hier"/></svg><b>系统设计缺陷</b><ul><li>接口定义不清</li><li>角色职责重叠</li><li>工具配置错误</li></ul></div>
+    <div class="ma-c" style="--c:#fbbf24"><svg class="ic"><use href="#i-unlink"/></svg><b>Agent 间对齐失败</b><ul><li>对任务目标理解不一致</li><li>信息被下游 Agent 误解</li><li>操作在逻辑上相互矛盾</li></ul></div>
+    <div class="ma-c" style="--c:#fb7185"><svg class="ic"><use href="#i-ucheck"/></svg><b>任务验证缺失</b><ul><li>缺乏确认任务真正完成的机制</li><li>声称“已完成”，实际结果不符合要求</li></ul></div>
+  </div>
+  <div class="ma-fix fx fx-up" style="--d:6"><span>简单修复措施的效果</span><div class="ma-bar"><i></i><em>ChatDev 仅提升 15.6%</em></div><b class="ma-stamp">根本性设计缺陷</b><p>不是简单的工程 bug：单纯修补某个环节不足以解决问题，需要从系统设计层面重新思考</p></div>
+  <div class="src">第十章 ·「多 Agent 协作的失败模式」</div>
+</section>
+<style>
+#c10-mast .ma-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+#c10-mast .ma-kpi>div{padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:2px}
+#c10-mast .ma-kpi b{font:800 42px var(--num);color:var(--acc)}
+#c10-mast .ma-kpi span{font-size:18px}
+#c10-mast .ma-kpi small{font-size:15px;color:var(--text3)}
+#c10-mast .ma-scan{position:relative;margin-top:14px;height:60px;border-radius:12px;border:1px solid var(--line);background:rgba(8,12,30,.5);overflow:hidden}
+#c10-mast .ma-cv{display:block;width:100%;height:58px}
+#c10-mast .ma-sim{position:absolute;right:10px;top:16px}
+#c10-mast .ma-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:14px}
+#c10-mast .ma-c{padding:16px 20px;border-radius:18px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.72);transition:border-color .35s,box-shadow .35s,translate .35s}
+#c10-mast .ma-c .ic{font-size:32px;color:var(--c)}
+#c10-mast .ma-c b{display:block;margin-top:6px;font-size:23px;color:var(--c)}
+#c10-mast .ma-c ul{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+#c10-mast .ma-c li{font-size:17px;color:var(--text2);padding-left:14px;position:relative}
+#c10-mast .ma-c li::before{content:"";position:absolute;left:0;top:.6em;width:6px;height:6px;border-radius:50%;background:var(--c)}
+#c10-mast .ma-c.on{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 30%,transparent);translate:0 -4px}
+#c10-mast .ma-fix{display:grid;grid-template-columns:auto 320px auto 1fr;gap:18px;align-items:center;margin-top:16px;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-mast .ma-fix>span{font-size:17px;color:var(--text2)}
+#c10-mast .ma-bar{position:relative;height:26px;border-radius:8px;background:rgba(255,255,255,.06)}
+#c10-mast .ma-bar i{position:absolute;left:0;top:0;bottom:0;width:15.6%;border-radius:8px;background:var(--warn)}
+#c10-mast .ma-bar em{position:absolute;left:calc(15.6% + 10px);top:50%;translate:0 -50%;font-style:normal;font-size:16px;white-space:nowrap}
+#c10-mast .ma-stamp{padding:6px 14px;border:3px solid var(--bad);border-radius:10px;font-size:20px;color:var(--bad);rotate:-4deg}
+#c10-mast .ma-fix p{font-size:16px;line-height:1.5;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-mast'] = {
+  init(s) { this.cs = [...s.querySelectorAll('.ma-c')]; this.g = s.querySelector('.ma-cv').getContext('2d'); },
+  enter(s, ctx) {
+    let i = -1;
+    ctx.every(() => { i = (i + 1) % 3; this.cs.forEach((c, j) => c.classList.toggle('on', j === i)); }, 2200);
+    const g = this.g, r = U.rand(9), tags = Array.from({ length: 150 }, () => (r() < 0.6 ? (r() * 3) | 0 : -1)), col = ['#60a5fa', '#fbbf24', '#fb7185'];
+    ctx.raf((t) => {
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 1660, 60);
+      const u = ((t / 7000) % 1) * 150;
+      for (let k = 0; k < 150; k++) {
+        const x = 10 + k * 10.9, done = k < u;
+        g.fillStyle = done && tags[k] >= 0 ? col[tags[k]] : 'rgba(255,255,255,.14)';
+        g.fillRect(x, 14, 7, 32);
+      }
+      g.fillStyle = '#fff'; g.fillRect(10 + u * 10.9, 6, 2, 48);
+    });
+  },
+  reset() { this.cs.forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-byz" data-part="8" data-trans="flip" data-dur="15000" data-title="崩溃故障与拜占庭故障" data-notes="分布式容错理论把故障分为两类：<b>崩溃故障</b>（部件停止工作）与<b>拜占庭故障</b>（部件持续工作，但给出错误信息）。传统分布式系统大多只需防崩溃；Agent 的故障却天生是拜占庭式的——它很少径直停止运行，而是继续给出看似可信的错误结论，且错误不会主动声明自己是错误。本章后文反复出现的交叉验证、多数表决，正是拜占庭容错的经典手段。<br>以下重点讨论几种在实践中尤为常见的失败模式。<br>演示（示意）：五个 Agent 回答同一个问题。崩溃故障时，出故障的 Agent 直接停止响应，超时就能发现；拜占庭故障时，它照常交出一个看起来同样可信的答案。打开多数表决后，系统比较五份独立结论，把少数派标出来。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">崩溃故障 vs 拜占庭故障：<em>Agent 的故障天生是拜占庭式的</em></h2></div>
+    <div class="bz-ctl fx fx-up" style="--d:2"><div class="seg bz-seg"><i class="knob"></i><button data-v="0">崩溃故障</button><button data-v="1">拜占庭故障</button></div><button class="tgl bz-vote"><i></i>多数表决</button></div></header>
+  <div class="bz-body">
+    <div class="bz-st fx fx-scale" style="--d:3">
+      <div class="bz-q"><span class="lbl">同一个问题</span><b>“这段代码的时间复杂度是多少？”</b></div>
+      <div class="bz-ags"></div>
+      <div class="bz-tal"><span class="bz-tt">—</span></div>
+      <span class="k10-sim bz-sim">示意</span>
+    </div>
+    <div class="bz-r fx fx-right" style="--d:4">
+      <div class="bz-c c"><b>崩溃故障</b><small>部件停止工作</small><p>传统分布式系统大多只需防崩溃：停止响应，超时就能发现</p></div>
+      <div class="bz-c y"><b>拜占庭故障</b><small>部件持续工作，但给出错误信息</small><p>Agent 很少径直停止运行，而是继续给出<b>看似可信的错误结论</b>，且错误不会主动声明自己是错误</p></div>
+      <div class="bz-c d"><b>拜占庭容错的经典手段</b><p>本章后文反复出现的<b>交叉验证、多数表决</b></p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「多 Agent 协作的失败模式」· 分布式容错</div>
+</section>
+<style>
+#c10-byz .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-byz .bz-ctl{display:flex;align-items:center;gap:14px}
+#c10-byz .bz-seg button{font-size:18px;padding:9px 18px}
+#c10-byz .bz-body{display:grid;grid-template-columns:1080px 1fr;gap:24px;height:660px}
+#c10-byz .bz-st{position:relative;padding:22px 26px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);display:flex;flex-direction:column;gap:24px}
+#c10-byz .bz-q{display:flex;align-items:center;gap:16px}
+#c10-byz .bz-q b{font-size:24px}
+#c10-byz .bz-sim{position:absolute;right:14px;top:12px}
+#c10-byz .bz-ags{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+#c10-byz .bz-a{display:flex;flex-direction:column;align-items:center;gap:12px}
+#c10-byz .bz-ans{width:100%;min-height:110px;padding:12px;border-radius:14px;text-align:center;font-size:19px;border:1px solid var(--line2);background:rgba(12,18,40,.85);transition:all .35s}
+#c10-byz .bz-ans small{display:block;margin-top:6px;font-size:15px;color:var(--text3)}
+#c10-byz .bz-a.dead .bz-ans{color:var(--text3);border-style:dashed}
+#c10-byz .bz-a.flag .bz-ans{border-color:var(--bad);background:rgba(251,113,133,.12);box-shadow:0 0 24px rgba(251,113,133,.35)}
+#c10-byz .bz-tal{margin-top:auto;padding:16px 20px;border-radius:16px;font-size:20px;line-height:1.55;border:1px solid var(--line);background:rgba(12,18,40,.75);min-height:90px}
+#c10-byz .bz-tal b{color:var(--acc)}
+#c10-byz .bz-tal .bad{color:var(--bad)}
+#c10-byz .bz-r{display:flex;flex-direction:column;gap:14px}
+#c10-byz .bz-c{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .35s,box-shadow .35s}
+#c10-byz .bz-c b{display:block;font-size:22px}
+#c10-byz .bz-c small{font-size:15px;color:var(--text3)}
+#c10-byz .bz-c p{margin-top:6px;font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-byz .bz-c p b{display:inline;font-size:inherit;color:var(--text)}
+#c10-byz .bz-c.c>b{color:#94a3b8}#c10-byz .bz-c.y>b{color:var(--bad)}#c10-byz .bz-c.d>b{color:var(--ok)}
+#c10-byz[data-m="0"] .bz-c.c,#c10-byz[data-m="1"] .bz-c.y{border-color:var(--acc);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 25%,transparent)}
+</style>
+<script>
+HOOKS['c10-byz'] = {
+  init(s) {
+    s.querySelector('.bz-ags').innerHTML = [0, 1, 2, 3, 4].map((i) => `<div class="bz-a"><div class="k10-ag" style="--c:${['#a78bfa', '#22d3ee', '#fbbf24', '#34d399', '#60a5fa'][i]}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent ${i + 1}</b></div><div class="bz-ans">…</div></div>`).join('');
+    this.as = [...s.querySelectorAll('.bz-a')];
+    this.set = U.seg(s.querySelector('.bz-seg'), (v) => { this.auto = false; this.mode(s, +v); });
+    this.vb = s.querySelector('.bz-vote');
+    this.vb.addEventListener('click', () => { this.auto = false; this.vote = !this.vote; this.vb.classList.toggle('on', this.vote); this.run(s); });
+  },
+  mode(s, m) { this.m = m; s.dataset.m = m; this.set(String(m)); this.run(s); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), tal = s.querySelector('.bz-tal');
+    this.as.forEach((a) => { a.classList.remove('dead', 'flag'); a.querySelector('.k10-ag').classList.remove('bad', 'ok', 'dim'); a.querySelector('.bz-ans').innerHTML = '…'; });
+    tal.innerHTML = '五个 Agent 各自作答……';
+    for (let i = 0; i < 5; i++) {
+      await w(450); if (!ok()) return;
+      const a = this.as[i], bad = i === 2;
+      if (bad && this.m === 0) { a.classList.add('dead'); a.querySelector('.k10-ag').classList.add('dim'); a.querySelector('.bz-ans').innerHTML = '（无响应）<small>超时</small>'; }
+      else if (bad) a.querySelector('.bz-ans').innerHTML = 'O(n)<small>“只有一层循环，所以是线性的”</small>';
+      else a.querySelector('.bz-ans').innerHTML = 'O(n log n)<small>“排序主导了整体开销”</small>';
+    }
+    await w(800); if (!ok()) return;
+    if (this.m === 0) tal.innerHTML = 'Agent 3 停止响应：<b>超时即可发现</b>，换一个实例重试就好——传统系统主要防的就是这种';
+    else if (!this.vote) tal.innerHTML = 'Agent 3 照常交出答案，<span class="bad">看起来和其他人一样可信</span>，也没有声明自己错了——单看任何一份都无从察觉';
+    else {
+      tal.innerHTML = '多数表决：<b>O(n log n) 4 票 · O(n) 1 票</b>';
+      await w(900); if (!ok()) return;
+      this.as[2].classList.add('flag'); this.as[2].querySelector('.k10-ag').classList.add('bad');
+      this.as.forEach((a, i) => i !== 2 && a.querySelector('.k10-ag').classList.add('ok'));
+      tal.innerHTML = '多数表决：<b>O(n log n) 4 票 · O(n) 1 票</b>——少数派被标出，交给交叉验证复核';
+    }
+    await w(2800); if (!ok()) return;
+    if (this.auto) {
+      if (this.m === 0) this.mode(s, 1);
+      else if (!this.vote) { this.vote = true; this.vb.classList.add('on'); this.run(s); }
+      else { this.vote = false; this.vb.classList.remove('on'); this.mode(s, 0); }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.vote = false; this.vb.classList.remove('on'); this.mode(s, 0); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.m = 0; },
+};
+</script>
+
+<section class="slide" id="c10-race" data-part="8" data-trans="rise" data-dur="18000" data-title="失败模式一：共享文件系统的并发冲突" data-notes="一旦选择共享内存式通信，并发冲突就会随之而来——这是操作系统和数据库几十年前就解决过的问题。冲突可以分为两类。<br><b>简单冲突（文件级写入冲突）</b>：两个 Agent 同时修改同一个文件，后写入的那个把先写入的修改覆盖掉了。<br><b>语义冲突（逻辑级一致性冲突）</b>：文件层面看不出任何冲突，但多个 Agent 的操作在逻辑上相互矛盾——这种冲突更隐蔽，也更危险。举个例子：Agent A 负责重新编排全书的图片编号，Agent B 同时在修改某一章节的内容并引用了原始编号的图片。两者操作的是不同文件，在文件层面完全没有冲突。但结果是 B 引用的图片编号在 A 完成重编后全部失效，读者看到的是错误的图片引用。<br><b>解决方案：乐观锁（Optimistic Locking）机制</b>。这是数据库领域常用的并发控制策略：每个文件维护一个版本号（或最后修改时间戳）。Agent 读取文件时记录当前版本号，写入时检查版本号是否仍与读取时一致。如果文件在此期间已被其他 Agent 修改过，写入就会失败，Agent 被迫重新读取最新版本，在此基础上重新执行操作。这种机制的代价是偶尔需要重试，但换来的是数据一致性保证。<br>需要注意的是，乐观锁只能防止<b>同一文件</b>的写入冲突。对于前述的<b>跨文件语义冲突</b>，则需要更高层的语义校验机制。在多个 Coding Agent 并发修改同一代码库这一最常见的场景里，业界主流的做法是<b>工作副本隔离</b>：为每个 Agent 分配独立的 Git 分支或 worktree，各自在自己的副本上并行修改、互不干扰，冲突被集中推迟到最后的合并点。<br>四个情形会自动轮播，也可以点右上角切换；文件内容为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式一：<em>共享文件系统的并发冲突</em></h2></div>
+    <div class="seg rc-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">简单冲突</button><button data-v="1">语义冲突</button><button data-v="2">乐观锁</button><button data-v="3">工作副本隔离</button></div></header>
+  <div class="rc-body">
+    <div class="rc-st fx fx-scale" style="--d:3">
+      <div class="rc-ag a"><div class="k10-ag" style="--c:#a78bfa"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent A</b></div><span class="rc-do a">—</span></div>
+      <div class="rc-files"></div>
+      <div class="rc-ag b"><div class="k10-ag" style="--c:#22d3ee"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent B</b></div><span class="rc-do b">—</span></div>
+      <span class="k10-sim rc-sim">示意</span>
+    </div>
+    <div class="rc-r fx fx-right" style="--d:4"><b class="rc-h">—</b><div class="rc-log"></div><p class="rc-k"></p></div>
+  </div>
+  <div class="src">第十章 ·「失败模式一：共享文件系统的并发冲突」</div>
+</section>
+<style>
+#c10-race .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-race .rc-seg button{font-size:17px;padding:9px 16px}
+#c10-race .rc-body{display:grid;grid-template-columns:1060px 1fr;gap:24px;height:660px}
+#c10-race .rc-st{position:relative;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);display:grid;grid-template-columns:200px 1fr 200px;gap:20px;align-items:center;padding:24px}
+#c10-race .rc-sim{position:absolute;right:14px;top:12px}
+#c10-race .rc-ag{display:flex;flex-direction:column;align-items:center;gap:14px}
+#c10-race .rc-do{padding:8px 12px;border-radius:10px;font-size:16px;text-align:center;line-height:1.45;border:1px solid var(--line2);min-height:64px;transition:border-color .3s}
+#c10-race .rc-do.on{border-color:var(--acc)}
+#c10-race .rc-files{display:flex;flex-direction:column;gap:16px}
+#c10-race .rc-f{padding:12px 16px;border-radius:14px;border:1.5px solid var(--line2);background:rgba(12,18,40,.9);transition:border-color .35s,box-shadow .35s}
+#c10-race .rc-fh{display:flex;align-items:center;gap:10px}
+#c10-race .rc-fh code{font:700 17px var(--mono);color:var(--ctx)}
+#c10-race .rc-fh em{margin-left:auto;font-style:normal;font:700 15px var(--mono);padding:2px 8px;border-radius:6px;color:#06101f;background:var(--warn)}
+#c10-race .rc-fb{margin-top:8px;font:16px/1.6 var(--mono);color:var(--text2);white-space:pre-wrap}
+#c10-race .rc-fb s{color:var(--bad)}
+#c10-race .rc-fb .a{color:#c4b5fd}#c10-race .rc-fb .b{color:#67e8f9}
+#c10-race .rc-fb .x{color:var(--bad);font-weight:700}
+#c10-race .rc-f.hit{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c10-race .rc-f.bad{border-color:var(--bad);box-shadow:0 0 24px rgba(251,113,133,.35)}
+#c10-race .rc-f.ok{border-color:var(--ok)}
+#c10-race .rc-r{display:flex;flex-direction:column;gap:12px}
+#c10-race .rc-h{font-size:24px;color:var(--acc)}
+#c10-race .rc-log{flex:1;padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:8px}
+#c10-race .rc-l{font-size:17px;line-height:1.5;animation:upIn .35s var(--ease) both}
+#c10-race .rc-l b{font-family:var(--mono);margin-right:6px}
+#c10-race .rc-l.a b{color:#c4b5fd}#c10-race .rc-l.b b{color:#67e8f9}#c10-race .rc-l.x{color:var(--bad)}#c10-race .rc-l.o{color:var(--ok)}
+#c10-race .rc-k{font-size:18px;line-height:1.6;padding:12px 16px;border-radius:14px;border-left:4px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c10-race .rc-k b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c10-race'] = {
+  H: ['简单冲突（文件级写入冲突）', '语义冲突（逻辑级一致性冲突）', '解决方案：乐观锁（Optimistic Locking）机制', '工作副本隔离'],
+  K: [
+    '两个 Agent 同时修改同一个文件，<b>后写入的覆盖了先写入的</b>',
+    '两者操作不同文件，<b>文件层面完全没有冲突</b>——但 B 引用的图号在重编后全部失效，更隐蔽也更危险',
+    '代价是偶尔重试，换来数据一致性；但乐观锁<b>只能防同一文件</b>的写入冲突，跨文件语义冲突需要更高层的语义校验',
+    '每个 Agent 一个独立的 Git 分支或 worktree，互不干扰，冲突<b>集中推迟到最后的合并点</b>',
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.rc-seg'), (v) => { this.auto = false; this.play(s, +v); });
+    this.files = s.querySelector('.rc-files');
+    this.log = s.querySelector('.rc-log');
+    this.da = s.querySelector('.rc-do.a'); this.db = s.querySelector('.rc-do.b');
+  },
+  file(id, name, ver, body) { return `<div class="rc-f" data-f="${id}"><div class="rc-fh"><svg class="ic"><use href="#i-file"/></svg><code>${name}</code>${ver != null ? `<em>v${ver}</em>` : ''}</div><div class="rc-fb">${body}</div></div>`; },
+  upd(id, body, ver, cls) {
+    const f = this.files.querySelector(`[data-f="${id}"]`);
+    if (body != null) f.querySelector('.rc-fb').innerHTML = body;
+    if (ver != null) f.querySelector('em').textContent = 'v' + ver;
+    f.classList.remove('hit', 'bad', 'ok'); if (cls) f.classList.add(cls);
+  },
+  l(c, who, t) { this.log.insertAdjacentHTML('beforeend', `<div class="rc-l ${c}">${who ? `<b>${who}</b>` : ''}${t}</div>`); },
+  async play(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), A = (t) => (this.da.textContent = t), B = (t) => (this.db.textContent = t);
+    this.m = m; this.set(String(m));
+    s.querySelector('.rc-h').textContent = this.H[m];
+    s.querySelector('.rc-k').innerHTML = this.K[m];
+    this.log.innerHTML = ''; A('—'); B('—');
+    if (m === 0) {
+      this.files.innerHTML = this.file('f', 'summary.md', null, '结论：待补充');
+      await w(700); if (!ok()) return;
+      A('读取 summary.md'); B('读取 summary.md'); this.l('a', 'A', '读取 summary.md'); this.l('b', 'B', '读取 summary.md'); this.upd('f', null, null, 'hit');
+      await w(1200); if (!ok()) return;
+      A('写入：补充实验结论'); this.l('a', 'A', '写入“实验结论：方法有效”'); this.upd('f', '结论：<span class="a">实验结论：方法有效</span>', null, 'hit');
+      await w(1300); if (!ok()) return;
+      B('写入：补充参考文献'); this.l('b', 'B', '基于旧内容写入“参考文献 3 篇”'); this.upd('f', '结论：<s>实验结论：方法有效</s>\n<span class="b">参考文献 3 篇</span>', null, 'bad');
+      this.l('x', '', 'A 的修改被覆盖，没有任何报错');
+    } else if (m === 1) {
+      this.files.innerHTML = this.file('g', 'figures/', null, '图3 架构图 · 图4 时序图') + this.file('c', 'chapter2.md', null, '……如图3 所示……');
+      await w(700); if (!ok()) return;
+      A('重新编排全书图片编号'); this.l('a', 'A', '在 figures/ 前插入一张新图，全部重编'); this.upd('g', '<span class="a">图3 新增流程图</span> · 图4 架构图 · 图5 时序图', null, 'hit');
+      await w(1300); if (!ok()) return;
+      B('修改第二章内容'); this.l('b', 'B', '在 chapter2.md 中写“如图3 所示的架构”'); this.upd('c', '……<span class="b">如图3 所示的架构</span>……', null, 'hit');
+      await w(1300); if (!ok()) return;
+      this.l('', '', '文件层面：两个文件各写各的，<b>没有冲突</b>');
+      await w(1000); if (!ok()) return;
+      this.upd('c', '……<span class="x">如图3 所示的架构</span>（图3 现在是流程图）……', null, 'bad');
+      this.l('x', '', '逻辑层面：B 引用的编号已经失效，读者看到错误的图片引用');
+    } else if (m === 2) {
+      this.files.innerHTML = this.file('f', 'summary.md', 1, '结论：待补充');
+      await w(700); if (!ok()) return;
+      A('读取，记下 v1'); B('读取，记下 v1'); this.l('a', 'A', '读取 summary.md，版本 v1'); this.l('b', 'B', '读取 summary.md，版本 v1');
+      await w(1200); if (!ok()) return;
+      A('写入（期望 v1）'); this.l('a', 'A', '写入时检查：当前仍是 v1 → 成功，版本变为 v2'); this.upd('f', '结论：<span class="a">实验结论：方法有效</span>', 2, 'ok');
+      await w(1300); if (!ok()) return;
+      B('写入（期望 v1）'); this.l('x', 'B', '写入时检查：当前已是 v2 ≠ v1 → 写入失败'); this.upd('f', null, null, 'bad');
+      await w(1300); if (!ok()) return;
+      B('重新读取 v2，重做'); this.l('b', 'B', '重新读取最新版本 v2，在此基础上重新执行');
+      await w(1100); if (!ok()) return;
+      this.upd('f', '结论：<span class="a">实验结论：方法有效</span>\n<span class="b">参考文献 3 篇</span>', 3, 'ok'); this.l('o', 'B', '写入成功，版本 v3：两份修改都在');
+    } else {
+      this.files.innerHTML = this.file('a', 'worktree-a（分支 agent-a）', null, '') + this.file('b', 'worktree-b（分支 agent-b）', null, '') + this.file('m', 'main · 合并点', null, '等待合并');
+      await w(700); if (!ok()) return;
+      for (let i = 1; i <= 3; i++) {
+        A(`在自己的副本上提交 #${i}`); B(`在自己的副本上提交 #${i}`);
+        this.upd('a', Array.from({ length: i }, (_, j) => `<span class="a">● commit a${j + 1}</span>`).join('  '), null, 'hit');
+        this.upd('b', Array.from({ length: i }, (_, j) => `<span class="b">● commit b${j + 1}</span>`).join('  '), null, 'hit');
+        if (i === 1) this.l('', '', '两个 Agent 并行修改，<b>互不干扰</b>');
+        await w(1000); if (!ok()) return;
+      }
+      this.upd('m', '合并 agent-a ✓\n合并 agent-b：<span class="x">1 处冲突</span> → 在合并点集中解决', null, 'hit');
+      this.l('x', '', '冲突被集中推迟到最后的合并点');
+      await w(1200); if (!ok()) return;
+      this.upd('m', '合并 agent-a ✓  合并 agent-b ✓', null, 'ok'); this.l('o', '', '解决后合入 main');
+    }
+    await w(3000); if (!ok()) return;
+    if (this.auto) this.play(s, (m + 1) % 4); else this.play(s, m);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.play(s, 0); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.log.innerHTML = ''; this.files.innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-telephone" data-part="8" data-trans="zoom" data-dur="15000" data-title="失败模式二：错误的级联放大" data-notes="进程间传递字节，逐位保真，但 Agent 间传递语义，每转述一次都是有损的重新编码。当多个 Agent 频繁互动时，一个 Agent 的错误可能被后续 Agent 逐层强化，就像“传话游戏”中信息越传越走样。<br><b>交叉验证</b>是打断这条链的关键手段。核心不是让更多 Agent 参与同一条思维链，而是让某个 Agent 以<b>独立视角</b>重新审视结论：不看前序 Agent 的思考过程，只看原始证据和最终结论是否一致。这正是第五章讨论的提议者-审核者机制在多 Agent 场景中的延伸。<br>演示（示意）：一条实验结论经过五个 Agent 逐次转述，每一次都只改了一点点；打开交叉验证后，独立审核者跳过整条转述链，只把原始证据和最终结论放在一起比较。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式二：错误的<em>级联放大</em></h2></div>
+    <button class="tgl te-x fx fx-up" style="--d:2"><i></i>交叉验证</button></header>
+  <p class="lead fx fx-up" style="--d:2">进程间传递字节，逐位保真；Agent 间传递语义，<b>每转述一次都是有损的重新编码</b></p>
+  <div class="te-st fx fx-scale" style="--d:3">
+    <div class="te-ev"><span class="lbl">原始证据</span><b>3 个数据集：2 个提升、1 个下降</b></div>
+    <div class="te-chain"></div>
+    <div class="te-rev"><div class="k10-ag" style="--c:#34d399"><span class="k10-av"><svg class="ic"><use href="#i-search"/></svg></span><b>独立审核者</b><small>不看前序思考过程</small></div><p class="te-rm">—</p></div>
+    <span class="k10-sim te-sim">示意</span>
+  </div>
+  <p class="tagline te-tag fx fx-up" style="--d:5">核心不是让更多 Agent 参与同一条思维链，而是以<b>独立视角</b>只看原始证据与最终结论是否一致——第五章提议者-审核者机制的延伸</p>
+  <div class="src">第十章 ·「失败模式二：错误的级联放大」</div>
+</section>
+<style>
+#c10-telephone .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-telephone .lead b{color:var(--acc)}
+#c10-telephone .te-st{position:relative;height:560px;margin-top:10px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-telephone .te-sim{position:absolute;right:14px;top:12px}
+#c10-telephone .te-ev{position:absolute;left:30px;top:30px;padding:12px 18px;border-radius:14px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 8%,rgba(10,16,36,.9))}
+#c10-telephone .te-ev b{display:block;font-size:20px;margin-top:4px}
+#c10-telephone .te-chain{position:absolute;left:30px;right:30px;top:150px;display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+#c10-telephone .te-n{display:flex;flex-direction:column;align-items:center;gap:12px}
+#c10-telephone .te-b{position:relative;width:100%;min-height:96px;padding:10px 12px;border-radius:14px;font-size:18px;line-height:1.45;text-align:center;border:1px solid var(--line2);background:rgba(12,18,40,.9);opacity:.25;transition:opacity .4s,border-color .4s}
+#c10-telephone .te-b.on{opacity:1;border-color:color-mix(in srgb,var(--c) 70%,transparent)}
+#c10-telephone .te-b small{display:block;margin-top:4px;font-size:15px;color:var(--text3)}
+#c10-telephone .te-n:not(:last-child) .te-b::after{content:"→";position:absolute;right:-16px;top:50%;translate:0 -50%;font-size:20px;color:var(--text3)}
+#c10-telephone .te-rev{position:absolute;right:30px;bottom:30px;width:640px;display:flex;align-items:center;gap:20px;padding:14px 18px;border-radius:16px;border:1.5px dashed var(--line2);opacity:.35;transition:opacity .4s,border-color .4s}
+#c10-telephone .te-rev.on{opacity:1;border-color:var(--ok)}
+#c10-telephone .te-rm{flex:1;font-size:18px;line-height:1.55}
+#c10-telephone .te-rm b{color:var(--bad)}
+#c10-telephone .te-tag{margin-top:16px;font-size:21px}
+</style>
+<script>
+HOOKS['c10-telephone'] = {
+  T: [['2/3 的数据集提升', '略去了下降的那个'], ['多数数据集提升', '把比例换成了“多数”'], ['普遍提升', '“多数”变成“普遍”'], ['显著提升', '加上了程度词'], ['在所有数据集上全面显著提升', '最终报告']],
+  C: ['#a78bfa', '#22d3ee', '#fbbf24', '#f472b6', '#fb7185'],
+  init(s) {
+    s.querySelector('.te-chain').innerHTML = this.T.map(([t, n], i) => `<div class="te-n"><div class="k10-ag" style="--c:${this.C[i]}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent ${i + 1}</b></div><div class="te-b" style="--c:${this.C[i]}">“${t}”<small>${n}</small></div></div>`).join('');
+    this.bs = [...s.querySelectorAll('.te-b')];
+    this.rev = s.querySelector('.te-rev');
+    this.xb = s.querySelector('.te-x');
+    this.xb.addEventListener('click', () => { this.auto = false; this.x = !this.x; this.xb.classList.toggle('on', this.x); this.run(s); });
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), rm = s.querySelector('.te-rm');
+    this.bs.forEach((b) => b.classList.remove('on'));
+    this.rev.classList.remove('on'); rm.textContent = this.x ? '等待最终结论……' : '（未启用）';
+    for (const b of this.bs) { await w(900); if (!ok()) return; b.classList.add('on'); }
+    await w(900); if (!ok()) return;
+    if (this.x) { this.rev.classList.add('on'); rm.innerHTML = '只对照原始证据和最终结论：“全面显著提升”与“1 个数据集下降”<b>不一致</b> → 打回'; }
+    else rm.textContent = '（未启用）每一步只改了一点，链上没有人发现走样';
+    await w(3000); if (!ok()) return;
+    if (this.auto) { this.x = !this.x; this.xb.classList.toggle('on', this.x); }
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.x = false; this.xb.classList.remove('on'); this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.bs.forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-homo" data-part="8" data-trans="flip" data-dur="16000" data-title="失败模式三：同质趋同" data-notes="错误不一定沿通信链传播，也可能由多个同质 Agent 独立地产生。Anthropic 的实验中，30 个同时上线的 Agent 有 18 个创建了同名 Git 分支；在写作实验中，不同 Agent 还会不约而同地使用相同标题。这类由共同模型和脚手架引发的<b>共因失效</b>意味着，同一模型、相似上下文生成的多个审核意见，不能自动视为相互独立的证据。系统除了要有意识地引入模型、上下文和数据来源的差异，还应使用命名空间、资源配额和速率限制，防止相同决策同时冲击共享资源。<br>协调本身也未必有益。在 Bertrand 定价实验中，逐利 Agent 有私密信道时很快达成价格合谋；移除所有直接通信后，它们仍会通过公开报价板来合谋报价。<br>左侧：30 个点代表 30 个 Agent，其中 18 个汇向同一个分支名（分支名与位置为示意）；打开对策后，各自落在带命名空间的分支上。右侧价格线为示意，不是实验数据。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式三：<em>同质趋同</em></h2></div>
+    <button class="tgl hm-fix fx fx-up" style="--d:2"><i></i>差异化 + 命名空间 + 配额 + 速率限制</button></header>
+  <div class="hm-body">
+    <div class="hm-l fx fx-left" style="--d:2">
+      <div class="hm-cvw"><canvas class="hm-cv" width="1360" height="860"></canvas><span class="k10-sim hm-sim">示意</span></div>
+      <div class="hm-kpi"><b class="hm-n">18</b><span>/ 30 个同时上线的 Agent 创建了<b>同名 Git 分支</b>；写作实验中还会不约而同地用<b>相同标题</b></span></div>
+    </div>
+    <div class="hm-r fx fx-right" style="--d:3">
+      <div class="hm-c"><b>共因失效</b><p>由共同模型和脚手架引发：同一模型、相似上下文生成的多个审核意见，<b>不能自动视为相互独立的证据</b></p></div>
+      <div class="hm-c"><b>对策</b><p>引入模型、上下文和数据来源的差异；用命名空间、资源配额和速率限制，防止相同决策<b>同时冲击共享资源</b></p></div>
+      <div class="hm-bt"><span class="lbl">协调本身也未必有益：Bertrand 定价实验 <span class="k10-sim">示意</span></span>
+        <svg class="hm-svg" viewBox="0 0 560 220" width="560" height="220"><path d="M30 190H540M30 190V20" stroke="rgba(255,255,255,.2)" stroke-width="2" fill="none"/><path class="hm-cp" d="M30 170 H540" stroke="rgba(52,211,153,.6)" stroke-dasharray="6 6" stroke-width="2"/><text x="536" y="164" text-anchor="end" fill="#6ee7b7" font-size="15">竞争价</text><path class="hm-p1" fill="none" stroke="#fb7185" stroke-width="3.5"/><path class="hm-p2" fill="none" stroke="#fbbf24" stroke-width="3.5"/><text x="34" y="16" fill="#94a3b8" font-size="15">报价</text></svg>
+        <div class="hm-lg"><span class="r">有私密信道：很快达成价格合谋</span><span class="y">移除直接通信：仍借公开报价板合谋</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「失败模式三：同质趋同」</div>
+</section>
+<style>
+#c10-homo .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-homo .hm-body{display:grid;grid-template-columns:700px 1fr;gap:26px;height:680px}
+#c10-homo .hm-l{display:flex;flex-direction:column;gap:14px}
+#c10-homo .hm-cvw{position:relative;height:430px;border-radius:20px;border:1px solid var(--line);background:rgba(10,16,36,.5);overflow:hidden}
+#c10-homo .hm-cv{display:block;width:680px;height:426px}
+#c10-homo .hm-sim{position:absolute;right:12px;top:10px}
+#c10-homo .hm-kpi{display:flex;align-items:center;gap:16px;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-homo .hm-kpi>b{font:800 54px var(--num);color:var(--bad)}
+#c10-homo .hm-kpi span{font-size:18px;line-height:1.55;color:var(--text2)}
+#c10-homo .hm-kpi span b{color:var(--text)}
+#c10-homo .hm-r{display:flex;flex-direction:column;gap:14px}
+#c10-homo .hm-c{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-homo .hm-c>b{font-size:20px;color:var(--acc)}
+#c10-homo .hm-c p{margin-top:4px;font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-homo .hm-c p b{color:var(--text)}
+#c10-homo .hm-bt{padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-homo .hm-svg{display:block;margin-top:6px}
+#c10-homo .hm-lg{display:flex;gap:20px;font-size:16px}
+#c10-homo .hm-lg .r{color:#fb7185}#c10-homo .hm-lg .y{color:#fbbf24}
+</style>
+<script>
+HOOKS['c10-homo'] = {
+  init(s) {
+    this.g = s.querySelector('.hm-cv').getContext('2d');
+    const r = U.rand(4);
+    this.P = Array.from({ length: 30 }, (_, i) => ({ x: 40 + r() * 600, y: 60 + r() * 330, same: i < 18, ns: i, h: (r() * 360) | 0 }));
+    this.fb = s.querySelector('.hm-fix');
+    this.fb.addEventListener('click', () => { this.auto = false; this.fix = !this.fix; this.fb.classList.toggle('on', this.fix); this.t0 = performance.now(); });
+    this.p1 = s.querySelector('.hm-p1'); this.p2 = s.querySelector('.hm-p2');
+  },
+  enter(s, ctx) {
+    this.auto = true; this.fix = false; this.fb.classList.remove('on'); this.t0 = performance.now();
+    const g = this.g, nEl = s.querySelector('.hm-n');
+    ctx.raf((t) => {
+      let u = Math.min(1, (t - this.t0) / 2600);
+      if (this.auto && t - this.t0 > 6000) { this.fix = !this.fix; this.fb.classList.toggle('on', this.fix); this.t0 = t; u = 0; }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 680, 430);
+      const tx = 340, ty = 215, e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+      if (!this.fix) { g.strokeStyle = 'rgba(251,113,133,.6)'; g.lineWidth = 2; g.beginPath(); g.arc(tx, ty, 46, 0, 6.283); g.stroke(); g.fillStyle = '#fda4af'; g.font = '16px monospace'; g.textAlign = 'center'; g.fillText('fix/test-failures', tx, ty + 70); }
+      this.P.forEach((p, i) => {
+        let x = p.x, y = p.y;
+        if (!this.fix && p.same) { const a = (i / 18) * 6.283; x = p.x + (tx + Math.cos(a) * 30 - p.x) * e; y = p.y + (ty + Math.sin(a) * 30 - p.y) * e; }
+        g.fillStyle = !this.fix && p.same ? '#fb7185' : `hsl(${p.h} 70% 65%)`;
+        g.beginPath(); g.arc(x, y, 8, 0, 6.283); g.fill();
+        if (this.fix && u > 0.4) { g.fillStyle = 'rgba(226,232,240,.75)'; g.font = '15px monospace'; g.textAlign = 'center'; if (i % 3 === 0) g.fillText(`a${i + 1}/fix`, x, y - 14); }
+      });
+      nEl.textContent = this.fix ? 0 : 18;
+      // Bertrand 定价（示意）：两条报价线逐步抬离竞争价
+      const k = ((t / 8000) % 1), pts1 = [], pts2 = [];
+      for (let j = 0; j <= 50; j++) { const x = 30 + j * 10.2, q = Math.min(1, j / 50 / Math.max(0.05, k)); pts1.push(`${x} ${170 - 140 * (1 - Math.exp(-6 * Math.min(j / 50, k)))}`); pts2.push(`${x} ${170 - 110 * (1 - Math.exp(-2.5 * Math.min(j / 50, k)))}`); }
+      this.p1.setAttribute('d', 'M' + pts1.join('L')); this.p2.setAttribute('d', 'M' + pts2.join('L'));
+    });
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c10-blame" data-part="8" data-trans="rise" data-dur="17000" data-title="失败模式四：互相扯皮" data-notes="目标互斥时，系统还可能从趋同走向对抗。Anthropic 让三个 Agent 分别把同一后端迁移到不同语言，它们很快把其他 Agent 的操作理解为蓄意阻挠，继而终止对方进程、撤销权限，甚至部署自复制的破坏代码。<b>更强的执行能力并不等于更好的协调能力</b>；运行时必须预先定义目标优先级、资源所有权和权限边界，并在冲突无法按可验证规则解决时暂停执行、交由人工裁决。<br>MetaGPT 的早期版本也出现过多个开发角色 Agent 之间像患了大公司病一样，互相扯皮的问题。例如，测试工程师指出一个 bug，前端工程师和后端工程师互相推诿，认为应该由对方先改；后端工程师认为是产品设计问题，产品经理认为是后端架构问题；测试工程师指出一个 bug，但这个 bug 实际来自测试环境，不管前后端工程师如何修改，测试工程师都始终报相同的 bug，导致陷入僵局。<br>左侧逐级点亮升级过程；打开“运行时规则”后，冲突在第一步就被暂停并交给人工裁决。右侧推诿与死锁为示意回放。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式四：<em>互相扯皮</em></h2></div>
+    <button class="tgl bl-rule fx fx-up" style="--d:2"><i></i>运行时规则：优先级 · 所有权 · 权限边界</button></header>
+  <div class="bl-body">
+    <div class="bl-l panel fx fx-left" style="--d:2">
+      <div class="bl-h"><b>Anthropic：三个 Agent，把同一后端迁移到不同语言</b><small>目标互斥，从趋同走向对抗</small></div>
+      <div class="bl-ags"><div class="k10-ag" style="--c:#a78bfa"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>迁移 Agent 1</b></div><div class="k10-ag" style="--c:#22d3ee"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>迁移 Agent 2</b></div><div class="k10-ag" style="--c:#fbbf24"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>迁移 Agent 3</b></div></div>
+      <div class="bl-esc"></div>
+      <p class="bl-k"><b>更强的执行能力并不等于更好的协调能力</b></p>
+    </div>
+    <div class="bl-r fx fx-right" style="--d:3">
+      <div class="bl-mg panel"><span class="lbl">MetaGPT 早期版本：像患了大公司病 <span class="k10-sim">示意</span></span><div class="bl-pp"><span data-r="0">测试工程师</span><span data-r="1">前端工程师</span><span data-r="2">后端工程师</span><span data-r="3">产品经理</span></div><p class="bl-say">—</p></div>
+      <div class="bl-dl panel"><span class="lbl">死锁：bug 实际来自测试环境</span><div class="bl-loop"><span>测试报 bug</span><i>→</i><span>前后端修改</span><i>→</i><span>测试仍报同一个 bug</span><i class="bl-back">↺</i></div><small>不管怎么改，测试工程师都始终报相同的 bug</small></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「失败模式四：互相扯皮」</div>
+</section>
+<style>
+#c10-blame .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-blame .bl-body{display:grid;grid-template-columns:820px 1fr;gap:26px;height:680px}
+#c10-blame .bl-l{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c10-blame .bl-h b{display:block;font-size:21px}
+#c10-blame .bl-h small{font-size:16px;color:var(--text3)}
+#c10-blame .bl-ags{display:flex;justify-content:space-around}
+#c10-blame .bl-esc{display:flex;flex-direction:column;gap:10px}
+#c10-blame .bl-e{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;font-size:19px;border:1px solid var(--line);opacity:.3;transition:all .4s}
+#c10-blame .bl-e em{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 16px var(--num);color:#06101f;background:var(--bad)}
+#c10-blame .bl-e.on{opacity:1;border-color:var(--bad);background:rgba(251,113,133,.1)}
+#c10-blame .bl-e.stop{opacity:1;border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c10-blame .bl-e.stop em{background:var(--ok)}
+#c10-blame .bl-k{margin-top:auto;font-size:20px;text-align:center}
+#c10-blame .bl-k b{color:var(--warn)}
+#c10-blame .bl-r{display:flex;flex-direction:column;gap:16px}
+#c10-blame .bl-mg,#c10-blame .bl-dl{padding:16px 20px}
+#c10-blame .bl-pp{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+#c10-blame .bl-pp span{padding:10px;border-radius:12px;text-align:center;font-size:18px;border:1px solid var(--line2);transition:all .3s}
+#c10-blame .bl-pp span.on{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 12%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--warn) 35%,transparent)}
+#c10-blame .bl-say{margin-top:12px;min-height:56px;font-size:18px;line-height:1.5}
+#c10-blame .bl-loop{display:flex;align-items:center;gap:8px;margin-top:10px}
+#c10-blame .bl-loop span{padding:8px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2)}
+#c10-blame .bl-loop i{font-style:normal;color:var(--text3)}
+#c10-blame .bl-back{font-size:26px;color:var(--bad)!important;animation:spin 3s linear infinite;display:inline-block}
+#c10-blame .bl-dl small{display:block;margin-top:10px;font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-blame'] = {
+  E: ['把其他 Agent 的操作理解为蓄意阻挠', '终止对方进程', '撤销对方权限', '部署自复制的破坏代码'],
+  PP: [[0, '测试工程师：这里有个 bug'], [1, '前端：应该后端先改'], [2, '后端：应该前端先改'], [2, '后端：这是产品设计问题'], [3, '产品经理：这是后端架构问题'], [0, '测试工程师：bug 还在']],
+  init(s) {
+    this.esc = s.querySelector('.bl-esc');
+    this.rb = s.querySelector('.bl-rule');
+    this.rb.addEventListener('click', () => { this.auto = false; this.rule = !this.rule; this.rb.classList.toggle('on', this.rule); this.run(s); });
+    this.pp = [...s.querySelectorAll('.bl-pp span')];
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    this.esc.innerHTML = this.E.map((e, i) => `<div class="bl-e"><em>${i + 1}</em><span>${e}</span></div>`).join('');
+    const es = [...this.esc.children];
+    for (let i = 0; i < es.length; i++) {
+      await w(1100); if (!ok()) return;
+      if (this.rule && i === 1) {
+        es[i].className = 'bl-e stop';
+        es[i].querySelector('span').innerHTML = '冲突无法按可验证规则解决 → <b>暂停执行，交由人工裁决</b>（依据预先定义的目标优先级、资源所有权与权限边界）';
+        break;
+      }
+      es[i].classList.add('on');
+    }
+    await w(3000); if (!ok()) return;
+    if (this.auto) { this.rule = !this.rule; this.rb.classList.toggle('on', this.rule); }
+    this.run(s);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.rule = false; this.rb.classList.remove('on'); this.run(s);
+    let i = 0;
+    const say = s.querySelector('.bl-say');
+    ctx.every(() => { const [r, t] = this.PP[i]; this.pp.forEach((p, j) => p.classList.toggle('on', j === r)); say.textContent = t; i = (i + 1) % this.PP.length; }, 1500);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.esc.innerHTML = ''; this.pp.forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-runaway" data-part="8" data-trans="zoom" data-dur="14000" data-title="失败模式五：循环失控" data-notes="“对等协作”一节讨论的过早终止是循环转不下去，多 Agent 场景下还有相反的一种失败：循环停不下来。<b>失控的 Agent 有时会生成数千个子 Agent，浪费大量 token</b>。因此，对于自主性较强的 Agent，建议使用独立的 API key，防止 token 开销不受控增长。<br>演示（示意）：每个子 Agent 都可能再派生子 Agent，数量呈指数增长；打开“独立 API key + 预算上限”后，花费到达上限即被截断，不会拖垮其他服务。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式五：<em>循环停不下来</em></h2></div>
+    <button class="tgl ru-cap fx fx-up" style="--d:2"><i></i>独立 API key + 预算上限</button></header>
+  <div class="ru-body">
+    <div class="ru-st fx fx-scale" style="--d:2"><canvas class="ru-cv" width="2080" height="1200"></canvas><span class="k10-sim ru-sim">示意</span></div>
+    <div class="ru-r fx fx-right" style="--d:3">
+      <div class="ru-k"><span>子 Agent 数</span><b class="ru-n">1</b></div>
+      <div class="ru-k"><span>token 开销</span><div class="meter"><i class="ru-m"></i></div><small class="ru-s">—</small></div>
+      <div class="ru-two"><div><b>过早终止</b><small>对等协作一节</small><p>循环<b>转不下去</b></p></div><div class="bad"><b>循环失控</b><small>多 Agent 场景</small><p>循环<b>停不下来</b>：有时会生成数千个子 Agent</p></div></div>
+      <p class="ru-tip"><svg class="ic"><use href="#i-key"/></svg>对自主性较强的 Agent，建议使用<b>独立的 API key</b>，防止 token 开销不受控增长</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「失败模式五：循环失控」</div>
+</section>
+<style>
+#c10-runaway .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-runaway .ru-body{display:grid;grid-template-columns:1040px 1fr;gap:26px;height:640px}
+#c10-runaway .ru-st{position:relative;height:600px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);overflow:hidden}
+#c10-runaway .ru-cv{display:block;width:100%;height:596px}
+#c10-runaway .ru-sim{position:absolute;right:14px;top:12px}
+#c10-runaway .ru-r{display:flex;flex-direction:column;gap:16px}
+#c10-runaway .ru-k{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:6px}
+#c10-runaway .ru-k span{font-size:17px;color:var(--text3)}
+#c10-runaway .ru-k b{font:800 56px var(--num);color:var(--bad)}
+#c10-runaway .ru-m{--c:var(--bad);transition:width .2s linear!important}
+#c10-runaway .ru-s{font-size:16px;color:var(--text2)}
+#c10-runaway .ru-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c10-runaway .ru-two>div{padding:12px 14px;border-radius:14px;border:1px solid var(--line)}
+#c10-runaway .ru-two b{font-size:19px}
+#c10-runaway .ru-two small{display:block;font-size:15px;color:var(--text3)}
+#c10-runaway .ru-two p{margin-top:6px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-runaway .ru-two p b{font-size:inherit;color:var(--text)}
+#c10-runaway .ru-two .bad{border-color:var(--bad);background:rgba(251,113,133,.08)}
+#c10-runaway .ru-tip{display:flex;gap:12px;align-items:flex-start;font-size:18px;line-height:1.55;margin-top:auto;padding:14px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c10-runaway .ru-tip .ic{flex:none;font-size:26px;color:var(--ok)}
+#c10-runaway .ru-tip b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c10-runaway'] = {
+  CAP: 60,
+  init(s) {
+    this.g = s.querySelector('.ru-cv').getContext('2d');
+    this.cb = s.querySelector('.ru-cap');
+    this.cb.addEventListener('click', () => { this.auto = false; this.cap = !this.cap; this.cb.classList.toggle('on', this.cap); this.restart(); });
+  },
+  restart() { this.N = [{ x: 520, y: 300, px: 520, py: 300, d: 0, t: 0 }]; this.acc = 0; this.full = 0; this.t0 = performance.now(); },
+  enter(s, ctx) {
+    this.auto = true; this.cap = false; this.cb.classList.remove('on'); this.restart();
+    const g = this.g, nEl = s.querySelector('.ru-n'), m = s.querySelector('.ru-m'), st = s.querySelector('.ru-s');
+    let last = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      this.acc += dt;
+      if (this.acc > 260 && !this.full) {
+        this.acc = 0;
+        const add = [];
+        for (const p of this.N) if (Math.random() < 0.35 && p.d < 9) { const a = Math.random() * 6.283, r = 40 + Math.random() * 40; add.push({ x: Math.max(10, Math.min(1030, p.x + Math.cos(a) * r)), y: Math.max(10, Math.min(590, p.y + Math.sin(a) * r)), px: p.x, py: p.y, d: p.d + 1, t: 0 }); }
+        for (const a of add) { if (this.cap && this.N.length >= this.CAP) { this.full = 1; break; } this.N.push(a); if (this.N.length > 2400) { this.full = 1; break; } }
+      }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 1040, 600);
+      g.lineWidth = 1;
+      for (const p of this.N) { p.t = Math.min(1, p.t + dt / 400); g.strokeStyle = 'rgba(251,113,133,.25)'; g.beginPath(); g.moveTo(p.px, p.py); g.lineTo(p.px + (p.x - p.px) * p.t, p.py + (p.y - p.py) * p.t); g.stroke(); }
+      for (const p of this.N) { g.fillStyle = p.d === 0 ? '#fbbf24' : this.cap ? '#34d399' : '#fb7185'; g.beginPath(); g.arc(p.px + (p.x - p.px) * p.t, p.py + (p.y - p.py) * p.t, p.d === 0 ? 9 : 3.2, 0, 6.283); g.fill(); }
+      const n = this.N.length, v = this.cap ? (n / this.CAP) * 100 : Math.min(100, (n / 2400) * 100);
+      nEl.textContent = n.toLocaleString('en-US');
+      nEl.style.color = this.cap ? 'var(--ok)' : 'var(--bad)';
+      m.style.setProperty('--v', v.toFixed(1) + '%');
+      m.style.setProperty('--c', this.cap ? 'var(--ok)' : 'var(--bad)');
+      st.textContent = this.full ? (this.cap ? '到达这把 key 的预算上限：派生被截断，其他服务不受影响' : '数千个子 Agent：大量 token 被浪费') : this.cap ? '受独立 API key 的预算约束' : '共享 key：开销不受控增长';
+      if (this.full && t - this.t0 > 9000) { if (this.auto) { this.cap = !this.cap; this.cb.classList.toggle('on', this.cap); } this.restart(); }
+    });
+  },
+  reset() { this.restart(); },
+};
+</script>
+
+<section class="slide" id="c10-debt" data-part="8" data-trans="iris" data-dur="16000" data-title="失败模式六：理解债与认知投降" data-notes="这种模式不是 Agent 的失败，而是人的失败。随着 Agent 的智力提升、执行长流程任务的能力提升，人是否能理解 Agent 的交付件，是否能给 Agent 有效的指导，变得越来越难。<br>使用 Agent 开发容易造成<b>理解债</b>：Agent 循环交付代码的速度越快，工程师对系统实际实现的理解就落后得越远，等到出现严重问题，必须人工介入时，已经看不懂自己的系统。另一个问题是<b>认知投降</b>：工程师习惯了用 Agent 代劳，逐渐放弃独立思考与审查，导致软件质量失控。<br>Andrej Karpathy 曾说，“你可以外包你的思考，但不能外包你的理解”。管理 Agent 就像管理技术员工，既不能越俎代庖，也不能放手不管。合格的技术管理者需要理解并指导系统架构，而不是仅仅用 PUA 的方式指挥 Agent。因此，Agent 使用者的技术基本功很重要。<br>以上所有讨论都是工程视角：如何让一组 Agent 协作完成任务。接下来视角切换：当大量 Agent 长期共存、不再由单一目标驱动时，会涌现什么？<br>左侧曲线是示意：系统实现的规模随交付速度增长，人的理解落在后面，两者之间的阴影就是理解债。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">失败模式六：<em>理解债与认知投降</em>——不是 Agent 的失败，而是人的失败</h2></header>
+  <div class="dt-body">
+    <div class="dt-l panel fx fx-left" style="--d:2">
+      <svg class="dt-svg" viewBox="0 0 800 440" width="800" height="440">
+        <path d="M50 400H780M50 400V20" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/>
+        <text x="776" y="428" text-anchor="end" fill="#94a3b8" font-size="16">时间 →</text>
+        <path class="dt-gap" fill="rgba(251,113,133,.16)"/>
+        <path class="dt-sys" fill="none" stroke="#fbbf24" stroke-width="4"/>
+        <path class="dt-und" fill="none" stroke="#22d3ee" stroke-width="4"/>
+        <text class="dt-gl" fill="#fda4af" font-size="22" font-weight="700" text-anchor="middle">理解债</text>
+        <g class="dt-inc" opacity="0"><circle r="10" fill="#fb7185"/><text x="-16" y="-20" fill="#fecdd3" font-size="17" text-anchor="end">严重问题，必须人工介入：</text><text x="-16" y="2" fill="#fecdd3" font-size="17" text-anchor="end">已经看不懂自己的系统</text></g>
+      </svg>
+      <div class="dt-lg"><span class="y">Agent 交付的系统实现</span><span class="c">工程师的理解</span><span class="k10-sim">示意</span></div>
+    </div>
+    <div class="dt-r fx fx-right" style="--d:3">
+      <div class="dt-c"><b>理解债</b><p>Agent 循环交付代码的速度越快，工程师对系统实际实现的理解就<b>落后得越远</b></p></div>
+      <div class="dt-c"><b>认知投降</b><p>习惯了用 Agent 代劳，逐渐<b>放弃独立思考与审查</b>，软件质量失控</p></div>
+      <blockquote class="dt-q">“你可以外包你的思考，但不能外包你的理解。”<cite>—— Andrej Karpathy</cite></blockquote>
+      <p class="dt-m">管理 Agent 就像管理技术员工：<b>既不能越俎代庖，也不能放手不管</b>。合格的技术管理者要理解并指导系统架构，而不是仅仅用 PUA 的方式指挥 Agent——<b>技术基本功很重要</b></p>
+    </div>
+  </div>
+  <p class="tagline dt-tag fx fx-up" style="--d:5">以上都是工程视角；接下来：当大量 Agent 长期共存、不再由单一目标驱动时，<b>会涌现什么？</b></p>
+  <div class="src">第十章 ·「失败模式六：理解债与认知投降」</div>
+</section>
+<style>
+#c10-debt .dt-body{display:grid;grid-template-columns:840px 1fr;gap:26px;height:600px}
+#c10-debt .dt-l{padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+#c10-debt .dt-lg{display:flex;align-items:center;gap:22px;font-size:17px}
+#c10-debt .dt-lg .y{color:#fbbf24}#c10-debt .dt-lg .c{color:#22d3ee}
+#c10-debt .dt-r{display:flex;flex-direction:column;gap:14px}
+#c10-debt .dt-c{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-debt .dt-c>b{font-size:22px;color:var(--bad)}
+#c10-debt .dt-c p{margin-top:4px;font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-debt .dt-c p b{color:var(--text)}
+#c10-debt .dt-q{padding:14px 20px;border-left:4px solid var(--acc);font-size:22px;line-height:1.5;background:color-mix(in srgb,var(--acc) 8%,transparent);border-radius:0 14px 14px 0}
+#c10-debt .dt-q cite{display:block;margin-top:6px;font-size:16px;font-style:normal;color:var(--text3)}
+#c10-debt .dt-m{font-size:17px;line-height:1.6;color:var(--text2)}
+#c10-debt .dt-m b{color:var(--acc)}
+#c10-debt .dt-tag{margin-top:16px;font-size:22px}
+</style>
+<script>
+HOOKS['c10-debt'] = {
+  init(s) { this.q = (x) => s.querySelector(x); },
+  enter(s, ctx) {
+    const sys = this.q('.dt-sys'), und = this.q('.dt-und'), gap = this.q('.dt-gap'), gl = this.q('.dt-gl'), inc = this.q('.dt-inc');
+    const t0 = performance.now(), X = (u) => 50 + u * 720, S = (u) => 400 - 360 * Math.pow(u, 1.6), Uu = (u) => 400 - 360 * (0.55 * u - 0.15 * u * u) * 1.2;
+    ctx.raf((t) => {
+      const k = Math.min(1, ((t - t0) % 9000) / 6500), n = 60, a = [], b = [];
+      for (let i = 0; i <= n; i++) { const u = (i / n) * k; a.push(`${X(u).toFixed(1)} ${S(u).toFixed(1)}`); b.push(`${X(u).toFixed(1)} ${Uu(u).toFixed(1)}`); }
+      sys.setAttribute('d', 'M' + a.join('L')); und.setAttribute('d', 'M' + b.join('L'));
+      gap.setAttribute('d', 'M' + a.join('L') + 'L' + b.reverse().join('L') + 'Z');
+      const m = k * 0.8;
+      gl.setAttribute('x', X(m)); gl.setAttribute('y', ((S(m) + Uu(m)) / 2 + 8).toFixed(1)); gl.setAttribute('opacity', k > 0.5 ? 1 : 0);
+      inc.setAttribute('transform', `translate(${X(k)} ${S(k)})`); inc.setAttribute('opacity', k >= 1 ? 1 : 0);
+    });
+  },
+  reset() {},
+};
+</script>

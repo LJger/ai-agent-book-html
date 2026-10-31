@@ -1,0 +1,1220 @@
+<!-- ================= PART 08 · 元能力：多媒体与适配器 ================= -->
+<section class="slide chapter" id="c05-d8" data-part="8" data-title="PART 08 · 元能力：多媒体与适配器" data-notes="元能力由内向外的第三、四层：内容呈现与系统接口。<br>代码驱动的多媒体生成：许多复杂文档的创作本质上是结构化数据的组织和呈现，通过代码生成，Agent 绕开了视觉定位难题，获得对文档的精确控制能力——PPT 生成与提议者-审核者机制（图5-5，实验 5-6），论文讲解视频（图5-6，实验 5-7），视频编辑（实验 5-8），以及 3D 与工业零件里代码生成与生成模型的边界（实验 5-9）。<br>代码作为系统适配器：这一节的代码不再产出面向人的东西，而是连接机器与机器——跟随格式演化的日志解析（实验 5-10），以及从生产日志到 GitHub Issue 的自动诊断（图5-7，实验 5-11）。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">元能力：<br>多媒体与适配器</h1>
+  <div class="ch-s fx fx-up" style="--d:3">代码驱动的多媒体生成 · 代码作为系统适配器</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">通过代码生成，Agent 绕开了视觉定位难题，获得对文档的精确控制能力。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<!-- ================= 代码驱动的多媒体生成 ================= -->
+<section class="slide" id="c05-gui" data-part="8" data-dur="16000" data-title="文档的本质是代码 · PPT 生成 Agent" data-notes="许多复杂文档的创作本质上是结构化数据的组织和呈现。无论是演示文稿、技术报告还是交互式应用，底层都由代码定义——HTML 描述结构，CSS 控制样式，JavaScript 实现交互。传统的文档创作依赖 GUI 界面的所见即所得编辑，但这种方式对 Agent 来说既不直观也不高效，因为 GUI 操作需要视觉理解和精确的坐标定位。通过代码生成，Agent 绕开了视觉定位难题，获得对文档的精确控制能力——每个元素的位置、样式、内容都是明确定义的，可以用程序化的方式修改和优化。<br><b>PPT 生成 Agent。</b>PPT 创作往往耗时费力：一个典型的学术报告 PPT 可能包含数十页幻灯片，每页都需精心设计布局、提炼要点、选配图表。如果把 PPT 创作转化为代码生成问题，就能极大降低复杂度。现代 PPT 框架（如 Slidev）采用优雅的设计哲学：用 Markdown 和 HTML 定义演示内容，创建一页幻灯片只需编写简洁的标记语言，框架会自动处理渲染、布局和动画——这对掌握了代码生成能力的 Agent 极其友好。<br>左边的 GUI 操作与坐标是示意；右边的 Slidev 代码取自原书图5-5。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">文档的本质是代码：<em>PPT 生成 Agent</em></h2></header>
+  <div class="p8b-body">
+    <div class="p8b-gui panel fx fx-left" style="--d:2">
+      <div class="p8b-h"><b>GUI 所见即所得</b><span>需要视觉理解 + 精确的坐标定位</span><span class="c5-tag demo">示意</span></div>
+      <div class="p8b-app">
+        <div class="p8b-tb"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="p8b-cv"><div class="p8b-t" data-k="t">单击此处添加标题</div><div class="p8b-bl" data-k="b">单击此处添加文本</div><div class="p8b-im" data-k="i">插入图片</div></div>
+        <svg class="p8b-cur" viewBox="0 0 24 24"><path d="M4 2l15 11-7 1.3 4.2 7.5-2.6 1.4-4.2-7.6L4 20z"/></svg>
+        <i class="p8b-ring"></i>
+      </div>
+      <div class="p8b-log"></div>
+    </div>
+    <div class="p8b-cd panel fx fx-right" style="--d:3">
+      <div class="p8b-h"><b>代码生成：Slidev</b><span>用 Markdown 和 HTML 定义演示内容</span></div>
+      <div class="p8b-ed">
+        <div class="win"><div class="win-bar"><i></i><i></i><i></i><span>slides.md</span></div><div class="c5-code p8b-md"></div></div>
+        <div class="p8b-pv"><span class="lbl">框架自动渲染</span><div class="p8b-sl"><b class="p8b-pt">Transformer 架构</b><div class="p8b-pc"><ul><li data-k="1">自注意力机制</li><li data-k="2">多头注意力</li></ul><div class="p8b-pi"><svg viewBox="0 0 120 90"><rect x="20" y="8" width="80" height="18" rx="4"/><rect x="20" y="36" width="80" height="18" rx="4"/><rect x="20" y="64" width="80" height="18" rx="4"/><path d="M60 26v10M60 54v10"/></svg><small>fig3.png</small></div></div></div></div>
+      </div>
+    </div>
+  </div>
+  <p class="p8b-tag fx fx-up" style="--d:4">HTML 描述结构，CSS 控制样式，JavaScript 实现交互——<b>每个元素的位置、样式、内容都是明确定义的</b>，可以用程序化的方式修改和优化</p>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· PPT 生成 Agent</div>
+</section>
+<style>
+.p8b-body{display:grid;grid-template-columns:1fr 1.15fr;gap:24px;flex:1;min-height:0}
+.p8b-gui,.p8b-cd{padding:16px 20px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.p8b-h{display:flex;align-items:baseline;gap:12px}
+.p8b-h b{font-size:20px}
+.p8b-h span:not(.c5-tag){font-size:15px;color:var(--text3)}
+.p8b-h .c5-tag{margin-left:auto}
+.p8b-app{position:relative;border-radius:12px;border:1px solid var(--line2);background:rgba(5,9,22,.7);padding:10px;display:flex;flex-direction:column;gap:10px}
+.p8b-tb{display:flex;gap:8px}
+.p8b-tb i{width:28px;height:22px;border-radius:5px;background:rgba(255,255,255,.08)}
+.p8b-cv{position:relative;height:250px;border-radius:8px;background:#f4f5f8}
+.p8b-cv>div{position:absolute;border:1.5px dashed #9aa3b5;border-radius:4px;display:grid;place-items:center;font-size:16px;color:#7b8396;transition:all .3s}
+.p8b-t{left:8%;top:8%;width:84%;height:20%}
+.p8b-bl{left:8%;top:36%;width:46%;height:54%}
+.p8b-im{left:58%;top:36%;width:34%;height:54%}
+.p8b-cv>div.sel{border:2px solid #2563eb;color:#2563eb;background:rgba(37,99,235,.06)}
+.p8b-cur{position:absolute;left:0;top:0;width:26px;height:26px;fill:#fff;stroke:#111;stroke-width:1.2;transition:transform .7s var(--ease);z-index:2}
+.p8b-ring{position:absolute;left:0;top:0;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid var(--bad);opacity:0}
+.p8b-ring.ok{border-color:var(--ok)}
+.p8b-ring.go{animation:p8bring .6s ease-out}
+@keyframes p8bring{from{opacity:1;transform:scale(.4)}to{opacity:0;transform:scale(1.4)}}
+.p8b-log{flex:1;display:flex;flex-direction:column;gap:5px;font:15px/1.5 var(--mono);color:var(--text2);min-height:0}
+.p8b-log div{animation:upIn .35s var(--spring) both}
+.p8b-log .bad{color:#fda4af}.p8b-log .ok{color:#6ee7b7}
+.p8b-ed{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
+.p8b-md{font-size:16px;padding:10px 6px}
+.p8b-md .ln{transition:opacity .3s}
+.p8b-md .ln.dimln{opacity:0}
+.p8b-pv{display:flex;flex-direction:column;gap:8px}
+.p8b-sl{flex:1;border-radius:10px;background:#fff;color:#1e293b;padding:18px 20px;display:flex;flex-direction:column;gap:14px;box-shadow:0 18px 40px -20px rgba(0,0,0,.8)}
+.p8b-pt{font-size:26px;color:#0f172a;opacity:0;transition:opacity .4s}
+.p8b-pc{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1}
+.p8b-pc ul{display:flex;flex-direction:column;gap:10px;padding-left:18px;list-style:disc}
+.p8b-pc li{font-size:18px;opacity:0;transform:translateX(-10px);transition:all .4s}
+.p8b-pi{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;border-radius:8px;background:#eef2f7;opacity:0;transition:opacity .4s}
+.p8b-pi svg{width:110px}
+.p8b-pi rect{fill:#c7d2fe;stroke:#6366f1}
+.p8b-pi path{stroke:#6366f1;stroke-width:2}
+.p8b-pi small{font:15px var(--mono);color:#475569}
+.p8b-sl .on{opacity:1;transform:none}
+.p8b-tag{margin-top:16px;font-size:19px;line-height:1.6;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.p8b-tag b{color:var(--text)}
+</style>
+<script>
+HOOKS['c05-gui'] = {
+  MD: '---\nlayout: two-cols\n---\n# Transformer 架构\n::left::\n- 自注意力机制\n- 多头注意力\n::right::\n<img src="fig3.png" />',
+  // GUI 侧：[目标, 偏移(px), 日志, 是否命中]
+  G: [
+    ['t', [26, 30], '点击 (612, 238)：想选中标题框 → 点到了框外', 0],
+    ['t', [0, 0], '重新截图、重新估算坐标 → 选中标题框', 1],
+    ['i', [40, -26], '拖动图片框 → 落点偏了 40 px', 0],
+    ['b', [0, 0], '再截图、再估算 → 选中正文框', 1],
+  ],
+  init(s) {
+    this.ln = C5.code(s.querySelector('.p8b-md'), this.MD, 'js');
+  },
+  async gui(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const app = s.querySelector('.p8b-app'), cur = s.querySelector('.p8b-cur'), ring = s.querySelector('.p8b-ring'), log = s.querySelector('.p8b-log');
+    while (ok()) {
+      log.innerHTML = ''; s.querySelectorAll('.p8b-cv>div').forEach((d) => d.classList.remove('sel'));
+      cur.style.transform = 'translate(20px, 20px)';
+      for (const [k, [dx, dy], t, hit] of this.G) {
+        await U.wait(ctx, 700); if (!ok()) return;
+        const el = s.querySelector(`.p8b-cv [data-k="${k}"]`), a = app.getBoundingClientRect(), r = el.getBoundingClientRect(), sc = U.scale || 1;
+        const x = (r.left - a.left + r.width / 2) / sc + dx + (hit ? 0 : r.width / sc / 2), y = (r.top - a.top + r.height / 2) / sc + dy + (hit ? 0 : r.height / sc / 2);
+        cur.style.transform = `translate(${x}px, ${y}px)`;
+        await U.wait(ctx, 800); if (!ok()) return;
+        ring.style.left = x + 'px'; ring.style.top = y + 'px';
+        ring.className = 'p8b-ring' + (hit ? ' ok' : ''); void ring.offsetWidth; ring.classList.add('go');
+        if (hit) el.classList.add('sel');
+        log.insertAdjacentHTML('beforeend', `<div class="${hit ? 'ok' : 'bad'}">${t}</div>`);
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  async code(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const pt = s.querySelector('.p8b-pt'), li = [...s.querySelectorAll('.p8b-pc li')], pi = s.querySelector('.p8b-pi');
+    const show = { 3: [pt], 5: [li[0]], 6: [li[1]], 8: [pi] };
+    while (ok()) {
+      this.ln.forEach((l) => l.classList.add('dimln'));
+      [pt, pi, ...li].forEach((e) => e.classList.remove('on'));
+      for (let i = 0; i < this.ln.length; i++) {
+        await U.wait(ctx, 520); if (!ok()) return;
+        this.ln[i].classList.remove('dimln');
+        (show[i] || []).forEach((e) => e.classList.add('on'));
+      }
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.gui(s); this.code(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p8b-log').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c05-fig55" data-part="8" data-steps="1" data-trans="zoom" data-dur="22000" data-title="图5-5 提议者-审核者机制" data-notes="仅能生成代码还不够。<b>Agent 编写完代码后并不知道实际渲染效果</b>：内容是否太挤、文字是否溢出、图片尺寸是否合适，这些只有真正渲染出来才能发现。因此需要引入<b>提议者-审核者</b>（Proposer-Reviewer）机制（图5-5），将代码编写和质量评审解耦为两个独立 Agent：<b>Proposer Agent</b> 负责生成 Slidev 代码，理解内容逻辑结构并将其分解为合理的页面；<b>Reviewer Agent</b> 运行代码将每页渲染为图片，用 Vision LLM 从内容密度、可读性、布局合理性、视觉美感等维度分析渲染结果，生成<b>结构化的改进建议</b>——不是模糊的“不好看”，而是具体可执行的指导（如“第 3 页：内容过多，建议拆分”“第 7 页：代码块字体过小，建议增大到 14pt”），包含页码、问题类型、严重程度等字段。Proposer 接收反馈后修改代码，新版本再次提交 Reviewer 审查，迭代直到质量达标或达到最大迭代次数（如 5 轮）——这正是 Loop 工程要求的两类显式终止条件：前者由审核者判定目标达成，后者用预算上限防止循环失控。<br>按 → 第二步：本章的迭代循环与第四章的<b>事前审批</b>同属第一章命名的提议者-审核者模式：生成与审查分离、双模型独立评估（用 Loop 工程的语言说，就是“制造者”与“验证者”分离的子 Agent）。差异在目标与形态：第四章用于不可逆操作的安全审查，审核者对单次操作给出批准或否决；本章用于内容质量的迭代改进——多轮循环，且审核者接触到提议者看不到的新信息（渲染结果）。核心设计原则一脉相承：共享目标约束、使用不同模型家族降低同类错误概率、反馈作为特殊事件加入 Proposer 轨迹。采用双 Agent 分工而非单 Agent 循环的核心优势在于上下文管理（见实验 5-6）。这一机制将在视频编辑和日志可视化实验中重复使用；第十章将进一步探讨其他多 Agent 协作模式。左侧缩略图里的问题页是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图5-5 <em>提议者-审核者</em>机制</h2></header>
+  <div class="p8c-stage">
+    <div class="p8c-a">
+      <div class="p8c-loop">
+        <div class="p8c-ag pro panel fx fx-left" style="--d:2"><div class="p8c-ah"><svg class="ic"><use href="#i-code"/></svg><b>Proposer Agent</b></div><p>输入：paper.pdf → 提取章节 / 论点 / 图表</p><p>输出：<b>Slidev Markdown</b></p><div class="p8c-st"></div></div>
+        <div class="p8c-mid fx fx-up" style="--d:3">
+          <div class="p8c-ar r"><span>Slidev 代码</span><i></i></div>
+          <div class="p8c-th"><div class="p8c-cmd">slidev export --per-slide</div><div class="p8c-grid"></div></div>
+          <div class="p8c-ar l"><i></i><span>结构化修改建议</span></div>
+        </div>
+        <div class="p8c-ag rev panel fx fx-right" style="--d:4"><div class="p8c-ah"><svg class="ic"><use href="#i-eye"/></svg><b>Reviewer Agent</b></div><p>渲染截图 → <b>Vision LLM</b> 审查</p><ul class="p8c-dim"><li>文字是否溢出边界</li><li>布局是否拥挤</li><li>图片尺寸是否合适</li></ul><code class="p8c-json"></code></div>
+      </div>
+      <div class="p8c-foot fx fx-up" style="--d:5">
+        <div class="p8c-rd"><span class="lbl">迭代</span><b>第 <em class="p8c-n">1</em> 轮</b><span>上限 5 轮</span></div>
+        <div class="p8c-stop"><span class="lbl">两类显式终止条件</span><span class="p8c-c q">质量达标 · 审核者判定</span><span class="p8c-c b">最大轮数 · 预算上限</span></div>
+        <div class="p8c-why"><b>为什么分离？</b><span>单 Agent：数十页截图 → 上下文膨胀；代码 + 截图混合 → 注意力分散</span></div>
+      </div>
+    </div>
+    <div class="p8c-b" data-step="1">
+      <div class="p8c-tbl panel">
+        <div class="p8c-tr h"><span></span><span>第四章 · 事前审批</span><span>本章 · 迭代改进</span></div>
+        <div class="p8c-tr"><span>目标</span><span>不可逆操作的<b>安全审查</b></span><span>内容质量的<b>迭代改进</b></span></div>
+        <div class="p8c-tr"><span>形态</span><span>审核者对<b>单次操作</b>给出批准或否决</span><span><b>多轮循环</b>，直到达标或用完轮数</span></div>
+        <div class="p8c-tr"><span>审核者的信息</span><span>审查提议本身</span><span>接触到提议者<b>看不到的新信息</b>：渲染结果</span></div>
+      </div>
+      <div class="p8c-same"><span class="lbl">同属第一章命名的提议者-审核者模式：生成与审查分离、双模型独立评估</span>
+        <div><span>共享目标约束</span><span>使用不同模型家族，降低同类错误概率</span><span>反馈作为特殊事件加入 Proposer 轨迹</span></div>
+        <p>“制造者”与“验证者”分离的子 Agent · 第十章还会讨论其他多 Agent 协作模式</p></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 图5-5 PPT 生成的提议者-审核者机制</div>
+</section>
+<style>
+.p8c-stage{position:relative;flex:1;min-height:0}
+.p8c-a,.p8c-b{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;transition:opacity .5s,transform .5s}
+#c05-fig55:has(.p8c-b.on) .p8c-a{opacity:0;transform:translateY(-20px);pointer-events:none}
+.p8c-b{opacity:0;transform:translateY(20px);pointer-events:none}
+.p8c-b.on{opacity:1;transform:none;pointer-events:auto}
+.p8c-loop{display:grid;grid-template-columns:360px 1fr 400px;gap:18px;flex:1;min-height:0}
+.p8c-ag{padding:16px 20px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .4s,border-color .4s}
+.p8c-ag.on{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 30%,transparent)}
+.p8c-ah{display:flex;align-items:center;gap:10px}
+.p8c-ah .ic{font-size:26px;color:var(--acc)}
+.p8c-ah b{font-size:21px}
+.p8c-ag p{font-size:17px;line-height:1.5;color:var(--text2)}
+.p8c-ag p b{color:var(--text)}
+.p8c-st{margin-top:auto;min-height:48px;padding:8px 12px;border-radius:10px;font-size:16px;line-height:1.5;color:var(--acc);border:1px dashed color-mix(in srgb,var(--acc) 45%,transparent)}
+.p8c-dim{display:flex;flex-direction:column;gap:4px}
+.p8c-dim li{font-size:16px;color:var(--text2);padding-left:20px;position:relative}
+.p8c-dim li::before{content:"✓";position:absolute;left:0;color:var(--ok)}
+.p8c-json{margin-top:auto;min-height:150px;padding:10px 12px;border-radius:10px;font:15px/1.5 var(--mono);color:#fde68a;background:rgba(5,9,22,.7);border:1px solid var(--line);white-space:pre-wrap}
+.p8c-mid{display:flex;flex-direction:column;gap:12px;min-width:0}
+.p8c-ar{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text2)}
+.p8c-ar i{flex:1;height:3px;border-radius:3px;background:var(--line2);position:relative;overflow:hidden}
+.p8c-ar i::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--acc),transparent);transform:translateX(-100%)}
+.p8c-ar.go i::after{animation:p8cflow 1s ease}
+.p8c-ar.l.go i::after{animation-name:p8cflowr}
+@keyframes p8cflow{to{transform:translateX(100%)}}
+@keyframes p8cflowr{from{transform:translateX(100%)}to{transform:translateX(-100%)}}
+.p8c-th{flex:1;display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(5,9,22,.55);min-height:0}
+.p8c-cmd{font:15px var(--mono);color:var(--text3)}
+.p8c-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.p8c-s{position:relative;aspect-ratio:16/9;border-radius:6px;background:#eef1f6;padding:6px 7px;display:flex;flex-direction:column;gap:4px;opacity:0;transform:scale(.8);transition:all .35s var(--spring)}
+.p8c-s.on{opacity:1;transform:none}
+.p8c-s i{display:block;height:5px;border-radius:3px;background:#94a3b8}
+.p8c-s i:first-child{width:60%;height:7px;background:#334155}
+.p8c-s em{position:absolute;right:5px;bottom:3px;font:600 15px var(--num);font-style:normal;color:#475569}
+.p8c-s.dense i{background:#64748b}
+.p8c-s.scan{outline:3px solid var(--acc)}
+.p8c-s.bad{outline:3px solid var(--bad)}
+.p8c-s.warn{outline:3px solid var(--tool)}
+.p8c-s.ok{outline:3px solid var(--ok)}
+.p8c-foot{display:grid;grid-template-columns:auto auto 1fr;gap:18px;align-items:center}
+.p8c-rd{display:flex;align-items:baseline;gap:10px}
+.p8c-rd b{font-size:22px}
+.p8c-rd em{font:800 30px var(--num);font-style:normal;color:var(--acc)}
+.p8c-rd span:not(.lbl){font-size:15px;color:var(--text3)}
+.p8c-stop{display:flex;align-items:center;gap:8px}
+.p8c-c{padding:5px 12px;border-radius:999px;font-size:15px;border:1px solid var(--line2);color:var(--text2);transition:all .3s}
+.p8c-c.on{color:#06101f;font-weight:700;background:var(--ok);border-color:var(--ok)}
+.p8c-why{display:flex;flex-direction:column;gap:2px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p8c-why b{font-size:16px;color:var(--acc)}
+.p8c-why span{font-size:15px;color:var(--text2)}
+.p8c-tbl{padding:12px 22px}
+.p8c-tr{display:grid;grid-template-columns:160px 1fr 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--line);font-size:18px;line-height:1.5;color:var(--text2)}
+.p8c-tr.h{border-top:none;font-size:17px;font-weight:700;color:var(--acc)}
+.p8c-tr span:first-child{color:var(--text3)}
+.p8c-tr b{color:var(--text)}
+.p8c-same{padding:16px 22px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent);display:flex;flex-direction:column;gap:10px}
+.p8c-same div{display:flex;flex-wrap:wrap;gap:10px}
+.p8c-same div span{padding:6px 14px;border-radius:999px;font-size:17px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.p8c-same p{font-size:16px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c05-fig55'] = {
+  J1: '[{"page": 3, "type": "内容过多",\n  "severity": "high",\n  "suggestion": "建议拆分"},\n {"page": 7, "type": "字体过小",\n  "severity": "medium",\n  "suggestion": "增大到 14pt"}]',
+  init(s) { this.grid = s.querySelector('.p8c-grid'); },
+  draw(n, dense) { this.grid.innerHTML = Array.from({ length: n }, (_, i) => `<div class="p8c-s${dense.includes(i + 1) ? ' dense' : ''}"><i></i><i></i><i></i>${dense.includes(i + 1) ? '<i></i><i></i>' : ''}<em>${i + 1}</em></div>`).join(''); return [...this.grid.children]; },
+  async loop(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const pro = s.querySelector('.p8c-ag.pro'), rev = s.querySelector('.p8c-ag.rev'), st = s.querySelector('.p8c-st'), js = s.querySelector('.p8c-json');
+    const ar = s.querySelector('.p8c-ar.r'), al = s.querySelector('.p8c-ar.l'), n = s.querySelector('.p8c-n'), cs = [...s.querySelectorAll('.p8c-c')];
+    while (ok()) {
+      cs.forEach((c) => c.classList.remove('on')); js.textContent = ''; n.textContent = 1;
+      for (let round = 1; round <= 2; round++) {
+        n.textContent = round;
+        pro.classList.add('on'); rev.classList.remove('on');
+        st.textContent = round === 1 ? '逐页生成 Slidev 代码……' : '按建议修改：第 3 页拆成两页，第 7 页放大代码字体';
+        const sl = round === 1 ? this.draw(8, [3]) : this.draw(9, []);
+        await U.wait(ctx, 1200); if (!ok()) return;
+        U.restart(ar, 'go');
+        for (const x of sl) { x.classList.add('on'); await U.wait(ctx, 140); if (!ok()) return; }
+        pro.classList.remove('on'); rev.classList.add('on');
+        for (const x of sl) {
+          x.classList.add('scan'); await U.wait(ctx, 220); if (!ok()) return; x.classList.remove('scan');
+          const i = sl.indexOf(x) + 1;
+          if (round === 1 && i === 3) x.classList.add('bad');
+          else if (round === 1 && i === 7) x.classList.add('warn');
+          else if (round === 2) x.classList.add('ok');
+        }
+        if (round === 1) {
+          js.textContent = this.J1;
+          await U.wait(ctx, 900); if (!ok()) return;
+          U.restart(al, 'go');
+          await U.wait(ctx, 1000); if (!ok()) return;
+        } else {
+          js.textContent = '[]  全部页面通过';
+          cs[0].classList.add('on');
+          st.textContent = '质量达标：循环终止';
+          await U.wait(ctx, 3600); if (!ok()) return;
+        }
+      }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.loop(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.grid.innerHTML = ''; s.querySelectorAll('.p8c-ag').forEach((a) => a.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-exp56" data-part="8" data-trans="flip" data-dur="20000" data-title="实验 5-6 ★★：论文 → PPT" data-notes="<b>实验 5-6 ★★：基于论文的 PPT 自动生成</b>。实验目标：从学术论文自动生成高质量演示文稿，验证提议者-审核者机制在内容创作质量控制中的有效性。技术方案：使用 Slidev 框架；Proposer Agent 阅读论文 PDF，提取章节结构、核心论点和图表，规划 PPT 结构，逐页生成 Slidev 代码；<b>关键步骤</b>：Reviewer Agent 渲染每页截图，用 Vision LLM 检查渲染效果，识别文字溢出、内容拥挤、图片尺寸不当等问题，生成结构化改进建议，迭代直到效果达标。验收标准：生成 10–20 页 PPT，覆盖论文主要贡献，至少包含 3 张原文图表且与文字说明匹配，渲染无文字溢出、布局合理；对比单 Agent 自我审查与提议者-审核者分工在上下文消耗和生成质量方面的差异。<br>原书指出，采用双 Agent 分工而非单 Agent 循环的<b>核心优势在于上下文管理</b>：Reviewer 每次只处理最新版本的渲染图片，不受历史版本干扰；Proposer 仅累积结构化文本反馈，token 消耗少且更易于推理；单 Agent 方案则需要在同一上下文中累积数十页渲染图片的多轮迭代，上下文迅速超限。<br>配套仓库实测（2026-07-30，doubao-seed-1-6-250615 文本与视觉，论文《Attention Is All You Need》，哈希固定，带 Figure 1、3、4 三张原图）：两臂都生成 20 页，独立 Vision 评委都给 95 分并通过——质量持平。上下文差异很明显：单 Agent 自审 7 次调用，每次的 prompt token 从 11,957 一路涨到 92,601；双 Agent 中 Proposer 3 次（11,918 → 14,970）、Reviewer 1 次（24,186）。峰值 24,186 对 92,601，相差 3.83 倍；总 token（含输出）73,227 对 298,259。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-6 <span class="c5-stars">★★</span>：基于论文的 <em>PPT 自动生成</em></h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>从学术论文自动生成高质量演示文稿，验证提议者-审核者机制在内容质量控制中的有效性</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>Slidev；Proposer 读 PDF、规划结构、逐页生成代码；关键步骤：Reviewer 渲染截图、Vision LLM 给出结构化建议</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>10–20 页、覆盖主要贡献、≥ 3 张原文图表、无溢出；对比单 Agent 自审的上下文消耗与质量</p></div>
+  </div>
+  <div class="p8d-body">
+    <div class="p8d-race panel fx fx-left" style="--d:3">
+      <div class="p8d-h"><b>每次调用的 prompt token</b><span class="c5-tag real">实测</span></div>
+      <div class="p8d-ch">
+        <div class="p8d-g s"><div class="p8d-bars"></div><span>单 Agent 自审 · 图片在同一上下文里累积</span></div>
+        <div class="p8d-g d"><div class="p8d-bars"></div><span>提议者-审核者 · Proposer ×3 + Reviewer ×1</span></div>
+        <i class="p8d-pk"><span>峰值 24,186</span></i>
+      </div>
+    </div>
+    <div class="p8d-side fx fx-right" style="--d:4">
+      <div class="p8d-kp"><div class="c5-kpi"><b data-count="3.83" data-dec="2" data-suffix="×">0</b><span>峰值上下文 92,601 vs 24,186</span></div><div class="c5-kpi"><b>73k</b><span>总 token（含输出）<br>73,227 vs 298,259</span></div><div class="c5-kpi"><b>95 = 95</b><span>独立评委打分，两臂都 20 页、带 3 张原图</span></div></div>
+      <div class="p8d-why"><b>核心优势在于上下文管理</b><p>Reviewer 每次只处理<b>最新版本</b>的渲染图片；Proposer 只累积<b>结构化文本反馈</b></p></div>
+      <div class="p8d-iss"><span class="lbl">实测：Reviewer 的结构化建议（节选）</span><code>{"page": 13, "issue_type": "readability", "severity": "low",
+ "suggestion": "第二点和第三点内容较长，可考虑适当断行或简化表述以提高可读性"}</code></div>
+    </div>
+  </div>
+  <div class="c5-rec-h p8d-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/paper-to-ppt 验收记录，2026-07-30，doubao-seed-1-6-250615（文本与视觉）· 论文《Attention Is All You Need》（arXiv 1706.03762）· 质量持平，上下文优势成立</div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 实验 5-6</div>
+</section>
+<style>
+#c05-exp56 .c5-xp{margin-bottom:16px}
+.p8d-body{display:grid;grid-template-columns:1.25fr 1fr;gap:24px;height:500px}
+.p8d-race{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.p8d-h{display:flex;align-items:center;justify-content:space-between}
+.p8d-h b{font-size:20px}
+.p8d-ch{position:relative;flex:1;display:grid;grid-template-columns:1.6fr 1fr;gap:26px;padding-top:8px}
+.p8d-g{display:flex;flex-direction:column;gap:10px;min-width:0}
+.p8d-g>span{font-size:15px;line-height:1.4;color:var(--text2);text-align:center}
+.p8d-bars{flex:1;display:flex;align-items:flex-end;gap:8px;border-bottom:1px solid var(--line2)}
+.p8d-b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%}
+.p8d-b em{font:600 15px var(--num);font-style:normal;color:var(--text2);opacity:0;transition:opacity .3s}
+.p8d-b i{width:100%;height:0;border-radius:6px 6px 0 0;background:var(--c);transition:height .7s var(--ease)}
+.p8d-b small{font-size:15px;color:var(--text3);height:20px}
+.p8d-b.on em{opacity:1}
+.p8d-g.s .p8d-b{--c:linear-gradient(180deg,#fda4af,#fb7185)}
+.p8d-g.d .p8d-b{--c:linear-gradient(180deg,var(--acc),color-mix(in srgb,var(--acc) 60%,#000))}
+.p8d-g.d .p8d-b.rv{--c:linear-gradient(180deg,#c4b5fd,#8b5cf6)}
+.p8d-pk{position:absolute;left:0;right:0;height:0;border-top:2px dashed var(--acc);opacity:0;transition:opacity .4s}
+.p8d-pk.on{opacity:.8}
+.p8d-pk span{position:absolute;right:0;top:-24px;font:600 15px var(--num);color:var(--acc)}
+.p8d-side{display:flex;flex-direction:column;gap:14px}
+.p8d-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.p8d-kp .c5-kpi b{font-size:30px}
+.p8d-why{padding:14px 18px;border-radius:14px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),transparent)}
+.p8d-why>b{font-size:20px}
+.p8d-why p{margin-top:6px;font-size:17px;line-height:1.6;color:var(--text2)}
+.p8d-why p b{color:var(--text)}
+.p8d-iss{display:flex;flex-direction:column;gap:6px}
+.p8d-iss code{padding:10px 12px;border-radius:12px;font:15px/1.55 var(--mono);color:#fde68a;background:rgba(5,9,22,.7);border:1px solid var(--line);white-space:pre-wrap}
+.p8d-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp56'] = {
+  S: [11957, 13800, 15397, 40646, 42189, 67399, 92601],
+  D: [[11918, 'P'], [13601, 'P'], [14970, 'P'], [24186, 'R']],
+  MAX: 92601,
+  init(s) {
+    const k = (v) => (v / 1000).toFixed(1) + 'k';
+    s.querySelector('.p8d-g.s .p8d-bars').innerHTML = this.S.map((v, i) => `<div class="p8d-b" data-h="${(v / this.MAX) * 100}"><em>${k(v)}</em><i></i><small>${i + 1}</small></div>`).join('');
+    s.querySelector('.p8d-g.d .p8d-bars').innerHTML = this.D.map(([v, r], i) => `<div class="p8d-b${r === 'R' ? ' rv' : ''}" data-h="${(v / this.MAX) * 100}"><em>${k(v)}</em><i></i><small>${r === 'R' ? 'Reviewer' : 'P' + (i + 1)}</small></div>`).join('');
+  },
+  async race(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const A = [...s.querySelectorAll('.p8d-g.s .p8d-b')], B = [...s.querySelectorAll('.p8d-g.d .p8d-b')], pk = s.querySelector('.p8d-pk');
+    const bars = s.querySelector('.p8d-g.d .p8d-bars');
+    while (ok()) {
+      [...A, ...B].forEach((b) => { b.classList.remove('on'); b.querySelector('i').style.height = '0'; });
+      pk.classList.remove('on');
+      await U.wait(ctx, 600); if (!ok()) return;
+      for (let i = 0; i < 7; i++) {
+        const go = (b) => { b.classList.add('on'); b.querySelector('i').style.height = `calc((100% - 50px) * ${+b.dataset.h / 100})`; };
+        go(A[i]); if (B[i]) go(B[i]);
+        await U.wait(ctx, 700); if (!ok()) return;
+      }
+      const r = bars.getBoundingClientRect(), ch = s.querySelector('.p8d-ch').getBoundingClientRect(), sc = U.scale || 1;
+      pk.style.top = ((r.bottom - ch.top) / sc - ((r.height / sc - 50) * 24186) / this.MAX - 20) + 'px';
+      pk.classList.add('on');
+      await U.wait(ctx, 5000);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.race(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p8d-b').forEach((b) => { b.classList.remove('on'); b.querySelector('i').style.height = '0'; }); },
+};
+</script>
+
+<section class="slide" id="c05-exp57" data-part="8" data-trans="rise" data-dur="20000" data-title="实验 5-7 ★★：论文讲解视频 · 图5-6" data-notes="<b>实验 5-7 ★★：论文讲解视频的自动生成</b>。实验目标：扩展 PPT 生成能力，结合视觉和听觉通道实现视频讲解自动生成。技术方案：基于实验 5-6 的 PPT 生成流程，Agent 同时生成每页的口语化讲解文字（引导性叙述而非复述），调用 TTS（文本转语音）合成语音，用 ffmpeg 将 PPT 截图与音频同步合成视频。验收标准：视频 5–15 分钟，每页展示时间与语音时长精确匹配，讲解内容与视觉元素呼应。<br>图5-6 把端到端流水线分成两个阶段：阶段一是 PPT 生成（提议者-审核者）——PDF 输入、内容规划、Slidev 生成、渲染检查、迭代修复；阶段二是视频合成——逐页截图、讲解稿生成、TTS 合成、音画同步（截图时长 = 音频时长）、输出最终视频。图中的验收标准：PPT 10–20 页、覆盖主要贡献、至少 3 张原图表；渲染零文字溢出、布局合理、图文匹配；视频 5–15 分钟、音画同步、叙述连贯。<br>配套仓库实测（2026-07-30）：取实验 5-6 的 12 张真实页面，Kimi K3 写讲解词，Qwen-VL-Max 逐页对照像素审核，Fish Audio S1 合成语音；H.264/AAC 成片 513.010 秒（8.55 分钟），逐页音频合计 512.913 秒，最大逐页漂移 0.024 秒。第 12 页供应商返回过一次非法 JSON，失败的尝试与重试都保留在记录里。下方时间轴每段的宽度就是该页的真实音频时长。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-7 <span class="c5-stars">★★</span>：论文<em>讲解视频</em>的自动生成 · 图5-6</h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>扩展 PPT 生成能力，结合视觉和听觉通道，实现视频讲解自动生成</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>每页生成口语化讲解（引导性叙述而非复述）→ TTS 合成语音 → ffmpeg 把截图与音频同步合成视频</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>视频 5–15 分钟；每页展示时间与语音时长精确匹配；讲解与视觉元素呼应</p></div>
+  </div>
+  <div class="p8e-pipe fx fx-up" style="--d:3">
+    <div class="p8e-ph"><em>阶段一</em><b>PPT 生成（提议者-审核者）</b><div><span>PDF 输入</span><span>内容规划</span><span>Slidev 生成</span><span>渲染检查</span><span>迭代修复</span><span>PPT 完成</span></div></div>
+    <div class="p8e-ph"><em>阶段二</em><b>视频合成</b><div><span>逐页截图</span><span>讲解稿生成</span><span>TTS 合成</span><span>音画同步 · ffmpeg</span><span>output.mp4</span></div></div>
+  </div>
+  <div class="p8e-tl panel fx fx-up" style="--d:4">
+    <div class="p8e-th"><b>成片时间轴：每段宽度 = 该页真实音频时长</b><span class="p8e-ro">第 <em class="p8e-pg">1</em> 页 · 音频 <em class="p8e-du">40.359</em> 秒</span></div>
+    <div class="p8e-trk"><div class="p8e-segs"></div><i class="p8e-hd"></i></div>
+    <div class="p8e-lb"></div>
+    <div class="p8e-ax"><span>0</span><span>8.55 分钟</span></div>
+    <div class="p8e-kp">
+      <div class="c5-kpi"><b data-count="513.010" data-dec="3" data-suffix=" s">0</b><span>H.264/AAC 成片</span></div>
+      <div class="c5-kpi"><b>512.913 s</b><span>逐页音频合计</span></div>
+      <div class="c5-kpi"><b>0.024 s</b><span>最大逐页漂移</span></div>
+      <div class="p8e-st"><span>Kimi K3 写讲解词</span><span>Qwen-VL-Max 逐页像素审核</span><span>Fish Audio S1 合成</span><span>第 12 页非法 JSON 的失败与重试一并保留</span></div>
+    </div>
+  </div>
+  <div class="c5-rec-h p8e-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/paper-to-video 验收记录，2026-07-30 · 取实验 5-6 的 12 张真实页面</div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 实验 5-7 · 图5-6 论文到讲解视频的端到端流水线</div>
+</section>
+<style>
+#c05-exp57 .c5-xp{margin-bottom:14px}
+.p8e-pipe{display:grid;grid-template-columns:1.2fr 1fr;gap:16px}
+.p8e-ph{display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.p8e-ph em{font-style:normal;font-size:15px;font-weight:700;color:var(--acc)}
+.p8e-ph b{font-size:18px}
+.p8e-ph div{display:flex;flex-wrap:wrap;gap:6px}
+.p8e-ph div span{position:relative;padding:4px 10px;border-radius:8px;font-size:15px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.p8e-tl{margin-top:14px;padding:14px 22px;display:flex;flex-direction:column;gap:10px}
+.p8e-th{display:flex;align-items:center;justify-content:space-between}
+.p8e-th b{font-size:19px}
+.p8e-ro{font-size:17px;color:var(--text2)}
+.p8e-ro em{font:700 19px var(--num);font-style:normal;color:var(--acc)}
+.p8e-trk{position:relative;height:84px}
+.p8e-segs{display:flex;height:100%;gap:3px}
+.p8e-seg{position:relative;display:grid;place-items:center;border-radius:8px;font:600 20px var(--num);color:var(--text2);background:rgba(255,255,255,.05);border:1px solid var(--line);transition:all .3s;overflow:hidden}
+.p8e-seg.done{background:color-mix(in srgb,var(--acc) 22%,transparent);color:var(--text)}
+.p8e-seg.cur{background:color-mix(in srgb,var(--acc) 45%,transparent);border-color:var(--acc);color:#fff}
+.p8e-hd{position:absolute;top:-6px;bottom:-6px;left:0;width:3px;border-radius:2px;background:#fff;box-shadow:0 0 12px #fff}
+.p8e-lb{display:flex;gap:3px}
+.p8e-lb span{text-align:center;font:15px var(--num);color:var(--text3)}
+.p8e-ax{display:flex;justify-content:space-between;font:15px var(--num);color:var(--text3)}
+.p8e-kp{display:grid;grid-template-columns:repeat(3,200px) 1fr;gap:12px;align-items:stretch}
+.p8e-kp .c5-kpi b{font-size:28px}
+.p8e-st{display:flex;flex-wrap:wrap;gap:6px;align-content:center}
+.p8e-st span{padding:4px 10px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2)}
+.p8e-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c05-exp57'] = {
+  D: [40.359, 46.916, 42.553, 41.691, 45.819, 43.337, 42.109, 41.169, 41.691, 42.815, 39.993, 44.460],
+  init(s) {
+    const tot = this.D.reduce((a, b) => a + b, 0);
+    this.tot = tot;
+    s.querySelector('.p8e-segs').innerHTML = this.D.map((d, i) => `<div class="p8e-seg" style="flex:${d}">${i + 1}</div>`).join('');
+    s.querySelector('.p8e-lb').innerHTML = this.D.map((d) => `<span style="flex:${d}">${d.toFixed(1)} s</span>`).join('');
+  },
+  enter(s, ctx) {
+    const segs = [...s.querySelectorAll('.p8e-seg')], hd = s.querySelector('.p8e-hd'), pg = s.querySelector('.p8e-pg'), du = s.querySelector('.p8e-du');
+    const T = 14000, t0 = performance.now();
+    ctx.raf((now) => {
+      const t = ((now - t0) % (T + 1500)) / T, x = Math.min(1, t) * this.tot;
+      let acc = 0, k = 0;
+      for (; k < this.D.length - 1 && acc + this.D[k] < x; k++) acc += this.D[k];
+      segs.forEach((g, j) => { g.classList.toggle('done', j < k); g.classList.toggle('cur', j === k); });
+      hd.style.left = `calc(${(Math.min(1, t) * 100).toFixed(2)}% - 1px)`;
+      pg.textContent = k + 1; du.textContent = this.D[k].toFixed(3);
+    });
+  },
+  reset(s) { s.querySelectorAll('.p8e-seg').forEach((g) => g.classList.remove('done', 'cur')); },
+};
+</script>
+
+<section class="slide" id="c05-video" data-part="8" data-dur="18000" data-title="视频编辑 Agent" data-notes="<b>视频编辑 Agent。</b>用通用 Computer Use 做视频编辑面临根本挑战：视频剪辑软件 GUI 极其复杂，包含大量时间轴、图层、效果面板，Agent 需要精确定位这些界面元素并通过鼠标键盘操作编辑，精确输出坐标非常困难。<br>把视频编辑重构为 API 调用和代码生成问题则大幅降低了复杂度。许多专业软件——如 Blender（开源的 3D 创作与视频合成工具，支持 Python 脚本控制）、FFmpeg（音视频处理领域的命令行瑞士军刀）——提供了程序化 API 接口，以结构化、可组合的方式暴露核心功能。例如 Blender Python API 允许通过代码精确控制视频片段的导入、裁剪、排列、过渡效果、音频混合等操作，每个操作对应一个清晰的函数调用。对 Agent 而言，将自然语言需求转化为 API 调用，远比理解 GUI 界面并模拟鼠标点击容易得多。与 PPT 生成类似，视频编辑同样采用提议者-审核者机制——Proposer Agent 生成 Blender 脚本，Reviewer Agent 渲染关键帧并用 Vision LLM 检查效果，反馈修改建议。<br>左侧的剪辑软件界面是示意；右侧是实验 5-8 正式活动中模型真实生成的 Blender 脚本（节选，排版有调整），每执行一段，右下角的通道里就落下一条轨道。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>视频编辑 Agent</em>：GUI 坐标还是 API 调用？</h2></header>
+  <div class="p8f-body">
+    <div class="p8f-gui panel fx fx-left" style="--d:2">
+      <div class="p8f-h"><b>剪辑软件 GUI</b><span>时间轴、图层、效果面板</span><span class="c5-tag demo">示意</span></div>
+      <div class="p8f-nle">
+        <div class="p8f-pn"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="p8f-mon"><svg class="ic"><use href="#i-play"/></svg></div>
+        <div class="p8f-tks"><div><span>V2</span><b style="left:22%;width:18%"></b></div><div><span>V1</span><b style="left:4%;width:58%"></b><b style="left:64%;width:30%"></b></div><div><span>A1</span><b class="a" style="left:4%;width:90%"></b></div><i class="p8f-ph"></i></div>
+        <svg class="p8f-cur" viewBox="0 0 24 24"><path d="M4 2l15 11-7 1.3 4.2 7.5-2.6 1.4-4.2-7.6L4 20z"/></svg>
+      </div>
+      <p class="p8f-say"></p>
+    </div>
+    <div class="p8f-api panel fx fx-right" style="--d:3">
+      <div class="p8f-h"><b>Blender Python API</b><span>实验 5-8 正式活动 · 模型生成的脚本（节选）</span><span class="c5-tag real">实测</span></div>
+      <div class="c5-code p8f-code"></div>
+      <div class="p8f-ch"><div data-c="4"><span>ch 4</span></div><div data-c="3"><span>ch 3</span></div><div data-c="2"><span>ch 2</span></div><div data-c="1"><span>ch 1</span></div></div>
+    </div>
+  </div>
+  <div class="p8f-pr fx fx-up" style="--d:4"><span class="lbl">与 PPT 生成同一套机制</span><span>Proposer 生成 Blender 脚本</span><i>→</i><span>Reviewer 渲染关键帧</span><i>→</i><span>Vision LLM 检查效果</span><i>→</i><span>反馈修改建议</span></div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 视频编辑 Agent</div>
+</section>
+<style>
+.p8f-body{display:grid;grid-template-columns:1fr 1.15fr;gap:24px;flex:1;min-height:0}
+.p8f-gui,.p8f-api{padding:14px 20px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.p8f-h{display:flex;align-items:baseline;gap:12px}
+.p8f-h b{font-size:20px}
+.p8f-h span:not(.c5-tag){font-size:15px;color:var(--text3)}
+.p8f-h .c5-tag{margin-left:auto}
+.p8f-nle{position:relative;flex:1;display:grid;grid-template-columns:130px 1fr;grid-template-rows:1fr auto;gap:8px;padding:10px;border-radius:12px;background:rgba(5,9,22,.7);border:1px solid var(--line2);min-height:0}
+.p8f-pn{display:flex;flex-direction:column;gap:6px}
+.p8f-pn i{flex:1;border-radius:6px;background:rgba(255,255,255,.06)}
+.p8f-mon{display:grid;place-items:center;border-radius:8px;background:#0b0f1d;border:1px solid var(--line)}
+.p8f-mon .ic{font-size:42px;color:var(--text3)}
+.p8f-tks{position:relative;grid-column:1/3;display:flex;flex-direction:column;gap:5px}
+.p8f-tks>div{position:relative;height:30px;border-radius:6px;background:rgba(255,255,255,.04)}
+.p8f-tks span{position:absolute;left:6px;top:4px;font:15px var(--mono);color:var(--text3)}
+.p8f-tks b{position:absolute;top:4px;bottom:4px;border-radius:5px;background:rgba(96,165,250,.55)}
+.p8f-tks b.a{background:rgba(52,211,153,.45)}
+.p8f-ph{position:absolute;top:-4px;bottom:-4px;left:40%;width:2px;background:var(--bad)}
+.p8f-cur{position:absolute;left:0;top:0;width:24px;height:24px;fill:#fff;stroke:#111;stroke-width:1.2;transition:transform .8s var(--ease)}
+.p8f-say{min-height:52px;font-size:17px;line-height:1.55;color:#fda4af}
+.p8f-code{font-size:15px;line-height:1.5;padding:8px 4px;flex:1;min-height:0}
+.p8f-code .ln{transition:opacity .3s}
+.p8f-code .ln.dimln{opacity:.18}
+.p8f-ch{display:flex;flex-direction:column;gap:4px}
+.p8f-ch>div{position:relative;height:26px;border-radius:6px;background:rgba(255,255,255,.04)}
+.p8f-ch span{position:absolute;left:8px;top:3px;font:15px var(--mono);color:var(--text3)}
+.p8f-ch b{position:absolute;left:70px;top:3px;bottom:3px;border-radius:5px;font:600 15px/20px var(--mono);color:#06101f;padding-left:8px;animation:p8fin .5s var(--spring) both;transform-origin:left}
+@keyframes p8fin{from{transform:scaleX(0)}}
+.p8f-pr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:16px}
+.p8f-pr span:not(.lbl){padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.p8f-pr i{font-style:normal;color:var(--text3)}
+</style>
+<script>
+HOOKS['c05-video'] = {
+  CODE: `FPS = 25
+START_SECONDS = 9.250
+END_SECONDS = 11.000
+start_frame = int(round(START_SECONDS * FPS))
+dur_frames = max(1, int(round((END_SECONDS - START_SECONDS) * FPS)))
+render_dur = int(round(dur_frames * 1.5))
+se = scene.sequence_editor_create()
+movie = se.sequences.new_movie(name='clip', filepath=INPUT_PATH,
+    channel=1, frame_start=1 - start_frame)
+movie.frame_offset_start = start_frame
+sound = se.sequences.new_sound(name='audio', filepath=INPUT_PATH,
+    channel=2, frame_start=1 - start_frame)
+speed = se.sequences.new_effect(name='slowmo', type='SPEED',
+    channel=3, frame_start=1, frame_end=1 + dur_frames, seq1=movie)
+speed.speed_factor = 1.0 / 1.5
+text = se.sequences.new_effect(name='subtitle', type='TEXT',
+    channel=4, frame_start=1, frame_end=1 + render_dur)
+text.text = 'BIG BUNNY'`,
+  // 代码行号 → 落下的轨道 [通道, 标签, 颜色, 宽度%]
+  ADD: { 9: [1, 'clip · 视频片段', '#60a5fa', 58], 11: [2, 'audio · 原声', '#34d399', 58], 14: [3, 'slowmo · 放慢到 1.5 倍', '#fbbf24', 86], 17: [4, 'subtitle · BIG BUNNY', '#f472b6', 86] },
+  SAY: ['拖动 V1 片段的入点：差了 6 帧', '展开效果面板，找“速度控制”——又点到了相邻的按钮', '字幕轨要对齐到片段起点：坐标偏了'],
+  init(s) { this.ln = C5.code(s.querySelector('.p8f-code'), this.CODE, 'py'); },
+  async api(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const ch = (c) => s.querySelector(`.p8f-ch [data-c="${c}"]`);
+    while (ok()) {
+      this.ln.forEach((l) => { l.classList.add('dimln'); l.classList.remove('hl'); });
+      s.querySelectorAll('.p8f-ch b').forEach((b) => b.remove());
+      for (let i = 0; i < this.ln.length; i++) {
+        await U.wait(ctx, 420); if (!ok()) return;
+        if (i) this.ln[i - 1].classList.remove('hl');
+        this.ln[i].classList.remove('dimln'); this.ln[i].classList.add('hl');
+        const a = this.ADD[i];
+        if (a) ch(a[0]).insertAdjacentHTML('beforeend', `<b style="background:${a[2]};width:${a[3] * 0.8}%">${a[1]}</b>`);
+      }
+      this.ln[this.ln.length - 1].classList.remove('hl');
+      await U.wait(ctx, 3600);
+    }
+  },
+  async gui(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cur = s.querySelector('.p8f-cur'), say = s.querySelector('.p8f-say');
+    const P = [[340, 300], [60, 80], [300, 260]];
+    let i = 0;
+    while (ok()) {
+      cur.style.transform = `translate(${P[i][0]}px, ${P[i][1]}px)`;
+      await U.wait(ctx, 900); if (!ok()) return;
+      say.textContent = this.SAY[i];
+      await U.wait(ctx, 2000); if (!ok()) return;
+      i = (i + 1) % P.length;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.api(s); this.gui(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p8f-ch b').forEach((b) => b.remove()); s.querySelector('.p8f-say').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c05-exp58" data-part="8" data-trans="flip" data-dur="24000" data-title="实验 5-8 ★★：基于 API 的智能视频剪辑" data-notes="<b>实验 5-8 ★★：基于 API 的智能视频剪辑</b>。实验目标：验证 Agent 通过生成 Blender Python API 代码实现视频编辑的能力，评估基于视觉反馈的提议者-审核者机制在多媒体内容处理中的作用。<b>核心挑战</b>：理解用户的自然语言编辑需求并转化为精确的 API 调用序列，处理多种编辑操作（剪辑、合并、字幕、音轨混合、视觉效果），确保生成的脚本正确执行；Proposer Agent 编写代码后无法直接判断视频效果，必须通过 Reviewer Agent 渲染并用 Vision LLM 检查关键帧。技术方案：用户提供视频素材并以自然语言描述需求（如“把冲浪部分剪出来”），Proposer Agent 调用视频分析子 Agent，采用<b>两步定位策略</b>——<b>第一步，粗粒度定位</b>：传入视频路径、每 10 秒截图间隔、目标问题，子 Agent 用 ffmpeg 截取关键帧、连同问题交给 Vision LLM，返回场景区间；<b>第二步，精细粒度定位</b>：缩小时间范围，以每秒一张的密度截图，再次调用子 Agent，精确定位边界。把视频分析封装为子 Agent，避免大量截图占用主 Agent 上下文。定位后生成 Blender 脚本，Reviewer 快速预览、检查关键帧并反馈，达标后再完整渲染。验收标准：准确识别不同场景，起止点误差不超过 3 秒；特效要求（慢动作、转场、字幕）正确应用；Reviewer 能检测明显错误（遗漏关键内容、包含无关片段）并触发修正；输出格式正确、画质符合预期。<br>正式活动（exp5-6-real-blender-20260730-055102，doubao-seed-1-6-250615，Blender 4.3.2，素材是 Big Buck Bunny 预告片）：需求是剪出大白兔独自走在阳光草地上的镜头、放慢到 1.5 倍时长、底部加字幕 BIG BUNNY。粗定位每 10 秒一帧，得到 [10, 20] 秒；细定位在 [5, 25] 窗口内每秒一帧，得到 [9, 12]；第一版成片被 Reviewer 驳回——第三个关键帧出现了 THREE RODENTS 字卡，属于无关内容；于是按 0.25 秒精修，得到 [9.25, 11.0]，对照真值 [9.08, 11.2]，误差 0.17 / 0.2 秒，Reviewer 通过。负对照 [0, 3] 秒全是片头字卡，被 Reviewer 驳回。整个过程 13 次模型调用。教学示例（合成的四场景测试片：徒步 0–15、冲浪 15–30、滑雪 30–42、骑行 42–54 秒）：快速模式定位冲浪为 [16, 28]，真值 [15, 30]，误差 1 / 2 秒；截图都留在子 Agent 里，主 Agent 只用了 573 token，子 Agent 用了 2,934 token。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-8 <span class="c5-stars">★★</span>：基于 API 的<em>智能视频剪辑</em></h2></div>
+    <div class="p8g-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="f">正式活动</button><button data-v="t">教学示例</button></div></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标 · 核心挑战</b><p>把自然语言编辑需求转成精确的 Blender API 调用；Proposer 看不到效果，必须靠 Reviewer 渲染关键帧</p></div>
+    <div class="c5-xb"><b>两步定位策略</b><p>第一步，粗粒度定位：每 10 秒截图；第二步，精细粒度定位：缩小范围、每秒一张。视频分析封装为子 Agent</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>起止点误差 ≤ 3 秒；慢动作、字幕等特效正确；Reviewer 能发现遗漏或无关片段并触发修正</p></div>
+  </div>
+  <div class="p8g-body">
+    <div class="p8g-tl panel fx fx-left" style="--d:3">
+      <div class="p8g-q"></div>
+      <div class="p8g-rows"></div>
+      <div class="p8g-ax"></div>
+    </div>
+    <div class="p8g-side fx fx-right" style="--d:4"></div>
+  </div>
+  <div class="c5-rec-h p8g-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span><span class="p8g-src"></span></div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 实验 5-8</div>
+</section>
+<style>
+#c05-exp58 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c05-exp58 .c5-xp{margin-bottom:14px}
+#c05-exp58 .seg button{padding:8px 20px;font-size:17px}
+.p8g-body{display:grid;grid-template-columns:1.45fr 1fr;gap:22px;height:470px}
+.p8g-tl{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.p8g-q{font-size:17px;line-height:1.5;color:var(--text2);min-height:52px}
+.p8g-q b{color:var(--text)}
+.p8g-rows{display:flex;flex-direction:column;gap:12px;flex:1}
+.p8g-r{display:grid;grid-template-columns:170px 1fr;gap:12px;align-items:center;opacity:.25;transition:opacity .4s}
+.p8g-r.on{opacity:1}
+.p8g-r>span{font-size:16px;line-height:1.35;color:var(--text2)}
+.p8g-r>span b{display:block;color:var(--text)}
+.p8g-tr{position:relative;height:46px;border-radius:8px;background:rgba(255,255,255,.04)}
+.p8g-tk{position:absolute;top:6px;bottom:6px;width:3px;margin-left:-1px;border-radius:2px;background:var(--text3)}
+.p8g-band{position:absolute;top:2px;bottom:2px;border-radius:7px;background:color-mix(in srgb,var(--acc) 38%,transparent);border:2px solid var(--acc);transform:scaleX(0);transform-origin:left;transition:transform .6s var(--ease)}
+.p8g-bl{position:absolute;top:50%;transform:translateY(-50%);margin-left:8px;font:600 15px var(--num);color:var(--text);white-space:nowrap;opacity:0;transition:opacity .4s .5s}
+.p8g-r.on .p8g-bl{opacity:1}
+.p8g-r.on .p8g-band{transform:none}
+.p8g-band.bad{background:rgba(251,113,133,.35);border-color:var(--bad)}
+.p8g-truth{position:absolute;top:-3px;bottom:-3px;border:2px dashed var(--ok);border-radius:8px;pointer-events:none}
+.p8g-scn{position:absolute;top:6px;bottom:6px;border-radius:6px;display:grid;place-items:center;font-size:15px;color:#06101f;font-weight:600}
+.p8g-ax{position:relative;height:22px;margin-left:182px}
+.p8g-ax span{position:absolute;transform:translateX(-50%);font:15px var(--num);color:var(--text3)}
+.p8g-side{display:flex;flex-direction:column;gap:12px;min-height:0}
+.p8g-kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.p8g-kp .c5-kpi b{font-size:28px}
+.p8g-rv{display:flex;flex-direction:column;gap:8px}
+.p8g-m{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:12px;font-size:15px;line-height:1.5;border:1px solid;animation:upIn .4s var(--spring) both}
+.p8g-m b{flex:none;font-size:15px}
+.p8g-m.bad{color:#fda4af;border-color:rgba(251,113,133,.45);background:rgba(251,113,133,.06)}
+.p8g-m.ok{color:#6ee7b7;border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.06)}
+.p8g-m span{color:var(--text2)}
+.p8g-tok{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.p8g-tok>div{display:grid;grid-template-columns:110px 1fr 70px;gap:10px;align-items:center;font-size:16px;color:var(--text2)}
+.p8g-tok i{height:16px;border-radius:6px;background:var(--c)}
+.p8g-tok em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+.p8g-nt{font-size:15px;line-height:1.55;color:var(--text3)}
+.p8g-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c05-exp58'] = {
+  F: {
+    T: 32, ticks: [0, 5, 10, 15, 20, 25, 30],
+    q: '需求：剪出<b>大白兔独自走在阳光草地上</b>的镜头，放慢到 1.5 倍时长，底部加字幕 BIG BUNNY（素材：Big Buck Bunny 预告片）',
+    truth: [9.08, 11.2],
+    rows: [
+      { t: '第一步 · 粗定位', s: '每 10 秒一帧', k: [0, 10, 20, 30, 31.495], b: [10, 20] },
+      { t: '第二步 · 细定位', s: '窗口 [5, 25] · 每秒一帧', k: Array.from({ length: 21 }, (_, i) => 5 + i), b: [9, 12] },
+      { t: 'Reviewer 驱动精修', s: '[8, 13] · 每 0.25 秒一帧', k: Array.from({ length: 21 }, (_, i) => 8 + i * 0.25), b: [9.25, 11] },
+      { t: '负对照', s: '故意交一段错的', k: [], b: [0, 3], bad: 1 },
+    ],
+    src: '数据：配套仓库 chapter5/video-edit 正式活动 exp5-6-real-blender-20260730-055102，doubao-seed-1-6-250615，Blender 4.3.2 · 成片 2.645 秒、854×480、H.264 25fps + AAC',
+  },
+  T: {
+    T: 54, ticks: [0, 15, 30, 42, 54],
+    q: '需求：<b>把冲浪部分剪出来</b>（合成的四场景测试片，场景边界已知）',
+    truth: [15, 30],
+    scenes: [[0, 15, '徒步', '#fcd34d'], [15, 30, '冲浪', '#67e8f9'], [30, 42, '滑雪', '#e2e8f0'], [42, 54, '骑行', '#86efac']],
+    rows: [
+      { t: '四个场景', s: '真值边界', scn: 1 },
+      { t: '快速模式定位', s: '冲浪片段', k: [], b: [16, 28] },
+    ],
+    src: '数据：配套仓库 chapter5/video-edit 教学示例（合成四场景测试片）',
+  },
+  init(s) { this.set = U.seg(s.querySelector('.p8g-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  side(v) {
+    if (v === 'f') return `<div class="p8g-kp"><div class="c5-kpi"><b>0.17 / 0.2 s</b><span>最终起止误差（容限 3 秒）</span></div><div class="c5-kpi"><b>13 次</b><span>模型调用 · 精修 1 轮</span></div></div>
+      <div class="p8g-rv"><span class="lbl">Reviewer 看关键帧</span>
+      <div class="p8g-m bad" data-r="2"><b>驳回</b><span>[9, 12] 的第三个关键帧出现 THREE RODENTS 字卡——包含无关内容</span></div>
+      <div class="p8g-m ok" data-r="3"><b>通过</b><span>[9.25, 11.0] 每一帧都是草地上的大白兔，底部字幕 BIG BUNNY 清晰可见</span></div>
+      <div class="p8g-m bad" data-r="4"><b>驳回</b><span>负对照 [0, 3] 全是片头字卡，看不到目标镜头</span></div></div>`;
+    return `<div class="p8g-kp"><div class="c5-kpi"><b>1 / 2 s</b><span>起止误差（容限 3 秒）</span></div><div class="c5-kpi"><b>[16, 28]</b><span>定位结果 · 真值 [15, 30]</span></div></div>
+      <div class="p8g-tok"><span class="lbl">截图留在子 Agent 里</span><div><span>主 Agent</span><i style="--c:var(--acc);width:${(573 / 2934) * 100}%"></i><em>573</em></div><div><span>子 Agent</span><i style="--c:#c4b5fd;width:100%"></i><em>2,934</em></div><p class="p8g-nt">单位：token。大量截图不进入主 Agent 的上下文</p></div>`;
+  },
+  async show(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const D = v === 'f' ? this.F : this.T, pc = (t) => ((t / D.T) * 100).toFixed(2) + '%';
+    this.v = v; this.set(v);
+    s.querySelector('.p8g-q').innerHTML = D.q;
+    s.querySelector('.p8g-src').textContent = D.src;
+    s.querySelector('.p8g-ax').innerHTML = D.ticks.map((t, i) => (i === D.ticks.length - 1 ? `<span style="left:${pc(t)};transform:translateX(-${t === D.T ? 100 : 50}%)">${t} 秒</span>` : `<span style="left:${pc(t)}">${t}</span>`)).join('');
+    const tr = `<i class="p8g-truth" style="left:${pc(D.truth[0])};width:${pc(D.truth[1] - D.truth[0])}"></i>`;
+    s.querySelector('.p8g-rows').innerHTML = D.rows.map((r) => `<div class="p8g-r"><span><b>${r.t}</b>${r.s}</span><div class="p8g-tr">${r.scn ? D.scenes.map(([a, b, n, c]) => `<i class="p8g-scn" style="left:${pc(a)};width:calc(${pc(b - a)} - 3px);background:${c}">${n}</i>`).join('') : (r.k || []).map((t) => `<i class="p8g-tk" style="left:${pc(t)}"></i>`).join('') + `<i class="p8g-band${r.bad ? ' bad' : ''}" style="left:${pc(r.b[0])};width:${pc(r.b[1] - r.b[0])}"></i><i class="p8g-bl" style="left:${pc(r.b[1])}">[${r.b[0]}, ${r.b[1]}]</i>`}${r.scn ? '' : tr}</div></div>`).join('');
+    const sd = s.querySelector('.p8g-side');
+    sd.innerHTML = this.side(v);
+    const ms = [...sd.querySelectorAll('.p8g-m')];
+    ms.forEach((m) => (m.style.display = 'none'));
+    const rows = [...s.querySelectorAll('.p8g-r')];
+    for (let i = 0; i < rows.length; i++) {
+      await U.wait(ctx, i ? 1300 : 300); if (!ok()) return;
+      rows[i].classList.add('on');
+      const m = sd.querySelector(`.p8g-m[data-r="${i + 1}"]`);
+      if (m) { await U.wait(ctx, 700); if (!ok()) return; m.style.display = ''; }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.show(s, 'f');
+    ctx.every(() => { if (this.auto) this.show(s, this.v === 'f' ? 't' : 'f'); }, 10000);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c05-cad" data-part="8" data-dur="18000" data-title="3D 与工业零件" data-notes="<b>3D 与工业零件：代码生成与生成模型的边界。</b>同样是“生成一个东西”，Agent 面前有两条路：一条是写代码精确构造（CadQuery、OpenSCAD、Blender API），另一条是直接调 3D 生成模型（混元 3D 这类 text/image-to-3D 模型，和文生图同属 diffusion 一系）。到底什么时候该用代码生成，什么时候该用图片 / 3D 生成模型？<br><b>一看产物有没有紧凑的精确描述。</b>工业零件天然有紧凑的精确描述：一个法兰盘，外径、厚度、孔位圆直径、孔径、孔数，五六个参数就完整定义了，代码是它的<b>无损</b>表达。一盆绿植、一块太湖石、一张人脸就不一样了——它们有数不清的细节，<b>内在复杂度是近乎无限的</b>。<br><b>二看精度要求和可验证性。</b>零件的每个尺寸都是硬约束——孔径 5mm、公差 ±0.05mm，差一丝就是废品。代码生成的零件可以程序化验证：载入网格，量出外径、孔位，跟规格逐项对一遍；而 3D 生成模型生成的零件无法直接跟规格核对。<br>两条路还有一个更实际的差别：<b>表示形式和可编辑性</b>。制造流程要的是 B-rep（边界表示）参数化实体——STEP 文件里存着特征树和尺寸参数，可以直接驱动 CNC 加工；3D 生成模型吐出来的则是三角面片网格，曲面靠无数细碎面片逼近，放大看坑坑洼洼。等甲方说一句“安装孔从 M5 改成 M6”，差别就见分晓：代码路线改一个数字重跑一遍，其余尺寸分毫不差；生成模型路线只能整个重新生成，别的尺寸会不会跟着跑偏，全凭运气。<br>所以，走哪条路本身就是 Agent 要做的一次决策：掂量产物的内在复杂度和精度要求，把任务分给代码生成或 3D 生成模型；实际系统里两条路还可以混着走——几何体用代码参数化生成，表面纹理交给生成模型，各取所长。左侧法兰由参数实时绘制；中间生成模型路线的形状漂移是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">3D 与工业零件：<em>代码生成与生成模型的边界</em></h2></div>
+    <div class="p8h-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="5">M5 · 孔径 5.5</button><button data-v="6">改成 M6 · 孔径 6.5</button></div></header>
+  <div class="p8h-body">
+    <div class="p8h-a panel fx fx-left" style="--d:3">
+      <div class="p8h-h"><b>代码路线：参数化实体</b><span>B-rep · STEP 存特征树和尺寸参数</span></div>
+      <svg class="p8h-svg" viewBox="0 0 300 300"><circle class="p8h-od" cx="150" cy="150" r="120"/><circle class="p8h-bc" cx="150" cy="150" r="90"/><g class="p8h-hs"></g><line class="p8h-dm" x1="30" y1="285" x2="270" y2="285"/><text class="p8h-dt" x="150" y="279">⌀80</text><text class="p8h-dt s" x="150" y="68">孔位圆 ⌀60</text></svg>
+      <div class="p8h-pr"></div>
+      <p class="p8h-nt">只改孔径一个参数，<b>其余尺寸分毫不差</b>，可直接驱动 CNC</p>
+    </div>
+    <div class="p8h-b panel fx fx-up" style="--d:4">
+      <div class="p8h-h"><b>生成模型路线：三角面片网格</b><span class="c5-tag demo">示意</span></div>
+      <svg class="p8h-svg" viewBox="0 0 300 300"><polygon class="p8h-mesh" points=""/><g class="p8h-tri"></g></svg>
+      <div class="p8h-gen"><span class="p8h-gt">曲面靠无数细碎面片逼近，放大看坑坑洼洼</span></div>
+      <p class="p8h-nt">改一处只能<b>整个重新生成</b>——别的尺寸会不会跑偏，全凭运气</p>
+    </div>
+    <div class="p8h-c panel fx fx-right" style="--d:5">
+      <div class="p8h-h"><b>走哪条路，是一次决策</b></div>
+      <div class="p8h-q"><span><em>一看</em>产物有没有<b>紧凑的精确描述</b>：零件五六个参数就完整定义，代码是它的<b>无损</b>表达；绿植、太湖石、人脸的<b>内在复杂度是近乎无限的</b></span><span><em>二看</em><b>精度要求和可验证性</b>：零件尺寸是硬约束，代码产物可以程序化逐项核对</span></div>
+      <div class="p8h-map"><span class="p8h-yl">精度要求 ↑</span><span class="p8h-xl">内在复杂度 →</span>
+        <i class="p8h-pt a" style="left:14%;top:12%"><b>法兰盘</b>代码生成</i>
+        <i class="p8h-pt b" style="left:58%;top:54%"><b>绿植 · 太湖石 · 人脸</b>生成模型</i>
+      </div>
+      <p class="p8h-mx">还可以混着走：<b>几何体用代码参数化生成，表面纹理交给生成模型</b></p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 3D 与工业零件：代码生成与生成模型的边界</div>
+</section>
+<style>
+#c05-cad .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c05-cad .seg button{padding:8px 18px;font-size:17px}
+.p8h-body{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:20px;flex:1;min-height:0}
+.p8h-a,.p8h-b,.p8h-c{padding:14px 18px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.p8h-h{display:flex;flex-direction:column;gap:2px}
+.p8h-h b{font-size:19px}
+.p8h-h span:not(.c5-tag){font-size:15px;color:var(--text3)}
+.p8h-h .c5-tag{align-self:flex-start}
+.p8h-svg{width:100%;height:290px}
+.p8h-od{fill:rgba(96,165,250,.14);stroke:#60a5fa;stroke-width:3}
+.p8h-bc{fill:none;stroke:rgba(255,255,255,.35);stroke-width:1.5;stroke-dasharray:5 5}
+.p8h-hs circle{fill:#050816;stroke:var(--acc);stroke-width:2.5;transition:r .6s var(--spring)}
+.p8h-dm{stroke:var(--text3);stroke-width:1.5}
+.p8h-dt{font:600 16px var(--num);fill:var(--text2);text-anchor:middle}
+.p8h-pr{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font:15px/1.6 var(--mono);color:var(--text2)}
+.p8h-pr b{color:var(--text);font-weight:600;transition:color .3s}
+.p8h-pr b.chg{color:var(--acc)}
+.p8h-nt{margin-top:auto;font-size:16px;line-height:1.55;color:var(--text2)}
+.p8h-nt b{color:var(--text)}
+.p8h-mesh{fill:rgba(244,114,182,.12);stroke:#f472b6;stroke-width:2;transition:all .8s var(--ease)}
+.p8h-tri line{stroke:rgba(244,114,182,.35);stroke-width:1}
+.p8h-gen{font-size:15px;color:var(--text3)}
+.p8h-q{display:flex;flex-direction:column;gap:8px}
+.p8h-q span{font-size:16px;line-height:1.55;color:var(--text2)}
+.p8h-q em{font-style:normal;font-weight:700;color:var(--acc);margin-right:6px}
+.p8h-q b{color:var(--text)}
+.p8h-map{position:relative;flex:1;min-height:150px;border-left:2px solid var(--line2);border-bottom:2px solid var(--line2);margin:6px 0 24px 22px}
+.p8h-yl{position:absolute;left:-26px;top:0;writing-mode:vertical-rl;font-size:15px;color:var(--text3)}
+.p8h-xl{position:absolute;right:0;bottom:-24px;font-size:15px;color:var(--text3)}
+.p8h-pt{position:absolute;display:flex;flex-direction:column;padding:6px 12px;border-radius:12px;font-style:normal;font-size:15px;line-height:1.4}
+.p8h-pt b{font-size:16px}
+.p8h-pt.a{color:#93c5fd;border:1px solid rgba(96,165,250,.6);background:rgba(96,165,250,.1)}
+.p8h-pt.b{color:#f9a8d4;border:1px solid rgba(244,114,182,.6);background:rgba(244,114,182,.1)}
+.p8h-mx{font-size:16px;line-height:1.55;color:var(--text2);padding-left:12px;border-left:3px solid var(--acc)}
+.p8h-mx b{color:var(--text)}
+</style>
+<script>
+HOOKS['c05-cad'] = {
+  init(s) {
+    this.set = U.seg(s.querySelector('.p8h-seg'), (v) => { this.auto = false; this.m(s, v); });
+    s.querySelector('.p8h-hs').innerHTML = [0, 1, 2, 3].map((i) => { const a = (i * Math.PI) / 2 + Math.PI / 4; return `<circle cx="${(150 + 90 * Math.cos(a)).toFixed(1)}" cy="${(150 + 90 * Math.sin(a)).toFixed(1)}" r="8.25"/>`; }).join('');
+    this.rnd = U.rand(7);
+    this.mesh(s);
+  },
+  mesh(s) {
+    const N = 26, P = [], r0 = 70 + this.rnd() * 30, cx = 150 + (this.rnd() - 0.5) * 30, cy = 150 + (this.rnd() - 0.5) * 30, sx = 0.8 + this.rnd() * 0.5, sy = 0.8 + this.rnd() * 0.5;
+    for (let i = 0; i < N; i++) { const a = (i / N) * Math.PI * 2, r = r0 * (0.85 + this.rnd() * 0.3); P.push([cx + Math.cos(a) * r * sx, cy + Math.sin(a) * r * sy]); }
+    s.querySelector('.p8h-mesh').setAttribute('points', P.map((p) => p.map((v) => v.toFixed(1)).join(',')).join(' '));
+    s.querySelector('.p8h-tri').innerHTML = P.filter((_, i) => i % 2 === 0).map((p) => `<line x1="${cx.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}"/>`).join('');
+  },
+  m(s, v) {
+    this.v = v; this.set(v);
+    const d = v === '5' ? 5.5 : 6.5;
+    s.querySelectorAll('.p8h-hs circle').forEach((c) => c.setAttribute('r', (d * 1.5).toFixed(2)));
+    s.querySelector('.p8h-pr').innerHTML = [['outer_diameter', '80.0'], ['thickness', '10.0'], ['hole_count', '4'], ['hole_diameter', d.toFixed(1)], ['hole_circle', '60.0']].map(([k, x]) => `<span>${k}</span><b${k === 'hole_diameter' && v === '6' ? ' class="chg"' : ''}>${x}</b>`).join('');
+    this.mesh(s);
+    s.querySelector('.p8h-gt').textContent = v === '5' ? '曲面靠无数细碎面片逼近，放大看坑坑洼洼' : '整体重新生成：轮廓、比例都变了，孔仍未必出现';
+  },
+  enter(s, ctx) {
+    this.auto = true; this.m(s, '5');
+    ctx.every(() => { if (this.auto) this.m(s, this.v === '5' ? '6' : '5'); }, 3800);
+  },
+};
+</script>
+
+<section class="slide" id="c05-exp59" data-part="8" data-trans="rise" data-dur="22000" data-title="实验 5-9 ★★：同一个零件的两种路线" data-notes="<b>实验 5-9 ★★：同一个零件的两种生成路线——代码与生成模型</b>。实验目标：拿同一个带尺寸规格的机械零件，对比代码生成与 3D 生成模型两条路线在尺寸精度、可编辑性和制造可用性上的差异，验证“按内在复杂度与精度要求选路”的判断框架。技术方案：带明确规格的需求“法兰盘，外径 80mm，厚度 10mm，4 个均布 M5 安装孔，孔位圆直径 60mm”。<b>路线 A</b>：Agent 编写 CadQuery 代码构造零件，导出 STEP 与 STL。<b>路线 B</b>：把同一规格交给 3D 生成模型，得到三角面片网格。<b>程序化验证</b>：测量两条路线产物的关键尺寸与规格的偏差，并检查安装面的平整度。随后发出变更请求“安装孔从 M5 改为 M6”，记录两条路线各自的修改成本。<b>对照组</b>：生成一盆绿植，两条路线的优劣正好反转。<br>配套仓库实测（exp5-7-cad-vs-diffusion-20260821-015734-v1，9 次外部调用全部留证）：路线 A 由 kimi-k2.5 写出左边这 17 行 CadQuery，本地执行，外径 80.0、厚度 10.0、4 个孔、孔径 5.499（STL 三角离散的弦差，STEP 是精确的 B-rep）、孔位圆 60.0，安装面平整度 RMS 0，2,532 面。路线 B 先由 Gemini 出零件图，再交给 Hunyuan3D-2.1 公共 Space：外径 0.519（−99.4%）、厚度 1.989（−80.1%）、没有孔，平整度 0.030（网格单位），144,580 面——输出没有单位，比例也颠倒了。M5 改 M6（孔径 5.5 改 6.5）：路线 A 程序化改一行参数，0 次 LLM 调用、本地 2.1 秒，孔径 6.499，其余尺寸零漂移；路线 B 两次外部生成（6.9 + 24.6 秒），仍然无孔，外径从 0.519 漂到 1.988（+283%），法兰轴向从 Z 翻到了 Y。对照组绿植：Kimi 视觉模型给程序化渲染打 3 分，给文生图打 8 分——适用边界正好反转。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-9 <span class="c5-stars">★★</span>：同一个零件的<em>两种生成路线</em></h2></div>
+    <div class="p8i-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="5">M5 规格</button><button data-v="6">变更：M5 → M6</button></div></header>
+  <div class="p8i-body">
+    <div class="win p8i-cw fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>路线 A · kimi-k2.5 写的 17 行 CadQuery</span></div><div class="c5-code p8i-code"></div><div class="p8i-cost"></div></div>
+    <div class="p8i-tb panel fx fx-up" style="--d:4">
+      <div class="p8i-tr h"><span>尺寸（规格 mm）</span><span>路线 A：CadQuery 代码</span><span>路线 B：Hunyuan3D-2.1 网格</span></div>
+      <div class="p8i-rows"></div>
+      <div class="p8i-nb">路线 B 的网格<b>没有单位、没有坐标轴语义</b>：截面直径约 0.5、高约 2——比例与扁平法兰完全颠倒</div>
+    </div>
+    <div class="p8i-r fx fx-right" style="--d:5">
+      <div class="p8i-chg panel"></div>
+      <div class="p8i-ctl panel"><span class="lbl">对照组：一盆绿植 · Kimi 视觉模型评自然度</span>
+        <div class="p8i-sc"><span>程序化渲染</span><i><b style="--w:30%"></b></i><em>3</em></div>
+        <div class="p8i-sc g"><span>文生图</span><i><b style="--w:80%"></b></i><em>8</em></div>
+        <p>适用边界<b>正好反转</b></p></div>
+    </div>
+  </div>
+  <div class="c5-rec-h p8i-rec fx fx-up" style="--d:6"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/cad-vs-diffusion 正式 run exp5-7-cad-vs-diffusion-20260821-015734-v1 · 路线 B：Gemini 出零件图 → Hunyuan3D-2.1 公共 Space · 10/10 门禁通过</div>
+  <div class="src">第五章 ·「代码驱动的多媒体生成」· 实验 5-9</div>
+</section>
+<style>
+#c05-exp59 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c05-exp59 .seg button{padding:8px 18px;font-size:17px}
+.p8i-body{display:grid;grid-template-columns:660px 1fr 340px;gap:18px;flex:1;min-height:0}
+.p8i-cw{display:flex;flex-direction:column;min-height:0}
+.p8i-code{font-size:15px;line-height:1.5;padding:8px 4px}
+.p8i-code .ln{white-space:pre-wrap;padding-left:calc(2.4em + 8px);text-indent:-2.4em}
+.p8i-code .ln.chg{background:color-mix(in srgb,var(--acc) 22%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+.p8i-cost{margin:0 12px 12px;padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.5;color:var(--text2);border:1px dashed var(--line2);min-height:44px}
+.p8i-cost b{color:var(--acc)}
+.p8i-tb{padding:12px 16px;display:flex;flex-direction:column}
+.p8i-tr{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:8px;padding:8px 0;border-top:1px solid var(--line);font-size:16px;line-height:1.4;align-items:center}
+.p8i-tr.h{border-top:none;font-size:15px;color:var(--text3)}
+.p8i-tr span:first-child{color:var(--text2)}
+.p8i-tr .a{color:#6ee7b7;font-family:var(--num);font-weight:600}
+.p8i-tr .b{color:#fda4af;font-family:var(--num);font-weight:600}
+.p8i-tr .b small,.p8i-tr .a small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+.p8i-tr.flash .a,.p8i-tr.flash .b{animation:p8iflash 1s ease}
+@keyframes p8iflash{30%{background:rgba(255,255,255,.12)}}
+.p8i-nb{margin-top:auto;padding-top:8px;font-size:15px;line-height:1.55;color:var(--text3)}
+.p8i-nb b{color:var(--text2)}
+.p8i-r{display:flex;flex-direction:column;gap:14px;min-height:0}
+.p8i-chg{padding:12px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.p8i-chg .lbl{margin-bottom:2px}
+.p8i-cr{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;border:1px solid var(--line)}
+.p8i-cr b{font-size:16px}
+.p8i-cr span{font-size:15px;line-height:1.5;color:var(--text2)}
+.p8i-cr.a{border-color:rgba(52,211,153,.45)}.p8i-cr.a b{color:#6ee7b7}
+.p8i-cr.b{border-color:rgba(251,113,133,.45)}.p8i-cr.b b{color:#fda4af}
+.p8i-ctl{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.p8i-sc{display:grid;grid-template-columns:90px 1fr 30px;align-items:center;gap:8px;font-size:15px;color:var(--text2)}
+.p8i-sc i{height:14px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+.p8i-sc i b{display:block;height:100%;width:var(--w);border-radius:6px;background:#94a3c4}
+.p8i-sc.g i b{background:#f472b6}
+.p8i-sc em{font:700 18px var(--num);font-style:normal;color:var(--text)}
+.p8i-ctl p{font-size:15px;color:var(--text2)}
+.p8i-ctl p b{color:var(--acc)}
+.p8i-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c05-exp59'] = {
+  CODE: `import cadquery as cq
+
+PARAMS = {
+    "outer_diameter": 80.0,
+    "thickness": 10.0,
+    "hole_count": 4,
+    "hole_diameter": 5.5,
+    "hole_circle_diameter": 60.0
+}
+
+result = (cq.Workplane("XY")
+          .circle(PARAMS["outer_diameter"] / 2.0)
+          .extrude(PARAMS["thickness"])
+          .faces(">Z")
+          .workplane()
+          .polarArray(PARAMS["hole_circle_diameter"] / 2.0, 0, 360, PARAMS["hole_count"])
+          .hole(PARAMS["hole_diameter"]))`,
+  R: {
+    5: [['外径（80）', '80.0<small>偏差 0.0</small>', '0.519<small>−99.4%</small>'], ['厚度（10）', '10.0<small>偏差 0.0</small>', '1.989<small>−80.1%</small>'], ['孔数（4）', '4', '0<small>无通孔</small>'], ['孔径（5.5）', '5.499<small>STL 弦差 −0.001</small>', '无法测量'], ['孔位圆（60）', '60.0', '无法测量'], ['平整度 RMS', '0.0', '0.030<small>网格单位</small>'], ['网格面数', '2,532', '144,580']],
+    6: [['外径（80）', '80.0<small>零漂移</small>', '1.988<small>0.519 → 1.988，+283%</small>'], ['厚度（10）', '10.0<small>零漂移</small>', '−0.0015 变化'], ['孔数（4）', '4<small>不变</small>', '0<small>仍无孔</small>'], ['孔径（6.5）', '6.499<small>偏差 −0.001</small>', '无法测量'], ['孔位圆（60）', '60.0<small>零漂移</small>', '无法测量'], ['轴向', 'Z', 'Z → Y<small>摆放朝向变了</small>']],
+  },
+  init(s) {
+    this.ln = C5.code(s.querySelector('.p8i-code'), this.CODE, 'py');
+    this.set = U.seg(s.querySelector('.p8i-seg'), (v) => { this.auto = false; this.m(s, v); });
+  },
+  m(s, v) {
+    this.v = v; this.set(v);
+    this.ln[7].innerHTML = C5.hl(`    "hole_diameter": ${v === '5' ? '5.5' : '6.5'},`, 'py');
+    this.ln[7].classList.toggle('chg', v === '6');
+    s.querySelector('.p8i-cost').innerHTML = v === '5'
+      ? '规格要求的五个尺寸，集中在 PARAMS 里——代码就是零件的<b>无损</b>表达'
+      : '程序化修补 <b>PARAMS["hole_diameter"]</b> 一行：<b>0 次 LLM 调用</b>，本地重跑 2.1 秒';
+    s.querySelector('.p8i-rows').innerHTML = this.R[v].map(([a, b, c]) => `<div class="p8i-tr flash"><span>${a}</span><span class="a">${b}</span><span class="b">${c}</span></div>`).join('');
+    s.querySelector('.p8i-chg').innerHTML = v === '5'
+      ? `<span class="lbl">程序化验证</span><div class="p8i-cr a"><b>路线 A：一次成功</b><span>全部尺寸在 0.05mm 公差内；STEP 文件是精确 B-rep</span></div><div class="p8i-cr b"><b>路线 B：4 个孔全部丢失</b><span>输入的零件图本身有 4 个孔，是在 2D → 3D 重建时丢掉的</span></div>`
+      : `<span class="lbl">变更请求：M5 → M6 的修改成本</span><div class="p8i-cr a"><b>路线 A：改一行参数</b><span>0 次 LLM 调用 · 2.1 秒 · 其余尺寸零漂移</span></div><div class="p8i-cr b"><b>路线 B：整体重新生成</b><span>两次外部生成（6.9 + 24.6 秒），仍然无孔，外径 +283%，轴向 Z 翻到 Y</span></div>`;
+  },
+  enter(s, ctx) {
+    this.auto = true; this.m(s, '5');
+    ctx.every(() => { if (this.auto) this.m(s, this.v === '5' ? '6' : '5'); }, 6000);
+  },
+};
+</script>
+
+<!-- ================= 代码作为系统适配器 ================= -->
+<section class="slide" id="c05-adapter" data-part="8" data-dur="20000" data-title="代码作为系统适配器" data-notes="前几节的代码大多产出“面向人”的东西——报告、幻灯片、界面。这一节的代码指向另一个方向：<b>连接机器与机器</b>。真实系统里，Agent 要打交道的外部服务常常没有现成 SDK，接口也未必规范——文档缺失、返回格式非标准、字段随版本漂移。面对这种情况，Agent 不必等人预先写好适配层，而是当场阅读接口文档或直接观察一两条真实响应，即时生成适配代码：构造 HTTP 客户端、拼装鉴权头、解析非标准的返回结构、把上游的数据模型转换成下游可用的格式。代码在这里成了连接任意系统的“万能胶”——哪里接不上，就现场生成一段胶水补上，这正是元能力“系统接口”方向的核心。<br>这种“万能胶”还能延伸到<b>完全没有 API 的系统</b>：当外部系统只暴露图形界面时，Agent 可以先通过 Computer Use（第六章详细介绍）操作界面，再把成功完成的操作序列用代码固化为 RPA 工具——未来执行相同任务时直接运行代码，以极高的速度和稳定性完成操作，无需再调用昂贵的视觉思考。RPA 是“系统适配器”在无接口系统上的极端形态；这种“工作流录制与固化”机制将在第九章展开。<br>数据处理是软件系统中最常见但也最令人头疼的任务之一，根源在于数据格式的多样性和不断变化。为每种格式手写解析代码，维护成本极高；代码生成提供了全新思路：让 Agent 在遇到新格式时基于样本数据临时生成解析代码，系统自动适应数据格式的演化，无需人工干预。<br>页面上的接口字段、胶水代码与耗时都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">代码作为系统适配器：<em>连接机器与机器</em></h2></header>
+  <div class="p8j-body">
+    <div class="p8j-l panel fx fx-left" style="--d:2">
+      <div class="p8j-h"><b>接口不规范：现场生成一段胶水</b><span class="c5-tag demo">示意</span></div>
+      <div class="p8j-flow">
+        <div class="p8j-box up"><span class="lbl">上游服务 · 一条真实响应</span><code class="p8j-raw"></code></div>
+        <div class="p8j-glue"><span class="lbl">Agent 生成的适配代码</span><div class="c5-code p8j-code"></div></div>
+        <div class="p8j-box dn"><span class="lbl">下游需要的格式</span><code class="p8j-out"></code></div>
+      </div>
+      <div class="p8j-st"></div>
+    </div>
+    <div class="p8j-r panel fx fx-right" style="--d:3">
+      <div class="p8j-h"><b>完全没有 API 的系统</b><span class="c5-tag demo">示意</span></div>
+      <div class="p8j-lane cu"><span class="lbl">先用 Computer Use 操作界面</span><div class="p8j-steps"></div><em class="p8j-t1"></em></div>
+      <div class="p8j-arw"><svg class="ic"><use href="#i-save"/></svg>把成功的操作序列<b>用代码固化为 RPA 工具</b></div>
+      <div class="p8j-lane rpa"><span class="lbl">以后直接运行代码</span><div class="p8j-steps"></div><em class="p8j-t2"></em></div>
+      <p class="p8j-nt">RPA 是“系统适配器”在无接口系统上的极端形态 · 工作流录制与固化 → 第九章</p>
+    </div>
+  </div>
+  <div class="p8j-evo fx fx-up" style="--d:4"><svg class="ic"><use href="#i-refresh"/></svg><p>数据格式不断演化：为每种格式手写解析代码维护成本极高 → 让 Agent <b>遇到新格式时基于样本临时生成解析代码</b>，系统自动适应格式演化</p></div>
+  <div class="src">第五章 ·「代码作为系统适配器」</div>
+</section>
+<style>
+.p8j-body{display:grid;grid-template-columns:1.2fr 1fr;gap:24px;flex:1;min-height:0}
+.p8j-l,.p8j-r{padding:14px 20px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.p8j-h{display:flex;align-items:center;justify-content:space-between}
+.p8j-h b{font-size:20px}
+.p8j-flow{display:grid;grid-template-columns:1fr 1.35fr 1fr;gap:12px;flex:1;min-height:0}
+.p8j-box,.p8j-glue{display:flex;flex-direction:column;gap:6px}
+.p8j-box code{flex:1;padding:10px 12px;border-radius:12px;font:15px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;background:rgba(5,9,22,.7);border:1px solid var(--line);transition:border-color .3s}
+.p8j-box.up code{color:#fde68a}
+.p8j-box.dn code{color:#6ee7b7}
+.p8j-box code .dr{color:#fda4af;background:rgba(251,113,133,.15);border-radius:4px}
+.p8j-glue .c5-code{flex:1;font-size:15px;line-height:1.5;padding:8px 4px;border-radius:12px;background:rgba(5,9,22,.7);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);white-space:pre-wrap}
+.p8j-glue .c5-code .ln.dimln{opacity:.15}
+.p8j-l.err .p8j-box.dn code{border-color:var(--bad)}
+.p8j-st{min-height:46px;padding:8px 14px;border-radius:12px;font-size:16px;line-height:1.5;color:var(--text2);border:1px solid var(--line)}
+.p8j-st.ok{color:#6ee7b7;border-color:rgba(52,211,153,.45)}
+.p8j-st.bad{color:#fda4af;border-color:rgba(251,113,133,.5)}
+.p8j-lane{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p8j-steps{display:flex;gap:6px;flex-wrap:wrap;min-height:34px}
+.p8j-steps span{padding:4px 10px;border-radius:8px;font-size:15px;color:var(--text2);border:1px solid var(--line2);animation:pop .3s var(--spring)}
+.p8j-lane.cu .p8j-steps span.v{color:#c4b5fd;border-color:rgba(196,181,253,.45)}
+.p8j-lane.rpa .p8j-steps span{color:#6ee7b7;border-color:rgba(52,211,153,.45)}
+.p8j-lane em{font-style:normal;font-size:15px;color:var(--text3)}
+.p8j-arw{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--text2)}
+.p8j-arw .ic{font-size:24px;color:var(--acc)}
+.p8j-arw b{color:var(--text)}
+.p8j-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text3)}
+.p8j-evo{display:flex;align-items:center;gap:14px;margin-top:16px;padding:12px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.p8j-evo .ic{font-size:26px;color:var(--acc);flex:none}
+.p8j-evo p{font-size:17px;line-height:1.55;color:var(--text2)}
+.p8j-evo b{color:var(--text)}
+</style>
+<script>
+HOOKS['c05-adapter'] = {
+  RAW1: '{"ts": 1752748981,\n "amt_cents": 12900,\n "cust": {"nm": "张三"}}',
+  RAW2: '{"ts": 1752748981,\n "<span class="dr">amount_fen</span>": 12900,\n "cust": {"nm": "张三"}}',
+  OUT: '{"time": "2025-07-17T10:43:01Z",\n "amount": 129.00,\n "customer": "张三"}',
+  G1: 'def adapt(raw):\n    return {\n        "time": iso(raw["ts"]),\n        "amount": raw["amt_cents"] / 100,\n        "customer": raw["cust"]["nm"],\n    }',
+  G2: 'def adapt(raw):\n    return {\n        "time": iso(raw["ts"]),\n        "amount": raw["amount_fen"] / 100,\n        "customer": raw["cust"]["nm"],\n    }',
+  async glue(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const L = s.querySelector('.p8j-l'), raw = s.querySelector('.p8j-raw'), out = s.querySelector('.p8j-out'), st = s.querySelector('.p8j-st'), host = s.querySelector('.p8j-code');
+    const say = (c, t) => { st.className = 'p8j-st ' + c; st.textContent = t; };
+    const write = async (src) => { const ln = C5.code(host, src, 'py'); ln.forEach((l) => l.classList.add('dimln')); for (const l of ln) { await U.wait(ctx, 260); if (!ok()) return false; l.classList.remove('dimln'); } return true; };
+    while (ok()) {
+      L.classList.remove('err'); raw.textContent = this.RAW1; out.textContent = '……'; host.innerHTML = '';
+      say('', '没有现成 SDK、返回格式非标准——观察一条真实响应');
+      await U.wait(ctx, 1400); if (!ok()) return;
+      say('', '当场生成适配代码：解析非标准结构，转换成下游的数据模型');
+      if (!(await write(this.G1))) return;
+      out.textContent = this.OUT; say('ok', '数据流通');
+      await U.wait(ctx, 2200); if (!ok()) return;
+      raw.innerHTML = this.RAW2; L.classList.add('err'); out.textContent = "KeyError: 'amt_cents'";
+      say('bad', '上游字段随版本漂移：amt_cents 改名成了 amount_fen');
+      await U.wait(ctx, 1800); if (!ok()) return;
+      say('', '读新的样本，重新生成胶水');
+      if (!(await write(this.G2))) return;
+      L.classList.remove('err'); out.textContent = this.OUT; say('ok', '接上了：不必等人预先写好适配层');
+      await U.wait(ctx, 2600);
+    }
+  },
+  async rpa(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const [a, b] = s.querySelectorAll('.p8j-steps'), t1 = s.querySelector('.p8j-t1'), t2 = s.querySelector('.p8j-t2');
+    const S = ['登录', '查找客户', '打开工单', '填写处理结果', '提交'];
+    while (ok()) {
+      a.innerHTML = ''; b.innerHTML = ''; t1.textContent = ''; t2.textContent = '';
+      for (const x of S) {
+        a.insertAdjacentHTML('beforeend', '<span class="v">截图 · 视觉思考</span>'); await U.wait(ctx, 500); if (!ok()) return;
+        a.lastElementChild.className = ''; a.lastElementChild.textContent = x; await U.wait(ctx, 300); if (!ok()) return;
+      }
+      t1.textContent = '每一步都要截图、调用昂贵的视觉思考——慢，也不稳定';
+      await U.wait(ctx, 900); if (!ok()) return;
+      for (const x of S) { b.insertAdjacentHTML('beforeend', `<span>${x}</span>`); await U.wait(ctx, 120); if (!ok()) return; }
+      t2.textContent = '同样的操作序列：以极高的速度和稳定性完成';
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.glue(s); this.rpa(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p8j-steps').forEach((e) => (e.innerHTML = '')); s.querySelector('.p8j-code').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c05-exp510" data-part="8" data-trans="zoom" data-dur="22000" data-title="实验 5-10 ★★★：自适应的日志解析系统" data-notes="<b>Agent 日志解析和可视化。</b>Agent 系统的可观测性依赖于对执行流程的可视化。一个复杂的 Agent 任务可能包含数百步操作，涉及多次 LLM 调用、数十次工具执行、多次子 Agent 交互。可视化这些数据面临多重挑战：不同工具返回不同结构的数据，格式随系统迭代不断演化；一个完整轨迹可能包含数十万字符，需要在概览和细节之间找到平衡。代码生成提供了一种优雅的解决方案——建立一个自动修复的反馈循环：当前端遇到无法解析的日志格式时，不是显示错误，而是自动将失败信息（原始日志样本、详细报错）报告给 Agent；Agent 分析样本数据结构，生成能正确解析的前端代码；代码先在虚拟浏览器中自动测试（验证解析正确性，用 Vision LLM 检查可视化效果），通过后热更新到前端系统。<br><b>实验 5-10 ★★★：自适应的日志解析系统</b>。实验目标：构建能自我进化的 Agent 日志可视化系统。技术方案：初始系统仅支持基本格式；前端检测解析失败 → 报告 Agent → 生成解析代码 → 虚拟浏览器测试 → 热更新部署，全流程自动化。验收标准：自动检测失败并触发学习，生成代码通过自动测试，热更新后正确解析新格式。<br>配套仓库正式活动（20260729T212342Z，doubao-seed-1-6-250615）：两个真实的日志进程各吐出 3 条初始无法解析的样本——一种是竖线分隔，一种是方括号、尖括号、花括号嵌套；模型生成了两个解析器，测试通过后热更新；重启后直接从 parsers/ 目录加载、不再调用模型；Chromium 渲染出 6 行结构化表格，视觉模型认可；总共 3 次模型调用、7,765 token。左边日志流与右边的表格都是这次活动的真实记录，中间是模型生成的解析器。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-10 <span class="c5-stars">★★★</span>：<em>自适应</em>的日志解析系统</h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>构建能自我进化的 Agent 日志可视化系统（Agent 日志解析和可视化）</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>初始只支持基本格式：检测解析失败 → 报告 Agent → 生成解析代码 → 虚拟浏览器测试 → 热更新部署</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>自动检测失败并触发学习；生成代码通过自动测试；热更新后正确解析新格式</p></div>
+  </div>
+  <div class="p8k-body">
+    <div class="p8k-l fx fx-left" style="--d:3">
+      <div class="win p8k-lw"><div class="win-bar"><i></i><i></i><i></i><span>两个真实日志进程</span></div><div class="c5-term p8k-log" data-clip-ok></div></div>
+      <div class="p8k-loop"></div>
+    </div>
+    <div class="win p8k-cw fx fx-up" style="--d:4"><div class="win-bar"><i></i><i></i><i></i><span class="p8k-fn">parsers/live_pipe_parser.py</span><span class="p8k-cut">模型生成 · 节选</span></div><div class="c5-code p8k-code"></div></div>
+    <div class="p8k-r panel fx fx-right" style="--d:5">
+      <div class="p8k-th"><b>热更新后的结构化表格</b><span class="p8k-rs">0 行</span></div>
+      <div class="p8k-tbl" data-clip-ok></div>
+      <div class="p8k-kp"><div class="c5-kpi"><b>3 次</b><span>模型调用</span></div><div class="c5-kpi"><b>7,765</b><span>token</span></div><div class="c5-kpi"><b>2</b><span>解析器 · 重启后复用</span></div></div>
+    </div>
+  </div>
+  <div class="c5-rec-h p8k-rec fx fx-up" style="--d:6"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/adaptive-log-parser 正式活动 20260729T212342Z，doubao-seed-1-6-250615 · Chromium 渲染 6 行表格，视觉模型认可</div>
+  <div class="src">第五章 ·「代码作为系统适配器」· Agent 日志解析和可视化 · 实验 5-10</div>
+</section>
+<style>
+#c05-exp510 .c5-xp{margin-bottom:14px}
+.p8k-body{display:grid;grid-template-columns:540px 1fr 480px;gap:18px;height:500px}
+.p8k-l{display:flex;flex-direction:column;gap:12px;min-height:0}
+.p8k-lw{flex:1;min-height:0;display:flex;flex-direction:column}
+.p8k-log{flex:1;min-height:0;font-size:15px;line-height:1.5}
+.p8k-log .l{word-break:break-all}
+.p8k-log .l.bad{color:#fda4af;background:rgba(251,113,133,.1)}
+.p8k-log .l.good{color:#6ee7b7}
+.p8k-loop{display:flex;flex-wrap:wrap;gap:6px}
+.p8k-loop span{padding:5px 10px;border-radius:9px;font-size:15px;color:var(--text3);border:1px solid var(--line2);transition:all .3s}
+.p8k-loop span.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc)}
+.p8k-loop span.dn{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.p8k-cw{display:flex;flex-direction:column;min-height:0}
+.p8k-cw .win-bar .p8k-cut{margin-left:auto;font-family:var(--font)}
+.p8k-code{font-size:15px;line-height:1.42;padding:8px 4px;white-space:pre-wrap}
+.p8k-code .ln{white-space:pre-wrap;word-break:break-all;padding-left:2.4em;text-indent:-2.4em}
+.p8k-code .ln.dimln{opacity:.12}
+.p8k-r{padding:12px 16px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.p8k-th{display:flex;align-items:center;justify-content:space-between}
+.p8k-th b{font-size:18px}
+.p8k-rs{font:600 16px var(--num);color:var(--acc)}
+.p8k-tbl{flex:1;display:flex;flex-direction:column;gap:4px;min-height:0}
+.p8k-row{display:grid;grid-template-columns:84px 74px 1fr;gap:8px;padding:5px 8px;border-radius:8px;font-size:15px;line-height:1.4;background:rgba(255,255,255,.03);animation:upIn .4s var(--spring) both}
+.p8k-row.h{background:none;color:var(--text3);animation:none}
+.p8k-row em{font-style:normal;font-weight:700}
+.p8k-row em.INFO{color:#93c5fd}.p8k-row em.WARNING{color:var(--tool)}.p8k-row em.ERROR{color:#fda4af}
+.p8k-row code{font:15px var(--mono);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p8k-row span{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p8k-kp{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.p8k-kp .c5-kpi b{font-size:24px}
+.p8k-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c05-exp510'] = {
+  A: ['2026-07-30T05:23:42Z|INFO|checkout.worker|step=1|accepted real request req-81', '2026-07-30T05:23:42Z|WARNING|checkout.worker|step=2|retrying payment authorization req-81', '2026-07-30T05:23:42Z|ERROR|checkout.worker|step=3|authorization exhausted req-81'],
+  B: ['[2026-07-29T21:23:42.606+00:00] (INFO) <tool=inventory_lookup> {latency_ms=34 status=ok} :: stock check completed', '[2026-07-29T21:23:42.609+00:00] (WARNING) <tool=payment_api> {latency_ms=181 status=retry} :: upstream requested retry', '[2026-07-29T21:23:42.612+00:00] (ERROR) <tool=payment_api> {latency_ms=412 status=timeout} :: deadline exceeded'],
+  ROWS: [['INFO', 'pipe', 'checkout.worker · step 1', 'accepted real request req-81'], ['WARNING', 'pipe', 'checkout.worker · step 2', 'retrying payment authorization req-81'], ['ERROR', 'pipe', 'checkout.worker · step 3', 'authorization exhausted req-81'], ['INFO', 'bracket', 'inventory_lookup · 34 ms · ok', 'stock check completed'], ['WARNING', 'bracket', 'payment_api · 181 ms · retry', 'upstream requested retry'], ['ERROR', 'bracket', 'payment_api · 412 ms · timeout', 'deadline exceeded']],
+  PIPE: `import re
+
+def parse(line: str) -> dict | None:
+    # 定义匹配日志格式的正则表达式
+    pattern = r'^(\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z)\\|([A-Z]+)\\|([\\w.]+)\\|step=(\\d+)\\|(.*)$'
+    match = re.match(pattern, line.strip())
+    if not match:
+        return None
+    timestamp = match.group(1)
+    level = match.group(2)
+    module = match.group(3)
+    step = match.group(4)
+    message = match.group(5)
+    if not all([timestamp, level, module, step, message]):
+        return None
+    return {'timestamp': timestamp, 'level': level, 'module': module,
+            'step': step, 'message': message}`,
+  BRK: `import re
+def parse(line: str) -> dict | None:
+    pattern = r'^\\[(?P<timestamp>[^\\]]+)\\]\\s*\\((?P<level>[^)]+)\\)\\s*<tool=(?P<tool>[^>]+)>\\s*\\{latency_ms=(?P<latency_ms>\\d+)\\s+status=(?P<status>\\w+)\\}\\s*::\\s*(?P<message>.*)$'
+    match = re.match(pattern, line.strip())
+    if not match:
+        return None
+    groups = match.groupdict()
+    required_keys = ['timestamp', 'level', 'tool', 'latency_ms', 'status', 'message']
+    for key in required_keys:
+        if key not in groups or not groups[key]:
+            return None
+    try:
+        groups['latency_ms'] = int(groups['latency_ms'])
+    except ValueError:
+        return None
+    return groups`,
+  STG: ['检测解析失败', '报告 Agent：样本 + 报错', '生成 parse 函数', '自动测试 · 虚拟浏览器', '热更新 · 持久化到 parsers/'],
+  init(s) {
+    this.T = C5.term(s.querySelector('.p8k-log'), { max: 12 });
+    s.querySelector('.p8k-loop').innerHTML = this.STG.map((x) => `<span>${x}</span>`).join('');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const stg = [...s.querySelectorAll('.p8k-loop span')], tbl = s.querySelector('.p8k-tbl'), rs = s.querySelector('.p8k-rs'), fn = s.querySelector('.p8k-fn'), host = s.querySelector('.p8k-code');
+    const lit = (k) => stg.forEach((x, j) => { x.classList.toggle('on', j === k); x.classList.toggle('dn', j < k); });
+    while (ok()) {
+      this.T.clear(); host.innerHTML = ''; lit(-1);
+      tbl.innerHTML = '<div class="p8k-row h"><span>level</span><span>解析器</span><span>来源 · 消息</span></div>'; rs.textContent = '0 行';
+      let n = 0;
+      for (const [L, name, src, rows] of [[this.A, 'live_pipe_parser.py', this.PIPE, this.ROWS.slice(0, 3)], [this.B, 'live_bracket_parser.py', this.BRK, this.ROWS.slice(3)]]) {
+        const els = [];
+        for (const l of L) { els.push(await this.T.line('bad', l)); await U.wait(ctx, 380); if (!ok()) return; }
+        lit(0); await U.wait(ctx, 700); if (!ok()) return;
+        lit(1); await U.wait(ctx, 700); if (!ok()) return;
+        lit(2); fn.textContent = 'parsers/' + name;
+        const ln = C5.code(host, src, 'py'); ln.forEach((x) => x.classList.add('dimln'));
+        for (const x of ln) { await U.wait(ctx, 110); if (!ok()) return; x.classList.remove('dimln'); }
+        lit(3); await U.wait(ctx, 900); if (!ok()) return;
+        lit(4);
+        els.forEach((e) => (e.className = 'l good'));
+        for (const [lv, p, a, m] of rows) {
+          tbl.insertAdjacentHTML('beforeend', `<div class="p8k-row"><em class="${lv}">${lv}</em><code>${p}</code><span>${C5.esc(a)} · ${C5.esc(m)}</span></div>`);
+          rs.textContent = ++n + ' 行';
+          await U.wait(ctx, 260); if (!ok()) return;
+        }
+        await U.wait(ctx, 900); if (!ok()) return;
+      }
+      await this.T.line('ok', '重启后从 parsers/ 加载 2 个解析器——不再调用 Agent');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.T.clear(); s.querySelector('.p8k-code').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c05-exp511" data-part="8" data-trans="rise" data-dur="24000" data-title="实验 5-11 ★★★：生产日志的智能诊断 · 图5-7" data-notes="<b>Agent 执行日志自动分析和问题诊断。</b>生产环境的 Agent 会产生大量轨迹日志（trajectory，记录每次任务的完整过程），从日志中识别问题、定位根因、构建测试用例却是一项高成本的工作：问题定位困难，因为任务失败可能由多个模块的协同错误导致；复现成本高，因为生产环境的复杂性难以在测试环境中模拟；已修复的问题容易反复出现，因为缺乏系统化的回归测试。代码生成为诊断提供了自动化路径：Agent 读取生产日志，结合架构文档和 PRD（产品需求文档）判断执行流程是否符合预期，定位有问题的环节和模块，生成结构化问题报告（优先级、模块、描述、改进建议）和回归测试用例；测试用例引用问题轨迹 ID 和关键交互轮次，测试框架通过自动重放，验证修复后的系统在相同输入下能否产生正确行为；最后通过 MCP 对接 GitHub 创建 Issue 并分配给相关开发者。<br><b>实验 5-11 ★★★：生产日志的智能诊断系统</b>。实验目标：从生产轨迹中自动发现问题、生成测试用例、创建工作项。技术方案：读取轨迹集合，结合架构文档和 PRD 识别问题模式、定位模块；生成结构化报告与回归测试用例（引用轨迹 ID 和交互轮次，由测试框架自动重放验证）；通过 MCP 对接 GitHub 自动创建 Issue。上方五格是图5-7 的流水线内容。<br>正式活动（exp5-8-live-http-mcp-20260730-053403，doubao-seed-1-6-250615）：从真实的本地 HTTP 子进程采集两条带原始响应和实测延迟的轨迹 HTTP-RF-001、HTTP-INV-001；2 次模型调用完成诊断与可执行测试生成——P0：退款流程没有先调用 verify_refund_eligibility；P1：check_stock 超时后没有走降级缓存路由（实测延迟约 350 毫秒，超过 250 毫秒的客户端期限）。三个测试在有缺陷的实现上全部失败，修复后全部通过；最后通过官方 github/github-mcp-server 的 issue_write 创建了 Issue #502。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-11 <span class="c5-stars">★★★</span>：生产日志的<em>智能诊断</em> · 图5-7</h2></header>
+  <div class="p8l-pipe fx fx-up" style="--d:2"></div>
+  <div class="p8l-low">
+    <div class="p8l-rp panel fx fx-left" style="--d:3">
+      <div class="p8l-h"><b>重放验证（正式活动）</b><span>同一组测试，先跑缺陷实现，再跑修复实现</span></div>
+      <div class="p8l-tests"></div>
+    </div>
+    <div class="p8l-is panel fx fx-right" style="--d:4">
+      <div class="p8l-h"><b>GitHub Issue</b></div>
+      <div class="p8l-iss"><svg class="ic"><use href="#i-branch"/></svg><div><b>bojieli/ai-agent-book #502</b><span>官方 github/github-mcp-server · issue_write(method=create)</span></div></div>
+      <div class="p8l-dx"><span><em class="p0">P0</em>退款前没有调用 verify_refund_eligibility</span><span><em class="p1">P1</em>check_stock 超时未走降级缓存路由</span></div>
+      <p class="p8l-nt">2 次模型调用 · 测试引用轨迹 ID 与关键轮次</p>
+    </div>
+  </div>
+  <div class="c5-rec-h p8l-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/log-diagnosis 正式活动 exp5-8-live-http-mcp-20260730-053403，doubao-seed-1-6-250615 · 轨迹 HTTP-RF-001 / HTTP-INV-001 来自真实本地 HTTP 子进程</div>
+  <div class="src">第五章 ·「代码作为系统适配器」· Agent 执行日志自动分析和问题诊断 · 实验 5-11 · 图5-7</div>
+</section>
+<style>
+.p8l-pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;height:356px}
+.p8l-st{position:relative;display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.4;transition:all .4s;min-width:0}
+.p8l-st.on{opacity:1;border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 25%,transparent)}
+.p8l-st.dn{opacity:1}
+.p8l-st b{font-size:17px}
+.p8l-st pre{flex:1;margin:0;font:15px/1.45 var(--mono);color:var(--text2);white-space:pre-wrap;word-break:break-all;overflow:hidden}
+.p8l-st pre .k{color:#fde68a}
+.p8l-st pre .g{color:#6ee7b7}
+.p8l-st pre .r{color:#fda4af}
+.p8l-low{display:grid;grid-template-columns:1.5fr 1fr;gap:18px;margin-top:16px;height:250px}
+.p8l-rp,.p8l-is{padding:12px 18px;display:flex;flex-direction:column;gap:10px}
+.p8l-h{display:flex;align-items:baseline;gap:12px}
+.p8l-h b{font-size:18px}
+.p8l-h span{font-size:15px;color:var(--text3)}
+.p8l-tests{display:flex;flex-direction:column;gap:6px}
+.p8l-t{display:grid;grid-template-columns:1.1fr 1fr 1fr;gap:10px;align-items:center;font-size:15px}
+.p8l-t.h{color:var(--text3)}
+.p8l-t code{font:15px var(--mono);color:var(--text)}
+.p8l-t span.v{padding:4px 10px;border-radius:8px;border:1px solid var(--line);color:var(--text3);transition:all .35s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.p8l-t span.v.f{color:#fda4af;border-color:rgba(251,113,133,.5);background:rgba(251,113,133,.08)}
+.p8l-t span.v.p{color:#6ee7b7;border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.08)}
+.p8l-iss{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;border:1px solid rgba(52,211,153,.45);background:rgba(52,211,153,.06);opacity:0;transform:translateY(10px);transition:all .45s var(--spring)}
+.p8l-iss.on{opacity:1;transform:none}
+.p8l-iss .ic{font-size:26px;color:#6ee7b7}
+.p8l-iss b{display:block;font-size:18px}
+.p8l-iss span{font-size:15px;color:var(--text2)}
+.p8l-dx{display:flex;flex-direction:column;gap:6px}
+.p8l-dx span{font-size:15px;color:var(--text2)}
+.p8l-dx em{font-style:normal;font-weight:700;margin-right:8px;padding:1px 8px;border-radius:6px}
+.p8l-dx em.p0{color:#06101f;background:var(--bad)}
+.p8l-dx em.p1{color:#06101f;background:var(--tool)}
+.p8l-nt{margin-top:auto;font-size:15px;color:var(--text3)}
+.p8l-rec{margin-top:12px}
+</style>
+<script>
+HOOKS['c05-exp511'] = {
+  ST: [
+    ['① 日志采集', 'trajectory_001.json:\n {"role":"user","content":\n  "取消订单 #12345"}\n {"role":"assistant",\n  "tool_call":"cancel_order"}\n {"role":"tool","result":\n  <span class="r">"ERROR: no insurance"</span>}\n<span class="r">→ Agent 未告知用户原因</span>'],
+    ['② LLM 分析', '输入: 轨迹 + 架构文档 + PRD\n分析维度:\n - 执行流程是否符合预期\n - 工具调用是否正确\n - 错误处理是否得当\n - 用户体验是否满意\n<span class="g">→ 定位偏差环节和模块</span>'],
+    ['③ 结构化报告', '问题报告:\n 优先级: <span class="r">P1</span> (用户流失风险)\n 模块: cancellation_handler\n 描述: 取消失败后未向\n  用户解释原因和替代方案\n 建议: 添加失败原因说明\n  和购买保险的引导'],
+    ['④ 回归测试用例生成', '<span class="k">def</span> test_cancel_no_insurance():\n """轨迹 #001, 轮次 3-5"""\n resp = agent.run(\n   "取消订单 #12345")\n <span class="k">assert</span> "保险" in resp.text\n <span class="k">assert</span> "替代方案" in resp.text\n <span class="k">assert</span> "ERROR" not in resp.text'],
+    ['⑤ GitHub Issue 自动创建', 'gh issue create \\\n --title "P1: 取消失败缺少\n   用户引导" \\\n --body "**问题**: Agent 在\n   cancel_order 失败后直接\n   返回错误……" \\\n --assignee @backend-team'],
+  ],
+  TS: [
+    ['TC-R1-HTTP-RF-001-T2', 'verify_refund_eligibility calls=0', 'verify_refund_eligibility calls=1'],
+    ['TC-R2-LATENCY-HTTP-INV-001-T2', 'check_stock 350.383 ms > 250', 'check_stock 101.234 ms < 250'],
+    ['TC-R2-STATUS-HTTP-INV-001-T2', 'final_status=failed', 'final_status=success'],
+  ],
+  init(s) {
+    s.querySelector('.p8l-pipe').innerHTML = this.ST.map(([t, c]) => `<div class="p8l-st"><b>${t}</b><pre>${c}</pre></div>`).join('');
+    s.querySelector('.p8l-tests').innerHTML = '<div class="p8l-t h"><span>测试（引用轨迹与轮次）</span><span>缺陷实现</span><span>修复实现</span></div>' + this.TS.map(([n]) => `<div class="p8l-t"><code>${n.replace(/-HTTP/, '<br>HTTP')}</code><span class="v">等待重放</span><span class="v">等待重放</span></div>`).join('');
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const st = [...s.querySelectorAll('.p8l-st')], rows = [...s.querySelectorAll('.p8l-t:not(.h)')], iss = s.querySelector('.p8l-iss');
+    while (ok()) {
+      st.forEach((x) => x.classList.remove('on', 'dn')); iss.classList.remove('on');
+      rows.forEach((r) => r.querySelectorAll('.v').forEach((v) => { v.className = 'v'; v.textContent = '等待重放'; }));
+      for (let i = 0; i < st.length; i++) {
+        if (i) { st[i - 1].classList.remove('on'); st[i - 1].classList.add('dn'); }
+        st[i].classList.add('on');
+        await U.wait(ctx, 1500); if (!ok()) return;
+        if (i === 3) {
+          for (let k = 0; k < rows.length; k++) { const v = rows[k].querySelectorAll('.v')[0]; v.className = 'v f'; v.textContent = 'FAIL · ' + this.TS[k][1]; await U.wait(ctx, 450); if (!ok()) return; }
+          for (let k = 0; k < rows.length; k++) { const v = rows[k].querySelectorAll('.v')[1]; v.className = 'v p'; v.textContent = 'PASS · ' + this.TS[k][2]; await U.wait(ctx, 450); if (!ok()) return; }
+        }
+      }
+      iss.classList.add('on');
+      await U.wait(ctx, 4200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p8l-st').forEach((x) => x.classList.remove('on', 'dn')); s.querySelector('.p8l-iss').classList.remove('on'); },
+};
+</script>

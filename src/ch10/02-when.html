@@ -1,0 +1,791 @@
+<!-- ================= PART 02 何时优于单 Agent ================= -->
+<section class="slide chapter" id="c10-d2" data-part="2" data-title="PART 02 · 何时优于单 Agent" data-notes="本部分对应原书「多 Agent 何时真正优于单 Agent」一节。在进入具体的协作架构之前，先回答一个更根本的问题：<b>什么时候真正需要多个 Agent，什么时候一个 Agent 就够了？</b>这个问题的答案会成为后文所有工程方案的总体参照。<br>近年的一系列研究给出了一个清晰的判断框架——核心判据只有一条：协作过程是否引入了单个 Agent 在生成时无法获得的新信息？在此之外，还要看步骤预算能否真正转化为结果，以及多 Agent 带来的额外 token 成本是否值得。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:88px">多 Agent 何时<br>真正优于单 Agent</h1>
+  <div class="ch-s fx fx-up" style="--d:3">核心判据只有一条：是否引入新信息</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">什么时候真正需要多个 Agent，什么时候一个 Agent 就够了？</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c10-newinfo" data-part="2" data-dur="15000" data-title="核心判据：是否引入新信息" data-notes="近年的一系列研究给出了一个清晰的判断框架——核心判据只有一条：<b>协作过程是否引入了单个 Agent 在生成时无法获得的新信息？</b>这个答案会成为后文所有工程方案的总体参照。<br><b>表10-1</b> 汇总了不同协作模式是否引入新信息，用来判断多 Agent 协作相对单 Agent 是否具有实质价值：<br>· 同一模型自我审查（重新阅读自己的输出）：不引入新信息，通常无效甚至有害；<br>· 不同 Agent 辩论同一段文本：不引入新信息，在等计算量下与单 Agent 持平；<br>· 审核者使用测试执行结果审查代码：引入执行反馈，显著提升；<br>· 审核者查看渲染截图审查前端 / PPT 代码：引入视觉反馈，显著提升；<br>· 审核者使用外部工具验证事实：引入工具反馈，显著提升。<br>右侧演示：没有新信息时，同样的文本只是在两个 Agent 之间打转；有外部反馈时，一个生成者原本看不到的信号（绿色数据包）进入了循环，可用信息随之增加。表格逐行自动高亮，也可以点击任一行。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">核心判据：协作是否带来<em>新信息</em></h2>
+  <p class="lead fx fx-up" style="--d:2">表10-1 多 Agent 协作模式的信息增量对比</p></header>
+  <div class="ni-body">
+    <div class="ni-left">
+      <div class="k10-tbl ni-tbl fx fx-left" style="--d:3;--cols:1fr 200px 290px">
+        <div class="k10-tr k10-th"><span>协作模式</span><span>是否引入新信息</span><span>效果</span></div>
+        <div class="k10-tr" data-i="0"><span>同一模型自我审查（重新阅读自己的输出）</span><span class="ni-y no">否</span><span class="ni-e bad">通常无效甚至有害</span></div>
+        <div class="k10-tr" data-i="1"><span>不同 Agent 辩论同一段文本</span><span class="ni-y no">否</span><span class="ni-e mid">在等计算量下与单 Agent 持平</span></div>
+        <div class="k10-tr" data-i="2"><span>审核者使用测试执行结果审查代码</span><span class="ni-y ok">是（执行反馈）</span><span class="ni-e ok">显著提升</span></div>
+        <div class="k10-tr" data-i="3"><span>审核者查看渲染截图审查前端/PPT 代码</span><span class="ni-y ok">是（视觉反馈）</span><span class="ni-e ok">显著提升</span></div>
+        <div class="k10-tr" data-i="4"><span>审核者使用外部工具验证事实</span><span class="ni-y ok">是（工具反馈）</span><span class="ni-e ok">显著提升</span></div>
+      </div>
+      <div class="ni-q fx fx-up" style="--d:5"><svg class="ic"><use href="#i-target"/></svg><div><span>近年研究给出的判断框架：核心判据只有一条</span><b>协作过程是否引入了单个 Agent 在生成时无法获得的新信息？</b></div></div>
+    </div>
+    <div class="ni-scene panel fx fx-right" style="--d:4">
+      <p class="ni-h"></p>
+      <svg class="ni-svg" viewBox="0 0 600 330" width="600" height="330">
+        <g class="ni-ext" transform="translate(456 50)"><rect x="-112" y="-34" width="224" height="68" rx="16"/><use class="ni-ic ni-ei" href="#i-flask" x="-98" y="-15" width="30" height="30"/><text class="ni-et" x="14" y="7"></text></g>
+        <path class="ni-p" d="M196 196C262 142 344 142 410 196"/>
+        <path class="ni-p" d="M410 238C344 292 262 292 196 238"/>
+        <path class="ni-p ext" d="M456 84V171"/>
+        <text class="ni-l1" x="303" y="140"></text>
+        <text class="ni-l2" x="303" y="310"></text>
+        <g class="ni-g" transform="translate(150 217)"><circle r="46"/><use class="ni-ic" href="#i-edit" x="-17" y="-17" width="34" height="34"/><text y="74">生成者</text></g>
+        <g class="ni-r" transform="translate(456 217)"><circle r="46"/><use class="ni-ic" href="#i-eye" x="-17" y="-17" width="34" height="34"/><text class="ni-rt" y="74"></text></g>
+        <circle class="ni-pk a" r="9"/><circle class="ni-pk b" r="9"/>
+      </svg>
+      <div class="ni-info"><span class="ni-il">循环里可用的信息</span><div class="ni-bars"><i class="ni-b0">生成时已有的信息</i><i class="ni-b1">+ 新信息</i></div></div>
+      <div class="ni-fx"><span>效果</span><b class="ni-fv"></b></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「多 Agent 何时真正优于单 Agent」· 表10-1 多 Agent 协作模式的信息增量对比</div>
+</section>
+<style>
+.ni-body{display:grid;grid-template-columns:1000px 1fr;gap:30px}
+.ni-left{display:flex;flex-direction:column;gap:20px}
+.ni-tbl .k10-tr{padding:15px 22px}
+.ni-y,.ni-e{font-weight:700}
+.ni-y.no,.ni-e.bad{color:var(--bad)}
+.ni-y.ok,.ni-e.ok{color:var(--ok)}
+.ni-e.mid{color:var(--warn)}
+.ni-q{display:flex;gap:18px;align-items:center;padding:18px 24px;border-radius:18px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 16%,transparent),transparent);border-left:4px solid var(--acc)}
+.ni-q>.ic{font-size:40px;color:var(--acc);flex:none}
+.ni-q span{display:block;font-size:16px;color:var(--text3);letter-spacing:.06em}
+.ni-q b{display:block;font-size:25px;line-height:1.5;margin-top:4px}
+.ni-scene{padding:18px 15px 16px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.ni-h{font-size:18px;line-height:1.5;color:var(--acc);text-align:center;min-height:54px;padding:0 10px}
+.ni-h.sw{animation:swIn .45s var(--ease) both}
+.ni-svg{display:block;overflow:visible}
+.ni-ext{opacity:0;transition:opacity .5s}
+.ni-scene.ext .ni-ext{opacity:1}
+.ni-ext rect{fill:color-mix(in srgb,#a3e635 12%,rgba(10,16,36,.95));stroke:#a3e635;stroke-width:2;transition:fill .3s}
+.ni-ext.hit rect{fill:color-mix(in srgb,#a3e635 32%,rgba(10,16,36,.95))}
+.ni-ei{stroke:#a3e635}
+.ni-et{fill:var(--text);font-size:19px;font-weight:700}
+.ni-p{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2.4;stroke-dasharray:6 7;animation:flow 1.2s linear infinite}
+.ni-p.ext{stroke:color-mix(in srgb,#a3e635 60%,transparent);opacity:0;transition:opacity .5s}
+.ni-scene.ext .ni-p.ext{opacity:1}
+.ni-l1,.ni-l2{fill:var(--text2);font-size:16px;text-anchor:middle}
+.ni-g,.ni-r{--c:#a78bfa}
+.ni-g circle,.ni-r circle{fill:rgba(10,16,36,.95);stroke:var(--c);stroke-width:2.6;transition:fill .3s,stroke .3s}
+.ni-g.hit circle,.ni-r.hit circle{fill:color-mix(in srgb,var(--c) 32%,#0a1024)}
+.ni-r.same circle{stroke-dasharray:6 5}
+.ni-ic{fill:none;stroke:var(--c);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ni-g text,.ni-r text{fill:var(--text);font-size:18px;font-weight:700;text-anchor:middle}
+.ni-pk{opacity:0}
+.ni-pk.a{fill:#cbd5e1;filter:drop-shadow(0 0 6px #cbd5e1)}
+.ni-pk.b{fill:#a3e635;filter:drop-shadow(0 0 10px #a3e635)}
+.ni-info{width:100%;padding:0 12px}
+.ni-il{font-size:15px;color:var(--text3)}
+.ni-bars{display:flex;gap:6px;margin-top:6px;height:30px}
+.ni-bars i{display:flex;align-items:center;justify-content:center;border-radius:9px;font-size:15px;font-style:normal;white-space:nowrap;overflow:hidden}
+.ni-b0{width:56%;color:var(--text2);background:rgba(255,255,255,.08);border:1px solid var(--line2)}
+.ni-b1{width:0;color:#1a2e05;font-weight:700;background:#a3e635;transition:width .8s var(--ease)}
+.ni-b1.on{width:40%}
+.ni-fx{display:flex;align-items:center;gap:14px;width:100%;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ni-fx span{font-size:16px;color:var(--text3)}
+.ni-fv{font-size:21px}
+.ni-fv.ok{color:var(--ok)}.ni-fv.bad{color:var(--bad)}.ni-fv.mid{color:var(--warn)}
+</style>
+<script>
+HOOKS['c10-newinfo'] = {
+  // 每行的演示参数：g = 0 有害 / 1 持平 / 2 显著提升
+  R: [
+    { g: 0, fx: '通常无效甚至有害', rv: '同一模型', rc: '#a78bfa', ext: null, l1: '重新阅读自己的输出', l2: '“再想一遍”', h: '没有外部信号：同一个模型只是在自己的输出上打转' },
+    { g: 1, fx: '在等计算量下与单 Agent 持平', rv: '另一个 Agent', rc: '#f472b6', ext: null, l1: '同一段文本', l2: '同一段文本上的论证', h: '辩论双方处理的是完全相同的文本信息' },
+    { g: 2, fx: '显著提升', rv: '审核者', rc: '#34d399', ext: ['flask', '测试执行结果'], l1: '代码', l2: '带证据的修改意见', h: '执行测试产生的通过 / 失败结果，是编写代码时并不存在的新信号' },
+    { g: 2, fx: '显著提升', rv: '审核者', rc: '#34d399', ext: ['image', '渲染截图'], l1: '前端 / PPT 代码', l2: '带证据的修改意见', h: '截图承载着生成代码时完全无法获得的视觉信息' },
+    { g: 2, fx: '显著提升', rv: '审核者', rc: '#34d399', ext: ['search', '外部工具验证'], l1: '事实陈述', l2: '带证据的修正意见', h: '外部工具的验证输出，是生成时没有的依据' },
+  ],
+  init(s) {
+    this.rows = [...s.querySelectorAll('.ni-tbl .k10-tr[data-i]')];
+    this.rows.forEach((r) => r.addEventListener('click', () => { this.auto = false; this.show(s, +r.dataset.i); }));
+    this.P = [...s.querySelectorAll('.ni-p')];
+    this.K = [...s.querySelectorAll('.ni-pk')];
+  },
+  show(s, i) {
+    this.i = i;
+    const r = this.R[i], sc = s.querySelector('.ni-scene'), R = s.querySelector('.ni-r');
+    this.rows.forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    const h = s.querySelector('.ni-h');
+    h.textContent = r.h;
+    U.restart(h, 'sw');
+    s.querySelector('.ni-l1').textContent = r.l1;
+    s.querySelector('.ni-l2').textContent = r.l2;
+    R.style.setProperty('--c', r.rc);
+    R.classList.toggle('same', r.g === 0);
+    s.querySelector('.ni-rt').textContent = r.rv;
+    sc.classList.toggle('ext', !!r.ext);
+    if (r.ext) {
+      s.querySelector('.ni-ei').setAttribute('href', '#i-' + r.ext[0]);
+      s.querySelector('.ni-et').textContent = r.ext[1];
+    }
+    s.querySelector('.ni-b1').classList.remove('on');
+    const fv = s.querySelector('.ni-fv');
+    fv.textContent = r.fx;
+    fv.className = 'ni-fv ' + ['bad', 'mid', 'ok'][r.g];
+    this.loop(s);
+  },
+  async loop(s) {
+    const me = this, tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const lv = { get alive() { return ctx.alive && tk === me.tk; } };
+    const r = this.R[this.i], P = this.P, K = this.K;
+    const G = s.querySelector('.ni-g'), Rn = s.querySelector('.ni-r'), E = s.querySelector('.ni-ext');
+    const fl = (el, ms) => { el.classList.add('hit'); ctx.later(() => el.classList.remove('hit'), ms); };
+    await U.wait(ctx, 500);
+    while (lv.alive) {
+      fl(G, 500);
+      await U.fly(K[0], P[0], 900, { ctx: lv }); if (!lv.alive) return;
+      fl(Rn, 800);
+      if (r.ext) {
+        fl(E, 800);
+        await U.fly(K[1], P[2], 700, { ctx: lv }); if (!lv.alive) return;
+        s.querySelector('.ni-b1').classList.add('on');
+        fl(Rn, 800);
+        await U.fly(K[1], P[1], 900, { ctx: lv }); if (!lv.alive) return;
+      } else {
+        await U.wait(ctx, 400); if (!lv.alive) return;
+        await U.fly(K[0], P[1], 900, { ctx: lv }); if (!lv.alive) return;
+      }
+      fl(G, 700);
+      await U.wait(ctx, 700);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.R.length); }, 5800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.rows.forEach((x) => x.classList.remove('on'));
+    s.querySelector('.ni-scene').classList.remove('ext');
+    s.querySelector('.ni-b1').classList.remove('on');
+  },
+};
+</script>
+
+<section class="slide" id="c10-feedback" data-part="2" data-trans="rise" data-dur="14000" data-title="执行反馈与视觉反馈：RLEF 与 WebGen-Agent" data-notes="表10-1 里“显著提升”的几行，背后都有实证。<br>2025 年的 <b>RLEF</b>（Reinforcement Learning from Execution Feedback）证实了这一点：通过强化学习训练模型利用代码执行反馈来迭代改进代码，效果远超让模型独立多次采样。关键在于每次迭代都引入了<b>真实的执行结果</b>（编译错误、测试失败、运行时异常），这些信息在模型写代码时并不存在。<br>2025 年的 <b>WebGen-Agent</b> 在网页生成任务上，通过多层级的视觉反馈（截图 + 视觉语言模型描述）构成的反馈脚手架，据报道使 Claude 3.5 Sonnet 在该基准上的表现从 26.4% 提升到 51.9%——接近翻倍。<br>左侧切换“独立多次采样”与“利用执行反馈迭代”：前者每次都从同样的信息出发，后者每一轮都把新的执行结果带进上下文（三类报错出现的先后顺序是示意）。右侧是视觉反馈循环与原书报告的数字。<br>文献：Gehring, J., et al. RLEF: Grounding Code LLMs in Execution Feedback with Reinforcement Learning. arXiv:2410.02089, 2025；Lu, Z., et al. WebGen-Agent: Enhancing Interactive Website Generation with Multi-Level Feedback and Step-Level Reinforcement Learning. arXiv:2509.22644, 2025。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每次迭代都带来<em>真实的执行结果</em></h2>
+  <p class="lead fx fx-up" style="--d:2">执行反馈与视觉反馈：两项 2025 年的研究</p></header>
+  <div class="fb-body">
+    <div class="fb-l panel fx fx-left" style="--d:3">
+      <div class="fb-h"><b>RLEF</b><span>Reinforcement Learning from Execution Feedback · 2025</span></div>
+      <div class="fb-seg seg"><i class="knob"></i><button data-v="ind">让模型独立多次采样</button><button data-v="exe">利用代码执行反馈迭代</button></div>
+      <div class="fb-st"></div>
+      <p class="fb-c">通过强化学习训练模型利用代码执行反馈来迭代改进代码，效果<b>远超</b>让模型独立多次采样<span class="k10-sim">报错顺序示意</span></p>
+    </div>
+    <div class="fb-r panel fx fx-right" style="--d:4">
+      <div class="fb-h"><b>WebGen-Agent</b><span>网页生成 · 多层级视觉反馈 · 2025</span></div>
+      <svg class="fb-loop" viewBox="0 0 640 230" width="640" height="230">
+        <path class="fb-lp" d="M168 98C206 62 232 48 252 46"/>
+        <path class="fb-lp" d="M388 46C412 48 438 62 472 98"/>
+        <path class="fb-lp" d="M472 132C436 172 410 184 390 186"/>
+        <path class="fb-lp" d="M250 186C228 184 202 172 168 132"/>
+        <g class="fb-ln" transform="translate(100 115)"><rect x="-82" y="-26" width="164" height="52" rx="14"/><text y="7">网页代码</text></g>
+        <g class="fb-ln" transform="translate(320 46)"><rect x="-68" y="-26" width="136" height="52" rx="14"/><text y="7">渲染截图</text></g>
+        <g class="fb-ln" transform="translate(540 115)"><rect x="-80" y="-26" width="160" height="52" rx="14"/><text y="7">VLM 描述</text></g>
+        <g class="fb-ln" transform="translate(320 186)"><rect x="-74" y="-26" width="148" height="52" rx="14"/><text y="7">改进建议</text></g>
+        <text class="fb-lc" x="320" y="122">反馈脚手架</text>
+        <circle class="fb-pk" r="8"/>
+      </svg>
+      <div class="fb-bars">
+        <div class="fb-br"><span>Claude 3.5 Sonnet</span><div class="fb-bb"><i style="--w:26.4%"></i></div><b data-count="26.4" data-dec="1" data-suffix="%">0</b></div>
+        <div class="fb-br hi"><span>+ 视觉反馈脚手架</span><div class="fb-bb"><i style="--w:51.9%"></i></div><b data-count="51.9" data-dec="1" data-suffix="%" data-delay="900">0</b></div>
+      </div>
+      <p class="fb-c">据报道，Claude 3.5 Sonnet 在该基准上从 26.4% 提升到 51.9%——<b>接近翻倍</b></p>
+    </div>
+  </div>
+  <p class="tagline fb-tag fx fx-up" style="--d:6">关键在于每次迭代都引入了<b>真实的执行结果</b>：编译错误、测试失败、运行时异常——这些信息在模型写代码时并不存在</p>
+  <div class="src">第十章 ·「多 Agent 何时真正优于单 Agent」· RLEF（arXiv:2410.02089）· WebGen-Agent（arXiv:2509.22644）</div>
+</section>
+<style>
+.fb-body{display:grid;grid-template-columns:900px 1fr;gap:30px}
+.fb-l,.fb-r{height:540px;padding:20px 24px;display:flex;flex-direction:column}
+.fb-h{display:flex;align-items:baseline;gap:14px}
+.fb-h b{font:800 30px var(--num);color:var(--acc)}
+.fb-h span{font-size:16px;color:var(--text3)}
+.fb-seg{margin-top:14px;align-self:flex-start}
+.fb-seg button{font-size:18px;padding:8px 20px}
+.fb-st{flex:1;min-height:0;margin-top:16px;display:flex;flex-direction:column;justify-content:center;gap:18px}
+.fb-ind,.fb-exe{display:flex;align-items:stretch;justify-content:center;gap:8px}
+.fb-sc{width:180px;padding:14px 12px;border-radius:14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(10,16,36,.85);border:1px solid var(--line2);opacity:.2;translate:0 12px;transition:opacity .5s,translate .5s var(--ease)}
+.fb-sc.on{opacity:1;translate:0 0}
+.fb-sc .ic{font-size:34px;color:var(--text2)}
+.fb-sn{font-size:18px;font-weight:700}
+.fb-sc p{font-size:16px;color:var(--text)}
+.fb-sc small{font-size:15px;color:var(--text3);line-height:1.4}
+.fb-sep{align-self:center;font-style:normal;font-size:26px;color:var(--text3)}
+.fb-v{width:126px;padding:14px 8px;border-radius:14px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px;background:rgba(10,16,36,.85);border:1px solid var(--line2);opacity:.2;transition:opacity .5s,border-color .5s,box-shadow .5s}
+.fb-v.on{opacity:1}
+.fb-v b{font:800 28px var(--num)}
+.fb-v span{font-size:16px;color:var(--text2)}
+.fb-res{font-style:normal;font-size:16px;font-weight:700;min-height:24px}
+.fb-v.bad{border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+.fb-v.bad .fb-res{color:var(--bad)}
+.fb-v.ok{border-color:var(--ok);box-shadow:0 0 24px color-mix(in srgb,var(--ok) 40%,transparent)}
+.fb-v.ok .fb-res{color:var(--ok)}
+.fb-ar{width:94px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.fb-ar span{font-size:15px;color:var(--text3);transition:color .3s}
+.fb-ar.run span{color:var(--acc)}
+.fb-fbk{font-style:normal;font-size:15px;padding:3px 8px;border-radius:8px;color:#1a2e05;background:#a3e635;font-weight:700;opacity:0;scale:.6;transition:opacity .4s,scale .4s var(--spring)}
+.fb-fbk.on{opacity:1;scale:1}
+.fb-ctx{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:rgba(5,9,22,.55);border:1px solid var(--line);opacity:.35;transition:opacity .5s}
+.fb-ctx.on{opacity:1}
+.fb-cl{font-size:15px;color:var(--text3)}
+.fb-cg{font-size:16px;padding:3px 10px;border-radius:8px;color:var(--text2);border:1px solid var(--line2)}
+.fb-adds{display:flex;gap:8px}
+.fb-adds i{font-style:normal;font-size:16px;padding:3px 10px;border-radius:8px;color:#d9f99d;border:1px solid rgba(163,230,53,.6);background:rgba(163,230,53,.12);animation:upIn .45s var(--spring) both}
+.fb-c{font-size:18px;line-height:1.6;color:var(--text2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.fb-c b{color:var(--acc)}
+.fb-loop{display:block;align-self:center;margin-top:10px;overflow:visible}
+.fb-lp{fill:none;stroke:color-mix(in srgb,var(--acc) 50%,transparent);stroke-width:2.4;stroke-dasharray:6 7;animation:flow 1.2s linear infinite}
+.fb-ln rect{fill:rgba(10,16,36,.95);stroke:var(--acc2);stroke-width:2}
+.fb-ln text{fill:var(--text);font-size:18px;font-weight:700;text-anchor:middle}
+.fb-lc{fill:var(--acc);font-size:17px;text-anchor:middle;letter-spacing:.1em}
+.fb-pk{fill:#a3e635;opacity:0;filter:drop-shadow(0 0 9px #a3e635)}
+.fb-bars{display:flex;flex-direction:column;gap:14px;margin:auto 0 14px}
+.fb-br{display:grid;grid-template-columns:190px 1fr 86px;gap:14px;align-items:center}
+.fb-br span{font-size:17px;color:var(--text2)}
+.fb-bb{height:22px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.fb-bb i{display:block;height:100%;width:0;border-radius:999px;background:rgba(203,213,225,.55);transition:width 1.6s var(--ease) .4s}
+.fb-br.hi .fb-bb i{background:linear-gradient(90deg,var(--acc),var(--acc2));transition-delay:1.2s}
+.active .fb-bb i{width:var(--w)}
+.fb-br b{font:800 28px var(--num);text-align:right}
+.fb-br.hi b{color:var(--acc)}
+.fb-tag{margin-top:20px;font-size:23px}
+</style>
+<script>
+HOOKS['c10-feedback'] = {
+  FB: ['编译错误', '测试失败', '运行时异常'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.fb-seg'), (v) => { this.auto = false; this.mode(s, v); });
+    this.LP = [...s.querySelectorAll('.fb-lp')];
+    this.LK = s.querySelector('.fb-pk');
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(m);
+    const st = s.querySelector('.fb-st');
+    if (m === 'ind') {
+      st.innerHTML = `<div class="fb-ind">${[1, 2, 3, 4].map((k) => `<div class="fb-sc"><span class="fb-sn">采样 ${k}</span><svg class="ic"><use href="#i-code"/></svg><p>从同一个题目出发</p><small>看不到其他采样的执行结果</small></div>`).join('<i class="fb-sep">∥</i>')}</div>
+        <div class="fb-ctx"><span class="fb-cl">每次的上下文</span><span class="fb-cg">只有题目</span><span class="fb-cl">——没有新信息进入</span></div>`;
+    } else {
+      const v = (k) => `<div class="fb-v"><b>v${k}</b><span>代码</span><em class="fb-res"></em></div>`;
+      const a = (j) => `<div class="fb-ar"><span>执行 ▶</span><i class="fb-fbk">${this.FB[j]}</i></div>`;
+      st.innerHTML = `<div class="fb-exe">${v(1)}${a(0)}${v(2)}${a(1)}${v(3)}${a(2)}${v(4)}</div>
+        <div class="fb-ctx on"><span class="fb-cl">上下文</span><span class="fb-cg">题目</span><span class="fb-adds"></span></div>`;
+    }
+    this.run(s);
+  },
+  async run(s) {
+    const me = this, tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const lv = { get alive() { return ctx.alive && tk === me.tk; } };
+    const st = s.querySelector('.fb-st');
+    await U.wait(ctx, 400); if (!lv.alive) return;
+    if (this.m === 'ind') {
+      for (const c of st.querySelectorAll('.fb-sc')) { c.classList.add('on'); await U.wait(ctx, 650); if (!lv.alive) return; }
+      st.querySelector('.fb-ctx').classList.add('on');
+    } else {
+      const vs = [...st.querySelectorAll('.fb-v')], fs = [...st.querySelectorAll('.fb-fbk')], ars = [...st.querySelectorAll('.fb-ar')], adds = st.querySelector('.fb-adds');
+      for (let k = 0; k < 4; k++) {
+        vs[k].classList.add('on');
+        await U.wait(ctx, 600); if (!lv.alive) return;
+        if (k < 3) {
+          ars[k].classList.add('run');
+          await U.wait(ctx, 450); if (!lv.alive) return;
+          vs[k].querySelector('.fb-res').textContent = this.FB[k];
+          vs[k].classList.add('bad');
+          fs[k].classList.add('on');
+          adds.insertAdjacentHTML('beforeend', `<i>+ ${this.FB[k]}</i>`);
+          await U.wait(ctx, 700); if (!lv.alive) return;
+        } else {
+          vs[k].querySelector('.fb-res').textContent = '通过';
+          vs[k].classList.add('ok');
+        }
+      }
+    }
+    await U.wait(ctx, 2400); if (!lv.alive) return;
+    this.mode(s, this.auto ? (this.m === 'ind' ? 'exe' : 'ind') : this.m);
+  },
+  // 右侧：数据包沿视觉反馈环不停流转
+  async ring() {
+    const me = this, tk = (this.tk2 = (this.tk2 || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const lv = { get alive() { return ctx.alive && tk === me.tk2; } };
+    await U.wait(ctx, 800);
+    while (lv.alive) {
+      for (const p of this.LP) { await U.fly(this.LK, p, 750, { ctx: lv }); if (!lv.alive) return; }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'ind');
+    this.ring();
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.tk2 = (this.tk2 || 0) + 1; s.querySelector('.fb-st').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-paradox" data-part="2" data-steps="1" data-trans="flip" data-dur="13000" data-title="学术与工程的“矛盾”" data-notes="这个“新信息”框架解释了一个看似矛盾的现象：一些学术研究认为多 Agent 并不能提升 Agent 能力上限，但在工程实践中，多 Agent 确实表现得更好。矛盾的根源在于两者讨论的是不同类型的“多 Agent”：学术研究中比较的多是“多个 Agent 看着同一段上下文互相讨论”的模式，而工程实践中有效的多 Agent 系统往往包含外部反馈环路（代码执行、视觉渲染、工具调用）。<b>前者没有引入新信息，后者引入了。</b><br>按 → 看一个工程案例：Anthropic 2026 年的漏洞挖掘实验中，45 个 Agent 通过共享论坛协调搜索、互相审查，再由独立 Agent 仲裁结果。Agent 集群用 2700 万 token 找到 266 个漏洞，而独立 Agent 并行方案用 650 万 token 只找到 21 个。在开放搜索空间里，多 Agent 通过互相通信，可以动态转移搜索重点、形成专门分工，用更高 token 预算换取更广的覆盖和更多样化的发现路径。<br>下方画布是示意动画，不对应实验数据：左边各自独立的搜索会反复覆盖同一片区域，右边通过共享信息把搜索重点转移到没人去过的地方。<br>出处：Anthropic Frontier Red Team, Patterns and Problems in Emerging Multiagent Systems, 2026-08-13。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">学术与工程的“矛盾”：比较的是<em>不同的多 Agent</em></h2></header>
+  <div class="pd-body">
+    <div class="pd-left">
+      <div class="pd-k fx fx-left" style="--d:2">
+        <div class="pd-kh"><b>学术研究中比较的“多 Agent”</b><span class="chip bad">没有引入新信息</span></div>
+        <div class="pd-kb">
+          <svg class="pd-mini" viewBox="0 0 260 160" width="260" height="160">
+            <path class="pd-tri" d="M130 26L226 128L34 128Z"/>
+            <rect class="pd-doc" x="102" y="66" width="56" height="44" rx="6"/><path class="pd-dl" d="M112 80H148M112 90H148M112 100H136"/>
+            <g class="pd-a" transform="translate(130 26)"><circle r="20"/></g><g class="pd-a" transform="translate(226 128)"><circle r="20"/></g><g class="pd-a" transform="translate(34 128)"><circle r="20"/></g>
+            <circle class="pd-gk" r="6"><animateMotion dur="3.6s" repeatCount="indefinite" path="M130 26L226 128L34 128Z"/></circle>
+            <circle class="pd-gk" r="6"><animateMotion dur="3.6s" begin="-1.8s" repeatCount="indefinite" path="M130 26L226 128L34 128Z"/></circle>
+          </svg>
+          <div class="pd-kt"><p>多个 Agent <b>看着同一段上下文</b>互相讨论</p><p class="pd-to"><svg class="ic"><use href="#i-arrow"/></svg>一些研究：多 Agent 并不能提升 Agent 能力上限</p></div>
+        </div>
+      </div>
+      <div class="pd-k ok fx fx-left" style="--d:3">
+        <div class="pd-kh"><b>工程实践中有效的多 Agent 系统</b><span class="chip ok">引入了新信息</span></div>
+        <div class="pd-kb">
+          <svg class="pd-mini" viewBox="0 0 260 160" width="260" height="160">
+            <path class="pd-al" d="M66 62C110 30 150 30 176 50"/><path class="pd-fl" d="M176 110C150 130 110 130 66 98"/>
+            <g class="pd-a" transform="translate(46 80)"><circle r="22"/></g>
+            <g class="pd-env" transform="translate(206 80)"><rect x="-46" y="-50" width="92" height="100" rx="12"/><text y="-22">外部反馈</text><text class="pd-es" y="2">代码执行</text><text class="pd-es" y="22">视觉渲染</text><text class="pd-es" y="42">工具调用</text></g>
+            <circle class="pd-wk" r="6"><animateMotion dur="2.4s" repeatCount="indefinite" path="M66 62C110 30 150 30 176 50"/></circle>
+            <circle class="pd-lk" r="7"><animateMotion dur="2.4s" begin="-1.2s" repeatCount="indefinite" path="M176 110C150 130 110 130 66 98"/></circle>
+          </svg>
+          <div class="pd-kt"><p>往往包含<b>外部反馈环路</b>：代码执行、视觉渲染、工具调用</p><p class="pd-to"><svg class="ic"><use href="#i-arrow"/></svg>工程实践中：多 Agent 确实表现得更好</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="pd-right panel fx fx-up" data-step="1">
+      <div class="pd-rh"><b>Anthropic 2026 年的漏洞挖掘实验</b><span>45 个 Agent 通过共享论坛协调搜索、互相审查，再由独立 Agent 仲裁结果</span></div>
+      <div class="pd-bars">
+        <div class="pd-lg"><span><i class="g"></i>独立 Agent 并行</span><span><i class="l"></i>Agent 集群（共享论坛协调）</span></div>
+        <div class="pd-grp"><em>token 消耗</em>
+          <div class="pd-br"><div class="pd-bb"><i class="g" style="--w:24%"></i></div><b><span data-count="650">0</span> 万</b></div>
+          <div class="pd-br"><div class="pd-bb"><i class="l" style="--w:100%"></i></div><b><span data-count="2700" data-delay="700">0</span> 万</b></div></div>
+        <div class="pd-grp"><em>找到的漏洞</em>
+          <div class="pd-br"><div class="pd-bb"><i class="g" style="--w:7.9%"></i></div><b><span data-count="21">0</span> 个</b></div>
+          <div class="pd-br"><div class="pd-bb"><i class="l" style="--w:100%"></i></div><b><span data-count="266" data-delay="700">0</span> 个</b></div></div>
+      </div>
+      <div class="pd-cvw"><canvas class="pd-cv"></canvas><span class="k10-sim pd-sim">示意动画 · 非实验数据</span></div>
+      <p class="pd-cap">开放搜索空间里：动态转移搜索重点、形成专门分工，用<b>更高 token 预算</b>换取更广的覆盖和更多样化的发现路径</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「多 Agent 何时真正优于单 Agent」· Anthropic Frontier Red Team, Patterns and Problems in Emerging Multiagent Systems, 2026-08-13</div>
+</section>
+<style>
+.pd-body{display:grid;grid-template-columns:760px 1fr;gap:30px}
+.pd-left{display:flex;flex-direction:column;gap:20px}
+.pd-k{--c:var(--bad);padding:18px 22px;border-radius:20px;background:rgba(12,18,40,.75);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.pd-k.ok{--c:var(--ok)}
+.pd-kh{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.pd-kh b{font-size:23px}
+.pd-kh .chip{font-size:16px}
+.pd-kb{display:flex;gap:20px;align-items:center;margin-top:10px}
+.pd-mini{flex:none;overflow:visible}
+.pd-tri{fill:none;stroke:rgba(255,255,255,.18);stroke-width:2;stroke-dasharray:5 6;animation:flow 1.4s linear infinite}
+.pd-doc{fill:rgba(255,255,255,.06);stroke:var(--text3);stroke-width:1.6}
+.pd-dl{stroke:var(--text3);stroke-width:2}
+.pd-a circle{fill:rgba(10,16,36,.95);stroke:var(--c);stroke-width:2.4}
+.pd-gk{fill:#cbd5e1;filter:drop-shadow(0 0 5px #cbd5e1)}
+.pd-al{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2;stroke-dasharray:5 6}
+.pd-fl{fill:none;stroke:rgba(163,230,53,.6);stroke-width:2.4;stroke-dasharray:5 6;animation:flow 1.2s linear infinite}
+.pd-env rect{fill:color-mix(in srgb,#a3e635 10%,rgba(10,16,36,.95));stroke:#a3e635;stroke-width:2}
+.pd-env text{fill:#d9f99d;font-size:16px;font-weight:700;text-anchor:middle}
+.pd-env .pd-es{fill:var(--text2);font-size:15px;font-weight:400}
+.pd-wk{fill:#e9edf8}
+.pd-lk{fill:#a3e635;filter:drop-shadow(0 0 8px #a3e635)}
+.pd-kt p{font-size:20px;line-height:1.6}
+.pd-kt b{color:var(--c)}
+.pd-to{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:18px!important;color:var(--text2)}
+.pd-to .ic{color:var(--c);flex:none}
+.pd-right{padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.pd-rh b{display:block;font-size:24px;color:var(--acc)}
+.pd-rh span{display:block;font-size:17px;color:var(--text2);margin-top:4px;line-height:1.5}
+.pd-bars{display:flex;flex-direction:column;gap:8px}
+.pd-lg{display:flex;gap:24px;font-size:15px;color:var(--text3)}
+.pd-lg span{display:flex;align-items:center;gap:8px}
+.pd-lg i{width:14px;height:14px;border-radius:4px}
+.pd-lg i.g,.pd-bb i.g{background:rgba(203,213,225,.55)}
+.pd-lg i.l,.pd-bb i.l{background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.pd-grp{display:grid;grid-template-columns:110px 1fr;column-gap:14px;row-gap:6px;align-items:center}
+.pd-grp em{grid-row:span 2;font-style:normal;font-size:17px;color:var(--text2)}
+.pd-br{display:grid;grid-template-columns:1fr 120px;gap:12px;align-items:center}
+.pd-bb{height:18px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.pd-bb i{display:block;height:100%;width:0;border-radius:999px;transition:width 1.4s var(--ease) .3s}
+.pd-right.on .pd-bb i{width:var(--w)}
+.pd-br b{font:800 22px var(--num);text-align:right;white-space:nowrap}
+.pd-cvw{position:relative;height:236px;border-radius:14px;background:rgba(5,9,22,.55);border:1px solid var(--line)}
+.pd-cv{position:absolute;left:0;top:0;width:820px;height:236px}
+.pd-sim{position:absolute;right:10px;bottom:8px}
+.pd-cap{font-size:17px;line-height:1.55;color:var(--text2)}
+.pd-cap b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-paradox'] = {
+  W: 820, H: 236, CW: 16, NX: 25, NY: 12,
+  init(s) {
+    const cv = s.querySelector('.pd-cv');
+    cv.width = this.W * 2; cv.height = this.H * 2;
+    this.g = cv.getContext('2d');
+    this.g.setTransform(2, 0, 0, 2, 0, 0);
+  },
+  // 示意：左边各自独立随机搜索；右边共享“已搜过”的信息，优先去没人去过的格子
+  start() {
+    const me = this, tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const NX = this.NX, NY = this.NY, CW = this.CW, g = this.g, OX = [10, 420], OY = 32;
+    const nb = (x, y) => [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < NX && b < NY);
+    const mk = () => {
+      const v = new Uint8Array(NX * NY), w = Array.from({ length: 5 }, () => ({ x: (Math.random() * NX) | 0, y: (Math.random() * NY) | 0 }));
+      w.forEach((p) => (v[p.y * NX + p.x] = 1));
+      return { v, w };
+    };
+    const bfs = (ar, sx, sy) => {
+      const st = sy * NX + sx, prev = new Int32Array(NX * NY).fill(-1), q = [st];
+      prev[st] = st;
+      while (q.length) {
+        const c = q.shift(), x = c % NX, y = (c / NX) | 0;
+        if (!ar.v[c]) { let p = c; while (prev[p] !== st) p = prev[p]; return [p % NX, (p / NX) | 0]; }
+        for (const [a, b] of nb(x, y)) { const k = b * NX + a; if (prev[k] < 0) { prev[k] = c; q.push(k); } }
+      }
+      return null;
+    };
+    let A = [mk(), mk()], f = 0, hold = 0;
+    ctx.raf(() => {
+      if (tk !== me.tk) return false;
+      f++;
+      if (f % 6 === 0) {
+        for (const w of A[0].w) { const n = nb(w.x, w.y), [a, b] = n[(Math.random() * n.length) | 0]; w.x = a; w.y = b; A[0].v[b * NX + a] = Math.min(255, A[0].v[b * NX + a] + 1); }
+        for (const w of A[1].w) {
+          const n = nb(w.x, w.y).filter(([a, b]) => !A[1].v[b * NX + a]);
+          const t = n.length ? n[(Math.random() * n.length) | 0] : bfs(A[1], w.x, w.y) || nb(w.x, w.y)[0];
+          w.x = t[0]; w.y = t[1];
+          A[1].v[t[1] * NX + t[0]] = Math.min(255, A[1].v[t[1] * NX + t[0]] + 1);
+        }
+        let cov = 0;
+        for (let i = 0; i < A[1].v.length; i++) if (A[1].v[i]) cov++;
+        if (cov >= NX * NY) hold++;
+        if (hold > 30) { A = [mk(), mk()]; hold = 0; }
+      }
+      g.clearRect(0, 0, this.W, this.H);
+      g.font = '15px "PingFang SC","Microsoft YaHei",sans-serif';
+      g.fillStyle = '#a5afc9';
+      g.fillText('独立 Agent 并行：各搜各的，反复覆盖同一片', OX[0], 20);
+      g.fillText('共享论坛协调：动态转移搜索重点', OX[1], 20);
+      A.forEach((ar, k) => {
+        for (let y = 0; y < NY; y++) for (let x = 0; x < NX; x++) {
+          const v = ar.v[y * NX + x], px = OX[k] + x * CW, py = OY + y * CW;
+          g.fillStyle = v ? `rgba(163,230,53,${Math.min(0.9, 0.16 + 0.16 * v).toFixed(2)})` : 'rgba(255,255,255,0.04)';
+          g.fillRect(px + 1, py + 1, CW - 2, CW - 2);
+        }
+        g.fillStyle = '#ffffff';
+        for (const w of ar.w) { g.beginPath(); g.arc(OX[k] + w.x * CW + CW / 2, OY + w.y * CW + CW / 2, 5, 0, Math.PI * 2); g.fill(); }
+      });
+    });
+  },
+  enter(s, ctx, k) { this.ctx = ctx; if (k >= 1) this.start(); },
+  step(s, ctx, k) { if (k >= 1) this.start(); else this.tk = (this.tk || 0) + 1; },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.g.clearRect(0, 0, this.W, this.H); },
+};
+</script>
+
+<section class="slide" id="c10-budget" data-part="2" data-trans="zoom" data-dur="16000" data-title="步骤预算与 Agent 性能" data-notes="<b>步骤预算与 Agent 性能。</b>一个相关的研究方向是：给 Agent 分配不同的步骤预算（即允许的工具调用次数或迭代轮数），会如何影响其表现？直觉上，更多步骤应该带来更好的结果——30 步预算下 Agent 只能快速实现核心功能，300 步预算下它还可以先做规划、再实现、再测试、再改进。但 2025 年 Google 的论文《Budget-Aware Tool-Use Enables Effective Agent Scaling》发现了一个反直觉的结论：<b>单纯增加 Agent 可用的步骤数并不能保证性能提升</b>。标准的 Agent 缺乏“预算意识”——即使有 300 步的预算，它们仍然倾向于执行浅层搜索，很快就“饱和”了。要让更多的步骤真正转化为更好的结果，Agent 需要一种显式的预算感知机制，根据剩余资源动态调整策略：前期广泛探索，后期聚焦最有希望的方向。2026 年的 BAVT（Budget-Aware Value Tree Search）进一步提出了步骤级别的价值评估，在每一步根据剩余预算比例调整探索与利用的权重——随着预算减少，Agent 从“广撒网”逐渐切换到“深挖掘”。<br>这些发现对多 Agent 系统设计有直接的指导意义。比如在管理者模式中，Manager Agent 不应只是简单地将任务分发给子 Agent 然后等待结果，而应该根据任务的复杂度<b>动态分配步骤预算</b>——简单子任务给较少的步骤，复杂子任务给充足的步骤。同时还要引导子 Agent 合理利用这些预算（先规划、再实现、再测试、再改进），而不是一头扎进去直接开干。<br>页面上的曲线、搜索树和预算条都是示意；拖动滑块可以手动调节预算。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">更多步骤 ≠ 更好结果：Agent 需要<em>预算意识</em></h2></header>
+  <div class="bg-body">
+    <div class="bg-chart panel fx fx-left" style="--d:2">
+      <div class="bg-ch"><b>步骤预算与 Agent 性能</b><span class="bg-ref">Google 2025《Budget-Aware Tool-Use Enables Effective Agent Scaling》</span><span class="k10-sim">示意曲线</span></div>
+      <svg class="bg-svg" viewBox="0 0 900 290" width="900" height="290">
+        <path class="bg-ax" d="M60 20V260H884"/>
+        <text class="bg-at" x="66" y="16">性能</text>
+        <text class="bg-at" x="884" y="284" style="text-anchor:end">步骤预算（工具调用次数 / 迭代轮数）</text>
+        <g class="bg-ticks"></g>
+        <path class="bg-c0" d=""/><path class="bg-c1" d=""/>
+        <text class="bg-cl1" x="878" y="44">有预算意识</text>
+        <text class="bg-cl0" x="878" y="128">标准 Agent：很快“饱和”</text>
+        <line class="bg-mk" x1="60" y1="20" x2="60" y2="260"/>
+        <circle class="bg-d0" r="8" cx="60" cy="260"/><circle class="bg-d1" r="8" cx="60" cy="260"/>
+      </svg>
+      <div class="bg-ctl"><span>步骤预算</span><input class="rng bg-rng" type="range" min="30" max="300" step="1" value="30"><b class="bg-v">30 步</b></div>
+      <div class="bg-read"><div><em class="c0">标准 Agent</em><span class="bg-r0"></span></div><div><em class="c1">有预算意识</em><span class="bg-r1"></span></div></div>
+    </div>
+    <div class="bg-bavt panel fx fx-right" style="--d:3">
+      <div class="bg-ch"><b>BAVT · 2026</b><span class="bg-ref">Budget-Aware Value Tree Search</span></div>
+      <svg class="bg-tree" viewBox="0 0 620 300" width="620" height="300"><g class="bg-te"></g><g class="bg-tn"></g></svg>
+      <div class="bg-w">
+        <div class="bg-wr"><span>剩余预算</span><div class="bg-wb"><i class="bg-wr0"></i></div><b class="bg-ph"></b></div>
+        <div class="bg-wr"><span>探索权重</span><div class="bg-wb"><i class="bg-wr1"></i></div><em>广撒网</em></div>
+        <div class="bg-wr"><span>利用权重</span><div class="bg-wb"><i class="bg-wr2"></i></div><em>深挖掘</em></div>
+      </div>
+    </div>
+  </div>
+  <div class="bg-mgr fx fx-up" style="--d:5">
+    <div class="bg-mh"><b>动态分配步骤预算</b><span>Manager 不应只是把任务分发给子 Agent 然后等待结果</span></div>
+    <div class="bg-tasks">
+      <div class="bg-t"><span>简单子任务</span><div class="bg-tb"><i style="--w:24%"></i></div><em>较少的步骤</em></div>
+      <div class="bg-t"><span>复杂子任务</span><div class="bg-tb"><i style="--w:94%"></i></div><em>充足的步骤</em></div>
+    </div>
+    <div class="bg-flow"><span>还要引导子 Agent 合理利用预算</span><div><i style="--k:0">先规划</i><b>→</b><i style="--k:1">再实现</i><b>→</b><i style="--k:2">再测试</i><b>→</b><i style="--k:3">再改进</i></div><small>而不是一头扎进去直接开干 <span class="k10-sim">预算长度示意</span></small></div>
+  </div>
+  <div class="src">第十章 ·「多 Agent 何时真正优于单 Agent」· 步骤预算与 Agent 性能 · Google 2025 · BAVT 2026</div>
+</section>
+<style>
+.bg-body{display:grid;grid-template-columns:950px 1fr;gap:30px}
+.bg-chart,.bg-bavt{height:492px;padding:18px 24px}
+.bg-chart{display:flex;flex-direction:column}
+.bg-ch{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.bg-ch b{font-size:22px;color:var(--acc)}
+.bg-ref{font-size:15px;color:var(--text3)}
+.bg-svg{display:block;margin-top:6px;overflow:visible}
+.bg-ax{fill:none;stroke:var(--line2);stroke-width:2}
+.bg-at{fill:var(--text3);font-size:15px}
+.bg-tk{fill:var(--text3);font:15px var(--num);text-anchor:middle}
+.bg-tl{stroke:rgba(255,255,255,.07);stroke-width:1}
+.bg-c0,.bg-c1{fill:none;stroke-width:4;stroke-linecap:round}
+.bg-c0{stroke:#94a3b8}
+.bg-c1{stroke:var(--acc);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--acc) 60%,transparent))}
+.bg-cl0,.bg-cl1{font-size:17px;font-weight:700;text-anchor:end}
+.bg-cl0{fill:#cbd5e1}.bg-cl1{fill:var(--acc)}
+.bg-mk{stroke:#fff;stroke-width:1.5;stroke-dasharray:4 5;opacity:.6}
+.bg-d0{fill:#94a3b8}
+.bg-d1{fill:var(--acc);filter:drop-shadow(0 0 8px var(--acc))}
+.bg-ctl{display:grid;grid-template-columns:auto 1fr 90px;gap:16px;align-items:center;margin-top:8px}
+.bg-ctl span{font-size:17px;color:var(--text2)}
+.bg-v{font:800 22px var(--num);color:var(--acc);text-align:right}
+.bg-read{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px}
+.bg-read div{display:flex;flex-direction:column;gap:4px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.bg-read em{font-style:normal;font-size:15px;font-weight:700}
+.bg-read em.c0{color:#cbd5e1}.bg-read em.c1{color:var(--acc)}
+.bg-read span{font-size:17px;line-height:1.45}
+.bg-bavt{display:flex;flex-direction:column}
+.bg-tree{display:block;margin-top:6px;overflow:visible}
+.bg-e{stroke:rgba(255,255,255,.22);stroke-width:2;opacity:0;transition:opacity .4s,stroke .4s}
+.bg-e.on{opacity:1}
+.bg-e.best{stroke:var(--acc);stroke-width:3}
+.bg-n{fill:#0a1024;stroke:var(--text3);stroke-width:2;opacity:0;transition:opacity .4s,fill .4s,stroke .4s}
+.bg-n.on{opacity:1;fill:color-mix(in srgb,#94a3b8 30%,#0a1024)}
+.bg-n.best{stroke:var(--acc);fill:color-mix(in srgb,var(--acc) 40%,#0a1024)}
+.bg-n.root{opacity:1;stroke:var(--acc)}
+.bg-w{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.bg-wr{display:grid;grid-template-columns:80px 1fr 110px;gap:12px;align-items:center}
+.bg-wr span{font-size:15px;color:var(--text2)}
+.bg-wb{height:12px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.bg-wb i{display:block;height:100%;border-radius:999px;width:100%;transition:width .45s var(--ease)}
+.bg-wr0{background:linear-gradient(90deg,#fbbf24,#a3e635)}
+.bg-wr1{background:#22d3ee}
+.bg-wr2{background:#f472b6}
+.bg-wr b,.bg-wr em{font-size:15px;font-style:normal;color:var(--text3)}
+.bg-ph{color:var(--acc)!important;font-weight:700}
+.bg-mgr{display:grid;grid-template-columns:330px 1fr 560px;gap:28px;align-items:center;margin-top:20px;padding:16px 24px;border-radius:18px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.bg-mh b{display:block;font-size:22px;color:var(--acc)}
+.bg-mh span{display:block;font-size:16px;line-height:1.5;color:var(--text2);margin-top:4px}
+.bg-tasks{display:flex;flex-direction:column;gap:10px}
+.bg-t{display:grid;grid-template-columns:100px 1fr 100px;gap:12px;align-items:center}
+.bg-t span{font-size:16px;color:var(--text2)}
+.bg-t em{font-size:15px;font-style:normal;color:var(--text3)}
+.bg-tb{height:16px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+.bg-tb i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width 1.4s var(--ease) 1s}
+.active .bg-tb i{width:var(--w)}
+.bg-flow{display:flex;flex-direction:column;gap:8px}
+.bg-flow>span{font-size:16px;color:var(--text2)}
+.bg-flow div{display:flex;align-items:center;gap:8px}
+.bg-flow i{font-style:normal;font-size:17px;padding:5px 12px;border-radius:10px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);opacity:.3;transition:opacity .5s;transition-delay:calc(var(--k)*350ms + 1.4s)}
+.active .bg-flow i{opacity:1}
+.bg-flow b{color:var(--text3);font-weight:400}
+.bg-flow small{font-size:15px;color:var(--text3);display:flex;align-items:center;gap:10px}
+</style>
+<script>
+HOOKS['c10-budget'] = {
+  X: (b) => 60 + ((b - 30) / 270) * 820,
+  Y: (p) => 260 - p * 220,
+  std: (b) => 0.33 + 0.22 * (1 - Math.exp(-(b - 30) / 25)),
+  aw: (b) => 0.33 + 0.62 * Math.pow((b - 30) / 270, 0.7),
+  // 搜索树：[x, y, 父节点]；先逐层铺开（广撒网），再沿最有希望的分支往深处走（深挖掘）
+  TN: [[310, 26, -1], [70, 96, 0], [190, 96, 0], [310, 96, 0], [430, 96, 0], [550, 96, 0],
+    [45, 166, 1], [95, 166, 1], [165, 166, 2], [215, 166, 2], [285, 166, 3], [335, 166, 3], [405, 166, 4], [455, 166, 4], [525, 166, 5], [575, 166, 5],
+    [300, 226, 10], [280, 282, 16], [322, 282, 16]],
+  ORD: [1, 2, 3, 4, 5, 6, 8, 10, 12, 14, 11, 16, 17, 18],
+  BEST: [3, 10, 16, 17],
+  init(s) {
+    let d0 = '', d1 = '';
+    for (let b = 30; b <= 300; b += 5) {
+      const c = b === 30 ? 'M' : 'L', x = this.X(b).toFixed(1);
+      d0 += c + x + ' ' + this.Y(this.std(b)).toFixed(1);
+      d1 += c + x + ' ' + this.Y(this.aw(b)).toFixed(1);
+    }
+    s.querySelector('.bg-c0').setAttribute('d', d0);
+    s.querySelector('.bg-c1').setAttribute('d', d1);
+    s.querySelector('.bg-ticks').innerHTML = [30, 100, 200, 300].map((b) => `<line class="bg-tl" x1="${this.X(b)}" y1="20" x2="${this.X(b)}" y2="260"/><text class="bg-tk" x="${this.X(b)}" y="282">${b}${b === 300 ? ' 步' : ''}</text>`).join('');
+    this.rng = s.querySelector('.bg-rng');
+    this.rng.addEventListener('input', () => { this.auto = false; this.set(s, +this.rng.value); });
+    const T = this.TN;
+    s.querySelector('.bg-te').innerHTML = T.map(([x, y, p], i) => (p < 0 ? '' : `<line class="bg-e" data-n="${i}" x1="${T[p][0]}" y1="${T[p][1]}" x2="${x}" y2="${y}"/>`)).join('');
+    s.querySelector('.bg-tn').innerHTML = T.map(([x, y], i) => `<circle class="bg-n${i ? '' : ' root'}" data-n="${i}" cx="${x}" cy="${y}" r="${i ? 10 : 13}"/>`).join('');
+    this.set(s, 30);
+  },
+  set(s, b) {
+    const x = this.X(b);
+    this.rng.value = b;
+    this.rng.style.setProperty('--p', ((b - 30) / 270) * 100 + '%');
+    s.querySelector('.bg-v').textContent = b + ' 步';
+    const mk = s.querySelector('.bg-mk');
+    mk.setAttribute('x1', x); mk.setAttribute('x2', x);
+    const d0 = s.querySelector('.bg-d0'), d1 = s.querySelector('.bg-d1');
+    d0.setAttribute('cx', x); d0.setAttribute('cy', this.Y(this.std(b)));
+    d1.setAttribute('cx', x); d1.setAttribute('cy', this.Y(this.aw(b)));
+    s.querySelector('.bg-r0').textContent = b <= 60 ? '快速实现核心功能' : '仍倾向执行浅层搜索，很快“饱和”';
+    s.querySelector('.bg-r1').textContent = b <= 60 ? '快速实现核心功能' : b < 200 ? '按剩余预算调整：前期广泛探索，后期聚焦' : '还可以先规划、再实现、再测试、再改进';
+  },
+  async tree(s) {
+    const me = this, tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const lv = { get alive() { return ctx.alive && tk === me.tk; } };
+    const N = [...s.querySelectorAll('.bg-n')], E = [...s.querySelectorAll('.bg-e')];
+    const edge = (i) => E.find((e) => +e.dataset.n === i);
+    const bars = (ratio) => {
+      s.querySelector('.bg-wr0').style.width = ratio * 100 + '%';
+      s.querySelector('.bg-wr1').style.width = ratio * 100 + '%';
+      s.querySelector('.bg-wr2').style.width = (1 - ratio) * 100 + '%';
+      s.querySelector('.bg-ph').textContent = ratio > 0.42 ? '阶段：广撒网' : '阶段：深挖掘';
+    };
+    while (lv.alive) {
+      N.forEach((n, i) => { if (i) n.classList.remove('on', 'best'); });
+      E.forEach((e) => e.classList.remove('on', 'best'));
+      bars(1);
+      await U.wait(ctx, 700); if (!lv.alive) return;
+      for (let t = 0; t < this.ORD.length; t++) {
+        const i = this.ORD[t], deep = t >= 11;
+        N[i].classList.add('on');
+        edge(i).classList.add('on');
+        if (deep) this.BEST.forEach((b) => { N[b].classList.add('best'); edge(b).classList.add('best'); });
+        bars(1 - (t + 1) / this.ORD.length);
+        await U.wait(ctx, 560); if (!lv.alive) return;
+      }
+      await U.wait(ctx, 2000);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.set(s, 30);
+    this.tree(s);
+    const t0 = performance.now();
+    ctx.raf((t) => {
+      if (!this.auto) return;
+      const u = ((t - t0) % 11000) / 11000;
+      const e = u < 0.42 ? u / 0.42 : u < 0.58 ? 1 : u < 0.95 ? 1 - (u - 0.58) / 0.37 : 0;
+      this.set(s, Math.round(30 + 270 * (0.5 - 0.5 * Math.cos(e * Math.PI))));
+    });
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.set(s, 30);
+    s.querySelectorAll('.bg-n,.bg-e').forEach((x) => x.classList.remove('on', 'best'));
+  },
+};
+</script>
+
+<section class="slide" id="c10-decide" data-part="2" data-trans="iris" data-dur="14000" data-title="成本：收益要覆盖额外开销" data-notes="此外，<b>成本</b>是多 Agent 系统必须关注的要点。多 Agent 的并行探索与反复迭代都要消耗大量 token。这意味着多 Agent 带来的收益必须足够大，能够覆盖数倍乃至一个数量级的额外开销，否则一个调校得当的单 Agent 往往是更划算的选择。<br>本章小结把这一部分归结为第一判断标准：多 Agent 协作的价值在于引入单个 Agent 原本无法获得的新信息——代码执行结果、视觉反馈和外部工具验证能够打破单一思维链的盲区。因而，<b>是否真正带来信息增量、是否值得额外的 token 成本</b>，应成为是否采用多 Agent 的第一判断标准。审查若不引入新信息，就只是“让模型再想一遍”。<br>左侧两个问题会自动轮换几种组合，也可以自己点选“是 / 否”看结论；右侧的 token 倍数条只是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">还要算<em>成本</em>：收益必须覆盖额外开销</h2></header>
+  <div class="dc-body">
+    <div class="dc-qs panel fx fx-left" style="--d:2">
+      <div class="dc-q" data-q="0"><span class="dc-n">1</span><div class="dc-qt"><b>是否真正带来信息增量？</b><small>代码执行结果、视觉反馈、外部工具验证——单个 Agent 原本无法获得的新信息</small></div><div class="dc-yn seg"><i class="knob"></i><button data-v="y">是</button><button data-v="n">否</button></div></div>
+      <div class="dc-q" data-q="1"><span class="dc-n">2</span><div class="dc-qt"><b>是否值得额外的 token 成本？</b><small>收益要足够大，能够覆盖数倍乃至一个数量级的额外开销</small></div><div class="dc-yn seg"><i class="knob"></i><button data-v="y">是</button><button data-v="n">否</button></div></div>
+      <div class="dc-v"><span class="dc-vi"><svg class="ic"><use href="#i-check"/></svg></span><div class="dc-vx"><b class="dc-vt"></b><p class="dc-vd"></p></div></div>
+    </div>
+    <div class="dc-cost panel fx fx-right" style="--d:3">
+      <div class="dc-ch"><b>为什么必须算账</b><span class="k10-sim">倍数长度示意</span></div>
+      <p class="dc-cp">多 Agent 的<b>并行探索</b>与<b>反复迭代</b>都要消耗大量 token</p>
+      <div class="dc-bars">
+        <div class="dc-b"><span>单 Agent</span><div class="dc-bb"><i style="--w:9%;--k:0"></i></div><em>1×</em></div>
+        <div class="dc-b"><span>多 Agent</span><div class="dc-bb"><i style="--w:36%;--k:1"></i></div><em>数倍</em></div>
+        <div class="dc-b"><span>多 Agent</span><div class="dc-bb"><i style="--w:92%;--k:2"></i></div><em>一个数量级</em></div>
+      </div>
+      <p class="dc-cn">收益覆盖不了这些开销时，一个<b>调校得当的单 Agent</b> 往往是更划算的选择</p>
+    </div>
+  </div>
+  <blockquote class="quote dc-sum fx fx-blur" style="--d:6">多 Agent 协作的价值在于引入单个 Agent 原本无法获得的新信息。代码执行结果、视觉反馈和外部工具验证能够打破单一思维链的盲区。</blockquote>
+  <p class="tagline dc-tag fx fx-up" style="--d:8">是否真正带来<b>信息增量</b>、是否值得<b>额外的 token 成本</b>，应成为是否采用多 Agent 的第一判断标准</p>
+  <div class="src">第十章 ·「多 Agent 何时真正优于单 Agent」· 成本 ·「本章小结」</div>
+</section>
+<style>
+.dc-body{display:grid;grid-template-columns:1000px 1fr;gap:30px}
+.dc-qs{padding:26px 30px;display:flex;flex-direction:column;gap:18px;min-height:450px}
+.dc-q{display:grid;grid-template-columns:52px 1fr auto;gap:18px;align-items:center;padding:20px 22px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--line);transition:opacity .4s,filter .4s}
+.dc-q.off{opacity:.32;filter:saturate(.2);pointer-events:none}
+.dc-n{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font:800 22px var(--num);color:#06101f;background:var(--acc)}
+.dc-qt b{display:block;font-size:25px}
+.dc-qt small{display:block;font-size:17px;line-height:1.5;color:var(--text2);margin-top:4px}
+.dc-yn button{font-size:19px;padding:8px 24px}
+.dc-v{--c:var(--ok);display:flex;gap:20px;align-items:center;padding:20px 24px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent);transition:border-color .4s,background .4s}
+.dc-v.warn{--c:var(--warn)}.dc-v.bad{--c:var(--bad)}
+.dc-vi{flex:none;width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:34px;color:#06101f;background:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 55%,transparent);transition:background .4s}
+.dc-vt{display:block;font-size:25px;color:var(--c)}
+.dc-vd{font-size:18px;line-height:1.6;color:var(--text);margin-top:6px}
+.dc-vx.sw{animation:swIn .45s var(--ease) both}
+.dc-cost{padding:26px 30px;display:flex;flex-direction:column;gap:18px;min-height:450px}
+.dc-ch{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dc-ch b{font-size:24px;color:var(--acc)}
+.dc-cp{font-size:19px;line-height:1.6;color:var(--text2)}
+.dc-cp b,.dc-cn b{color:var(--text)}
+.dc-bars{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+.dc-b{display:grid;grid-template-columns:86px 1fr 100px;gap:14px;align-items:center}
+.dc-b span{font-size:17px;color:var(--text2)}
+.dc-b em{font-style:normal;font-size:18px;font-weight:700;color:var(--acc)}
+.dc-bb{height:26px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+.dc-bb i{display:block;height:100%;width:0;border-radius:8px;background:repeating-linear-gradient(90deg,var(--acc) 0 14px,color-mix(in srgb,var(--acc) 55%,#0a1024) 14px 18px);transition:width 1.2s var(--ease);transition-delay:calc(var(--k)*500ms + 600ms)}
+.dc-b:first-child .dc-bb i{background:repeating-linear-gradient(90deg,#94a3b8 0 14px,#475569 14px 18px)}
+.active .dc-bb i{width:var(--w)}
+.dc-cn{margin-top:auto;font-size:19px;line-height:1.6;color:var(--text2);padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.dc-sum{margin-top:24px;font-size:25px;max-width:1500px}
+.dc-tag{margin-top:20px;font-size:24px}
+</style>
+<script>
+HOOKS['c10-decide'] = {
+  CYC: [['y', 'y'], ['y', 'n'], ['n', 'y']],
+  init(s) {
+    this.a = ['y', 'y'];
+    this.sets = [...s.querySelectorAll('.dc-yn')].map((q, i) => U.seg(q, (v) => { this.auto = false; this.a[i] = v; this.render(s); }));
+  },
+  render(s) {
+    const [a, b] = this.a;
+    this.sets[0](a);
+    this.sets[1](b);
+    s.querySelector('.dc-q[data-q="1"]').classList.toggle('off', a === 'n');
+    const v = s.querySelector('.dc-v');
+    let cls, ic, t, d;
+    if (a === 'n') { cls = 'bad'; ic = 'x'; t = '没有信息增量：协作只是“让模型再想一遍”'; d = '这类多 Agent 相对单 Agent 没有实质价值，一个调校得当的单 Agent 往往是更划算的选择'; }
+    else if (b === 'n') { cls = 'warn'; ic = 'scale'; t = '有信息增量，但收益不够大'; d = '收益覆盖不了数倍乃至一个数量级的额外开销时，一个调校得当的单 Agent 往往是更划算的选择'; }
+    else { cls = 'ok'; ic = 'check'; t = '多 Agent 协作具有实质价值'; d = '协作引入了单个 Agent 生成时无法获得的新信息，而且收益足以覆盖额外的 token 开销'; }
+    v.className = 'dc-v ' + cls;
+    v.querySelector('use').setAttribute('href', '#i-' + ic);
+    s.querySelector('.dc-vt').textContent = t;
+    s.querySelector('.dc-vd').textContent = d;
+    U.restart(s.querySelector('.dc-vx'), 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.k = 0;
+    this.a = this.CYC[0].slice();
+    this.render(s);
+    ctx.every(() => {
+      if (!this.auto) return;
+      this.k = (this.k + 1) % this.CYC.length;
+      this.a = this.CYC[this.k].slice();
+      this.render(s);
+    }, 3800);
+  },
+  reset(s) { this.a = ['y', 'y']; s.querySelector('.dc-q[data-q="1"]').classList.remove('off'); },
+};
+</script>

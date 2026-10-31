@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+{{CSS}}
+</style>
+<script>
+{{CORE}}
+</script>
+<script>
+window.DECK_CFG = {{CONFIG}};
+</script>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+<div class="gridlines"></div><div class="vignette"></div>
+{{ICONS}}
+<div id="viewport"><div id="deck">
+{{SLIDES}}
+</div></div>
+<div id="sweep"></div>
+<div id="progress"></div>
+<div id="hud">
+  <div class="hud-l"><a href="{{HUB}}" data-leave title="返回总目录"><svg class="ic"><use href="#i-home"/></svg>总目录</a><span id="hud-p"></span></div>
+  <div id="rail"></div>
+  <div class="hud-r">
+    <span id="count"></span>
+    <button data-act="prev" title="上一步（←）"><svg class="ic"><use href="#i-left"/></svg></button>
+    <button data-act="next" title="下一步（→ / 空格）"><svg class="ic"><use href="#i-right"/></svg></button>
+    <button id="autobtn" data-act="auto" title="自动播放（P）"><svg class="ic i-play"><use href="#i-play"/></svg><svg class="ic i-pause"><use href="#i-pause"/></svg><svg class="ring" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15"/></svg></button>
+    <button data-act="overview" title="目录（O）"><svg class="ic"><use href="#i-grid"/></svg></button>
+    <button data-act="notes" title="讲解（N）"><svg class="ic"><use href="#i-note"/></svg></button>
+    <button data-act="help" title="快捷键（H）"><svg class="ic"><use href="#i-help"/></svg></button>
+    <button data-act="full" title="全屏（F）"><svg class="ic"><use href="#i-expand"/></svg></button>
+  </div>
+</div>
+<div class="overlay" id="overview"><div class="ov-box"><h3>{{TITLE}} · 目录 <small>点击跳转 · Esc 关闭</small></h3><div id="ov-grid"></div></div></div>
+<div class="overlay" id="help"><div class="ov-box" style="width:min(780px,92vw)"><h3>快捷键 <small>Esc 关闭</small></h3>
+  <div class="help-grid">
+    <div><kbd>→</kbd><kbd>空格</kbd> 下一步</div><div><kbd>←</kbd> 上一步</div>
+    <div><kbd>P</kbd> 自动播放 / 暂停</div><div><kbd>N</kbd> 显示讲解（原书要点）</div>
+    <div><kbd>O</kbd> 本章目录</div><div><kbd>F</kbd> 全屏</div>
+    <div><kbd>0</kbd>~<kbd>9</kbd> 跳到对应部分</div><div><kbd>Home</kbd><kbd>End</kbd> 首页 / 末页</div>
+    <div>滚轮 / 左右滑动 翻页</div><div>页面里的卡片、按钮、开关都可以点</div>
+  </div></div></div>
+<div id="notes"><div class="nh">讲解 · <span id="notes-t"></span></div><div id="notes-b"></div></div>
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+<div id="leaveMask"></div>
+<script>
+{{RUNTIME}}
+</script>
+</body>
+</html>

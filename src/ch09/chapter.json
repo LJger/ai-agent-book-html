@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#c084fc", "acc2": "#818cf8" },
+    { "n": "从运行轨迹中获得学习信号", "k": "PART 01", "short": "信号", "acc": "#22d3ee", "acc2": "#34d399" },
+    { "n": "四种更新载体", "k": "PART 02", "short": "载体", "acc": "#a78bfa", "acc2": "#f472b6" },
+    { "n": "将经验沉淀为知识", "k": "PART 03", "short": "知识", "acc": "#2dd4bf", "acc2": "#22d3ee" },
+    { "n": "将经验写成指令", "k": "PART 04", "short": "指令", "acc": "#fbbf24", "acc2": "#fb923c" },
+    { "n": "将经验写成程序", "k": "PART 05", "short": "程序", "acc": "#60a5fa", "acc2": "#818cf8" },
+    { "n": "写入参数与更新“更新方法”", "k": "PART 06", "short": "元优化", "acc": "#c084fc", "acc2": "#f472b6" },
+    { "n": "可长期运行的进化闭环", "k": "PART 07", "short": "闭环", "acc": "#34d399", "acc2": "#2dd4bf" },
+    { "n": "边界与安全", "k": "PART 08", "short": "边界", "acc": "#fb7185", "acc2": "#fb923c" },
+    { "n": "睡眠学习", "k": "PART 09", "short": "睡眠", "acc": "#818cf8", "acc2": "#38bdf8" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#c084fc", "acc2": "#818cf8" }
+  ]
+}

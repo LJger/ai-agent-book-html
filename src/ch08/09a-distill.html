@@ -1,0 +1,370 @@
+<!-- ================= 第 9 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d9" data-part="9" data-title="PART 09 · 蒸馏与问题案例" data-notes="「蒸馏：提升样本效率」与「从问题案例到后训练」。前述实验已系统展示了 RL 在 Agent 训练中的核心价值，但都付出了高昂的样本成本。这一部分先讲蒸馏为什么能提升样本效率：在轨蒸馏（On-Policy Distillation）让一次 rollout 产生密集监督；没有更强教师时，用在轨自蒸馏（OPSD）。然后回到第七章留下的问题：基于生产问题案例构建的评估数据集，如何真正变成后训练的输入——表8-5 的映射，以及三个案例：Coding Agent 过早结束（实验 8-17）、中文引号（实验 8-18）、编辑文件经常失败（实验 8-19）。">
+  <div class="ch-k fx fx-up">PART 09</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">蒸馏与问题案例</h1>
+  <div class="ch-s fx fx-up" style="--d:3">让一条 rollout 贡献更多梯度；把问题案例变成训练数据</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">学生决定走到哪里，教师负责在学生已经走到的位置告诉它下一步的完整概率分布。</blockquote>
+  <div class="ch-loop" data-node="8" data-num="09"></div>
+</section>
+
+<!-- ================= 样本效率 ================= -->
+<section class="slide" id="c08-effic" data-part="9" data-trans="zoom" data-dur="24000" data-title="蒸馏：提升样本效率" data-notes="前述实验已系统展示了 RL 在 Agent 训练中的核心价值，但都付出了高昂的样本成本。这里的“样本效率”特指：<b>每次昂贵的环境交互，能带来多少有效的参数更新</b>，而不只是训练步数或 GPU 时间。ReTool 的 RL 训练时间是 SFT 的 200 倍以上（9 天 vs 1 小时），因此减少环境采样尤其重要。<br>RL 样本效率低，除了高方差和在轨数据难复用，更根本的原因是<b>反馈太稀疏</b>。主流 model-free RL 通常只在一条 rollout 结束时得到一个成败标量，中间的错误原因、缺少字段、流程提示都没有直接的学习信号。比如客服说“需要信用卡后四位”，模型却只能从最终的 0/1 结果反复试错，可能要数百次交互才偶然学会这一步；人类听到一次就能记住。<br><b>蒸馏则把一次 rollout 变成密集的监督信号</b>，不必额外探索更多环境轨迹，就能让同一条轨迹贡献大量梯度，这是蒸馏提升样本效率的关键。<br>左侧动画为示意：同一条 rollout，RL 只在终点得到一个标量，蒸馏在每个 token 位置都得到一组监督。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">样本效率：<em>每次昂贵的环境交互，能带来多少有效的参数更新</em></h2></header>
+  <div class="c8ef-body">
+    <div class="c8ef-l panel fx fx-left" style="--d:2" data-v="rl">
+      <span class="c8-sx">示意</span>
+      <div class="c8ef-seg seg"><i class="knob"></i><button data-v="rl">RL：终点一个标量</button><button data-v="ds">蒸馏：逐 token 监督</button></div>
+      <div class="c8ef-lb">同一条 rollout（长度 T = 24）</div>
+      <div class="c8ef-row"></div>
+      <div class="c8ef-ax"><span>t = 1</span><span>……</span><span>t = T</span></div>
+      <div class="c8ef-cnt"><span>本条轨迹得到的监督</span><b class="c8ef-n">0</b><em>组</em></div>
+      <p class="c8ef-cap"></p>
+    </div>
+    <div class="c8ef-r fx fx-right" style="--d:3">
+      <div class="c8-card c8ef-k"><span>ReTool：RL 训练时间是 SFT 的 200 倍以上</span><div><b>9 天</b><i>vs</i><b>1 小时</b></div></div>
+      <div class="c8-card"><b class="c8ef-h">RL 样本效率为什么低</b><div class="c8ef-why"><span>高方差</span><span>在轨数据难复用</span><span class="on">反馈太稀疏 · 更根本</span></div><p>model-free RL 通常只在 rollout 结束时得到一个成败标量；错误原因、缺少字段、流程提示都没有直接的学习信号</p></div>
+      <div class="c8-card c8ef-cc"><span class="c8-sx">示意</span><div class="c8ef-msg">客服：需要信用卡后四位</div><div class="c8ef-vs"><div><b>模型</b><p>只能从最终 0/1 反复试错，可能要<b>数百次交互</b>才偶然学会这一步</p></div><div><b>人类</b><p>听到<b>一次</b>就能记住</p></div></div></div>
+      <p class="c8ef-nt"><b>蒸馏则把一次 rollout 变成密集的监督信号</b>：不必额外探索更多环境轨迹，同一条轨迹就能贡献大量梯度</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「蒸馏：提升样本效率」</div>
+</section>
+<style>
+.c8ef-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8ef-l{position:relative;padding:22px 26px;display:flex;flex-direction:column;gap:14px}
+.c8ef-seg{align-self:flex-start}.c8ef-seg button{font-size:16px}
+.c8ef-lb{font-size:16px;color:var(--text3);margin-top:6px}
+.c8ef-row{display:grid;grid-template-columns:repeat(24,1fr);gap:6px;height:230px;align-items:end;padding:0 4px}
+.c8ef-c{position:relative;height:100%;display:flex;align-items:flex-end;border-radius:8px;background:rgba(255,255,255,.03)}
+.c8ef-c::before{content:"";position:absolute;left:0;right:0;bottom:-16px;height:10px;border-radius:4px;background:rgba(255,255,255,.08);transition:background .3s}
+.c8ef-c.gen::before{background:#60a5fa}
+.c8ef-c i{display:block;width:100%;height:0;border-radius:6px;background:linear-gradient(180deg,#f9a8d4,#f472b6);transition:height .45s var(--ease)}
+.c8ef-c.end::after{content:"0/1";position:absolute;left:50%;bottom:40px;translate:-50% 0;padding:6px 10px;border-radius:10px;font:700 18px var(--num);color:#0b1020;background:#fbbf24;box-shadow:0 0 22px #fbbf24;white-space:nowrap;animation:c8efPop .4s var(--ease) both}
+@keyframes c8efPop{from{opacity:0;scale:.5}}
+.c8ef-ax{display:flex;justify-content:space-between;font-size:15px;color:var(--text3);margin-top:10px}
+.c8ef-cnt{display:flex;align-items:baseline;gap:14px;margin-top:6px}
+.c8ef-cnt span{font-size:17px;color:var(--text2)}.c8ef-cnt b{font:800 64px var(--num);color:var(--acc)}.c8ef-cnt em{font-style:normal;font-size:20px;color:var(--text2)}
+.c8ef-l[data-v=rl] .c8ef-cnt b{color:#fbbf24}
+.c8ef-cap{font-size:16px;line-height:1.6;color:var(--text2);min-height:52px}
+.c8ef-r{display:flex;flex-direction:column;gap:12px}
+.c8ef-k span{font-size:16px;color:var(--text2)}.c8ef-k div{display:flex;align-items:baseline;gap:16px;margin-top:4px}
+.c8ef-k b{font:800 44px var(--num);color:var(--acc)}.c8ef-k i{font-style:normal;color:var(--text3);font-size:20px}
+.c8ef-h{font-size:18px;color:var(--acc)}
+.c8ef-why{display:flex;gap:10px;margin:8px 0 6px}
+.c8ef-why span{padding:5px 12px;border-radius:999px;font-size:15px;border:1px solid var(--line2);color:var(--text3)}
+.c8ef-why span.on{color:#0b1020;background:var(--acc);border-color:var(--acc);font-weight:700}
+.c8ef-r .c8-card p{font-size:15px;line-height:1.55;color:var(--text2)}.c8ef-r .c8-card p b{color:var(--text)}
+.c8ef-msg{display:inline-block;padding:8px 16px;border-radius:14px 14px 14px 4px;background:rgba(45,212,191,.14);border:1px solid rgba(45,212,191,.4);font-size:17px}
+.c8ef-vs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.c8ef-vs b{font-size:16px}
+.c8ef-nt{font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8ef-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-effic'] = {
+  CAP: { rl: '只有终点一个成败标量：中间哪一步错了、缺了哪个字段，都要靠大量轨迹的统计差异慢慢摸出来', ds: '教师在每个 token 位置都给出一组监督：一条长度为 T 的 rollout 约产生 T 组信号，不需要再采一批环境轨迹' },
+  init(s) {
+    const r = U.rand(9);
+    this.h = Array.from({ length: 24 }, () => 0.3 + r() * 0.65);
+    s.querySelector('.c8ef-row').innerHTML = this.h.map(() => '<div class="c8ef-c"><i></i></div>').join('');
+    this.seg = U.seg(s.querySelector('.c8ef-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  clear(s) {
+    s.querySelectorAll('.c8ef-c').forEach((c) => { c.classList.remove('gen', 'end'); c.querySelector('i').style.height = '0'; });
+    s.querySelector('.c8ef-n').textContent = '0';
+  },
+  async show(s, v) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => tk === this.tk && ctx.alive;
+    const cs = [...s.querySelectorAll('.c8ef-c')], n = s.querySelector('.c8ef-n');
+    this.clear(s);
+    s.querySelector('.c8ef-l').dataset.v = v;
+    s.querySelector('.c8ef-cap').textContent = this.CAP[v];
+    for (const c of cs) { c.classList.add('gen'); await U.wait(ctx, 40); if (!ok()) return; }
+    await U.wait(ctx, 350); if (!ok()) return;
+    if (v === 'rl') { cs[cs.length - 1].classList.add('end'); n.textContent = '1'; return; }
+    for (let i = 0; i < cs.length; i++) { cs[i].querySelector('i').style.height = this.h[i] * 100 + '%'; n.textContent = i + 1; await U.wait(ctx, 70); if (!ok()) return; }
+  },
+  enter(s, ctx) { this.ctx = ctx; C8.auto(this, ctx, 2, 5600, (i) => { this.i = i; const v = i ? 'ds' : 'rl'; this.seg(v); this.show(s, v); }, 500); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.i = null; this.clear(s); },
+};
+</script>
+
+<!-- ================= 在轨蒸馏：三方法表 ================= -->
+<section class="slide" id="c08-opd" data-part="9" data-trans="rise" data-dur="24000" data-title="在轨蒸馏：谁生成状态前缀" data-notes="<b>在轨蒸馏</b>（On-Policy Distillation）由 Thinking Machines Lab 于 2025 年系统整理并推广。这里的 “policy” 指<b>谁生成学生将要学习的状态前缀</b>，不是指谁提供监督。表中三种方法：SFT / 离轨蒸馏的轨迹由人类或教师采样，监督是标注答案的逐 token 监督，密集；On-policy RL 由当前学生采样，监督是结果或过程奖励，通常稀疏；On-policy Distillation 由当前学生采样，监督是教师在学生前缀上的逐 token 分布，密集。<br>SFT 的监督很密集，却主要覆盖教师会走到的状态。学生部署后若在早期犯了教师不会犯的错误，就会进入训练数据没有覆盖的前缀；后续每一步都在陌生状态上预测，误差可能沿长序列累积。On-policy RL 直接在学生自己的状态分布上训练，相关性更高，却常常只在轨迹结束得到一个成败信号。On-policy Distillation 把两者组合起来：<b>学生决定走到哪里，教师负责在学生已经走到的位置告诉它下一步的完整概率分布。</b><br>它同样不是“从零创造能力”的办法：学生至少要能进入教师可纠正的有效状态，教师策略也不能离学生的有效支持太远。若基模连目标语言、领域概念或基本动作都没有，仍应先 Mid-training 或用离轨示范冷启动，再切换到在轨蒸馏。<br>这里也能看清前文数值问题为什么重要：在轨蒸馏优化的是“学生当前策略所访问状态上的教师 KL”；如果 rollout 引擎实际从 μ 采样，而 trainer 计算的是另一个 π_θ，即使不显式使用 PPO 的概率比，训练状态也已经离轨。实现时仍应做“更新前 sampler/trainer log probability 是否一致”的检查，否则名义上的 On-policy Distillation 也会退化成带分布错位的训练。<br>点击表格的行，右侧状态树切换到对应方法（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“policy” 指的是：<em>谁生成学生将要学习的状态前缀</em></h2></header>
+  <div class="c8od-body">
+    <div class="c8od-l">
+      <div class="c8-tb c8od-tb fx fx-up" style="--d:2">
+        <div class="c8-tr c8-th"><span>方法</span><span>轨迹/状态由谁采样</span><span>每条轨迹的主要监督</span></div>
+        <div class="c8-tr c8od-r" data-m="sft" style="--c:#38bdf8"><b>SFT / 离轨蒸馏</b><span>人类或教师</span><span>标注答案的逐 token 监督，<b class="g">密集</b></span></div>
+        <div class="c8-tr c8od-r" data-m="rl" style="--c:#fbbf24"><b>On-policy RL</b><span>当前学生</span><span>结果或过程奖励，<b class="r">通常稀疏</b></span></div>
+        <div class="c8-tr c8od-r" data-m="opd" style="--c:#f472b6"><b>On-policy Distillation</b><span>当前学生</span><span>教师在学生前缀上的逐 token 分布，<b class="g">密集</b></span></div>
+      </div>
+      <div class="c8od-cs fx fx-up" style="--d:4">
+        <div class="c8-card"><b>不是从零创造能力</b><p>学生要能进入教师可纠正的有效状态，教师也不能离学生的有效支持太远；基模连目标语言、领域概念、基本动作都没有时，先 Mid-training 或离轨示范冷启动</p></div>
+        <div class="c8-card"><b>数值一致性仍然要查</b><p>rollout 引擎从 <span class="c8-m"><i>μ</i></span> 采样、trainer 算的是 <span class="c8-m"><i>π</i><sub><i>θ</i></sub></span> → 名义上的在轨蒸馏也已离轨；更新前检查 sampler/trainer log probability 是否一致</p></div>
+      </div>
+    </div>
+    <div class="c8od-p panel fx fx-right" style="--d:3"><span class="c8-sx">示意</span>
+      <svg class="c8od-svg" viewBox="0 0 760 420" data-m="sft"></svg>
+      <p class="c8od-cap"></p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「在轨蒸馏：让一次 rollout 产生密集监督」· 三种方法对照表</div>
+</section>
+<style>
+.c8od-body{display:grid;grid-template-columns:1.02fr 1fr;gap:22px;flex:1;min-height:0}
+.c8od-l{display:flex;flex-direction:column;gap:14px}
+.c8od-tb .c8-tr{grid-template-columns:230px 130px 1fr;font-size:16px;cursor:pointer}
+.c8od-tb .c8-th{cursor:default}
+.c8od-tb b{font-size:17px}.c8od-tb b.g{font-size:16px;color:#6ee7b7}.c8od-tb b.r{font-size:16px;color:#fda4af}
+.c8od-cs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.c8od-cs .c8-card>b{font-size:17px;color:var(--acc)}.c8od-cs p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}
+.c8od-p{position:relative;padding:16px 18px;display:flex;flex-direction:column;gap:6px}
+.c8od-svg{width:100%;height:420px}
+.c8od-svg text{font-size:15px;fill:var(--text2)}
+.c8od-svg .pt{fill:none;stroke:#38bdf8;stroke-width:4;opacity:.35;transition:opacity .4s}
+.c8od-svg .ps{fill:none;stroke:#fbbf24;stroke-width:4;stroke-dasharray:8 7;opacity:.35;transition:opacity .4s}
+.c8od-svg .nt{fill:#0c1530;stroke:#38bdf8;stroke-width:3}.c8od-svg .ns{fill:#0c1530;stroke:#fbbf24;stroke-width:3}
+.c8od-svg .ly{opacity:0;transition:opacity .45s}
+.c8od-svg[data-m=sft] .pt,.c8od-svg[data-m=rl] .ps,.c8od-svg[data-m=opd] .ps{opacity:1}
+.c8od-svg[data-m=sft] .ly-sft,.c8od-svg[data-m=rl] .ly-rl,.c8od-svg[data-m=opd] .ly-opd{opacity:1}
+.c8od-cap{font-size:16px;line-height:1.6;color:var(--text2);min-height:52px}
+</style>
+<script>
+HOOKS['c08-opd'] = {
+  M: ['sft', 'rl', 'opd'],
+  CAP: { sft: 'SFT：监督密集，但只覆盖教师会走到的状态。学生早期犯了教师不会犯的错，就进入陌生前缀，后续每一步都在没见过的状态上预测（问号），误差沿序列累积', rl: 'On-policy RL：在学生自己的状态分布上训练，相关性更高，但常常只在轨迹结束得到一个成败信号', opd: 'On-policy Distillation：学生决定走到哪里，教师在学生已经走到的每个位置给出下一步的完整概率分布' },
+  init(s) {
+    const svg = s.querySelector('.c8od-svg'), S = C7S;
+    const T = Array.from({ length: 7 }, (_, i) => [60 + i * 106, 90]);
+    const St = [T[0], T[1], ...Array.from({ length: 5 }, (_, j) => [60 + (j + 2) * 106, 90 + (j + 1) * 52])];
+    S('path', { d: C8.path(T), class: 'pt' }, svg); S('path', { d: C8.path(St), class: 'ps' }, svg);
+    const t1 = S('text', { x: 60, y: 50 }, svg); t1.textContent = '教师会走的状态'; t1.setAttribute('fill', '#7dd3fc');
+    const t2 = S('text', { x: 300, y: 400 }, svg); t2.textContent = '学生自己走出的前缀（早期偏离）'; t2.setAttribute('fill', '#fde68a');
+    const lay = (c) => S('g', { class: 'ly ' + c }, svg);
+    const gs = lay('ly-sft'), gr = lay('ly-rl'), gd = lay('ly-opd');
+    T.forEach(([x, y]) => { S('path', { d: `M${x - 8} ${y - 34} l6 6 l11 -12`, stroke: '#34d399', 'stroke-width': 4, fill: 'none' }, gs); });
+    St.slice(2).forEach(([x, y], j) => { const q = S('text', { x: x - 6, y: y + 40, 'font-size': 26, 'font-weight': 800 }, gs); q.textContent = '?'; q.setAttribute('fill', `rgba(251,113,133,${0.45 + j * 0.13})`); });
+    const [ex, ey] = St[St.length - 1];
+    S('rect', { x: ex - 34, y: ey - 58, width: 68, height: 32, rx: 9, fill: '#fbbf24' }, gr);
+    const rt = S('text', { x: ex, y: ey - 36, 'text-anchor': 'middle', 'font-weight': 800 }, gr); rt.textContent = '0/1'; rt.setAttribute('fill', '#0b1020');
+    St.forEach(([x, y], j) => { [0.7, 0.2, 0.1].map((h, k) => ((j + k) % 3 === 1 ? [0.55, 0.3, 0.15][k] : h)).forEach((h, k) => S('rect', { x: x - 14 + k * 10, y: y - 22 - h * 40, width: 8, height: h * 40, rx: 2, fill: '#f472b6', opacity: 1 - k * 0.25 }, gd)); });
+    T.forEach(([x, y]) => S('circle', { cx: x, cy: y, r: 11, class: 'nt' }, svg));
+    St.slice(2).forEach(([x, y]) => S('circle', { cx: x, cy: y, r: 11, class: 'ns' }, svg));
+    s.querySelectorAll('.c8od-r').forEach((r, i) => r.addEventListener('click', () => { this.auto = false; this.pick(s, i); }));
+  },
+  pick(s, i) {
+    this.i = i; const m = this.M[i];
+    s.querySelector('.c8od-svg').dataset.m = m;
+    s.querySelectorAll('.c8od-r').forEach((r, j) => { r.classList.toggle('on', j === i); r.classList.toggle('dim', j !== i); });
+    s.querySelector('.c8od-cap').textContent = this.CAP[m];
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 3, 5200, (i) => this.pick(s, i), 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8od-r').forEach((r) => r.classList.remove('on', 'dim')); s.querySelector('.c8od-svg').dataset.m = 'sft'; s.querySelector('.c8od-cap').textContent = ''; },
+};
+</script>
+
+<!-- ================= 逐 token 对齐 ================= -->
+<section class="slide" id="c08-opd2" data-part="9" data-trans="flip" data-dur="26000" data-title="逐 token 对齐：一条 rollout，约 T 组监督" data-notes="因此，一条长度为 T 的 rollout 不再只产生一个 0/1 信号，而能产生约 T 组逐 token 监督。它比离轨 SFT 更贴近学生实际会犯的错，比纯 RL 的反馈更密集、方差更低；教师推理增加的是计算，却不需要再采一批环境轨迹。<br>具体做法是让学生的预测分布贴近教师分布，通常最小化两者的 <b>KL 散度</b>。例如学生生成 “先查询 API，再解析返回值……” 时，教师可以在 “查询” 这个 token 的位置给出“查询”80%、“调用”15%、其余 5% 的 token 分布。相比最终成败的二元奖励，逐 token 对齐提供了密集得多、方差更低的学习信号；代价是教师推理成本，因此在环境交互昂贵时尤其划算。<br>伪代码：学生先 rollout，然后对轨迹上的每个状态取教师 logits，累加 KL，最后更新学生。在数学等任务上，达到同等性能所需的训练步数约为纯 RL 的 <b>1/10</b>。在多轮 Agent 中，成败信号更晚、更稀疏，逐 token 的教师分布能直接指导中间决策；但前提是仿真环境足够真实，让学生探索到的状态接近部署分布，否则教师对陌生偏差状态的评分也不可靠。<br>“稠密信号胜过稀疏信号”在纯 Agent 场景中也得到过验证：作者和合作者在“时间感”任务上比较 DPO、四种 RL 与 On-Policy Distillation——前者分别受到稀疏奖励、目标错位、rollout 形状不匹配和策略崩溃的限制；换成冻结的 Qwen3-32B 教师，在学生自己的多轮轨迹上逐 token 对齐后，训练平滑收敛，四种条件下通过率比同源 SFT 基线高出 23 到 47 个百分点。这说明瓶颈往往不是奖励函数不够复杂，而是每次交互提供的信号不够密。<br>页面上“查询”位置的教师分布来自原书，其余位置的分布与 KL 数值为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一条 rollout，约 <em>T 组逐 token 监督</em></h2>
+  <p class="lead fx fx-up" style="--d:2">让学生的预测分布贴近教师分布：通常最小化两者的 KL 散度</p></header>
+  <div class="c8o2-body">
+    <div class="c8o2-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span>
+      <div class="c8o2-lb">学生自己生成的轨迹</div>
+      <div class="c8o2-tok"></div>
+      <div class="c8o2-dist">
+        <div class="c8o2-col"><b class="t">教师在这个位置的分布</b><div class="c8o2-bars" data-w="t"></div></div>
+        <div class="c8o2-col"><b class="s">学生当前的分布</b><div class="c8o2-bars" data-w="s"></div></div>
+      </div>
+      <div class="c8o2-kl"><span>本位置 KL</span><b class="c8o2-k1">0.00</b><span>累计 loss</span><b class="c8o2-k2">0.00</b><div class="meter c8o2-m"><i></i></div></div>
+    </div>
+    <div class="c8o2-r fx fx-right" style="--d:4">
+<pre class="c8-code c8o2-code"><span class="ln">student_trajectory = rollout(student, task)</span><span class="ln">loss = 0</span><span class="ln">for state in student_trajectory:</span><span class="ln">    teacher_logits = teacher(state)</span><span class="ln">    loss += KL(student_logits(state), teacher_logits)</span><span class="ln">update_student(loss)</span></pre>
+      <div class="c8o2-fs">
+        <div class="c8-card"><b>1/10</b><p>数学等任务上，达到同等性能所需训练步数约为纯 RL 的 1/10</p></div>
+        <div class="c8-card"><b>+23~47 pp</b><p>“时间感”任务：冻结 Qwen3-32B 教师，在学生自己的多轮轨迹上逐 token 对齐，四种条件下通过率比同源 SFT 基线高 23 到 47 个百分点</p></div>
+      </div>
+      <p class="c8o2-nt">多轮 Agent 的成败信号更晚、更稀疏，逐 token 的教师分布能直接指导中间决策——<b>前提是仿真环境足够真实</b>，否则教师对陌生偏差状态的评分也不可靠</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「在轨蒸馏：让一次 rollout 产生密集监督」</div>
+</section>
+<style>
+.c8o2-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8o2-l{position:relative;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.c8o2-lb{font-size:16px;color:var(--text3)}
+.c8o2-tok{display:flex;flex-wrap:wrap;gap:8px}
+.c8o2-tok span{padding:8px 14px;border-radius:10px;font-size:22px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.c8o2-tok span.done{border-color:color-mix(in srgb,var(--acc) 40%,transparent);color:var(--text2)}
+.c8o2-tok span.cur{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 18%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent);color:var(--text)}
+.c8o2-dist{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:4px}
+.c8o2-col>b{font-size:16px}.c8o2-col>b.t{color:#f9a8d4}.c8o2-col>b.s{color:#93c5fd}
+.c8o2-bars{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.c8o2-bars div{display:grid;grid-template-columns:70px 1fr 54px;gap:10px;align-items:center;font-size:16px}
+.c8o2-bars i{height:20px;border-radius:6px;width:0;transition:width .5s var(--ease)}
+.c8o2-bars[data-w=t] i{background:linear-gradient(90deg,#f472b6,#f9a8d4)}.c8o2-bars[data-w=s] i{background:linear-gradient(90deg,#3b82f6,#93c5fd)}
+.c8o2-bars em{font:700 16px var(--num);font-style:normal;color:var(--text2);text-align:right}
+.c8o2-kl{display:grid;grid-template-columns:auto 90px auto 90px 1fr;gap:12px;align-items:center;margin-top:auto;padding-top:10px;border-top:1px solid var(--line)}
+.c8o2-kl span{font-size:15px;color:var(--text3)}.c8o2-kl b{font:800 26px var(--num);color:var(--acc)}
+.c8o2-m{--v:0%}
+.c8o2-r{display:flex;flex-direction:column;gap:12px}
+.c8o2-code{font-size:16px}
+.c8o2-fs{display:grid;grid-template-columns:1fr 1.4fr;gap:12px}
+.c8o2-fs b{font:800 34px var(--num);color:var(--acc)}.c8o2-fs p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+.c8o2-nt{font-size:16px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8o2-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-opd2'] = {
+  P: [
+    ['先', [['先', 0.7], ['首先', 0.2], ['其余', 0.1]], [['先', 0.5], ['我', 0.3], ['其余', 0.2]]],
+    ['查询', [['查询', 0.8], ['调用', 0.15], ['其余', 0.05]], [['查询', 0.4], ['调用', 0.35], ['其余', 0.25]]],
+    ['API', [['API', 0.85], ['接口', 0.1], ['其余', 0.05]], [['API', 0.6], ['数据库', 0.25], ['其余', 0.15]]],
+    ['，', [['，', 0.9], ['。', 0.05], ['其余', 0.05]], [['，', 0.8], ['。', 0.12], ['其余', 0.08]]],
+    ['再', [['再', 0.75], ['然后', 0.2], ['其余', 0.05]], [['再', 0.45], ['然后', 0.25], ['其余', 0.3]]],
+    ['解析', [['解析', 0.75], ['检查', 0.2], ['其余', 0.05]], [['解析', 0.45], ['返回', 0.3], ['其余', 0.25]]],
+    ['返回值', [['返回值', 0.8], ['结果', 0.15], ['其余', 0.05]], [['返回值', 0.5], ['结果', 0.3], ['其余', 0.2]]],
+  ],
+  init(s) {
+    s.querySelector('.c8o2-tok').innerHTML = this.P.map((p) => `<span>${p[0]}</span>`).join('') + '<span>……</span>';
+    s.querySelectorAll('.c8o2-tok span').forEach((t, i) => t.addEventListener('click', () => { if (i < this.P.length) { this.auto = false; this.at(s, i); } }));
+    this.kl = this.P.map(([, t, st]) => st.reduce((a, [, q], k) => a + q * Math.log(q / t[k][1]), 0));
+  },
+  hl(s, n) { s.querySelectorAll('.c8o2-code .ln').forEach((l, i) => l.classList.toggle('hl', n.includes(i))); },
+  bars(el, d) {
+    el.innerHTML = d.map(([w, p]) => `<div><span>${w}</span><i></i><em>${Math.round(p * 100)}%</em></div>`).join('');
+    requestAnimationFrame(() => el.querySelectorAll('i').forEach((b, k) => { b.style.width = d[k][1] * 100 + '%'; }));
+  },
+  at(s, i) {
+    this.i = i;
+    const [, t, st] = this.P[i];
+    s.querySelectorAll('.c8o2-tok span').forEach((x, j) => { x.classList.toggle('cur', j === i); x.classList.toggle('done', j < i); });
+    this.bars(s.querySelector('[data-w=t]'), t); this.bars(s.querySelector('[data-w=s]'), st);
+    const sum = this.kl.slice(0, i + 1).reduce((a, b) => a + b, 0);
+    s.querySelector('.c8o2-k1').textContent = this.kl[i].toFixed(2);
+    s.querySelector('.c8o2-k2').textContent = sum.toFixed(2);
+    s.querySelector('.c8o2-m').style.setProperty('--v', Math.min(100, sum * 50) + '%');
+    this.hl(s, [2, 3, 4]);
+  },
+  enter(s, ctx) {
+    this.hl(s, [0]);
+    C8.auto(this, ctx, this.P.length + 1, 2600, (i) => {
+      if (i === this.P.length) { this.i = i; this.hl(s, [5]); s.querySelectorAll('.c8o2-tok span').forEach((x) => { x.classList.remove('cur'); x.classList.add('done'); }); return; }
+      this.at(s, i);
+    }, 1400);
+  },
+  reset(s) {
+    this.i = null; this.hl(s, []);
+    s.querySelectorAll('.c8o2-tok span').forEach((x) => x.classList.remove('cur', 'done'));
+    s.querySelectorAll('.c8o2-bars').forEach((b) => { b.innerHTML = ''; });
+    s.querySelector('.c8o2-k1').textContent = '0.00'; s.querySelector('.c8o2-k2').textContent = '0.00';
+    s.querySelector('.c8o2-m').style.setProperty('--v', '0%');
+  },
+};
+</script>
+
+<!-- ================= 在轨自蒸馏 ================= -->
+<section class="slide" id="c08-opsd" data-part="9" data-trans="iris" data-dur="24000" data-title="没有更强的教师怎么办：在轨自蒸馏" data-notes="On-Policy Distillation 的威力来自教师，但它也因此背上了一个硬前提：<b>必须有一个明显强于学生的教师模型。</b>这在很多场景里并不成立。如果你要训练的是垂直领域模型，现有模型的能力都存在不足，那就没有教师模型可用。<br>一个巧妙的破题思路是 <b>On-Policy Self-Distillation（OPSD，在轨自蒸馏）</b>：<b>同一个模型分饰教师和学生两角，但看到的上下文不同。</b>教师版能看到“特权信息”——如标准答案或已验证的正确解答；学生版只看到问题本身，却在自己采样的轨迹上向教师版的逐 token 分布对齐。对着答案解释学生刚走过的路径，通常比独立探索更容易，因此一条 rollout 仍能产生密集监督。<br>OPSD 可以看成在轨蒸馏伪代码的一个受限变体。其中 privileged_state 只能在训练侧构造，不能泄露给部署时的 Agent；retention_regularizer 代表保留集/风格约束，而不是某个固定超参数。训练流程还必须检查数据权限、答案遮蔽和遗忘风险。<br>相比 RLVR，OPSD 不要求奖励一定能被自动验证：特权信息可以是标准答案、人工示范或领域文档。它用这些信息替代更强的外部教师，同时保留“在轨采样 + 逐 token 监督”的样本效率优势。但它不会凭空创造新知识——如果模型拿着答案也讲不清过程，自蒸馏就没有额外信号；朴素 OPSD 还可能让模型丢失原有思考风格，需要额外正则稳定。<br>左侧示意图随伪代码逐行高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">没有更强的教师：<em>同一个模型分饰两角，看到的上下文不同</em></h2>
+  <p class="lead fx fx-up" style="--d:2">On-Policy Self-Distillation（OPSD，在轨自蒸馏）</p></header>
+  <div class="c8os-body">
+    <div class="c8os-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span>
+      <div class="c8os-ctx">
+        <div class="c8os-b" data-l="0"><b class="s">学生版上下文</b><div><span>问题</span></div><small>部署时也只有这些</small></div>
+        <div class="c8os-b" data-l="3"><b class="t">教师版上下文</b><div><span>问题</span><span class="pv">已验证答案 · 特权信息</span></div><small>只能在训练侧构造</small></div>
+      </div>
+      <div class="c8os-mid">
+        <div class="c8os-m" data-l="0,4"><svg class="ic"><use href="#i-brain"/></svg><b>同一个模型 θ</b><em class="sg" data-l="4">教师侧 stop_gradient</em></div>
+      </div>
+      <div class="c8os-tr" data-l="2"><span>学生自己采样的轨迹</span><div class="c8os-tk"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+      <div class="c8os-bot"><div class="c8os-kl" data-l="5">逐 token KL：学生分布 → 教师版分布</div><div class="c8os-up" data-l="6">更新 θ（loss + 保留集 / 风格约束）</div></div>
+    </div>
+    <div class="c8os-r fx fx-right" style="--d:4">
+<pre class="c8-code c8os-code"><span class="ln">student_trajectory = rollout(model, task_without_answer)</span><span class="ln">loss = 0</span><span class="ln">for state in student_trajectory:</span><span class="ln">    privileged_state = add_verified_answer(state)</span><span class="ln">    teacher_logits = stop_gradient(model(privileged_state))</span><span class="ln">    loss += KL(model(state), teacher_logits)</span><span class="ln">update(model, loss + retention_regularizer)</span></pre>
+      <div class="c8os-cs">
+        <div class="c8-card"><b>相比 RLVR</b><p>不要求奖励能被自动验证：特权信息可以是标准答案、人工示范或领域文档；保留“在轨采样 + 逐 token 监督”的样本效率</p></div>
+        <div class="c8-card"><b>局限</b><p>不会凭空创造新知识：拿着答案也讲不清过程，就没有额外信号；朴素 OPSD 可能丢失原有思考风格，需要额外正则</p></div>
+        <div class="c8-card"><b>工程约束</b><p>privileged_state 不能泄露给部署时的 Agent；retention_regularizer 是保留集 / 风格约束；检查数据权限、答案遮蔽、遗忘风险</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「没有更强的教师怎么办：On-Policy 自蒸馏」</div>
+</section>
+<style>
+.c8os-body{display:grid;grid-template-columns:1fr 1.05fr;gap:22px;flex:1;min-height:0}
+.c8os-l{position:relative;padding:22px 24px;display:flex;flex-direction:column;gap:16px}
+#c08-opsd [data-l]{transition:border-color .35s,background .35s,box-shadow .35s,opacity .35s}
+#c08-opsd [data-l].lit{border-color:var(--acc)!important;background:color-mix(in srgb,var(--acc) 14%,rgba(12,18,40,.8));box-shadow:0 0 22px -4px color-mix(in srgb,var(--acc) 60%,transparent)}
+.c8os-ctx{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.c8os-b{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:8px}
+.c8os-b b{font-size:17px}.c8os-b b.s{color:#93c5fd}.c8os-b b.t{color:#f9a8d4}
+.c8os-b div{display:flex;flex-wrap:wrap;gap:8px}
+.c8os-b span{padding:5px 12px;border-radius:9px;font-size:16px;background:rgba(255,255,255,.06)}
+.c8os-b span.pv{background:rgba(244,114,182,.18);color:#fbcfe8;border:1px dashed #f472b6}
+.c8os-b small{font-size:15px;color:var(--text3)}
+.c8os-mid{display:flex;justify-content:center}
+.c8os-m{display:flex;align-items:center;gap:12px;padding:12px 26px;border-radius:999px;border:1px solid var(--line2);background:rgba(129,140,248,.1)}
+.c8os-m .ic{width:30px;height:30px;color:var(--llm)}.c8os-m b{font-size:19px}
+.c8os-m em.sg{font-style:normal;font-size:15px;padding:3px 10px;border-radius:8px;border:1px solid var(--line2);color:var(--text3)}
+.c8os-tr{padding:12px 14px;border-radius:14px;border:1px solid var(--line)}
+.c8os-tr>span{font-size:15px;color:var(--text3)}
+.c8os-tk{display:grid;grid-template-columns:repeat(10,1fr);gap:6px;margin-top:8px}
+.c8os-tk i{height:26px;border-radius:6px;background:rgba(147,197,253,.35)}
+.c8os-bot{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.c8os-kl,.c8os-up{padding:12px 14px;border-radius:14px;border:1px solid var(--line);font-size:16px;text-align:center}
+.c8os-r{display:flex;flex-direction:column;gap:12px}
+.c8os-code{font-size:15.5px}
+.c8os-cs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c8os-cs b{font-size:17px;color:var(--acc)}.c8os-cs p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+</style>
+<script>
+HOOKS['c08-opsd'] = {
+  init(s) {
+    s.querySelectorAll('.c8os-code .ln').forEach((l, i) => { l.style.cursor = 'pointer'; l.addEventListener('click', () => { this.auto = false; this.line(s, i); }); });
+  },
+  line(s, n) {
+    this.i = n;
+    s.querySelectorAll('.c8os-code .ln').forEach((l, i) => l.classList.toggle('hl', i === n));
+    s.querySelectorAll('#c08-opsd [data-l]').forEach((e) => e.classList.toggle('lit', e.dataset.l.split(',').includes(String(n))));
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 7, 2400, (i) => this.line(s, i), 900); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8os-code .ln').forEach((l) => l.classList.remove('hl')); s.querySelectorAll('#c08-opsd [data-l]').forEach((e) => e.classList.remove('lit')); },
+};
+</script>
+
+<!-- ================= 表8-5 ================= -->
+<section class="slide" id="c08-t85" data-part="9" data-trans="slide" data-dur="22000" data-title="表8-5 评估数据集到训练用法的映射" data-notes="「从问题案例到后训练」。这一节回到第七章留下的问题：基于生产问题案例构建的评估数据集，如何真正变成后训练的输入。第七章结尾把评估环境和验证器比作后训练的基石。失败归因记录、端到端回归任务、轨迹前缀回归任务、Rubric 评分各自对应不同的训练用法（表8-5）：<br>端到端回归任务（含验证器）→ RL rollout 任务与可验证奖励（RLVR）；拒绝采样（RFT）的采样池。<br>轨迹前缀回归任务 → DPO 偏好对、决策边界的 SFT 示范、On-Policy Distillation 的教师状态。<br>失败归因记录（首个错误步骤与错误类别）→ 过程监督的负标签（PRM）、RLVP 路径惩罚的规则来源。<br>Rubric 多维评分与人工金标集 → 向量奖励的各维度、生成式奖励模型（GRM）的训练与校准数据。<br>点击任一行查看对应的训练用法；后面三个案例分别演示这些映射怎样落地。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第七章的评估资产，<em>就是第八章的训练输入</em></h2>
+  <p class="lead fx fx-up" style="--d:2">评估环境和验证器是后训练的基石</p></header>
+  <div class="c8-tb c8t5-tb fx fx-up" style="--d:3">
+    <div class="c8-tr c8-th"><span>第七章的评估数据集</span><span></span><span>第八章的训练用法</span></div>
+  </div>
+  <div class="src">第八章 ·「从问题案例到后训练」· 表8-5</div>
+</section>
+<style>
+.c8t5-tb{margin-top:10px}
+.c8t5-tb .c8-tr{grid-template-columns:480px 120px 1fr;padding:20px 26px;cursor:pointer}
+.c8t5-tb .c8-th{cursor:default}
+.c8t5-a{display:flex;align-items:center;gap:14px;font-size:21px;font-weight:700}
+.c8t5-a .ic{width:30px;height:30px;color:var(--c)}
+.c8t5-ar{position:relative;height:4px;border-radius:2px;background:rgba(255,255,255,.08);overflow:hidden}
+.c8t5-ar::after{content:"";position:absolute;inset:0;background:var(--c);translate:-100% 0}
+.c8-tr.on .c8t5-ar::after{animation:c8t5Go 1s var(--ease) forwards}
+@keyframes c8t5Go{to{translate:0 0}}
+.c8t5-u{display:flex;flex-wrap:wrap;gap:10px}
+.c8t5-u span{padding:8px 16px;border-radius:12px;font-size:18px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.c8-tr.on .c8t5-u span{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--text)}
+.c8-tr.on .c8t5-u span:nth-child(2){transition-delay:.15s}.c8-tr.on .c8t5-u span:nth-child(3){transition-delay:.3s}
+</style>
+<script>
+HOOKS['c08-t85'] = {
+  R: [['#34d399', 'check', '端到端回归任务（含验证器）', ['RL rollout 任务与可验证奖励（RLVR）', '拒绝采样（RFT）的采样池']], ['#38bdf8', 'branch', '轨迹前缀回归任务', ['DPO 偏好对', '决策边界的 SFT 示范', 'On-Policy Distillation 的教师状态']], ['#fb7185', 'bug', '失败归因记录（首个错误步骤与错误类别）', ['过程监督的负标签（PRM）', 'RLVP 路径惩罚的规则来源']], ['#fbbf24', 'clipboard', 'Rubric 多维评分与人工金标集', ['向量奖励的各维度', '生成式奖励模型（GRM）的训练与校准数据']]],
+  init(s) {
+    const tb = s.querySelector('.c8t5-tb');
+    tb.insertAdjacentHTML('beforeend', this.R.map(([c, ic, a, u]) => `<div class="c8-tr c8t5-r" style="--c:${c}"><div class="c8t5-a"><svg class="ic"><use href="#i-${ic}"/></svg>${a}</div><div class="c8t5-ar"></div><div class="c8t5-u">${u.map((x) => `<span>${x}</span>`).join('')}</div></div>`).join(''));
+    tb.querySelectorAll('.c8t5-r').forEach((r, i) => r.addEventListener('click', () => { this.auto = false; this.pick(s, i); }));
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c8t5-r').forEach((r, j) => { r.classList.toggle('on', j === i); r.classList.toggle('dim', j !== i); }); },
+  enter(s, ctx) { C8.auto(this, ctx, 4, 3800, (i) => this.pick(s, i), 600); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8t5-r').forEach((r) => r.classList.remove('on', 'dim')); },
+};
+</script>

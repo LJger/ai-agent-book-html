@@ -1,0 +1,282 @@
+<!-- ================= PART 03 工具：Agent 的手脚 ================= -->
+<section class="slide chapter" id="c1-d3" data-part="3" data-title="PART 03 · 工具：Agent 的手脚" data-notes="工具是 Agent 与外部世界交互的桥梁：<b>感知类工具承载环境到 Agent 的观察，执行类工具承载 Agent 到环境的行动</b>。没有工具，Agent 只能“纸上谈兵”；有了工具，它才能真正读取或改变世界。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">工具：<br>Agent 的手脚</h1>
+  <div class="ch-s fx fx-up" style="--d:3">Agent 与外部世界交互的桥梁</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">没有工具，Agent 只能“纸上谈兵”；有了工具，它才能真正读取或改变世界。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c1-tool5" data-part="3" data-title="五类工具" data-notes="为了系统化地讨论工具，可以<b>根据 Agent 与外界互动的方向</b>把工具分为五类。左图会依次演示每一类的方向，也可以点击任一类。<br><b>感知工具</b>让 Agent 能访问信息：搜索引擎提供实时网络数据，文件系统读取本地文档，API 和数据库则对接外部服务和企业核心数据。<b>执行工具</b>让 Agent 改变世界：代码执行、文件操作、系统命令、外部 API 调用——决策由此变成实际行动。<b>协作工具</b>让 Agent 与其他 Agent 分工合作：委托子 Agent 完成专项任务，在关键决策点请求人类确认，或在多 Agent 系统中协调行动。<br><b>事件触发工具</b>与前三类在调用方式上有本质的区别——它们不是 Agent 主动调用的，而是作为外部输入来驱动 Agent 开始执行任务：收到一封新邮件、到了某个预定时间点、或另一个系统发出了 Webhook 回调。事件适配器同样是 Environment 向 Agent 提供观察的通道，因此本书把它归入广义的工具体系。<b>用户沟通工具</b>是 Agent 主动与用户建立连接、传递信息的渠道，专注于信息的传递和交互。<br>完整的分类体系和设计原则在第四章展开。工具设计的质量直接决定了 Agent 能走多远；<b>MCP（Model Context Protocol，模型上下文协议）</b>标准的推广，正在让工具接入变得更容易。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">按与外界互动的方向，<em>五类工具</em></h2></header>
+  <div class="t5-body">
+    <div class="t5-dia fx fx-scale" style="--d:2">
+      <svg class="t5-svg" viewBox="0 0 860 600" width="860" height="600"><g class="t5-ps"></g><g class="t5-ds"></g></svg>
+      <div class="t5-core"><svg class="ic"><use href="#i-robot"/></svg><b>Agent</b><span class="t5-zz">休眠中…</span></div>
+      <div class="t5-ns"></div>
+    </div>
+    <div class="t5-card panel fx fx-right" style="--d:3">
+      <div class="t5-h"><span class="t5-ic"><svg class="ic"><use href="#i-eye"/></svg></span><div><b class="t5-n"></b><span class="badge t5-dir"></span></div></div>
+      <p class="t5-d"></p>
+      <div class="t5-ex"></div>
+      <div class="runbar t5-bar"><i></i></div>
+    </div>
+  </div>
+  <div class="t5-risk fx fx-up" style="--d:6">
+    <span class="lbl">工具设计的质量决定 Agent 能走多远</span>
+    <span class="chip bad">接口定义不清晰 → 模型乱用工具</span>
+    <span class="chip bad">错误处理不到位 → Agent 可能陷入死锁</span>
+    <span class="chip bad">权限控制太宽泛 → 出错后难以挽回</span>
+    <span class="chip acc">MCP 标准让工具接入更容易</span>
+  </div>
+  <div class="src">第一章 ·「工具：Agent 的手脚」</div>
+</section>
+<style>
+.t5-body{display:flex;gap:40px;align-items:center;margin-top:-14px}
+.t5-dia{position:relative;width:860px;height:600px;flex:none}
+.t5-svg{position:absolute;inset:0;overflow:visible}
+.t5-p{fill:none;stroke:rgba(255,255,255,.14);stroke-width:2.5;stroke-dasharray:6 8;transition:stroke .4s,opacity .4s}
+.t5-p.on{stroke:var(--c);stroke-width:3.5;animation:flow 1s linear infinite;filter:drop-shadow(0 0 6px var(--c))}
+.t5-p.rev.on{animation-direction:reverse}
+.t5-dot{opacity:0}
+.t5-core{position:absolute;left:340px;top:210px;width:180px;height:180px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid var(--llm);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--llm) 30%,#0a1024),#0a1024 70%);box-shadow:0 0 60px color-mix(in srgb,var(--llm) 35%,transparent);transition:all .5s var(--ease)}
+.t5-core .ic{font-size:52px;color:var(--llm)}
+.t5-core b{font:800 26px var(--num)}
+.t5-zz{position:absolute;bottom:-34px;font-size:16px;color:var(--text3);opacity:0;transition:opacity .4s}
+.t5-core.sleep{filter:grayscale(.8) brightness(.6);box-shadow:none}
+.t5-core.sleep .t5-zz{opacity:1}
+.t5-core.wake{animation:glowPulse .6s ease 2;--c:var(--llm)}
+.t5-n{--c:var(--acc)}
+.t5-node{--c:var(--acc);position:absolute;width:210px;margin-left:-105px;padding:14px 16px;border-radius:18px;text-align:center;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.9);transition:all .45s var(--ease)}
+.t5-node .ic{font-size:30px;color:var(--c)}
+.t5-node b{display:block;font-size:22px;margin-top:4px}
+.t5-node small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+.t5-node.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 15%,rgba(12,18,40,.92));box-shadow:0 0 34px color-mix(in srgb,var(--c) 40%,transparent);translate:0 -4px}
+.t5-node.dim{opacity:.45}
+.t5-card{flex:1;padding:30px 34px 22px;min-height:470px;display:flex;flex-direction:column;gap:18px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.t5-card::before{content:"";position:absolute;left:0;top:28px;bottom:28px;width:4px;border-radius:4px;background:var(--c);box-shadow:0 0 16px var(--c)}
+.t5-h{display:flex;gap:18px;align-items:center}
+.t5-ic{width:70px;height:70px;border-radius:20px;display:grid;place-items:center;font-size:36px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.t5-h b{display:block;font-size:34px;color:var(--c)}
+.t5-dir{margin-top:8px;--c:inherit}
+.t5-d{font-size:22px;line-height:1.7}
+.t5-ex{display:flex;flex-wrap:wrap;gap:10px}
+.t5-ex span{padding:8px 16px;border-radius:12px;font-size:19px;background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.t5-bar{margin-top:auto}
+.t5-card.sw .t5-h,.t5-card.sw .t5-d,.t5-card.sw .t5-ex{animation:swIn .5s var(--ease) both}
+.t5-risk{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:6px}
+.t5-risk .lbl{margin-right:6px}
+.t5-risk .chip{font-size:17px}
+</style>
+<script>
+HOOKS['c1-tool5'] = {
+  T: [
+    { n: '感知工具', ic: 'search', c: '#22d3ee', x: 140, y: 70, dir: '环境 → Agent', flow: 'in', sub: '访问信息', d: '让 Agent 能访问信息：搜索引擎提供实时网络数据，文件系统读取本地文档，API 和数据库则对接外部服务和企业核心数据。', ex: ['搜索引擎', '文件系统读取', 'API', '数据库'] },
+    { n: '执行工具', ic: 'zap', c: '#fbbf24', x: 720, y: 70, dir: 'Agent → 环境', flow: 'out', sub: '改变世界', d: '让 Agent 改变世界：代码执行、文件操作、系统命令、外部 API 调用——决策由此变成实际行动。', ex: ['代码执行', '文件操作', '系统命令', '外部 API 调用'] },
+    { n: '协作工具', ic: 'users', c: '#a78bfa', x: 760, y: 410, dir: 'Agent ⇄ 其他 Agent / 人类', flow: 'both', sub: '分工合作', d: '让 Agent 与其他 Agent 分工合作：委托子 Agent 完成专项任务，在关键决策点请求人类确认，或在多 Agent 系统中协调行动。', ex: ['委托子 Agent', '请求人类确认', '多 Agent 协调'] },
+    { n: '事件触发工具', ic: 'bell', c: '#f472b6', x: 430, y: 490, dir: '外部事件 → 唤醒 Agent', flow: 'wake', sub: '不是主动调用', d: '不是 Agent 主动调用的，而是作为外部输入来驱动 Agent 开始执行任务。事件适配器同样是 Environment 向 Agent 提供观察的通道，因此归入广义的工具体系。', ex: ['收到一封新邮件', '到了预定时间点', 'Webhook 回调'] },
+    { n: '用户沟通工具', ic: 'chat', c: '#34d399', x: 100, y: 410, dir: 'Agent → 用户', flow: 'out', sub: '传递信息', d: 'Agent 主动与用户建立连接、传递信息的渠道。与执行工具改变外部世界不同，它专注于信息的传递和交互，把执行进展或主动关怀传达给用户。', ex: ['文字消息', '语音通话', '邮件'] },
+  ],
+  init(s) {
+    const cx = 430, cy = 300;
+    s.querySelector('.t5-ns').innerHTML = this.T.map((t, i) => `<div class="t5-node" data-i="${i}" style="left:${t.x}px;top:${t.y}px;--c:${t.c}"><svg class="ic"><use href="#i-${t.ic}"/></svg><b>${t.n}</b><small>${t.sub}</small></div>`).join('');
+    // 连线：从节点中心指向 Agent 圆心（方向由动画决定）
+    s.querySelector('.t5-ps').innerHTML = this.T.map((t, i) => {
+      const nx = t.x, ny = t.y + 50, mx = (nx + cx) / 2 + (i % 2 ? 40 : -40), my = (ny + cy) / 2;
+      return `<path class="t5-p" data-i="${i}" style="--c:${t.c}" d="M${nx} ${ny} Q ${mx} ${my} ${cx} ${cy}"/>`;
+    }).join('');
+    s.querySelector('.t5-ds').innerHTML = '<circle class="t5-dot" r="10"/><circle class="t5-dot" r="10"/>';
+    s.querySelector('.t5-ns').addEventListener('click', (e) => { const n = e.target.closest('[data-i]'); if (n) { this.auto = false; this.show(s, +n.dataset.i); } });
+  },
+  show(s, i) {
+    const t = this.T[i], ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    this.i = i;
+    s.querySelectorAll('.t5-node').forEach((n) => { const on = +n.dataset.i === i; n.classList.toggle('on', on); n.classList.toggle('dim', !on); });
+    s.querySelectorAll('.t5-p').forEach((p) => { p.classList.toggle('on', +p.dataset.i === i); p.classList.toggle('rev', t.flow === 'out' && +p.dataset.i === i); });
+    const card = s.querySelector('.t5-card');
+    card.style.setProperty('--c', t.c);
+    card.querySelector('.t5-ic use').setAttribute('href', `#i-${t.ic}`);
+    card.querySelector('.t5-n').textContent = t.n;
+    card.querySelector('.t5-dir').textContent = t.dir;
+    card.querySelector('.t5-dir').style.setProperty('--c', t.c);
+    card.querySelector('.t5-d').textContent = t.d;
+    card.querySelector('.t5-ex').innerHTML = t.ex.map((x) => `<span>${x}</span>`).join('');
+    U.restart(card, 'sw');
+    const bar = card.querySelector('.t5-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) bar.classList.add('run');
+    const core = s.querySelector('.t5-core'), path = s.querySelector(`.t5-p[data-i="${i}"]`), [d1, d2] = s.querySelectorAll('.t5-dot');
+    d1.style.fill = t.c; d2.style.fill = t.c;
+    core.classList.toggle('sleep', t.flow === 'wake');
+    core.classList.remove('wake');
+    const run = async () => {
+      while (ok()) {
+        if (t.flow === 'wake') {
+          await U.wait(ctx, 700);
+          if (!ok()) return;
+          await U.fly(d1, path, 1100, { ctx, alive: ok });
+          if (!ok()) return;
+          core.classList.remove('sleep');
+          U.restart(core, 'wake');
+          await U.wait(ctx, 1500);
+          if (!ok()) return;
+          core.classList.add('sleep');
+        } else if (t.flow === 'both') {
+          await U.fly(d1, path, 1000, { ctx, alive: ok, reverse: true });
+          if (!ok()) return;
+          await U.fly(d2, path, 1000, { ctx, alive: ok });
+        } else {
+          await U.fly(d1, path, 1100, { ctx, alive: ok, reverse: t.flow === 'out' });
+        }
+        await U.wait(ctx, 250);
+      }
+    };
+    run();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.T.length); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.on,.dim,.sleep').forEach((e) => e.classList.remove('on', 'dim', 'sleep')); },
+};
+</script>
+
+<section class="slide" id="c1-call4" data-part="3" data-steps="4" data-trans="rise" data-title="工具调用的四步" data-notes="<b>工具调用</b>（Tool Calling，也称 Function Calling）是现代 LLM Agent 的一项核心能力，它让模型能够通过结构化的方式调用外部工具，把 LLM 从一个纯粹的文本生成器转变为能够执行实际操作的智能系统。本书后续统一使用“工具调用”这一术语。<br>流程分为四步：首先，<b>在上下文里告诉模型有哪些工具可用</b>（名称、用途和参数）；然后，<b>模型自主判断</b>要不要调用工具、调用哪个、传什么参数；接着，工具执行完毕后，<b>结果被追加到上下文中</b>；最后，<b>模型据此决定下一步行动</b>。这个循环就是后文要介绍的 ReAct 的基础。按 → 逐步演示查天气的例子（API 层面的简化表示）。<br><b>开发者只需要定义工具和执行工具调用，模型自主完成“要不要调用、调哪个、传什么参数”的决策。</b>第二章将详细展开这个 API 结构。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">工具调用（Tool Calling）的<em>四步</em></h2></header>
+  <div class="c4-body">
+    <ol class="sl c4-sl fx fx-left" style="--d:2">
+      <li data-i="1"><span>1</span><div><b>声明工具</b><p>在上下文里告诉模型有哪些工具：名称、用途和参数</p></div></li>
+      <li data-i="2"><span>2</span><div><b>模型决定调用</b><p>要不要调用、调哪个、传什么参数，由模型自主判断</p></div></li>
+      <li data-i="3"><span>3</span><div><b>结果追加到上下文</b><p>工具执行完毕，结果作为新消息追加</p></div></li>
+      <li data-i="4"><span>4</span><div><b>模型基于结果回复</b><p>据此决定下一步：继续调用，或给出回答</p></div></li>
+    </ol>
+    <div class="c4-win win fx fx-right" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>上下文（每次调用模型时发送的全部内容）</span></div>
+      <div class="c4-ml ml">
+        <div class="mr" data-r="system"><span class="rl">system</span><span class="tx">You are a helpful assistant.<em class="c4-sx">示意</em></span></div>
+        <div class="mr c4-r" data-r="tools" data-k="1"><span class="rl">tools</span><span class="tx mono">[{ name: "get_weather", parameters: { city: "string" } }]</span></div>
+        <div class="mr" data-r="user"><span class="rl">user</span><span class="tx">北京今天天气怎么样？<em class="c4-sx">示意</em></span></div>
+        <div class="mr c4-r" data-r="assistant" data-k="2"><span class="rl">assistant</span><span class="tx mono">tool_calls: [{ function: "get_weather", arguments: { city: "北京" } }]</span></div>
+        <div class="c4-exec c4-r" data-k="3"><svg class="ic"><use href="#i-server"/></svg><span>Agent 框架执行 get_weather</span><i class="c4-pg"><i></i></i></div>
+        <div class="mr c4-r" data-r="tool" data-k="3"><span class="rl">tool</span><span class="tx mono">{ tool_call_id: "call_1", content: '{"temp":28,"sky":"晴"}' }</span></div>
+        <div class="mr c4-r" data-r="assistant" data-k="4"><span class="rl">assistant</span><span class="tx">北京今天 28°C，晴。</span></div>
+      </div>
+      <div class="c4-call"><svg class="ic"><use href="#i-brain"/></svg>模型自主决定：要不要调用、调哪个、传什么参数</div>
+    </div>
+  </div>
+  <p class="tagline c4-tag fx fx-up" style="--d:5">开发者只需要<b>定义工具</b>和<b>执行工具调用</b>；这个“请求 → 调用 → 执行 → 追加 → 再请求”的循环，就是 ReAct 的基础</p>
+  <div class="src">第一章 ·「工具：Agent 的手脚」· 工具调用</div>
+</section>
+<style>
+.c4-body{display:flex;gap:40px;flex:1;min-height:0}
+.c4-sl{width:520px;flex:none}
+.c4-win{flex:1;display:flex;flex-direction:column;position:relative}
+.c4-ml{padding:20px 22px;gap:10px}
+.c4-ml .mr{font-size:19px}
+.c4-sx{font-style:normal;font-size:15px;color:var(--text3);margin-left:10px}
+.c4-r{display:none}
+.c4-r.show{display:flex;animation:upIn .6s var(--spring) both}
+.c4-exec{align-items:center;gap:12px;padding:8px 16px;margin-left:30px;border-radius:12px;font-size:17px;color:var(--har);border:1px dashed color-mix(in srgb,var(--har) 55%,transparent)}
+.c4-pg{flex:1;max-width:240px;height:6px;border-radius:6px;background:rgba(255,255,255,.08);overflow:hidden}
+.c4-pg i{display:block;height:100%;width:100%;background:var(--har);transform-origin:left;transform:scaleX(0)}
+.c4-exec.show .c4-pg i{animation:grow 1s var(--ease) forwards}
+.c4-call{position:absolute;right:22px;bottom:18px;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:12px;font-size:18px;color:var(--llm);background:color-mix(in srgb,var(--llm) 12%,rgba(8,12,28,.95));border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);opacity:0;translate:0 10px;transition:all .5s var(--ease)}
+#c1-call4[data-k="2"] .c4-call{opacity:1;translate:0 0}
+.c4-tag{margin-top:22px;font-size:23px}
+</style>
+<script>
+HOOKS['c1-call4'] = {
+  apply(s, k) {
+    s.dataset.k = k;
+    s.querySelectorAll('.c4-sl li').forEach((li) => { const i = +li.dataset.i; li.classList.toggle('cur', i === k); li.classList.toggle('done', i < k); });
+    s.querySelectorAll('.c4-r').forEach((r) => r.classList.toggle('show', +r.dataset.k <= k));
+  },
+  enter(s, ctx, k) { this.apply(s, k); },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { this.apply(s, 0); },
+};
+</script>
+
+<section class="slide" id="c1-scope" data-part="3" data-steps="3" data-title="从最窄能力起步" data-notes="在为 Agent 设计工具时，可以<b>先从任务所需的最窄能力起步，再随任务复杂度提升逐步扩展</b>。如果任务只是做四则运算，一个参数清晰的计算器就足够了；当任务升级为读取表格、清洗缺失值、计算统计量并绘图时，受限的 Python 代码解释器就比不断叠加专用工具更容易组合和探索。但<b>通用性也扩大了出错和攻击面</b>：代码必须在隔离沙盒中运行，默认不能访问网络，也不能读取授权工作目录以外的文件，并对执行时间、CPU、内存和输出大小设置上限。<br>同样，单一日志工具适合记录一段执行过程；对于需要数小时甚至数天的长程任务，<b>受控的虚拟工作目录</b>可以同时保存计划、中间结果、运行日志和最终产物，让 Agent 能在多次执行之间接续工作。这个目录也应限定可读写的路径、容量和文件类型，并防止路径越界，而不是把宿主文件系统全部暴露给 Agent。<br>通用工具并不总是优于专用工具。支付、删除数据、发送邮件和生产部署等高风险或强业务约束操作，仍应封装为参数明确、权限受限且全程可审计的专用工具，必要时再加上预览和人工确认。核心原则：<b>通用基础能力用于组合与探索；专用工具用于约束高风险和强业务规则操作</b>。<br>按 → 依次提升任务复杂度，最后一步切到高风险操作；也可以拖动滑块、点击开关。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从任务所需的<em>最窄能力</em>起步</h2></div>
+    <button class="tgl sc-risk fx fx-up" style="--d:2;--tc:var(--bad)"><i></i>高风险 / 强业务约束操作</button></header>
+  <div class="sc-body">
+    <div class="sc-left panel fx fx-left" style="--d:2">
+      <span class="lbl">任务复杂度</span>
+      <input class="rng sc-rng" type="range" min="1" max="3" step="1" value="1">
+      <div class="sc-ticks"><span>四则运算</span><span>表格分析与绘图</span><span>长程任务</span></div>
+      <div class="sc-task"><svg class="ic"><use href="#i-clipboard"/></svg><p></p></div>
+      <div class="sc-m"><span>通用性</span><div class="meter" style="--c:var(--ok)"><i class="sc-g"></i></div></div>
+      <div class="sc-m"><span>出错和攻击面</span><div class="meter" style="--c:var(--bad)"><i class="sc-a"></i></div></div>
+      <span class="cap">计量条为示意</span>
+    </div>
+    <div class="sc-right panel fx fx-right" style="--d:3">
+      <div class="sc-h"><span class="sc-ic"><svg class="ic"><use href="#i-sigma"/></svg></span><div><span class="lbl">推荐的工具形态</span><b class="sc-tool"></b></div></div>
+      <p class="sc-why"></p>
+      <span class="lbl sc-cl">必须加上的约束</span>
+      <ul class="sc-cons"></ul>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6"><b>通用基础能力</b>用于组合与探索；<b>专用工具</b>用于约束高风险和强业务规则操作</p>
+  <div class="src">第一章 ·「工具：Agent 的手脚」</div>
+</section>
+<style>
+#c1-scope .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.sc-body{display:flex;gap:34px;flex:1;min-height:0;margin-bottom:22px}
+.sc-left{width:620px;flex:none;padding:28px 32px;display:flex;flex-direction:column;gap:16px}
+.sc-ticks{display:flex;justify-content:space-between;font-size:16px;color:var(--text3);margin-top:-6px}
+.sc-task{display:flex;gap:14px;align-items:flex-start;padding:16px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line);min-height:96px}
+.sc-task .ic{font-size:26px;color:var(--acc);margin-top:2px}
+.sc-task p{font-size:21px;line-height:1.55}
+.sc-m{display:grid;grid-template-columns:130px 1fr;align-items:center;gap:14px;font-size:18px;color:var(--text2)}
+.sc-right{flex:1;padding:28px 34px;display:flex;flex-direction:column;gap:14px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent);transition:border-color .5s}
+.sc-h{display:flex;gap:18px;align-items:center}
+.sc-ic{width:76px;height:76px;border-radius:22px;display:grid;place-items:center;font-size:40px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:all .5s}
+.sc-tool{display:block;font-size:32px;color:var(--c);margin-top:4px}
+.sc-why{font-size:20px;line-height:1.65;color:var(--text2)}
+.sc-cl{margin-top:4px}
+.sc-cons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sc-cons li{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:12px;font-size:18px;line-height:1.5;background:color-mix(in srgb,var(--c) 8%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);animation:upIn .5s var(--spring) both;animation-delay:calc(var(--j)*90ms)}
+.sc-cons li .ic{flex:none;color:var(--c);margin-top:3px}
+.sc-right.sw .sc-h,.sc-right.sw .sc-why{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c1-scope'] = {
+  L: {
+    1: { task: '只做四则运算', tool: '参数清晰的计算器', ic: 'sigma', c: '#34d399', g: 15, a: 8, why: '任务只需要算术时，一个参数清晰的计算器就足够了，不必一开始就给 Agent 更大的能力。', cons: ['参数清晰：只接受算式'] },
+    2: { task: '读取表格、清洗缺失值、计算统计量并绘图', tool: '受限的 Python 代码解释器', ic: 'code', c: '#60a5fa', g: 72, a: 62, why: '比不断叠加专用工具更容易组合和探索；但通用性也扩大了出错和攻击面。', cons: ['在隔离沙盒中运行', '默认不能访问网络', '不能读取授权工作目录以外的文件', '限制执行时间、CPU、内存和输出大小'] },
+    3: { task: '需要数小时甚至数天的长程任务', tool: '受控的虚拟工作目录', ic: 'folder', c: '#a78bfa', g: 84, a: 70, why: '同时保存计划、中间结果、运行日志和最终产物，让 Agent 能在多次执行之间接续工作（单一日志工具只适合记录一段执行过程）。', cons: ['限定可读写的路径', '限定容量和文件类型', '防止路径越界', '不把宿主文件系统全部暴露给 Agent'] },
+    risk: { task: '支付、删除数据、发送邮件、生产部署', tool: '专用工具', ic: 'shield', c: '#fb7185', g: 10, a: 12, why: '高风险或强业务约束的操作，通用工具并不更好：要封装成参数明确、权限受限且全程可审计的专用工具。', cons: ['参数明确', '权限受限', '全程可审计', '必要时预览 + 人工确认'] },
+  },
+  init(s) {
+    this.rng = s.querySelector('.sc-rng');
+    this.tg = s.querySelector('.sc-risk');
+    this.rng.addEventListener('input', () => { this.lv = +this.rng.value; this.risk = false; this.apply(s); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    this.tg.addEventListener('click', () => { this.risk = !this.risk; this.apply(s); });
+  },
+  apply(s) {
+    const d = this.risk ? this.L.risk : this.L[this.lv];
+    this.rng.value = this.lv;
+    this.rng.style.setProperty('--p', ((this.lv - 1) / 2) * 100 + '%');
+    this.tg.classList.toggle('on', this.risk);
+    s.querySelector('.sc-task p').textContent = d.task;
+    s.querySelector('.sc-g').style.setProperty('--v', d.g + '%');
+    s.querySelector('.sc-a').style.setProperty('--v', d.a + '%');
+    const r = s.querySelector('.sc-right');
+    r.style.setProperty('--c', d.c);
+    r.querySelector('.sc-ic use').setAttribute('href', `#i-${d.ic}`);
+    r.querySelector('.sc-tool').textContent = d.tool;
+    r.querySelector('.sc-why').textContent = d.why;
+    r.querySelector('.sc-cons').innerHTML = d.cons.map((t, j) => `<li style="--j:${j}"><svg class="ic"><use href="#i-check"/></svg>${t}</li>`).join('');
+    U.restart(r, 'sw');
+  },
+  fromStep(k) { this.lv = Math.min(3, k + 1); this.risk = k >= 3; },
+  enter(s, ctx, k) { this.fromStep(k); this.apply(s); },
+  step(s, ctx, k) { this.fromStep(k); this.apply(s); },
+  reset(s) { this.lv = 1; this.risk = false; },
+};
+</script>

@@ -1,0 +1,288 @@
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c1-cover" data-part="0" data-title="封面" data-notes="本章是全书的<b>概念地图</b>：它会快速引入 Agent 的核心公式、运行循环、工程框架和设计模式，为后续章节提供统一的术语和参照坐标。初次阅读时不必逐一记住所有概念，建议先建立整体印象；后续每一章都会展开讲解本章提到的某一个方面。<br>右侧的轨道图就是本章的主线：Agent 由 <b>LLM、上下文、工具</b>三个工程组件构成；外圈是 Agent 与之交互、但并不属于 Agent 的 <b>Environment（环境）</b>。">
+  <div class="cv-orbit fx fx-scale" style="--d:4"></div>
+  <div class="cv-text">
+    <div class="cv-tag fx fx-up"><i></i>深入理解 AI Agent · 第一章</div>
+    <h1 class="cv-title"><span class="split">AI Agent</span><span class="split" data-off="8" data-grad="#22d3ee,#818cf8,#c084fc">入门</span></h1>
+    <p class="cv-sub fx fx-up" style="--d:12">从实践出发，理解 Agent 的核心组成、<br>运行循环、工程框架与设计模式</p>
+    <div class="cv-meta fx fx-up" style="--d:14"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="cv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c1-cover{justify-content:center;padding-left:150px}
+.cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.cv-title{margin-top:30px;font-size:136px;line-height:1.1;font-weight:800;letter-spacing:.01em}
+.cv-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.cv-orbit{position:absolute;right:110px;top:50%;width:720px;height:720px;margin-top:-372px}
+.cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.cv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c1-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.cv-orbit'), {
+      size: 720, core: 'Agent', outer: 'ENVIRONMENT · 环境 · ENVIRONMENT · 环境',
+      sats: [
+        { label: 'LLM · 大脑', color: '#a78bfa', rx: 0.36, ry: 0.15, tilt: -24, dur: 12, phase: 0 },
+        { label: '上下文 · 眼睛', color: '#22d3ee', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.35 },
+        { label: '工具 · 手脚', color: '#fbbf24', rx: 0.3, ry: 0.2, tilt: 88, dur: 10, phase: 0.7 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c1-products" data-part="0" data-title="你已经在使用 AI Agent 了" data-notes="如果你用 <b>Cursor</b> 写过代码，看它搜索代码库、编辑多个文件、运行测试直到通过；用 <b>Deep Research</b> 调研过一个课题，看它反复搜索、阅读，总结出一份完整报告；用 <b>Manus</b> 操控浏览器帮你完成在线任务；让<b>豆包手机助手</b>帮你在手机上订票、发消息；或者让 <b>Pine AI</b> 替你打电话给运营商协商降低账单——你已经在使用 AI Agent 了。<br>这些产品的形态各异，但有一个共同点：它们不再是「你问一句、它答一句」的被动对话，而是能够自主规划执行步骤、调用各种工具完成任务，并根据结果不断调整策略的智能系统。卡片会自动轮播，也可以点击任一产品。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">你已经在使用 <em>AI Agent</em> 了</h2>
+  <p class="lead fx fx-up" style="--d:2">形态各异的产品，做的都是同一类事：自己拆步骤、自己动手、看结果再调整</p></header>
+  <div class="pd-row"></div>
+  <div class="pd-common fx fx-up" style="--d:10">
+    <span class="pd-cl">共同点</span>
+    <span class="pd-t" data-k="0"><svg class="ic"><use href="#i-route"/></svg>自主规划执行步骤</span>
+    <span class="pd-t" data-k="1"><svg class="ic"><use href="#i-wrench"/></svg>调用各种工具完成任务</span>
+    <span class="pd-t" data-k="2"><svg class="ic"><use href="#i-refresh"/></svg>根据结果不断调整策略</span>
+  </div>
+  <div class="src">第一章 开篇</div>
+</section>
+<style>
+.pd-row{display:grid;grid-template-columns:repeat(5,1fr);gap:24px;margin-top:6px}
+.pd-c{--c:var(--acc);position:relative;height:452px;padding:30px 26px 24px;border-radius:22px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;
+  background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02) 60%);border:1px solid var(--line);transition:border-color .5s,box-shadow .5s,translate .5s var(--ease),opacity .5s}
+.pd-c.dim{opacity:.55}
+.pd-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 26px 60px -26px color-mix(in srgb,var(--c) 60%,transparent),0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent);translate:0 -8px}
+.pd-orb{width:104px;height:104px;border-radius:30px;display:grid;place-items:center;font-size:50px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:box-shadow .5s}
+.pd-c.on .pd-orb{box-shadow:0 0 40px color-mix(in srgb,var(--c) 50%,transparent)}
+.pd-c b{font-size:29px;margin-top:20px}
+.pd-k{font-size:17px;color:var(--text3);margin-top:4px;letter-spacing:.1em}
+.pd-steps{width:100%;margin-top:22px;display:flex;flex-direction:column;gap:10px}
+.pd-steps li{position:relative;padding:9px 12px 9px 40px;border-radius:12px;font-size:19px;text-align:left;color:var(--text2);background:rgba(255,255,255,.03);border:1px solid var(--line);transition:all .45s var(--ease)}
+.pd-steps li::before{content:"";position:absolute;left:15px;top:50%;width:10px;height:10px;margin-top:-5px;border-radius:50%;border:2px solid var(--line2);transition:all .45s}
+.pd-steps li.on{color:var(--text);border-color:color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.pd-steps li.on::before{background:var(--c);border-color:var(--c);box-shadow:0 0 10px var(--c)}
+.pd-res{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:18px;font-weight:600;color:var(--c);opacity:0;transform:translateY(8px);transition:all .5s var(--ease)}
+.pd-res.on{opacity:1;transform:none}
+.pd-common{margin-top:30px;display:flex;align-items:center;justify-content:center;gap:18px}
+.pd-cl{font-size:18px;letter-spacing:.3em;color:var(--text3)}
+.pd-t{display:inline-flex;align-items:center;gap:10px;padding:12px 24px;border-radius:999px;font-size:22px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text2);transition:all .45s var(--ease)}
+.pd-t .ic{color:var(--acc)}
+.pd-t.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 13%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 30%,transparent)}
+</style>
+<script>
+HOOKS['c1-products'] = {
+  P: [
+    { n: 'Cursor', k: '写代码', ic: 'code', c: '#60a5fa', st: ['搜索代码库', '编辑多个文件', '运行测试', '直到通过'], res: '测试全部通过' },
+    { n: 'Deep Research', k: '调研课题', ic: 'search', c: '#22d3ee', st: ['反复搜索', '阅读资料', '综合归纳', '总结成报告'], res: '一份完整报告' },
+    { n: 'Manus', k: '操控浏览器', ic: 'browser', c: '#a78bfa', st: ['打开网页', '操作页面', '完成在线任务'], res: '在线任务完成' },
+    { n: '豆包手机助手', k: '操作手机', ic: 'mobile', c: '#fb923c', st: ['在手机上订票', '发消息'], res: '票已订好、消息已发' },
+    { n: 'Pine AI', k: '替你打电话', ic: 'phone', c: '#34d399', st: ['打电话给运营商', '协商降低账单'], res: '账单降下来了' },
+  ],
+  init(s) {
+    s.querySelector('.pd-row').innerHTML = this.P.map((p, i) => `
+      <div class="pd-w fx fx-up" style="--d:${3 + i}"><div class="pd-c" data-i="${i}" style="--c:${p.c}">
+        <div class="pd-orb"><svg class="ic"><use href="#i-${p.ic}"/></svg></div>
+        <b>${p.n}</b><span class="pd-k">${p.k}</span>
+        <ul class="pd-steps">${p.st.map((t) => `<li>${t}</li>`).join('')}</ul>
+        <div class="pd-res"><svg class="ic"><use href="#i-check"/></svg>${p.res}</div>
+      </div></div>`).join('');
+    s.querySelectorAll('.pd-c').forEach((c) => c.addEventListener('click', () => { this.auto = false; this.show(s, +c.dataset.i); }));
+  },
+  // 选中一个产品：它的动作序列逐条点亮，底部三个共同点跟着亮起
+  show(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.i = i;
+    s.querySelectorAll('.pd-c').forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+    s.querySelectorAll('.pd-steps li,.pd-res,.pd-t').forEach((e) => e.classList.remove('on'));
+    const card = s.querySelectorAll('.pd-c')[i], lis = card.querySelectorAll('li'), ts = s.querySelectorAll('.pd-t');
+    lis.forEach((li, j) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      li.classList.add('on');
+      // 第一步对应"规划"，中间对应"调用工具"，最后一步对应"根据结果调整"
+      ts[j === 0 ? 0 : j === lis.length - 1 ? 2 : 1].classList.add('on');
+    }, 350 + j * 650));
+    ctx.later(() => { if (tk === this.tk) { card.querySelector('.pd-res').classList.add('on'); ts.forEach((t) => t.classList.add('on')); } }, 350 + lis.length * 650);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.P.length); }, 4600);
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.pd-c').forEach((c) => c.classList.remove('on', 'dim'));
+    s.querySelectorAll('.pd-steps li,.pd-res,.pd-t').forEach((e) => e.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c1-shift" data-part="0" data-steps="1" data-title="从被动对话到自主系统" data-notes="左边是我们熟悉的被动对话：你问一句、它答一句，回答之后就结束了，剩下的事还得你自己做。右边是 AI Agent：它能够<b>自主规划执行步骤、调用各种工具完成任务，并根据结果不断调整策略</b>，直到任务完成。<br>两边用的是同一个问题（第一章后文 ReAct 一节的多币种收入汇总例子）。按 → 或点击上方开关切换。<b>AI Agent 正在成为我们与计算机交互的一种全新方式。</b>">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不再是<em>一问一答</em></h2></div>
+    <div class="sf-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="old">被动对话</button><button data-v="new">AI Agent</button></div></header>
+  <div class="sf-body">
+    <div class="sf-old fx fx-left" style="--d:3"><div class="sf-pan panel">
+      <div class="sf-h"><svg class="ic"><use href="#i-chat"/></svg><b>被动对话</b><span class="chip">你问一句 · 它答一句</span></div>
+      <div class="sf-chat">
+        <div class="sf-b u"><span>公司四个季度的收入分别是 2.5M 美元、2.1M 欧元、1.8M 英镑、380M 日元，帮我算出年度总收入和季度平均收入。</span></div>
+        <div class="sf-b a"><span>你需要先查询欧元、英镑、日元对美元的汇率，把每个季度换算成美元，再把四个季度相加得到总收入，除以 4 得到平均值……</span></div>
+        <div class="sf-end"><svg class="ic"><use href="#i-user"/></svg>对话结束，剩下的事还得你自己去做</div>
+      </div>
+      <div class="sf-cap cap">示意：模型给出了方法，却没有动手</div>
+    </div></div>
+    <div class="sf-arrow fx fx-scale" style="--d:5"><svg class="ic"><use href="#i-arrow"/></svg></div>
+    <div class="sf-new fx fx-right" style="--d:4"><div class="sf-pan panel">
+      <div class="sf-h"><svg class="ic"><use href="#i-robot"/></svg><b>自主的智能系统</b><span class="chip acc">循环直到完成</span></div>
+      <div class="sf-in">
+        <div class="sf-ring"></div>
+        <ol class="sf-log"></ol>
+      </div>
+    </div></div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:8">AI Agent 正在成为我们与计算机交互的<b>一种全新方式</b></p>
+  <div class="src">第一章 开篇</div>
+</section>
+<style>
+#c1-shift .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.sf-body{display:flex;align-items:stretch;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.sf-old,.sf-new{display:flex}
+.sf-old{width:640px;flex:none}
+.sf-new{flex:1}
+.sf-pan{flex:1;padding:26px 30px;display:flex;flex-direction:column;transition:opacity .6s,filter .6s,border-color .6s,box-shadow .6s}
+#c1-shift[data-mode=old] .sf-new .sf-pan,#c1-shift[data-mode=new] .sf-old .sf-pan{opacity:.35;filter:saturate(.3)}
+#c1-shift[data-mode=new] .sf-new .sf-pan{border-color:color-mix(in srgb,var(--acc) 50%,transparent);box-shadow:0 0 60px -20px color-mix(in srgb,var(--acc) 60%,transparent)}
+.sf-h{display:flex;align-items:center;gap:12px;font-size:26px}
+.sf-h>.ic{font-size:30px;color:var(--acc)}
+.sf-h .chip{margin-left:auto;font-size:16px}
+.sf-chat{margin-top:22px;display:flex;flex-direction:column;gap:16px}
+.sf-b{display:flex}
+.sf-b span{max-width:500px;padding:14px 18px;border-radius:16px;font-size:20px;line-height:1.65}
+.sf-b.u{justify-content:flex-end}
+.sf-b.u span{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.32);border-top-right-radius:4px}
+.sf-b.a span{background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.26);border-top-left-radius:4px}
+.sf-b,.sf-end{opacity:0;transform:translateY(14px);transition:all .6s var(--ease)}
+.sf-b.on,.sf-end.on{opacity:1;transform:none}
+.sf-end{align-self:center;display:flex;align-items:center;gap:10px;padding:10px 18px;border-radius:999px;font-size:18px;color:var(--text3);border:1px dashed var(--line2)}
+.sf-cap{margin-top:auto}
+.sf-arrow{align-self:center;font-size:44px;color:var(--acc)}
+.sf-in{flex:1;display:flex;align-items:center;gap:20px;min-height:0}
+.sf-ring{width:470px;height:470px;flex:none}
+.sf-ring .lpc1{fill:var(--text);font-size:30px;font-weight:800;text-anchor:middle}
+.sf-ring .lpc2{fill:var(--text3);font-size:17px;letter-spacing:.2em;text-anchor:middle}
+.sf-log{flex:1;display:flex;flex-direction:column;gap:12px}
+.sf-log li{--c:var(--acc);display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:14px;font-size:18px;line-height:1.5;background:color-mix(in srgb,var(--c) 8%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 30%,transparent);animation:upIn .55s var(--spring) both}
+.sf-log li em{flex:none;font-style:normal;font:700 14px/1.9 var(--mono);color:var(--c)}
+</style>
+<script>
+HOOKS['c1-shift'] = {
+  L: [
+    ['规划', '#a78bfa', '先把非美元的三个季度换算成美元，再汇总'],
+    ['调用工具', '#fbbf24', 'convert_currency × 3（EUR / GBP / JPY → USD）'],
+    ['看结果', '#22d3ee', '拿到三个换算结果 → 调用代码解释器汇总'],
+    ['完成', '#34d399', '年度总收入 $9,602,895.73 · 季度均值 $2,400,723.93'],
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.sf-seg'), (v) => this.mode(s, v));
+    this.svg = U.ring(s.querySelector('.sf-ring'), {
+      size: 470, labelSize: 21, cometDur: 6,
+      nodes: [{ label: '规划', color: '#a78bfa' }, { label: '调用工具', color: '#fbbf24' }, { label: '看结果再调整', color: '#22d3ee' }],
+      center: (c) => `<text class="lpc1" x="${c}" y="${c - 4}">循环</text><text class="lpc2" x="${c}" y="${c + 30}">直到完成</text>`,
+    });
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    s.dataset.mode = m;
+    this.set(m);
+    const old = [...s.querySelectorAll('.sf-b,.sf-end')], log = s.querySelector('.sf-log');
+    const nodes = [...this.svg.querySelectorAll('.node,.lab')];
+    old.forEach((e) => e.classList.remove('on'));
+    log.innerHTML = '';
+    nodes.forEach((n) => n.classList.remove('on', 'dim'));
+    if (!ctx) return;
+    if (m === 'old') {
+      old.forEach((e, i) => ctx.later(() => tk === this.tk && e.classList.add('on'), 300 + i * 1100));
+      return;
+    }
+    // 右侧：循环节点依次点亮，执行记录逐条追加，结束后重来
+    const run = () => {
+      if (tk !== this.tk) return;
+      log.innerHTML = '';
+      this.L.forEach(([t, c, d], i) => ctx.later(() => {
+        if (tk !== this.tk) return;
+        const n = i === 3 ? -1 : i;
+        nodes.forEach((x) => { const on = +x.dataset.i === n; x.classList.toggle('on', on); x.classList.toggle('dim', n >= 0 && !on); });
+        log.insertAdjacentHTML('beforeend', `<li style="--c:${c}"><em>${t}</em><span>${d}</span></li>`);
+      }, 300 + i * 1500));
+      ctx.later(run, 300 + this.L.length * 1500 + 2400);
+    };
+    run();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 'new' : 'old'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'new' : 'old'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.mode = ''; s.querySelector('.sf-log').innerHTML = ''; s.querySelectorAll('.sf-b,.sf-end').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c1-map" data-part="0" data-title="本章是全书的概念地图" data-notes="本章是全书的概念地图——它会快速引入 Agent 的<b>核心公式、运行循环、工程框架和设计模式</b>，为后续章节提供统一的术语和参照坐标。初次阅读时不必逐一记住所有概念，建议先建立整体印象；后续每一章都会展开讲解本章提到的某一个方面，届时可随时回来对照。<br>四站下面的小标签都可以点击，直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章是全书的<em>概念地图</em></h2>
+  <p class="lead fx fx-up" style="--d:2">四个坐标，为后续章节提供统一的术语和参照</p></header>
+  <div class="mp-stage">
+    <svg class="mp-svg" viewBox="0 0 1660 560" width="1660" height="560">
+      <defs><linearGradient id="mpg" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset=".35" stop-color="#34d399"/><stop offset=".7" stop-color="#60a5fa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+      <path id="mpp" class="mp-route" d="M120 150 C 330 40, 470 260, 640 150 S 960 40, 1080 150 S 1400 260, 1540 150"/>
+      <path class="mp-flow" d="M120 150 C 330 40, 470 260, 640 150 S 960 40, 1080 150 S 1400 260, 1540 150"/>
+      <circle class="mp-comet" r="9"><animateMotion dur="7s" repeatCount="indefinite"><mpath href="#mpp"/></animateMotion></circle>
+    </svg>
+    <div class="mp-st"></div>
+  </div>
+  <blockquote class="quote fx fx-up" style="--d:9">初次阅读时不必逐一记住所有概念，建议先建立整体印象；后续每一章都会展开讲解本章提到的某一个方面，届时可随时回来对照。</blockquote>
+  <div class="src">第一章 ·「阅读提示」</div>
+</section>
+<style>
+.mp-stage{position:relative;height:560px;margin-top:-10px}
+.mp-svg{position:absolute;inset:0;overflow:visible}
+.mp-route{fill:none;stroke:url(#mpg);stroke-width:4;stroke-linecap:round;opacity:.5;stroke-dasharray:2200;stroke-dashoffset:2200}
+.active .mp-route{animation:arcDraw 2.4s var(--ease) .3s forwards}
+.mp-flow{fill:none;stroke:#fff;stroke-width:2;stroke-dasharray:2 18;opacity:0;animation:flow 1.2s linear infinite}
+.active .mp-flow{opacity:.45;transition:opacity 1s 2.4s}
+.mp-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff);opacity:0}
+.active .mp-comet{opacity:1;transition:opacity 1s 2.6s}
+.mp-s{--c:var(--acc);position:absolute;top:150px;width:330px;margin-left:-165px;text-align:center}
+.mp-dot{position:relative;width:100px;height:100px;margin:-50px auto 0;border-radius:50%;display:grid;place-items:center;font:800 40px var(--num);color:var(--c);background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid var(--c);box-shadow:0 0 0 8px color-mix(in srgb,var(--c) 12%,transparent),0 0 50px color-mix(in srgb,var(--c) 45%,transparent);transform:scale(0)}
+.active .mp-dot{animation:pop .6s var(--spring) forwards;animation-delay:calc(var(--i)*380ms + 600ms)}
+.mp-s b{display:block;margin-top:26px;font-size:34px;color:var(--c)}
+.mp-s .mp-sub{display:block;margin-top:8px;font-size:20px;color:var(--text2);font-family:var(--num)}
+.mp-chips{margin-top:20px;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.mp-chips button{padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .25s}
+.mp-chips button:hover{color:#06101f;background:var(--c);border-color:var(--c)}
+.mp-txt{opacity:0;transform:translateY(16px);transition:opacity .8s var(--ease),transform .8s var(--ease);transition-delay:calc(var(--i)*380ms + 900ms)}
+.active .mp-txt{opacity:1;transform:none}
+#c1-map .quote{max-width:1320px;font-size:26px}
+</style>
+<script>
+HOOKS['c1-map'] = {
+  S: [
+    { x: 120, c: '#a78bfa', b: '核心公式', sub: 'Agent = LLM + 上下文 + 工具', p: [[1, '核心公式'], [2, '观察与动作空间'], [3, '工具'], [4, '大脑'], [5, '眼睛']] },
+    { x: 640, c: '#34d399', b: '运行循环', sub: 'ReAct：想 → 做 → 看', p: [[6, 'ReAct 循环']] },
+    { x: 1080, c: '#60a5fa', b: '工程框架', sub: 'Harness：约束 · 验证 · 纠正', p: [[7, 'Harness 工程'], [8, '编排模式'], [9, '护栏与安全']] },
+    { x: 1540, c: '#22d3ee', b: '设计模式', sub: '贯穿全书的五个模式', p: [[10, '设计模式与小结']] },
+  ],
+  init(s) {
+    s.querySelector('.mp-st').innerHTML = this.S.map((t, i) => `
+      <div class="mp-s" style="left:${t.x}px;--c:${t.c};--i:${i}">
+        <div class="mp-dot">${i + 1}</div>
+        <div class="mp-txt"><b>${t.b}</b><span class="mp-sub">${t.sub}</span>
+        <div class="mp-chips">${t.p.map(([p, n]) => `<button data-p="${p}">${n}</button>`).join('')}</div></div>
+      </div>`).join('');
+    s.querySelector('.mp-st').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-p]');
+      if (!b) return;
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +b.dataset.p);
+      if (idx >= 0) DECK.go(idx, 0);
+    });
+  },
+};
+</script>

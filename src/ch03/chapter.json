@@ -1,0 +1,18 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#2dd4bf", "acc2": "#60a5fa" },
+    { "n": "记忆的评估与层次", "k": "PART 01", "short": "评估", "acc": "#2dd4bf", "acc2": "#a78bfa" },
+    { "n": "记忆的表示", "k": "PART 02", "short": "表示", "acc": "#34d399", "acc2": "#22d3ee" },
+    { "n": "记忆框架与治理", "k": "PART 03", "short": "框架", "acc": "#22d3ee", "acc2": "#818cf8" },
+    { "n": "RAG 与稠密嵌入", "k": "PART 04", "short": "稠密", "acc": "#38bdf8", "acc2": "#2dd4bf" },
+    { "n": "稀疏与混合检索", "k": "PART 05", "short": "混合", "acc": "#60a5fa", "acc2": "#a78bfa" },
+    { "n": "结构化索引", "k": "PART 06", "short": "索引", "acc": "#a78bfa", "acc2": "#2dd4bf" },
+    { "n": "文件系统与知识更新", "k": "PART 07", "short": "更新", "acc": "#fbbf24", "acc2": "#34d399" },
+    { "n": "智能体化 RAG", "k": "PART 08", "short": "智能体化", "acc": "#c084fc", "acc2": "#22d3ee" },
+    { "n": "上下文感知检索", "k": "PART 09", "short": "上下文", "acc": "#2dd4bf", "acc2": "#fbbf24" },
+    { "n": "知识发现与多模态", "k": "PART 10", "short": "前沿", "acc": "#f472b6", "acc2": "#a78bfa" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#2dd4bf", "acc2": "#60a5fa" }
+  ]
+}

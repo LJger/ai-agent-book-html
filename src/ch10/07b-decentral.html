@@ -1,0 +1,532 @@
+<!-- ================= PART 07（续）去中心化：消息池、群聊与 Swarm、handoff 协议、Agent Swarm、A2A ================= -->
+<section class="slide" id="c10-pool" data-part="7" data-trans="zoom" data-dur="16000" data-title="共享消息池 + 按角色订阅" data-notes="MetaGPT 真正对去中心化通信的贡献，在于它的信息传递机制：<b>共享消息池 + 按角色订阅</b>。每个角色把结构化消息发布到一个所有角色可见的消息池中，其他角色根据自己的订阅配置，只取用与自身职责相关的消息——而不是点对点地一对一传话。发布者不需要知道谁会消费自己的输出，新增角色只需声明订阅哪些消息类型，无需改动任何现有角色。这带来了真正的解耦：比如把 Product Manager 换成更强的模型，只要它发布的 PRD 仍然符合规范，其他所有 Agent 都无需修改。<br>需要如实说明的是，MetaGPT 在<b>控制流</b>上并不是去中心化的——角色顺序由 SOP 预先固定，整体更接近一条流水线（用第一章的语言说是工作流）。它被放在本节讨论，是因为消息池加订阅的通信机制展示了去中心化系统最关键的设计要素：解耦。至于“QA 直接找 Product Manager 澄清需求”“Engineer 找 Architect 讨论替代方案”这类多向动态反馈，是对这一架构的自然扩展设想，原版 MetaGPT 并未实现。<br>演示中各角色依次发布消息，订阅了该类型的角色取走消息（订阅关系为示意）；之后会演示“换更强模型的 PM”和“新增一个角色”，其他角色都不需要改动。虚线箭头是原版没有实现的扩展设想。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">MetaGPT 的真正贡献：<em>共享消息池 + 按角色订阅</em></h2></header>
+  <div class="po-body">
+    <div class="po-st fx fx-scale" style="--d:2">
+      <svg class="po-svg" viewBox="0 0 1060 600" width="1060" height="600"></svg>
+      <div class="po-pool"><b>共享消息池</b><small>所有角色可见</small><div class="po-msgs"></div></div>
+      <div class="po-roles"></div>
+      <div class="po-ev"></div>
+      <span class="k10-sim po-sim">示意</span>
+    </div>
+    <div class="po-r fx fx-right" style="--d:3">
+      <div class="po-c ok"><b>解耦</b><p>发布者不需要知道谁会消费自己的输出；新增角色只需<b>声明订阅哪些消息类型</b>，无需改动任何现有角色</p></div>
+      <div class="po-c ok"><b>换更强模型的 PM</b><p>只要它发布的 PRD <b>仍然符合规范</b>，其他所有 Agent 都无需修改</p></div>
+      <div class="po-c warn"><b>需要如实说明：控制流</b><p>角色顺序由 SOP 预先固定，整体更接近一条<b>流水线（工作流）</b>；它被放在这里，是因为通信机制展示了去中心化最关键的要素——解耦</p></div>
+      <div class="po-c dash"><b>扩展设想（原版未实现）</b><p>QA 直接找 Product Manager 澄清需求；Engineer 找 Architect 讨论替代方案</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「去中心化模式」· MetaGPT</div>
+</section>
+<style>
+#c10-pool .po-body{display:grid;grid-template-columns:1060px 1fr;gap:24px;height:640px}
+#c10-pool .po-st{position:relative;height:600px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-pool .po-svg{position:absolute;inset:0;overflow:visible}
+#c10-pool .po-pool{position:absolute;left:360px;top:200px;width:340px;height:200px;padding:14px;border-radius:24px;text-align:center;border:2px dashed color-mix(in srgb,var(--warn) 60%,transparent);background:color-mix(in srgb,var(--warn) 6%,rgba(10,16,36,.9))}
+#c10-pool .po-pool>b{display:block;font-size:22px;color:var(--warn)}
+#c10-pool .po-pool>small{font-size:15px;color:var(--text3)}
+#c10-pool .po-msgs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:10px}
+#c10-pool .po-m{padding:4px 10px;border-radius:8px;font:15px var(--mono);color:#fde68a;border:1px solid color-mix(in srgb,var(--warn) 50%,transparent);background:rgba(10,16,36,.9);animation:pop .4s var(--spring) both;transform:scale(.6)}
+#c10-pool .po-m.taken{opacity:.45}
+#c10-pool .po-r1{position:absolute;width:210px;padding:10px 12px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 50%,transparent);background:rgba(10,16,36,.95);transition:box-shadow .3s,border-color .3s,opacity .5s}
+#c10-pool .po-r1 b{display:block;font-size:18px;color:var(--c)}
+#c10-pool .po-r1 small{display:block;font-size:15px;color:var(--text3)}
+#c10-pool .po-r1 em{display:block;margin-top:4px;font-style:normal;font:15px var(--mono);color:var(--text2)}
+#c10-pool .po-r1 i{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:6px;font-style:normal;font-size:15px;color:#06101f;background:var(--c);opacity:0;transition:opacity .4s}
+#c10-pool .po-r1.up i{opacity:1}
+#c10-pool .po-r1.pub{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 50%,transparent)}
+#c10-pool .po-r1.sub{border-color:var(--ok);box-shadow:0 0 22px color-mix(in srgb,var(--ok) 45%,transparent)}
+#c10-pool .po-r1.new{opacity:0}
+#c10-pool .po-r1.new.show{opacity:1}
+#c10-pool .po-ev{position:absolute;left:0;right:0;bottom:14px;text-align:center;font-size:18px;color:var(--text)}
+#c10-pool .po-ev b{color:var(--acc)}
+#c10-pool .po-sim{position:absolute;right:14px;top:12px}
+#c10-pool .po-r{display:flex;flex-direction:column;gap:12px}
+#c10-pool .po-c{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-pool .po-c b{font-size:18px}
+#c10-pool .po-c p{margin-top:4px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c10-pool .po-c p b{font-size:inherit;color:var(--text)}
+#c10-pool .po-c.ok>b{color:var(--ok)}
+#c10-pool .po-c.warn{border-color:color-mix(in srgb,var(--warn) 50%,transparent);background:color-mix(in srgb,var(--warn) 6%,transparent)}
+#c10-pool .po-c.warn>b{color:var(--warn)}
+#c10-pool .po-c.dash{border-style:dashed}
+#c10-pool .po-c.dash>b{color:var(--text3)}
+</style>
+<script>
+HOOKS['c10-pool'] = {
+  // [角色, 发布, 订阅, x, y, 颜色]
+  R: [['Product Manager', 'PRD', '需求描述', 70, 40, '#f472b6'], ['Architect', 'Design', 'PRD', 425, 30, '#a78bfa'], ['Project Manager', 'Tasks', 'Design', 780, 40, '#60a5fa'], ['Engineer', 'Code', 'Tasks · Design', 780, 440, '#fbbf24'], ['QA Engineer', 'TestReport', 'Code · PRD', 425, 470, '#34d399'], ['新增：Doc Writer', 'Docs', 'Design · Code', 70, 440, '#2dd4bf']],
+  init(s) {
+    s.querySelector('.po-roles').innerHTML = this.R.map(([n, p, sub, x, y, c], i) => `<div class="po-r1${i === 5 ? ' new' : ''}" style="left:${x}px;top:${y}px;--c:${c}"><b>${n}</b><small>发布 ${p}</small><em>订阅：${sub}</em>${i === 0 ? '<i>更强的模型</i>' : ''}</div>`).join('');
+    this.rs = [...s.querySelectorAll('.po-r1')];
+    this.msgs = s.querySelector('.po-msgs');
+    this.ev = s.querySelector('.po-ev');
+    // 扩展设想：虚线（原版未实现）
+    s.querySelector('.po-svg').innerHTML = '<path d="M530 470 C 300 400, 200 250, 175 120" fill="none" stroke="rgba(148,163,184,.5)" stroke-width="2.5" stroke-dasharray="8 8"/><text x="230" y="330" fill="#94a3b8" font-size="15">QA ↔ PM（设想）</text><path d="M885 440 C 760 300, 640 160, 600 100" fill="none" stroke="rgba(148,163,184,.5)" stroke-width="2.5" stroke-dasharray="8 8"/><text x="740" y="300" fill="#94a3b8" font-size="15">Engineer ↔ Architect（设想）</text>';
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    let round = 0;
+    while (ok()) {
+      this.msgs.innerHTML = '';
+      const extra = round % 3 === 2, strong = round % 3 === 1;
+      this.rs[0].classList.toggle('up', strong);
+      this.rs[5].classList.toggle('show', extra);
+      const order = extra ? [0, 1, 2, 3, 5, 4] : [0, 1, 2, 3, 4];
+      for (const i of order) {
+        const [n, p] = this.R[i];
+        this.rs.forEach((r) => r.classList.remove('pub', 'sub'));
+        this.rs[i].classList.add('pub');
+        this.msgs.insertAdjacentHTML('beforeend', `<span class="po-m">${p}</span>`);
+        this.ev.innerHTML = `<b>${n}</b> 把 <b>${p}</b> 发布到消息池——不需要知道谁会消费` + (i === 0 && strong ? '（换了更强的模型，PRD 仍符合规范）' : '') + (i === 5 ? '（新增角色只声明了订阅，其他角色无需改动）' : '');
+        await w(900); if (!ok()) return;
+        const subs = this.R.map((r, j) => (j !== i && r[2].includes(p) && (j !== 5 || extra) ? j : -1)).filter((j) => j >= 0);
+        subs.forEach((j) => this.rs[j].classList.add('sub'));
+        if (subs.length) this.ev.innerHTML = `订阅了 <b>${p}</b> 的 ${subs.map((j) => this.R[j][0]).join('、')} 取走消息`;
+        await w(1000); if (!ok()) return;
+      }
+      this.rs.forEach((r) => r.classList.remove('pub', 'sub'));
+      this.ev.innerHTML = strong ? '换了更强模型的 PM：<b>下游角色一行都没改</b>' : extra ? '新增角色：<b>没有改动任何现有角色</b>' : '控制流仍由 SOP 固定：<b>PM → Architect → PjM → Engineer → QA</b>';
+      await w(2200); if (!ok()) return;
+      round++;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.msgs.innerHTML = ''; this.rs.forEach((r) => r.classList.remove('pub', 'sub', 'up', 'show')); },
+};
+</script>
+
+<section class="slide" id="c10-groupchat" data-part="7" data-trans="flip" data-dur="16000" data-title="AutoGen 群聊与 OpenAI Swarm" data-notes="<b>AutoGen 群聊。</b>AutoGen 的群聊（group chat）让多个 Agent 参与同一场会话：每轮由一个“发言者选择器”决定下一个发言的 Agent。选择器可以是简单的轮转规则，也可以是一个 LLM 根据当前对话内容判断谁最适合接话；任何 Agent 的发言对所有参与者可见。它并不是完全去中心化的系统：发言者的选择由一个中心化的 GroupChatManager 统一裁决，而“轮到谁发言”本身就是一种控制流决策。它是“共享对话记录 + 中心化调度”的混合形态，所有 Agent 看到同一份公共对话记录，但各自保有独立的系统提示词和工具集，而调度权集中在选择器手里。<br><b>OpenAI Swarm。</b>OpenAI Swarm 是控制流真正实现对等去中心化的代表：每个 Agent 配备若干 handoff（移交）选项，可以在任何时刻把控制权移交给网络中的任意其他 Agent。系统中没有中心调度者，控制权像接力棒一样在对等的 Agent 之间流转，路由决策完全分散在每个 Agent 自己的判断里。与共享上下文的多 Agent 协作不同，handoff 只应传递明确的任务包和产物引用，不应默认暴露完整私有轨迹。对等移交的风险则是成环：A 移交给 B，B 又移交回 A，任务在环路中空转，因此需要移交次数上限之类的保护机制。<br>右上角切换两种形态；群聊里可以切换选择器（轮转 / LLM）。对话内容为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">AutoGen 群聊 与 OpenAI Swarm：<em>调度权在哪里</em></h2></div>
+    <div class="seg gc-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">AutoGen 群聊</button><button data-v="1">OpenAI Swarm</button></div></header>
+  <div class="gc-st fx fx-scale" style="--d:3">
+    <div class="gc-v v0">
+      <div class="gc-sel"><b>GroupChatManager · 发言者选择器</b><div class="seg gc-sel2"><i class="knob"></i><button data-v="rr">轮转规则</button><button data-v="llm">LLM 判断</button></div><span class="gc-pick">—</span></div>
+      <div class="gc-ags"></div>
+      <div class="gc-log"><span class="lbl">公共对话记录 · 所有参与者可见</span><div class="gc-lines"></div></div>
+      <p class="gc-k">“共享对话记录 + 中心化调度”的混合形态：<b>轮到谁发言，本身就是控制流决策</b></p>
+    </div>
+    <div class="gc-v v1">
+      <svg class="gc-svg" viewBox="0 0 1000 480" width="1000" height="480"></svg>
+      <div class="gc-pk"><span class="lbl">接力棒里只有</span><b>任务包 + 产物引用</b><small>不默认暴露完整私有轨迹</small><div class="gc-cnt">移交次数 <b class="gc-n">0</b> / 上限 6</div></div>
+      <p class="gc-k2">没有中心调度者，路由决策完全分散在每个 Agent 自己的判断里；风险是<b>成环</b>：A → B → A，需要移交次数上限</p>
+    </div>
+    <span class="k10-sim gc-sim">示意</span>
+  </div>
+  <div class="src">第十章 ·「去中心化模式」· AutoGen 群聊 · OpenAI Swarm</div>
+</section>
+<style>
+#c10-groupchat .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-groupchat .gc-seg button{font-size:19px;padding:9px 22px}
+#c10-groupchat .gc-st{position:relative;height:680px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-groupchat .gc-sim{position:absolute;right:14px;top:12px}
+#c10-groupchat .gc-v{position:absolute;inset:0;padding:24px 30px;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+#c10-groupchat[data-v="0"] .v0,#c10-groupchat[data-v="1"] .v1{opacity:1;visibility:visible}
+#c10-groupchat .gc-sel{display:flex;align-items:center;gap:18px;padding:12px 20px;border-radius:16px;border:2px solid var(--acc);background:rgba(10,16,36,.95);width:max-content;margin:0 auto}
+#c10-groupchat .gc-sel b{font-size:20px;color:var(--acc)}
+#c10-groupchat .gc-sel2 button{font-size:16px;padding:6px 14px}
+#c10-groupchat .gc-pick{font-size:17px;color:var(--text);min-width:260px}
+#c10-groupchat .gc-ags{display:flex;justify-content:center;gap:60px;margin:22px 0}
+#c10-groupchat .gc-ags .k10-ag{width:170px}
+#c10-groupchat .gc-log{width:1100px;margin:0 auto;padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);height:250px;overflow:hidden}
+#c10-groupchat .gc-lines{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#c10-groupchat .gc-l{font-size:17px;line-height:1.5;animation:upIn .35s var(--ease) both}
+#c10-groupchat .gc-l b{color:var(--c);margin-right:8px}
+#c10-groupchat .gc-k,#c10-groupchat .gc-k2{position:absolute;left:30px;right:30px;bottom:22px;text-align:center;font-size:20px;color:var(--text2)}
+#c10-groupchat .gc-k b,#c10-groupchat .gc-k2 b{color:var(--warn)}
+#c10-groupchat .gc-svg{position:absolute;left:40px;top:40px;overflow:visible}
+#c10-groupchat .gc-pk{position:absolute;right:40px;top:80px;width:300px;padding:16px 20px;border-radius:18px;display:flex;flex-direction:column;gap:6px;border:1px solid color-mix(in srgb,var(--warn) 50%,transparent);background:color-mix(in srgb,var(--warn) 6%,rgba(10,16,36,.9))}
+#c10-groupchat .gc-pk b{font-size:21px;color:var(--warn)}
+#c10-groupchat .gc-pk small{font-size:15px;color:var(--text2)}
+#c10-groupchat .gc-cnt{margin-top:10px;font-size:17px;color:var(--text2)}
+#c10-groupchat .gc-cnt b{font:800 30px var(--num);color:var(--text)}
+#c10-groupchat .gc-cnt.bad b{color:var(--bad)}
+#c10-groupchat .gc-nd circle{fill:#0a1024;stroke:var(--c);stroke-width:3;transition:fill .3s}
+#c10-groupchat .gc-nd.on circle{fill:color-mix(in srgb,var(--c) 35%,#0a1024)}
+#c10-groupchat .gc-nd text{fill:var(--text);font-size:19px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+#c10-groupchat .gc-ed{stroke:rgba(255,255,255,.15);stroke-width:2;fill:none}
+#c10-groupchat .gc-ed.on{stroke:var(--warn);stroke-width:4}
+#c10-groupchat .gc-ed.bad{stroke:var(--bad);stroke-width:4;stroke-dasharray:8 6}
+</style>
+<script>
+HOOKS['c10-groupchat'] = {
+  A: [['Planner', '#a78bfa'], ['Coder', '#fbbf24'], ['Critic', '#fb7185'], ['Tester', '#34d399']],
+  SAY: ['先拆三步：读数据、画图、写结论', '第一步代码写好了', '图的坐标轴单位不对', '修正后测试通过', '结论要引用图 2', '已补上引用'],
+  N: [['分诊', 120, 240, '#a78bfa'], ['退款', 380, 80, '#fbbf24'], ['技术支持', 380, 400, '#22d3ee'], ['账单', 640, 240, '#34d399']],
+  E: [[0, 1], [0, 2], [1, 3], [2, 3], [1, 2], [0, 3]],
+  init(s) {
+    this.set = U.seg(s.querySelector('.gc-seg'), (v) => { this.auto = false; this.view(s, +v); });
+    this.set2 = U.seg(s.querySelector('.gc-sel2'), (v) => { this.auto = false; this.sel = v; this.set2(v); });
+    s.querySelector('.gc-ags').innerHTML = this.A.map(([n, c]) => `<div class="k10-ag" style="--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>${n}</b><small>独立系统提示词 · 工具集</small></div>`).join('');
+    this.ags = [...s.querySelectorAll('.gc-ags .k10-ag')];
+    let h = this.E.map(([a, b], i) => `<path class="gc-ed" data-e="${i}" d="M${this.N[a][1]} ${this.N[a][2]} L${this.N[b][1]} ${this.N[b][2]}"/>`).join('');
+    h += this.N.map(([n, x, y, c], i) => `<g class="gc-nd" data-n="${i}" style="--c:${c}"><circle cx="${x}" cy="${y}" r="58"/><text x="${x}" y="${y}">${n}</text></g>`).join('');
+    h += '<circle class="gc-bt" r="14" fill="#fbbf24" style="filter:drop-shadow(0 0 10px #fbbf24)"/>';
+    s.querySelector('.gc-svg').innerHTML = h;
+    this.bt = s.querySelector('.gc-bt');
+    this.nds = [...s.querySelectorAll('.gc-nd')];
+    this.eds = [...s.querySelectorAll('.gc-ed')];
+  },
+  view(s, v) { this.v = v; s.dataset.v = v; this.set(String(v)); this.run(s); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    if (this.v === 0) {
+      const lines = s.querySelector('.gc-lines'), pick = s.querySelector('.gc-pick');
+      lines.innerHTML = '';
+      const llm = [0, 1, 2, 1, 0, 1];
+      for (let i = 0; ok(); i++) {
+        const k = i % 6, who = this.sel === 'llm' ? llm[k] : i % 4;
+        pick.textContent = this.sel === 'llm' ? `LLM 判断：${this.A[who][0]} 最适合接话` : `轮转：下一位 ${this.A[who][0]}`;
+        this.ags.forEach((a, j) => { a.classList.toggle('on', j === who); a.classList.toggle('dim', j !== who); });
+        await w(700); if (!ok()) return;
+        lines.insertAdjacentHTML('beforeend', `<div class="gc-l" style="--c:${this.A[who][1]}"><b>${this.A[who][0]}</b>${this.SAY[k]}</div>`);
+        while (lines.children.length > 7) lines.firstElementChild.remove();
+        await w(1100); if (!ok()) return;
+        if (k === 5 && this.auto) { this.view(s, 1); return; }
+      }
+    } else {
+      const n = s.querySelector('.gc-n'), cnt = s.querySelector('.gc-cnt');
+      const path = [0, 1, 2, 1, 2, 1, 2];
+      this.eds.forEach((e) => e.classList.remove('on', 'bad'));
+      let c = 0; n.textContent = 0; cnt.classList.remove('bad');
+      this.bt.setAttribute('cx', this.N[0][1]); this.bt.setAttribute('cy', this.N[0][2]);
+      this.nds.forEach((d, j) => d.classList.toggle('on', j === 0));
+      await w(800); if (!ok()) return;
+      for (let i = 1; i < path.length; i++) {
+        const a = path[i - 1], b = path[i], ei = this.E.findIndex(([x, y]) => (x === a && y === b) || (x === b && y === a));
+        this.eds.forEach((e) => e.classList.remove('on'));
+        this.eds[ei].classList.add(i >= 3 ? 'bad' : 'on');
+        const [, x0, y0] = this.N[a], [, x1, y1] = this.N[b], t0 = performance.now();
+        await new Promise((res) => ctx.raf(() => { if (!ok()) { res(); return false; } const u = Math.min(1, (performance.now() - t0) / 700); this.bt.setAttribute('cx', x0 + (x1 - x0) * u); this.bt.setAttribute('cy', y0 + (y1 - y0) * u); if (u >= 1) { res(); return false; } }));
+        if (!ok()) return;
+        this.nds.forEach((d, j) => d.classList.toggle('on', j === b));
+        n.textContent = ++c;
+        if (c >= 6) { cnt.classList.add('bad'); cnt.innerHTML = `移交次数 <b class="gc-n">${c}</b> / 上限 6 · 退款 ⇄ 技术支持成环，触发上限保护`; break; }
+        await w(500); if (!ok()) return;
+      }
+      await w(2400); if (!ok()) return;
+      cnt.innerHTML = '移交次数 <b class="gc-n">0</b> / 上限 6';
+      if (this.auto) this.view(s, 0); else this.run(s);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.sel = 'rr'; this.set2('rr'); this.view(s, 0); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.v = 0; this.ags.forEach((a) => a.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c10-handoff" data-part="7" data-trans="rise" data-dur="16000" data-title="去中心化 handoff 的最小协议" data-notes="去中心化 handoff 的最小协议可以表示为：handoff 记录包含 task_id、sender、recipient、goal、constraints、accepted_facts、artifact_refs、remaining_budget、visited_agents；如果接收者已经在 visited_agents 里，就以 cycle 拒绝；如果剩余预算耗尽，就停止并上报（stop_and_escalate）；否则把接收者追加到访问链，再运行本地 Agent。<br>它把<b>“上下文隔离”变成可检查的接口</b>：接收者读任务包和引用，按需取证；<b>预算、访问链和循环检测由运行时保留，不能由任一 Agent 自行删除。</b><br>演示中任务包在 A → B → C 之间移交，visited_agents 增长、remaining_budget 递减；第一轮 C 想把任务交回 A，被以 cycle 拒绝；第二轮预算较少，在中途耗尽，触发 stop_and_escalate。Agent 名称与预算数值为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">去中心化 handoff 的最小协议：<em>把上下文隔离变成可检查的接口</em></h2></header>
+  <div class="ho-body">
+    <div class="ho-l fx fx-left" style="--d:2"><div class="win"><div class="win-bar"><i></i><i></i><i></i><span>handoff 协议</span></div><div class="code ho-cd"></div></div></div>
+    <div class="ho-r fx fx-right" style="--d:3">
+      <div class="ho-chain"></div>
+      <div class="ho-pk panel"><span class="lbl">任务包 handoff <span class="k10-sim">示意</span></span><div class="ho-fs"></div></div>
+      <div class="ho-msg"></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「去中心化模式」· OpenAI Swarm · handoff 协议</div>
+</section>
+<style>
+#c10-handoff .ho-body{display:grid;grid-template-columns:720px 1fr;gap:26px;height:680px}
+#c10-handoff .ho-cd{font-size:17px;line-height:1.65;padding:14px 20px}
+#c10-handoff .ho-r{display:flex;flex-direction:column;gap:16px}
+#c10-handoff .ho-chain{display:flex;align-items:center;justify-content:center;gap:16px;height:120px}
+#c10-handoff .ho-chain .k10-ag{width:130px}
+#c10-handoff .ho-chain i{width:60px;height:3px;background:var(--line2);position:relative}
+#c10-handoff .ho-chain i.on{background:var(--warn)}
+#c10-handoff .ho-chain i.bad{background:var(--bad)}
+#c10-handoff .ho-pk{padding:14px 18px}
+#c10-handoff .ho-fs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+#c10-handoff .ho-f{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .3s,background .3s}
+#c10-handoff .ho-f code{font:15px var(--mono);color:var(--text3)}
+#c10-handoff .ho-f span{font-size:16px;color:var(--text)}
+#c10-handoff .ho-f.rt{border-color:color-mix(in srgb,var(--har) 55%,transparent)}
+#c10-handoff .ho-f.rt code::after{content:"  运行时保留 · 不可删除";color:var(--har)}
+#c10-handoff .ho-f.ch{background:color-mix(in srgb,var(--warn) 12%,transparent);border-color:var(--warn)}
+#c10-handoff .ho-msg{padding:14px 18px;border-radius:14px;font-size:19px;line-height:1.55;border:1px solid var(--line);background:rgba(12,18,40,.75);min-height:90px}
+#c10-handoff .ho-msg b{color:var(--acc)}
+#c10-handoff .ho-msg.bad{border-color:var(--bad);background:rgba(251,113,133,.08)}
+#c10-handoff .ho-msg.bad b{color:var(--bad)}
+</style>
+<script>
+HOOKS['c10-handoff'] = {
+  CODE: [
+    'handoff = {',
+    '    task_id, sender, recipient, goal, constraints,',
+    '    accepted_facts, artifact_refs, remaining_budget,',
+    '    visited_agents',
+    '}',
+    '',
+    '<span class="t-k">if</span> recipient <span class="t-k">in</span> handoff.visited_agents:',
+    '    reject(<span class="t-s">"cycle"</span>)',
+    '<span class="t-k">elif</span> handoff.remaining_budget &lt;= <span class="t-n">0</span>:',
+    '    stop_and_escalate(handoff)',
+    '<span class="t-k">else</span>:',
+    '    append(recipient, handoff.visited_agents)',
+    '    run_local_agent(handoff)',
+  ],
+  F: ['task_id', 'goal', 'sender', 'recipient', 'accepted_facts', 'artifact_refs', 'remaining_budget', 'visited_agents'],
+  init(s) {
+    s.querySelector('.ho-cd').innerHTML = this.CODE.map((l) => `<span class="ln">${l || '&nbsp;'}</span>`).join('');
+    this.lns = [...s.querySelectorAll('.ho-cd .ln')];
+    s.querySelector('.ho-fs').innerHTML = this.F.map((f) => `<div class="ho-f${f === 'remaining_budget' || f === 'visited_agents' ? ' rt' : ''}" data-f="${f}"><code>${f}</code><span>—</span></div>`).join('');
+    s.querySelector('.ho-chain').innerHTML = ['A', 'B', 'C'].map((n, i) => `<div class="k10-ag" style="--c:${['#a78bfa', '#fbbf24', '#22d3ee'][i]}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent ${n}</b></div>`).join('<i></i>');
+    this.ags = [...s.querySelectorAll('.ho-chain .k10-ag')];
+    this.ars = [...s.querySelectorAll('.ho-chain i')];
+  },
+  f(s, k, v) { const e = s.querySelector(`.ho-f[data-f="${k}"]`); e.querySelector('span').textContent = v; e.classList.add('ch'); this.ctx.later(() => e.classList.remove('ch'), 700); },
+  hl(a) { this.lns.forEach((l, i) => l.classList.toggle('hl', a.includes(i))); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), msg = s.querySelector('.ho-msg');
+    const say = (h, bad) => { msg.innerHTML = h; msg.classList.toggle('bad', !!bad); };
+    for (let round = 0; ok(); round = 1 - round) {
+      let bud = round ? 2 : 5, vis = ['A'];
+      this.ags.forEach((a) => a.classList.remove('on', 'bad', 'ok'));
+      this.ars.forEach((a) => a.classList.remove('on', 'bad'));
+      this.ags[0].classList.add('on');
+      this.f(s, 'task_id', 'T-42'); this.f(s, 'goal', '整理竞品报告'); this.f(s, 'accepted_facts', '预算上限、截稿日期');
+      this.f(s, 'artifact_refs', 'reports/draft.md'); this.f(s, 'remaining_budget', bud); this.f(s, 'visited_agents', vis.join(' → '));
+      this.f(s, 'sender', '—'); this.f(s, 'recipient', '—');
+      this.hl([0, 1, 2, 3, 4]);
+      say('Agent A 发起任务：接收者只读<b>任务包和引用</b>，按需取证，不默认看到 A 的私有轨迹');
+      await w(2000); if (!ok()) return;
+      const steps = round ? ['B', 'C'] : ['B', 'C', 'A'];
+      let from = 'A';
+      for (const to of steps) {
+        this.f(s, 'sender', from); this.f(s, 'recipient', to);
+        const ti = 'ABC'.indexOf(to), fi = 'ABC'.indexOf(from);
+        this.hl([6]); await w(700); if (!ok()) return;
+        if (vis.includes(to)) {
+          this.hl([6, 7]); this.ags[ti].classList.add('bad'); this.ars[1].classList.add('bad');
+          say(`Agent ${from} 想把任务交回 ${to}：${to} 已在 visited_agents 里 → <b>reject("cycle")</b>`, true);
+          await w(2600); break;
+        }
+        this.hl([8]); await w(600); if (!ok()) return;
+        if (bud <= 0) {
+          this.hl([8, 9]); this.ags[fi].classList.add('bad');
+          say('remaining_budget 已耗尽 → <b>stop_and_escalate</b>：停止移交，上报给人或上层', true);
+          await w(2600); break;
+        }
+        this.hl([10, 11, 12]);
+        vis.push(to); bud -= 1;
+        this.f(s, 'visited_agents', vis.join(' → ')); this.f(s, 'remaining_budget', bud);
+        this.ars[Math.min(fi, ti)].classList.add('on');
+        this.ags.forEach((a, j) => a.classList.toggle('on', j === ti));
+        say(`移交给 Agent ${to}：访问链与预算由<b>运行时</b>更新，${to} 不能删除这两项`);
+        await w(1800); if (!ok()) return;
+        from = to;
+      }
+      if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.lns.forEach((l) => l.classList.remove('hl')); },
+};
+</script>
+
+<section class="slide" id="c10-swarm" data-part="7" data-trans="zoom" data-dur="16000" data-title="“Agent Swarm”：同名不同构" data-notes="2025 年以来，“Agent Swarm”（智能体集群）成为各厂商的热门词汇，但它并不对应单一架构。业界用法大致有两类：其一，OpenAI Swarm 式的 handoff 网络（LangGraph 的 swarm 库、微软 Agent Framework 的 handoff 编排同此），是本节的去中心化模式；其二，一些主流商业产品的 Agent Swarm 是规模化的管理者模式：Kimi K2.5 首发的 Agent Swarm 由主 Agent 动态创建上百个子 Agent 并行执行，把“何时拆、拆几个”的编排决策通过并行 Agent 强化学习直接训练进模型，K3 将其延续为独立模型档位并开源了配套的并行 Agent 训练沙箱 AgentEnv（脚注：GTC 2026 上披露并行子 Agent 上限已扩展至 300 个；AgentEnv 为月之暗面与 KVCache.ai 合作开源，随 Kimi K3 于 2026 年 7 月发布）；Anthropic 的多 Agent 研究系统与 Manus 的 Wide Research 同属 orchestrator-worker 星型拓扑。希望读者在阅读本书之后，能够看清概念背后的实质，分析不同多 Agent 系统的实际结构，而不被名称迷惑。<br><b>同一台机器上的多个对等 Agent 实例。</b>以上三个系统的 Agent 都在合作完成同一件事，还有一类去中心化则是各干各的：每个 Agent 有自己的任务，它们之间通信不是为了分工，而是为了协调使用共享资源。Claude Code 已经支持同一台机器上的多个 Agent 互相发现（这正是第四章 list_agents 的用途）并互相发消息：两个 Agent 在修改同一组文件时协商解决冲突，机器上只有一块 GPU 而两个实例都要跑训练时要协调使用 GPU。<br>去中心化模式进一步的演进是 Agent 社会，这将在本章最后介绍。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“Agent Swarm”：<em>同名不同构</em></h2></header>
+  <div class="aw-body">
+    <div class="aw-sort fx fx-up" style="--d:2">
+      <div class="aw-in"><span class="lbl">都叫“Agent Swarm”</span><div class="aw-chip"></div></div>
+      <div class="aw-bins">
+        <div class="aw-bin d"><div class="aw-bh"><svg class="aw-ic" viewBox="0 0 80 50" width="80" height="50"><circle cx="12" cy="25" r="7"/><circle cx="40" cy="8" r="7"/><circle cx="40" cy="42" r="7"/><circle cx="68" cy="25" r="7"/><path d="M12 25L40 8L68 25L40 42Z M40 8V42"/></svg><div><b>handoff 网络</b><small>本节的去中心化模式</small></div></div><div class="aw-list"></div></div>
+        <div class="aw-bin m"><div class="aw-bh"><svg class="aw-ic" viewBox="0 0 80 50" width="80" height="50"><circle cx="40" cy="25" r="9"/><circle cx="8" cy="8" r="5"/><circle cx="72" cy="8" r="5"/><circle cx="8" cy="42" r="5"/><circle cx="72" cy="42" r="5"/><path d="M40 25L8 8M40 25L72 8M40 25L8 42M40 25L72 42"/></svg><div><b>规模化的管理者模式</b><small>orchestrator-worker 星型拓扑</small></div></div><div class="aw-list"></div></div>
+      </div>
+      <p class="aw-k">看清概念背后的实质，<b>分析实际结构，而不被名称迷惑</b></p>
+    </div>
+    <div class="aw-peer fx fx-right" style="--d:3">
+      <span class="lbl">同一台机器上的多个对等 Agent 实例</span>
+      <p>各干各的：通信不是为了分工，而是为了<b>协调使用共享资源</b></p>
+      <div class="aw-pm">
+        <div class="k10-ag aw-a1" style="--c:#a78bfa"><span class="k10-av"><svg class="ic"><use href="#i-term"/></svg></span><b>实例 1</b><small>任务：重构</small></div>
+        <div class="aw-mid"><code>list_agents</code><span class="aw-say">—</span></div>
+        <div class="k10-ag aw-a2" style="--c:#22d3ee"><span class="k10-av"><svg class="ic"><use href="#i-term"/></svg></span><b>实例 2</b><small>任务：训练</small></div>
+      </div>
+      <div class="aw-res"><div class="aw-gpu"><svg class="ic"><use href="#i-gpu"/></svg><b>唯一一块 GPU</b><span class="aw-own">空闲</span></div><div class="aw-file"><svg class="ic"><use href="#i-file"/></svg><b>同一组文件</b><span class="aw-fo">—</span></div></div>
+      <span class="k10-sim">示意</span>
+    </div>
+  </div>
+  <div class="src">第十章 ·「去中心化模式」· Agent Swarm · 同一台机器上的多个对等 Agent 实例</div>
+</section>
+<style>
+#c10-swarm .aw-body{display:grid;grid-template-columns:1080px 1fr;gap:26px;height:680px}
+#c10-swarm .aw-sort{display:flex;flex-direction:column;gap:14px}
+#c10-swarm .aw-in{display:flex;align-items:center;gap:16px;height:60px;padding:0 18px;border-radius:14px;border:1px dashed var(--line2)}
+#c10-swarm .aw-chip{position:relative;flex:1;height:44px}
+#c10-swarm .aw-cp{position:absolute;left:0;top:4px;padding:6px 14px;border-radius:10px;font-size:17px;white-space:nowrap;border:1px solid var(--line2);background:rgba(12,18,40,.95);animation:c10aw-in .5s var(--ease) both}
+@keyframes c10aw-in{from{opacity:0;translate:-30px 0}}
+#c10-swarm .aw-bins{display:grid;grid-template-columns:1fr 1fr;gap:18px;flex:1}
+#c10-swarm .aw-bin{padding:14px 18px;border-radius:18px;border:1.5px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 6%,rgba(12,18,40,.7))}
+#c10-swarm .aw-bin.d{--c:#22d3ee}#c10-swarm .aw-bin.m{--c:#fbbf24}
+#c10-swarm .aw-bh{display:flex;align-items:center;gap:14px}
+#c10-swarm .aw-ic circle{fill:color-mix(in srgb,var(--c) 40%,#0a1024);stroke:var(--c);stroke-width:2}
+#c10-swarm .aw-ic path{fill:none;stroke:var(--c);stroke-width:1.5;opacity:.7}
+#c10-swarm .aw-bh b{display:block;font-size:21px;color:var(--c)}
+#c10-swarm .aw-bh small{font-size:15px;color:var(--text3)}
+#c10-swarm .aw-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+#c10-swarm .aw-it{padding:8px 12px;border-radius:10px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(10,16,36,.9);animation:upIn .45s var(--ease) both}
+#c10-swarm .aw-it b{font-size:17px}
+#c10-swarm .aw-it p{font-size:15px;line-height:1.45;color:var(--text2)}
+#c10-swarm .aw-k{font-size:20px;text-align:center;color:var(--text2)}
+#c10-swarm .aw-k b{color:var(--acc)}
+#c10-swarm .aw-peer{position:relative;padding:16px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:12px}
+#c10-swarm .aw-peer>p{font-size:17px;line-height:1.55;color:var(--text2)}
+#c10-swarm .aw-peer>p b{color:var(--text)}
+#c10-swarm .aw-peer>.k10-sim{position:absolute;right:14px;top:12px}
+#c10-swarm .aw-pm{display:grid;grid-template-columns:120px 1fr 120px;gap:8px;align-items:center}
+#c10-swarm .aw-mid{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+#c10-swarm .aw-mid code{font:15px var(--mono);color:var(--ctx)}
+#c10-swarm .aw-say{font-size:15px;line-height:1.45;padding:6px 10px;border-radius:10px;border:1px solid var(--line2);min-height:52px}
+#c10-swarm .aw-res{display:flex;flex-direction:column;gap:10px;margin-top:auto}
+#c10-swarm .aw-gpu,#c10-swarm .aw-file{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;border:1px solid var(--line2)}
+#c10-swarm .aw-gpu .ic,#c10-swarm .aw-file .ic{font-size:26px;color:var(--ok)}
+#c10-swarm .aw-gpu b,#c10-swarm .aw-file b{font-size:17px}
+#c10-swarm .aw-own,#c10-swarm .aw-fo{margin-left:auto;font-size:15px;color:var(--warn)}
+</style>
+<script>
+HOOKS['c10-swarm'] = {
+  S: [
+    ['OpenAI Swarm', 'd', '每个 Agent 配若干 handoff 选项，控制权在对等 Agent 间流转'],
+    ['Kimi K2.5 Agent Swarm', 'm', '主 Agent 动态创建上百个子 Agent 并行执行；“何时拆、拆几个”经并行 Agent 强化学习训练进模型'],
+    ['LangGraph 的 swarm 库', 'd', 'handoff 网络'],
+    ['Anthropic 多 Agent 研究系统', 'm', 'orchestrator-worker 星型拓扑'],
+    ['微软 Agent Framework handoff 编排', 'd', 'handoff 网络'],
+    ['Kimi K3 + AgentEnv', 'm', '独立模型档位；开源并行 Agent 训练沙箱 AgentEnv（GTC 2026 披露子 Agent 上限 300）'],
+    ['Manus Wide Research', 'm', 'orchestrator-worker 星型拓扑'],
+  ],
+  P: [['发现对方', '实例 1 用 list_agents 发现了实例 2', '空闲', '—'], ['协商文件冲突', '“我们都要改 utils.py：你先改，我等你提交后再动”', '空闲', '实例 2 优先，实例 1 等待'], ['协调 GPU', '“我要跑 2 小时训练，你的评测能等我跑完吗？”', '实例 2 训练中', '实例 2 已提交'], ['交还资源', '“训练完了，GPU 交给你”', '实例 1 评测中', '无冲突']],
+  init(s) {
+    this.lists = { d: s.querySelectorAll('.aw-list')[0], m: s.querySelectorAll('.aw-list')[1] };
+    this.chip = s.querySelector('.aw-chip');
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    while (ok()) {
+      this.lists.d.innerHTML = ''; this.lists.m.innerHTML = '';
+      for (const [n, b, d] of this.S) {
+        this.chip.innerHTML = `<span class="aw-cp">“${n}”</span>`;
+        await w(900); if (!ok()) return;
+        this.chip.innerHTML = '';
+        this.lists[b].insertAdjacentHTML('beforeend', `<div class="aw-it"><b>${n}</b><p>${d}</p></div>`);
+        await w(500); if (!ok()) return;
+      }
+      await w(3500);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.run(s);
+    let i = 0;
+    const say = s.querySelector('.aw-say'), own = s.querySelector('.aw-own'), fo = s.querySelector('.aw-fo'), a1 = s.querySelector('.aw-a1'), a2 = s.querySelector('.aw-a2');
+    const tick = () => { const [, t, g, f] = this.P[i]; say.textContent = t; own.textContent = g; fo.textContent = f; a1.classList.toggle('on', i % 2 === 0); a2.classList.toggle('on', i % 2 === 1); i = (i + 1) % this.P.length; };
+    tick();
+    ctx.every(tick, 2600);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.lists.d.innerHTML = ''; this.lists.m.innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-a2a" data-part="7" data-trans="iris" data-dur="16000" data-title="跨组织协作：A2A 协议" data-notes="以上系统都假设所有 Agent 由同一个团队开发、运行在同一个系统内，此时参数传递、共享文件、消息总线三种通信机制足够用。但当协作跨越组织边界——你的 Agent 需要调用另一家公司的 Agent——就需要标准化的互操作协议。A2A 之于 Agent，就是网络协议之于进程。2025 年 Google 发布的 <b>A2A</b>（Agent2Agent）协议正是为此设计的（后捐赠给 Linux 基金会托管）。它的核心要素有三个：<br>• <b>Agent Card</b>：一份描述 Agent 能力的元数据文档（发布在约定的公开地址下），声明这个 Agent 能做什么、支持哪些输入输出模态、如何认证——相当于 Agent 的“名片”，解决跨组织的能力发现问题。<br>• <b>任务生命周期管理</b>：A2A 把协作单元建模为任务（Task），带有明确的状态机（已提交、进行中、需要输入、已完成、失败），原生支持长时间运行的任务和流式进度更新。<br>• <b>不透明协作</b>：Agent 之间只交换任务与产物（Artifact），不暴露内部的提示词、思考过程和工具实现——这与本章“不共享上下文”的原则一致，也是跨组织协作中必要的安全属性。<br>A2A 的定位可以和第四章的 MCP 对照理解：MCP 解决的是 Agent 与工具之间的互操作，A2A 解决的是 Agent 与 Agent 之间的互操作。它并不取代本章介绍的三种通信机制，而是在它们之上、跨信任边界的标准化层。同一团队内部的多 Agent 系统直接用消息总线即可，只有当协作方互不信任、实现互不可见时，才需要 A2A 这样的公开协议。<br>演示：甲公司的 Agent 先读取乙公司 Agent 的 Agent Card，再提交任务；任务状态依次点亮，中途进入“需要输入”；最后只有产物越过组织边界。公司、任务与卡片内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">跨组织协作：<em>A2A 协议</em></h2>
+  <p class="lead fx fx-up" style="--d:2">A2A 之于 Agent，就是网络协议之于进程：协作方互不信任、实现互不可见时的标准化层</p></header>
+  <div class="aa-st fx fx-scale" style="--d:3">
+    <div class="aa-org l"><span class="aa-on">甲公司</span><div class="k10-ag" style="--c:#a78bfa"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>差旅 Agent</b></div><div class="aa-priv"><svg class="ic"><use href="#i-lock"/></svg>提示词 · 思考过程 · 工具实现</div></div>
+    <div class="aa-wall"><span>组织边界</span></div>
+    <div class="aa-org r"><span class="aa-on">乙公司</span><div class="k10-ag" style="--c:#22d3ee"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>酒店预订 Agent</b></div><div class="aa-priv"><svg class="ic"><use href="#i-lock"/></svg>提示词 · 思考过程 · 工具实现</div></div>
+    <div class="aa-card"><b>Agent Card</b><code>能做什么：查询与预订酒店<br>输入输出模态：文本 · JSON<br>认证方式：OAuth</code><small>发布在约定的公开地址 · 名片</small></div>
+    <div class="aa-sm"></div>
+    <div class="aa-art"><svg class="ic"><use href="#i-file"/></svg><span>Artifact：订单确认</span></div>
+    <div class="aa-msg"></div>
+    <span class="k10-sim aa-sim">示意</span>
+  </div>
+  <div class="aa-cmp fx fx-up" style="--d:5">
+    <div><b>MCP</b><span>Agent ↔ 工具 的互操作（第四章）</span></div>
+    <div><b>A2A</b><span>Agent ↔ Agent 的互操作，跨信任边界</span></div>
+    <div class="n"><span>不取代参数传递、共享文件、消息总线；<b>同一团队内部直接用消息总线即可</b></span></div>
+  </div>
+  <div class="src">第十章 ·「跨组织协作：A2A 协议」</div>
+</section>
+<style>
+#c10-a2a .aa-st{position:relative;height:540px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-a2a .aa-org{position:absolute;top:30px;bottom:30px;width:360px;padding:18px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:16px;border:1px solid var(--line2);background:rgba(12,18,40,.6)}
+#c10-a2a .aa-org.l{left:30px}#c10-a2a .aa-org.r{right:30px}
+#c10-a2a .aa-on{font-size:18px;font-weight:700;color:var(--text2)}
+#c10-a2a .aa-priv{margin-top:auto;display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;font-size:16px;color:var(--text3);border:1px dashed var(--line2);filter:blur(.4px)}
+#c10-a2a .aa-priv .ic{font-size:20px;color:var(--warn)}
+#c10-a2a .aa-wall{position:absolute;left:50%;top:14px;bottom:14px;width:0;border-left:3px dashed rgba(251,113,133,.5)}
+#c10-a2a .aa-wall span{position:absolute;top:-2px;left:10px;font-size:15px;color:#fda4af;white-space:nowrap}
+#c10-a2a .aa-card{position:absolute;left:1300px;top:190px;width:280px;padding:12px 16px;border-radius:14px;border:1.5px solid var(--ctx);background:rgba(10,16,36,.96);transition:left .9s var(--ease),box-shadow .4s}
+#c10-a2a .aa-card b{font-size:19px;color:var(--ctx)}
+#c10-a2a .aa-card code{display:block;margin-top:6px;font:15px/1.55 var(--mono);color:var(--text2)}
+#c10-a2a .aa-card small{display:block;margin-top:6px;font-size:15px;color:var(--text3)}
+#c10-a2a .aa-card.go{left:70px;box-shadow:0 0 30px color-mix(in srgb,var(--ctx) 45%,transparent)}
+#c10-a2a .aa-sm{position:absolute;left:420px;right:420px;top:40px;display:flex;flex-direction:column;gap:8px;align-items:center}
+#c10-a2a .aa-s{width:280px;padding:7px 12px;border-radius:10px;text-align:center;font-size:17px;color:var(--text3);border:1px solid var(--line);background:rgba(10,16,36,.9);transition:all .35s}
+#c10-a2a .aa-s.on{color:#06101f;font-weight:700;background:var(--c);border-color:var(--c);box-shadow:0 0 22px color-mix(in srgb,var(--c) 50%,transparent)}
+#c10-a2a .aa-s.done{color:var(--text2);border-color:color-mix(in srgb,var(--c) 50%,transparent)}
+#c10-a2a .aa-art{position:absolute;left:1330px;top:385px;display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:12px;font-size:17px;border:1.5px solid var(--ok);background:rgba(10,16,36,.96);opacity:0;transition:left 1.1s var(--ease),opacity .4s}
+#c10-a2a .aa-art .ic{font-size:22px;color:var(--ok)}
+#c10-a2a .aa-art.on{opacity:1}
+#c10-a2a .aa-art.go{left:100px}
+#c10-a2a .aa-msg{position:absolute;left:420px;right:420px;bottom:24px;text-align:center;font-size:18px;line-height:1.5;color:var(--text)}
+#c10-a2a .aa-msg b{color:var(--acc)}
+#c10-a2a .aa-sim{position:absolute;left:420px;bottom:80px}
+#c10-a2a .aa-cmp{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:16px;margin-top:18px}
+#c10-a2a .aa-cmp>div{padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:2px}
+#c10-a2a .aa-cmp b{font:800 22px var(--num);color:var(--acc)}
+#c10-a2a .aa-cmp span{font-size:17px;color:var(--text2)}
+#c10-a2a .aa-cmp .n span b{font:inherit;color:var(--text)}
+</style>
+<script>
+HOOKS['c10-a2a'] = {
+  S: [['已提交', '#60a5fa'], ['进行中', '#22d3ee'], ['需要输入', '#fbbf24'], ['已完成', '#34d399'], ['失败', '#fb7185']],
+  init(s) {
+    s.querySelector('.aa-sm').innerHTML = '<span class="lbl">Task 状态机</span>' + this.S.map(([n, c]) => `<div class="aa-s" style="--c:${c}">${n}</div>`).join('');
+    this.ss = [...s.querySelectorAll('.aa-s')];
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms), q = (x) => s.querySelector(x);
+    const card = q('.aa-card'), art = q('.aa-art'), msg = q('.aa-msg');
+    const st = (i) => this.ss.forEach((e, j) => { e.classList.toggle('on', j === i); if (j === i) e.classList.remove('done'); });
+    while (ok()) {
+      this.ss.forEach((e) => e.classList.remove('on', 'done'));
+      card.classList.remove('go'); art.classList.remove('on', 'go');
+      msg.innerHTML = '<b>能力发现</b>：读取对方发布在公开地址的 Agent Card';
+      await w(600); if (!ok()) return;
+      card.classList.add('go');
+      await w(1800); if (!ok()) return;
+      card.classList.remove('go');
+      const seq = [[0, '提交任务：预订 3 晚酒店'], [1, '对方执行中，<b>流式进度更新</b>'], [2, '<b>需要输入</b>：入住人姓名'], [1, '补充输入后继续执行'], [3, '任务完成']];
+      for (const [i, t] of seq) {
+        if (this.cur != null) this.ss[this.cur].classList.add('done');
+        this.cur = i; st(i); msg.innerHTML = t;
+        await w(1500); if (!ok()) return;
+      }
+      art.classList.add('on');
+      await w(300); if (!ok()) return;
+      art.classList.add('go');
+      msg.innerHTML = '<b>不透明协作</b>：越过边界的只有任务与产物，双方的提示词、思考过程、工具实现都不暴露';
+      await w(3200); if (!ok()) return;
+      this.cur = null;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.cur = null; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.ss.forEach((e) => e.classList.remove('on', 'done')); },
+};
+</script>

@@ -1,0 +1,328 @@
+<!-- ================= PART 05 如何阅读本书 ================= -->
+<section class="slide chapter" id="c00-d5" data-part="5" data-title="PART 05 · 如何阅读本书" data-notes="本书的各章节相对独立，你可以根据自己的需求选择不同的阅读路径。每章都包含大量的实验和思考题；大部分实验配有完整的可运行代码，组织在配套的开源仓库中。作者强烈建议动手跑一遍这些实验：AI Agent 是一个实践性极强的领域，很多设计上的直觉需要在动手调试的过程中才能真正建立起来。<br>这一部分最后给出阅读全书需要的前置知识，分“必需”和“推荐”两个层次，帮助你评估自己的准备程度。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">如何阅读本书</h1>
+  <div class="ch-s fx fx-up" style="--d:3">选一条阅读路径、动手跑实验、<br>对照前置知识自检</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">AI Agent 是一个实践性极强的领域，很多设计上的直觉需要在动手调试的过程中才能真正建立起来。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c00-paths" data-part="5" data-steps="2" data-dur="11000" data-title="选择你的身份 → 推荐路径" data-notes="本书的各章节相对独立，你可以根据自己的需求选择不同的阅读路径：<br>• <b>如果你是 Agent 开发者</b>，建议按顺序阅读全书：第一至六章建立完整的 Agent 构建方法，第七至十章则从评估、模型后训练、持续进化和多 Agent 协作四个方向讨论能力提升。<br>• <b>如果你时间有限</b>，优先阅读第一章（建立全局认知）和第二章（掌握最关键的上下文工程）。第二章中 KV Cache 的底层原理较为技术化，初次阅读可先跳过原理部分、只记住开头给出的三条核心结论，不影响后续理解。<br>• <b>如果你关注模型训练</b>，可以直接阅读第八章（模型后训练）；其中评估方法（第七章）是训练的前提，建议一并阅读，并先读第一至二章以建立整体认知。<br>按 → 切换三种身份，也可以直接点左侧的身份卡；右侧十章轨道上会画出推荐路径，圆圈里的序号是阅读顺序。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">选择你的身份 → <em>推荐路径</em></h2>
+  <p class="lead fx fx-up" style="--d:2">本书的各章节相对独立，你可以根据自己的需求选择不同的阅读路径</p></header>
+  <div class="pa-body">
+    <div class="pa-ids"></div>
+    <div class="pa-right fx fx-right" style="--d:4">
+      <div class="pa-track">
+        <svg class="pa-svg" viewBox="0 0 1110 300" width="1110" height="300"><path class="pa-path" d=""/><circle class="pk pa-dot" r="10" style="fill:#fff"/></svg>
+        <div class="pa-tiles"></div>
+        <div class="pa-band"><span class="a">第一部分 · 如何构建 Agent</span><span class="b">第二部分 · 如何提升 Agent 能力</span></div>
+      </div>
+      <div class="pa-why panel"><b class="pa-wt"></b><ul class="pa-wl"></ul></div>
+    </div>
+  </div>
+  <div class="src">引言 ·「如何阅读本书」</div>
+</section>
+<style>
+.pa-body{display:flex;gap:26px;height:640px}
+.pa-ids{width:500px;flex:none;display:flex;flex-direction:column;gap:18px}
+.pa-iw{flex:1}
+.pa-id{--c:var(--acc);height:100%;display:flex;align-items:center;gap:20px;padding:18px 24px;border-radius:20px;cursor:pointer;border:1px solid var(--line);background:rgba(12,18,40,.7);transition:all .45s var(--ease)}
+.pa-id .pa-ic{flex:none;width:76px;height:76px;border-radius:22px;display:grid;place-items:center;font-size:40px;color:var(--c);background:color-mix(in srgb,var(--c) 12%,transparent);border:1px solid color-mix(in srgb,var(--c) 40%,transparent)}
+.pa-id b{display:block;font-size:25px}
+.pa-id small{display:block;font-size:18px;color:var(--text2);margin-top:6px}
+.pa-id.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.85));box-shadow:0 0 40px -8px color-mix(in srgb,var(--c) 60%,transparent);translate:10px 0}
+.pa-id.on .pa-ic{background:var(--c);color:#06101f}
+.pa-right{flex:1;display:flex;flex-direction:column;gap:20px;min-width:0}
+.pa-track{position:relative;height:330px}
+.pa-svg{position:absolute;left:0;top:0;overflow:visible;z-index:2;pointer-events:none}
+.pa-path{fill:none;stroke:var(--acc);stroke-width:3.5;stroke-linecap:round;filter:drop-shadow(0 0 8px var(--acc))}
+.pa-dot{opacity:0}
+.pa-tiles{position:absolute;left:0;top:130px;display:flex;gap:12px}
+.pa-t{--c:#22d3ee;position:relative;width:100px;height:128px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(10,16,36,.9);transition:opacity .45s,border-color .45s,box-shadow .45s,background .45s}
+.pa-t b{font:800 30px var(--num);color:var(--c)}
+.pa-t span{font-size:15px;line-height:1.3;color:var(--text2);padding:0 4px}
+.pa-t.skip{opacity:.28}
+.pa-t.pick{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,rgba(10,16,36,.92));box-shadow:0 0 26px color-mix(in srgb,var(--c) 40%,transparent)}
+.pa-t.focus{box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 30%,transparent),0 0 40px color-mix(in srgb,var(--c) 60%,transparent)}
+.pa-o{position:absolute;top:-16px;right:-10px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:800 17px var(--num);color:#06101f;background:#fff;box-shadow:0 0 12px #fff;opacity:0;scale:.3;transition:opacity .3s,scale .4s var(--spring)}
+.pa-t.pick .pa-o.on{opacity:1;scale:1}
+.pa-kv{position:absolute;left:-34px;right:-34px;bottom:-38px;padding:3px 6px;white-space:nowrap;text-align:center;font-style:normal;border-radius:9px;font-size:15px;line-height:1.3;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);background:rgba(10,16,36,.94);opacity:0;transition:opacity .4s}
+#c00-paths[data-k="1"] .pa-kv{opacity:1}
+.pa-band{position:absolute;left:0;top:300px;width:1110px;display:grid;grid-template-columns:672px 1fr;gap:12px;font-size:16px}
+.pa-band span{padding:5px 0;border-radius:8px;text-align:center}
+.pa-band .a{color:#22d3ee;background:rgba(34,211,238,.08);border-top:2px solid #22d3ee}
+.pa-band .b{color:#a78bfa;background:rgba(167,139,250,.08);border-top:2px solid #a78bfa}
+.pa-why{flex:1;padding:22px 28px}
+.pa-wt{display:block;font-size:24px;color:var(--acc)}
+.pa-wl{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.pa-wl li{position:relative;padding-left:24px;font-size:20px;line-height:1.55;color:var(--text);animation:upIn .5s var(--ease) both}
+.pa-wl li:nth-child(2){animation-delay:.12s}.pa-wl li:nth-child(3){animation-delay:.24s}
+.pa-wl li::before{content:"";position:absolute;left:4px;top:.6em;width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 8px var(--acc)}
+.pa-wl b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c00-paths'] = {
+  SHORT: ['入门', '上下文工程', '记忆与知识库', '工具', 'Coding Agent', '交互', '评估', '后训练', '持续进化', '多 Agent'],
+  ID: [
+    { ic: 'code', c: '#7dd3fc', t: '如果你是 Agent 开发者', s: '建议按顺序阅读全书', path: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], why: ['<b>第一至六章</b>：建立完整的 Agent 构建方法', '<b>第七至十章</b>：从评估、模型后训练、持续进化和多 Agent 协作四个方向讨论能力提升'] },
+    { ic: 'hourglass', c: '#fbbf24', t: '如果你时间有限', s: '优先阅读第一章和第二章', path: [1, 2], why: ['<b>第一章</b>：建立全局认知', '<b>第二章</b>：掌握最关键的上下文工程', '第二章中 KV Cache 的底层原理较为技术化：初次阅读可先跳过原理部分、只记住开头给出的<b>三条核心结论</b>，不影响后续理解'] },
+    { ic: 'cpu', c: '#c4b5fd', t: '如果你关注模型训练', s: '可以直接阅读第八章', path: [1, 2, 7, 8], focus: 8, why: ['<b>第八章（模型后训练）</b>是你的重点', '评估方法（<b>第七章</b>）是训练的前提，建议一并阅读', '并先读<b>第一至二章</b>，以建立整体认知'] },
+  ],
+  CX(n) { return (n - 1) * 112 + 50; },
+  init(s) {
+    s.querySelector('.pa-ids').innerHTML = this.ID.map((d, i) => `<div class="pa-iw fx fx-left" style="--d:${3 + i}"><div class="pa-id" data-i="${i}" style="--c:${d.c}"><div class="pa-ic"><svg class="ic"><use href="#i-${d.ic}"/></svg></div><div><b>${d.t}</b><small>${d.s}</small></div></div></div>`).join('');
+    s.querySelector('.pa-tiles').innerHTML = this.SHORT.map((t, i) => `<div class="pa-t" data-n="${i + 1}" style="--c:${i < 6 ? '#22d3ee' : '#a78bfa'}"><b>${String(i + 1).padStart(2, '0')}</b><span>${t}</span><i class="pa-o"></i>${i === 1 ? '<em class="pa-kv">KV Cache 原理可先跳过</em>' : ''}</div>`).join('');
+    s.querySelectorAll('.pa-id').forEach((c) => c.addEventListener('click', () => DECK.go(DECK.cur, +c.dataset.i)));
+    this.path = s.querySelector('.pa-path');
+    this.dot = s.querySelector('.pa-dot');
+  },
+  // 在十章上方画出一条跳跃的阅读路径：相邻章节是小弧，跨越的章节是大弧
+  draw(P) {
+    const top = 130;
+    let d = `M${this.CX(P[0])} ${top}`;
+    for (let i = 1; i < P.length; i++) {
+      const a = this.CX(P[i - 1]), b = this.CX(P[i]), h = 26 + 16 * Math.abs(P[i] - P[i - 1]);
+      d += ` Q${(a + b) / 2} ${top - h * 2} ${b} ${top}`;
+    }
+    if (P.length === 1) d += ` l0.1 0`;
+    this.path.setAttribute('d', d);
+    const L = this.path.getTotalLength();
+    this.path.style.transition = 'none';
+    this.path.style.strokeDasharray = L;
+    this.path.style.strokeDashoffset = L;
+    void this.path.getBoundingClientRect();
+    this.path.style.transition = `stroke-dashoffset ${Math.min(2.6, 0.5 + P.length * 0.22)}s cubic-bezier(.4,0,.2,1)`;
+    this.path.style.strokeDashoffset = 0;
+    return L;
+  },
+  apply(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, d = this.ID[k];
+    s.dataset.k = k;
+    s.style.setProperty('--acc', d.c);
+    s.querySelectorAll('.pa-id').forEach((c, i) => c.classList.toggle('on', i === k));
+    const tiles = [...s.querySelectorAll('.pa-t')];
+    tiles.forEach((t) => {
+      const n = +t.dataset.n, at = d.path.indexOf(n);
+      t.classList.toggle('pick', at >= 0);
+      t.classList.toggle('skip', at < 0);
+      t.classList.toggle('focus', d.focus === n);
+      const o = t.querySelector('.pa-o');
+      o.textContent = at >= 0 ? at + 1 : '';
+      o.classList.remove('on');
+      if (at >= 0 && ctx) ctx.later(() => tk === this.tk && o.classList.add('on'), 300 + at * 220);
+    });
+    s.querySelector('.pa-wt').textContent = d.t;
+    s.querySelector('.pa-wl').innerHTML = d.why.map((x) => `<li>${x}</li>`).join('');
+    this.draw(d.path);
+    if (!ctx) return;
+    const loop = async () => {
+      await U.wait(ctx, 2600);
+      while (ctx.alive && tk === this.tk) {
+        await U.fly(this.dot, this.path, 900 + d.path.length * 260, { ctx, linear: true });
+        await U.wait(ctx, 900);
+      }
+    };
+    loop();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, k); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.k = 0; s.style.removeProperty('--acc'); },
+};
+</script>
+
+<section class="slide" id="c00-labs" data-part="5" data-steps="2" data-trans="flip" data-title="实验、思考题与配套代码" data-notes="每章都包含大量的<b>实验</b>和<b>思考题</b>，编号格式为“实验 X-Y”（X 为章节号，Y 为章节内序号）。实验和思考题的标题中用星级标注难度：★ 表示入门级，适合所有读者；★★ 表示中等难度，需要一定的工程实践基础；★★★ 表示进阶挑战，通常涉及开放性问题或复杂的系统设计。大部分实验配有完整的可运行代码，组织在配套的开源仓库中——<b>配套代码仓库</b>：https://github.com/bojieli/ai-agent-book（本页只显示地址，可点击复制）。<br>可以使用 Git 获取全部配套代码：先 git clone 仓库，再 cd ai-agent-book。不熟悉 Git 的读者也可以在仓库页面点击 <b>Code → Download ZIP</b> 下载。实验代码按章节组织在 chapter1/ 至 chapter10/ 中；要查找“实验 X-Y”，请先打开对应的 chapterX/README.md，根据实验编号找到项目目录，再按照项目自身的 README 安装依赖并运行。部分标为“复现指南”的实验依赖外部仓库，具体获取方式也会在相应的 README 中说明。<br>作者强烈建议你动手跑一遍这些实验：AI Agent 是一个实践性极强的领域，很多设计上的直觉需要在动手调试的过程中才能真正建立起来。终端里的 ls 输出只列出章节目录，是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验与思考题：<em>强烈建议动手跑一遍</em></h2></header>
+  <div class="lb-body">
+    <div class="lb-l">
+      <div class="lb-code panel fx fx-left" style="--d:2">
+        <span class="lbl">编号格式</span>
+        <div class="lb-big"><span>实验</span><em class="x">X</em><i>-</i><em class="y">Y</em></div>
+        <div class="lb-xy"><span class="x"><b>X</b> 章节号</span><span class="y"><b>Y</b> 章节内序号</span></div>
+        <p class="lb-note">实验和思考题的标题中，用星级标注难度</p>
+      </div>
+      <div class="lb-stars fx fx-left" style="--d:3"></div>
+    </div>
+    <div class="lb-r">
+      <div class="lb-repo panel fx fx-right" style="--d:3"><span class="lbl">配套代码仓库</span><div class="lb-url"><span class="mono sel">https://github.com/bojieli/ai-agent-book</span><button class="btn lb-copy"><svg class="ic"><use href="#i-copy"/></svg>复制</button></div><p>大部分实验配有完整的可运行代码 · 不熟悉 Git：仓库页面 <b>Code → Download ZIP</b></p></div>
+      <div class="lb-win win fx fx-right" data-step="1"><div class="win-bar"><i></i><i></i><i></i><span>终端</span><span class="lb-sx">示意</span></div><div class="code lb-term" data-clip-ok></div></div>
+      <ol class="sl lb-find fx fx-up" data-step="2">
+        <li><span>1</span><div><b>打开 chapterX/README.md</b><p>X 是实验编号里的章节号</p></div></li>
+        <li><span>2</span><div><b>根据实验编号找到项目目录</b><p>部分标为“复现指南”的实验依赖外部仓库，获取方式见 README</p></div></li>
+        <li><span>3</span><div><b>按照项目自身的 README 安装依赖并运行</b><p>很多设计直觉要在动手调试中才能真正建立</p></div></li>
+      </ol>
+    </div>
+  </div>
+  <div class="src">引言 ·「如何阅读本书」（实验、思考题与配套代码）</div>
+</section>
+<style>
+.lb-body{display:flex;gap:26px;height:700px}
+.lb-l{width:640px;flex:none;display:flex;flex-direction:column;gap:20px}
+.lb-code{padding:22px 28px}
+.lb-big{display:flex;align-items:baseline;gap:14px;margin-top:10px;font-size:64px;font-weight:800}
+.lb-big em{font:800 76px var(--num);font-style:normal;padding:0 18px;border-radius:16px}
+.lb-big em.x{color:#22d3ee;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.4)}
+.lb-big em.y{color:#a78bfa;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.4)}
+.lb-big i{font-style:normal;color:var(--text3)}
+.lb-xy{display:flex;gap:16px;margin-top:12px;font-size:20px}
+.lb-xy span{padding:6px 14px;border-radius:10px;color:var(--text2);background:rgba(255,255,255,.04)}
+.lb-xy b{font-family:var(--num);margin-right:6px}
+.lb-xy .x b{color:#22d3ee}.lb-xy .y b{color:#a78bfa}
+.lb-note{margin-top:14px;font-size:19px;color:var(--text2)}
+.lb-stars{display:flex;flex-direction:column;gap:12px}
+.lb-s{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:16px;padding:16px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .45s var(--ease)}
+.lb-s em{font-style:normal;font-size:30px;color:var(--tool);letter-spacing:.06em}
+.lb-s b{display:block;font-size:22px}
+.lb-s p{font-size:18px;color:var(--text2);margin-top:4px}
+.lb-s.on{border-color:color-mix(in srgb,var(--tool) 55%,transparent);background:color-mix(in srgb,var(--tool) 9%,rgba(12,18,40,.8));box-shadow:0 0 28px -6px color-mix(in srgb,var(--tool) 50%,transparent);translate:8px 0}
+.lb-r{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+.lb-repo{padding:18px 24px}
+.lb-url{display:flex;align-items:center;gap:14px;margin-top:8px}
+.lb-url .mono{font-size:23px;color:var(--acc)}
+.lb-copy{margin-left:auto;padding:7px 14px}
+.lb-repo p{font-size:18px;color:var(--text2);margin-top:10px}
+.lb-repo p b{color:var(--text)}
+.lb-sx{margin-left:auto;color:var(--text3)}
+.lb-term{height:178px;font-size:19px;line-height:1.65;padding:16px 22px;white-space:pre-wrap;overflow:hidden}
+.lb-term .p{color:var(--ok)}
+.lb-term .o{color:var(--text3)}
+.lb-find{gap:8px}
+.lb-find li{padding:10px 14px}
+.lb-find b{font-size:21px}
+.lb-find p{font-size:17px}
+</style>
+<script>
+HOOKS['c00-labs'] = {
+  ST: [['★', '入门级', '适合所有读者'], ['★★', '中等难度', '需要一定的工程实践基础'], ['★★★', '进阶挑战', '通常涉及开放性问题或复杂的系统设计']],
+  LINES: [['p', '$ git clone https://github.com/bojieli/ai-agent-book.git'], ['p', '$ cd ai-agent-book'], ['p', '$ ls'], ['o', 'chapter1/  chapter2/  chapter3/  ……  chapter10/']],
+  init(s) {
+    s.querySelector('.lb-stars').innerHTML = this.ST.map(([st, b, p]) => `<div class="lb-s"><em>${st}</em><div><b>${b}</b><p>${p}</p></div></div>`).join('');
+    s.querySelector('.lb-copy').addEventListener('click', () => U.copy('https://github.com/bojieli/ai-agent-book'));
+  },
+  typeAll(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), term = s.querySelector('.lb-term');
+    term.innerHTML = '';
+    let li = 0;
+    const next = () => {
+      if (!ctx.alive || tk !== this.tk || li >= this.LINES.length) return;
+      const [cls, txt] = this.LINES[li++], el = document.createElement('div');
+      el.className = cls;
+      term.appendChild(el);
+      if (cls === 'o') { el.textContent = txt; ctx.later(next, 400); return; }
+      let i = 0;
+      const tick = () => { if (!ctx.alive || tk !== this.tk) return; el.textContent = txt.slice(0, ++i); if (i < txt.length) ctx.later(tick, 26); else ctx.later(next, 420); };
+      tick();
+    };
+    ctx.later(next, 500);
+  },
+  find(s, ctx, k) {
+    const lis = [...s.querySelectorAll('.lb-find li')];
+    lis.forEach((l) => l.classList.remove('cur', 'done'));
+    if (k < 2) return;
+    let i = 0;
+    const run = () => { if (!ctx.alive || this.k < 2) return; lis.forEach((l, j) => { l.classList.toggle('cur', j === i % 4); l.classList.toggle('done', j < i % 4); }); i++; ctx.later(run, 1300); };
+    ctx.later(run, 600);
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    const ss = [...s.querySelectorAll('.lb-s')];
+    let j = 0;
+    ctx.every(() => { ss.forEach((x, i) => x.classList.toggle('on', i === j % 3)); j++; }, 2000);
+    ctx.later(() => ss[0].classList.add('on'), 900);
+    if (k >= 1) this.typeAll(s, ctx);
+    this.find(s, ctx, k);
+  },
+  step(s, ctx, k, dir) {
+    this.k = k;
+    if (k === 1 && dir > 0) this.typeAll(s, ctx);
+    this.find(s, ctx, k);
+  },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.lb-term').innerHTML = ''; s.querySelectorAll('.lb-s,.lb-find li').forEach((x) => x.classList.remove('on', 'cur', 'done')); },
+};
+</script>
+
+<section class="slide" id="c00-prereq" data-part="5" data-steps="1" data-dur="14000" data-title="前置知识：必需与推荐" data-notes="本书面向有一定技术背景的读者，但不要求你是某个特定领域的专家。前置知识分两个层次，帮助你评估自己的准备程度。<br><b>必需：阅读全书的基础</b>——<b>Python 编程</b>：书中几乎所有实验都基于 Python，需要熟悉基本语法、常用的数据结构、包管理（pip）等；不要求精通，但应能读懂和修改中等复杂度的 Python 代码。<b>LLM 的基本使用经验</b>：用过 ChatGPT、Claude 或类似的产品，理解“提示词（Prompt）→ 模型回复”的基本交互模式。<b>一款 AI 辅助编程工具</b>：强烈建议安装并熟悉至少一款，如 Claude Code、Codex、Cursor、TRAE 等——一方面能显著提高实验的开发效率，因为实验涉及大量代码编写和调试；另一方面这些工具本身就是成熟的 Coding Agent，使用中会直观体验到 ReAct 循环、工具调用、上下文管理等书中反复讨论的核心机制，这种第一手体验对理解 Agent 的设计原则极有价值。<b>软件工程常识</b>：命令行操作、Git 版本控制、JSON 数据格式、REST API 等，是运行实验和理解 Agent 工具调用机制的基础。<br><b>推荐：提升特定章节的阅读体验</b>——<b>机器学习基础</b>（第八章）：训练与推理、损失函数、梯度下降、过拟合等。<b>基础数学</b>（第 2-3、8 章）：对线性代数有直观理解（向量可以表示方向和大小、矩阵可以做批量运算）有助于理解嵌入和注意力机制；基本的概率统计知识有助于理解评估指标和强化学习中的期望奖励；书中的数学不涉及复杂推导，侧重直观解释。<b>Web 开发基础</b>（第 6 章）：HTTP、WebSocket、前后端分离架构等，有助于理解事件驱动的异步 Agent 架构和语音 Agent 的实时通信实验。<b>对 Transformer 架构的基本了解</b>（第 2、8 章）：Transformer 是当前几乎所有大语言模型的底层架构；希望系统补充大模型基础知识的读者，推荐阅读《图解大模型》（图灵出版），它以直观的图解讲解 Transformer 架构、预训练与微调等核心概念，与本书的 Agent 工程视角形成良好的互补。<br>如果你在某些前置知识上有所欠缺，不必因此却步。本书的核心价值在于<b>架构设计原则和工程实践的方法论</b>，而非某个具体的算法或技巧；除第八章后训练以外，全书对数学和机器学习的要求很低，完全可以作为起点。<br>勾选左右两栏的条目（不操作时会自动演示），下方十章会随之亮起：必需项决定能否开始，推荐项点亮对应章节。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">前置知识：<em>必需</em>与<em>推荐</em></h2></header>
+  <div class="pq-cols">
+    <div class="pq-col fx fx-left" style="--d:2"><div class="pq-h"><b>必需：阅读全书的基础</b><span>不要求你是某个特定领域的专家</span></div><div class="pq-list" data-g="m"></div></div>
+    <div class="pq-col fx fx-right" style="--d:3"><div class="pq-h r"><b>推荐：提升特定章节的阅读体验</b><span>只影响对应的章节</span></div><div class="pq-list" data-g="r"></div></div>
+  </div>
+  <div class="pq-strip fx fx-up" style="--d:5"><span class="pq-sl">全书十章</span><div class="pq-tiles"></div></div>
+  <p class="tagline pq-tag fx fx-up" data-step="1">有所欠缺也不必却步：本书的核心价值在于<b>架构设计原则和工程实践的方法论</b>；除第八章后训练以外，对数学和机器学习的要求很低</p>
+  <div class="src">引言 ·「前置知识」</div>
+</section>
+<style>
+.pq-cols{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.pq-h{display:flex;align-items:baseline;gap:14px;margin-bottom:12px}
+.pq-h b{font-size:24px;color:var(--acc)}
+.pq-h.r b{color:var(--acc2)}
+.pq-h span{font-size:16px;color:var(--text3)}
+.pq-list{display:flex;flex-direction:column;gap:10px}
+.pq-list .chk{padding:12px 18px;gap:16px;align-items:center}
+.pq-list .chk .box{width:30px;height:30px}
+.pq-list .chk b{display:block;font-size:21px}
+.pq-list .chk b em{font-style:normal;font-size:16px;font-weight:400;color:var(--acc2);margin-left:8px}
+.pq-list .chk p{font-size:16px;line-height:1.45;color:var(--text2);margin-top:3px}
+.pq-list[data-g="r"] .chk.done{border-color:color-mix(in srgb,var(--acc2) 50%,transparent);background:color-mix(in srgb,var(--acc2) 9%,transparent)}
+.pq-list[data-g="r"] .chk.done .box{background:var(--acc2);border-color:var(--acc2);box-shadow:0 0 16px color-mix(in srgb,var(--acc2) 60%,transparent)}
+.pq-strip{display:flex;align-items:center;gap:16px;margin-top:20px}
+.pq-sl{font-size:17px;color:var(--text3);letter-spacing:.2em;writing-mode:vertical-rl}
+.pq-tiles{flex:1;display:grid;grid-template-columns:repeat(10,1fr);gap:10px}
+.pq-t{--c:#22d3ee;position:relative;height:84px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1.5px solid var(--line2);background:rgba(10,16,36,.85);opacity:.45;transition:all .45s var(--ease)}
+.pq-t b{font:800 24px var(--num);color:var(--text3);transition:color .45s}
+.pq-t span{font-size:15px;color:var(--text3)}
+.pq-t.ready{opacity:1;border-color:color-mix(in srgb,var(--c) 55%,transparent)}
+.pq-t.ready b{color:var(--c)}
+.pq-t.ready span{color:var(--text2)}
+.pq-t.boost{background:color-mix(in srgb,var(--c) 16%,rgba(10,16,36,.9));box-shadow:0 0 26px color-mix(in srgb,var(--c) 45%,transparent)}
+.pq-t i{position:absolute;top:-12px;right:-6px;padding:1px 7px;border-radius:8px;font:700 15px var(--num);font-style:normal;color:#06101f;background:var(--acc2);opacity:0;scale:.4;transition:opacity .3s,scale .35s var(--spring)}
+.pq-t.boost i{opacity:1;scale:1}
+.pq-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c00-prereq'] = {
+  M: [
+    ['Python 编程', '书中几乎所有实验都基于 Python：基本语法、常用数据结构、包管理（pip）；能读懂和修改中等复杂度的代码'],
+    ['LLM 的基本使用经验', '用过 ChatGPT、Claude 或类似产品，理解“提示词（Prompt）→ 模型回复”的交互模式'],
+    ['一款 AI 辅助编程工具', 'Claude Code、Codex、Cursor、TRAE 等：提高实验效率；它们本身就是成熟的 Coding Agent'],
+    ['软件工程常识', '命令行操作、Git 版本控制、JSON 数据格式、REST API'],
+  ],
+  R: [
+    ['机器学习基础', '第八章', '训练与推理、损失函数、梯度下降、过拟合', [8]],
+    ['基础数学', '第 2-3、8 章', '线性代数的直观理解 → 嵌入与注意力；概率统计 → 评估指标与期望奖励', [2, 3, 8]],
+    ['Web 开发基础', '第 6 章', 'HTTP、WebSocket、前后端分离 → 事件驱动的异步架构、语音 Agent 实时通信', [6]],
+    ['对 Transformer 架构的基本了解', '第 2、8 章', '几乎所有大语言模型的底层架构；推荐《图解大模型》（图灵出版）', [2, 8]],
+  ],
+  SHORT: ['入门', '上下文', '记忆', '工具', 'Coding', '交互', '评估', '后训练', '进化', '协作'],
+  init(s) {
+    const box = '<span class="box"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span>';
+    s.querySelector('[data-g="m"]').innerHTML = this.M.map(([b, p], i) => `<div class="chk" data-k="m${i}">${box}<div><b>${b}</b><p>${p}</p></div></div>`).join('');
+    s.querySelector('[data-g="r"]').innerHTML = this.R.map(([b, c, p], i) => `<div class="chk" data-k="r${i}">${box}<div><b>${b}<em>${c}</em></b><p>${p}</p></div></div>`).join('');
+    s.querySelector('.pq-tiles').innerHTML = this.SHORT.map((t, i) => `<div class="pq-t" data-n="${i + 1}" style="--c:${i < 6 ? '#22d3ee' : '#a78bfa'}"><b>${String(i + 1).padStart(2, '0')}</b><span>${t}</span><i>+</i></div>`).join('');
+    this.items = [...s.querySelectorAll('.pq-list .chk')];
+    this.items.forEach((c) => c.addEventListener('click', () => { this.auto = false; c.classList.toggle('done'); this.paint(s); }));
+  },
+  // 必需项全部勾选 → 十章都可以开始；推荐项 → 点亮对应章节
+  paint(s) {
+    const on = (k) => s.querySelector(`.chk[data-k="${k}"]`).classList.contains('done');
+    const ready = this.M.every((_, i) => on('m' + i)), boost = new Set();
+    this.R.forEach((r, i) => { if (on('r' + i)) r[3].forEach((n) => boost.add(n)); });
+    s.querySelectorAll('.pq-t').forEach((t) => { const n = +t.dataset.n; t.classList.toggle('ready', ready); t.classList.toggle('boost', ready && boost.has(n)); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.items.forEach((c) => c.classList.remove('done'));
+    this.paint(s);
+    let i = 0;
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (i >= this.items.length + 3) { i = 0; this.items.forEach((c) => c.classList.remove('done')); this.paint(s); return; }
+      if (i < this.items.length) this.items[i].classList.add('done');
+      i++;
+      this.paint(s);
+    }, 1100);
+  },
+  reset(s) { this.items.forEach((c) => c.classList.remove('done')); this.paint(s); },
+};
+</script>

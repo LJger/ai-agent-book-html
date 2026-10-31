@@ -1,0 +1,494 @@
+<!-- ================= PART 06 结构化索引 ================= -->
+<section class="slide chapter" id="c03-d6" data-part="6" data-title="PART 06 · 结构化索引" data-notes="前面介绍的 RAG 基础技术解决了“给定一个文本块，如何快速找到最相关的那几个”。但一个更根本的问题是：这些文本块本身该怎么组织？这一部分先用黑猫白猫与 Xfinity 两个案例说明“把原始案例直接放进知识库远远不够”，再讲两种结构化索引——RAPTOR 的树状层次（图3-10）与 GraphRAG 的实体—关系图（图3-11）、图谱的语义降级与分层互补，用实验 3-7 在 Intel 手册上对比两者，最后讨论什么时候才需要结构化索引。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">结构化索引</h1>
+  <div class="ch-s fx fx-up" style="--d:3">超越扁平文本 · RAPTOR 树 · GraphRAG 图谱</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">只检索零散片段，就如同靠阅读字典的随机词条去理解一部小说。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c03-beyond" data-part="6" data-dur="16000" data-title="这些文本块本身该怎么组织？" data-notes="前面介绍的 RAG 基础技术（稠密嵌入、稀疏嵌入、混合检索）解决了“给定一个文本块，如何快速找到最相关的那几个”。但一个更根本的问题是：<b>这些文本块本身该怎么组织？</b>把文档切成互不关联的扁平文本块，会丢掉知识固有的内在层次和跨文档关联；面对技术手册、法律文书或学术论文这类结构复杂、逻辑严谨的材料，只检索零散片段，就如同靠阅读字典的随机词条去理解一部小说。要让 Agent 真正“理解”一个知识领域，就必须超越扁平文本块，构建能反映知识层次与关联的结构化索引。本节先介绍这些更高级的组织方法，然后——这是关键的一步——把它们<b>反过来应用到本章开头讨论的用户记忆上</b>，解决用户记忆检索中的精度问题。<br>接下来依次讨论六个主题——它们并非一条严格递进的阶梯，而是围绕“如何组织与检索知识”从不同侧面展开：两种<b>结构化索引</b>技术（RAPTOR 和 GraphRAG）解决“如何组织知识”；OpenViking 的<b>文件系统范式</b>展示轻量级的知识管理思路；<b>知识应该如何更新</b>区分增量更新与定期全量整理；<b>智能体化 RAG</b> 让 Agent 自主决定检索策略；<b>上下文感知检索</b>并不是架在智能体化 RAG 之上的更高一层，而是回过头去修补最基础的分块环节；最后展示如何从<b>结构化数据集</b>中提取深度知识。右侧六个主题可以点击跳转。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>这些文本块本身该怎么组织？</em></h2></header>
+  <div class="w6b-body">
+    <div class="w6b-l fx fx-left" style="--d:2">
+      <div class="w6b-flat panel"><div class="w6b-h"><b>扁平文本块</b><span>丢掉内在层次与跨文档关联</span></div><div class="w6b-chips"></div><p>就如同靠阅读字典的随机词条去理解一部小说</p></div>
+      <div class="w6b-st panel"><div class="w6b-h"><b>结构化索引</b><span>反映知识的层次与关联</span></div><div class="w6b-tree"><span class="r">手册</span><span>SIMD</span><span>状态管理</span><i>SSE</i><i>AVX</i><i>XSAVE</i></div></div>
+      <p class="w6b-key">关键一步：把这些方法<b>反过来应用到用户记忆上</b>，解决用户记忆检索中的精度问题</p>
+    </div>
+    <div class="w6b-r fx fx-right" style="--d:3"><span class="lbl">围绕“如何组织与检索知识”的六个侧面（可点击）</span><div class="w6b-tp"></div></div>
+  </div>
+  <div class="src">第三章 ·「超越扁平文本：知识的组织与检索」</div>
+</section>
+<style>
+.w6b-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.w6b-l{display:flex;flex-direction:column;gap:12px}
+.w6b-flat,.w6b-st{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+.w6b-h b{font-size:19px}
+.w6b-h span{margin-left:10px;font-size:15px;color:var(--text3)}
+.w6b-chips{display:flex;flex-wrap:wrap;gap:6px}
+.w6b-chips span{padding:4px 10px;border-radius:8px;font-size:15px;color:var(--text2);border:1px solid var(--line2);transform:rotate(var(--r));animation:w6bdr 3s ease-in-out infinite alternate;animation-delay:var(--dl)}
+@keyframes w6bdr{to{transform:rotate(calc(var(--r) * -1)) translateY(3px)}}
+.w6b-flat p{font-size:15px;color:var(--text3)}
+.w6b-tree{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.w6b-tree span,.w6b-tree i{padding:5px;border-radius:8px;font-style:normal;font-size:15px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);color:var(--text)}
+.w6b-tree .r{grid-column:1/4;justify-self:center;padding:5px 30px;background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.w6b-tree span:nth-child(3){grid-column:2/4}
+.w6b-key{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.w6b-key b{color:var(--text)}
+.w6b-r{display:flex;flex-direction:column;gap:10px}
+.w6b-tp{display:flex;flex-direction:column;gap:8px}
+.w6b-t{display:grid;grid-template-columns:44px 1fr;gap:4px 14px;align-items:start;padding:11px 16px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .3s}
+.w6b-t em{grid-row:span 2;font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.w6b-t b{font-size:18px;color:var(--text)}
+.w6b-t span{font-size:15px;color:var(--text2)}
+.w6b-t:hover,.w6b-t.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8))}
+</style>
+<script>
+HOOKS['c03-beyond'] = {
+  T: [['结构化索引', 'RAPTOR 与 GraphRAG：如何组织知识', 6], ['文件系统范式', 'OpenViking：轻量级的知识管理思路', 7], ['知识应该如何更新', '增量更新 vs 定期全量整理', 7], ['智能体化 RAG', '让 Agent 自主决定检索策略', 8], ['上下文感知检索', '回过头修补最基础的分块环节', 9], ['从结构化数据集提取深度知识', '从信息检索到知识发现', 10]],
+  W: ['SSE2 支持 128 位整数运算', '退款需提供订单号', 'XMM 寄存器', '张医生 · 牙科', '第 232 条', 'AVX 的 VEX 编码', 'MXCSR 第 13–14 位', '护照 2025 年到期'],
+  init(s) {
+    s.querySelector('.w6b-chips').innerHTML = this.W.map((w, i) => `<span style="--r:${(i % 2 ? 1 : -1) * (2 + (i % 3))}deg;--dl:${i * 0.3}s">${w}</span>`).join('');
+    const tp = s.querySelector('.w6b-tp');
+    tp.innerHTML = this.T.map(([b, t, p], i) => `<button class="w6b-t" data-p="${p}"><em>${i + 1}</em><b>${b}</b><span>${t}</span></button>`).join('');
+    tp.querySelectorAll('.w6b-t').forEach((b) => b.addEventListener('click', () => C3.jump(+b.dataset.p)));
+  },
+  enter(s, ctx) { const ts = [...s.querySelectorAll('.w6b-t')]; let k = 0; const tick = () => { ts.forEach((t, j) => t.classList.toggle('on', j === k % 6)); k++; }; tick(); ctx.every(tick, 1500); },
+  reset(s) { s.querySelectorAll('.w6b-t').forEach((t) => t.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-cats" data-part="6" data-trans="zoom" data-dur="16000" data-title="案例一：黑猫白猫的计数问题" data-notes="还有一个更深的问题：即便建好了 RAG，若只是把大量原始案例平铺进知识库，检索也无法保证召回全部相关信息，模型于是基于不完整的上下文做出错误判断。<br><b>案例一：黑猫白猫的计数问题</b>。第二章用黑猫白猫的计数例子说明过“注意力是软检索”，即使 100 个案例全部装进上下文窗口，模型也难以完成精确计数。在使用 RAG 的情况下，问题会更严重：假设知识库有 100 个独立案例文档（90 只黑猫、10 只白猫，每个是独立文本块），用户询问“比例是多少？”时，受限于 top-k（如 20），大部分案例根本不会被检索到，模型只能基于不完整样本（如只看到 15 只黑猫和 3 只白猫）得出错误结论。若预先生成摘要“共有 100 只猫：90 只黑猫（90%）和 10 只白猫（10%）”并索引，一次检索就能获得准确信息。<br>左侧示意 top-k 检索取回的那一小部分；打开右上角开关，索引里多了一条预先生成的统计摘要。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">案例一：<em>黑猫白猫的计数问题</em></h2></div>
+    <button class="tgl w6c-tg fx fx-up" style="--d:2"><i></i>预先生成摘要并索引</button></header>
+  <div class="w6c-body">
+    <div class="w6c-kb panel fx fx-left" style="--d:3"><div class="w6c-h"><b>知识库：100 个独立案例文档</b><span>90 只黑猫 · 10 只白猫</span></div><div class="w6c-grid"></div><div class="w6c-sum">共有 100 只猫：90 只黑猫（90%）和 10 只白猫（10%）</div></div>
+    <div class="w6c-r fx fx-right" style="--d:4">
+      <div class="w6c-q"><span class="lbl">用户</span><b>“黑猫和白猫的比例是多少？”</b></div>
+      <div class="w6c-ret"><span class="lbl">top-k = 20 检索到的内容</span><div class="w6c-got"></div></div>
+      <div class="w6c-ans"></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「超越扁平文本：知识的组织与检索」· 案例一：黑猫白猫的计数问题</div>
+</section>
+<style>
+#c03-cats .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.w6c-body{display:grid;grid-template-columns:1.05fr 1fr;gap:24px;flex:1;min-height:0}
+.w6c-kb{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.w6c-h b{font-size:19px}
+.w6c-h span{margin-left:10px;font-size:15px;color:var(--text3)}
+.w6c-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:4px}
+.w6c-grid i{aspect-ratio:1;border-radius:50%;background:#1f2937;border:1px solid #475569;transition:all .3s}
+.w6c-grid i.w{background:#f1f5f9;border-color:#f1f5f9}
+.w6c-grid i.hit{box-shadow:0 0 0 3px var(--acc)}
+.w6c-sum{padding:12px 16px;border-radius:12px;font-size:17px;font-weight:700;color:#06101f;background:var(--acc);opacity:0;transform:translateY(8px);transition:all .4s}
+.w6c-sum.on{opacity:1;transform:none}
+.w6c-r{display:flex;flex-direction:column;gap:12px}
+.w6c-q b{display:block;margin-top:4px;font-size:21px}
+.w6c-got{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;min-height:80px}
+.w6c-got i{width:22px;height:22px;border-radius:50%;background:#1f2937;border:1px solid #475569;animation:pop .3s var(--spring) both}
+.w6c-got i.w{background:#f1f5f9}
+.w6c-got .s{padding:8px 12px;border-radius:10px;font-size:16px;font-weight:700;color:#06101f;background:var(--acc);animation:pop .3s var(--spring) both}
+.w6c-ans{margin-top:auto;min-height:96px;padding:14px 18px;border-radius:14px;font-size:18px;line-height:1.6;border:1px dashed var(--line2);color:var(--text3)}
+.w6c-ans.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.07)}
+.w6c-ans.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+</style>
+<script>
+HOOKS['c03-cats'] = {
+  init(s) {
+    const rnd = U.rand(5), white = new Set(); while (white.size < 10) white.add(Math.floor(rnd() * 100));
+    this.white = white;
+    s.querySelector('.w6c-grid').innerHTML = Array.from({ length: 100 }, (_, i) => `<i class="${white.has(i) ? 'w' : ''}"></i>`).join('');
+    // 示意的 top-k 命中：15 只黑猫 + 3 只白猫（原书例子）
+    const wl = [...white].slice(0, 3), bl = []; for (let i = 0; bl.length < 15; i++) if (!white.has(i * 6 % 100)) bl.push(i * 6 % 100);
+    this.hit = [...bl, ...wl];
+    this.tg = s.querySelector('.w6c-tg');
+    this.tg.addEventListener('click', () => { this.auto = false; this.tg.classList.toggle('on'); this.run(s); });
+  },
+  async run(s) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const on = this.tg.classList.contains('on'), cells = [...s.querySelectorAll('.w6c-grid i')], got = s.querySelector('.w6c-got'), ans = s.querySelector('.w6c-ans');
+    s.querySelector('.w6c-sum').classList.toggle('on', on);
+    cells.forEach((c) => c.classList.remove('hit')); got.innerHTML = ''; ans.className = 'w6c-ans'; ans.textContent = '检索中……';
+    await U.wait(ctx, 500); if (!ok()) return;
+    if (on) {
+      got.innerHTML = '<span class="s">共有 100 只猫：90 只黑猫（90%）和 10 只白猫（10%）</span>';
+      await U.wait(ctx, 700); if (!ok()) return;
+      ans.className = 'w6c-ans ok'; ans.textContent = '一次检索就拿到准确信息：黑猫 90%、白猫 10%';
+      return;
+    }
+    for (const i of this.hit) { cells[i].classList.add('hit'); got.insertAdjacentHTML('beforeend', `<i class="${this.white.has(i) ? 'w' : ''}"></i>`); await U.wait(ctx, 70); if (!ok()) return; }
+    ans.className = 'w6c-ans bad'; ans.textContent = '只看到 15 只黑猫和 3 只白猫 → 推断白猫约占 17%（实际 10%）：大部分案例根本没被检索到';
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.tg.classList.remove('on'); this.run(s); ctx.every(() => { if (this.auto) { this.tg.classList.toggle('on'); this.run(s); } }, 5000); },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; this.tg.classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c03-xfinity" data-part="6" data-dur="20000" data-title="案例二：Xfinity 优惠资格的边界问题" data-notes="<b>案例二：Xfinity 优惠资格的边界问题</b>。这次的知识库是客服工单归档，几百条工单各自记录一次真实的处理结果：退伍军人 John 通过审核，医生 Sarah 拿到折扣，教师 Mike 被告知不符合条件……每条工单只写清一个个案的结论，没有任何一条写着资格范围本身。护士来问“我能不能享受优惠”时，同样有几重障碍：首先是<b>最近邻偏置</b>——“护士”与“医生”语义最近，Sarah 那条排在最前，模型顺势推断护士也可以；若 Mike 那条碰巧排得更前，同一个问题就会得到相反的答案。其次是<b>边界语义的缺失</b>——这一重障碍调大 k 也解决不了：“仅限……，其他一律不适用”这种带全称与否定的边界，不存在于任何单条工单中。最后是<b>完整性信号的缺失</b>——模型无从判断自己是否已经看全，于是不会追问，只照着手里这几条自信作答。<br>解决办法仍然要从索引阶段入手：离线通读整个工单库，提炼出一条规则卡“Xfinity 优惠适用于现役与退伍军人、持证医护人员（含护士）；教师等其他职业不适用”。两个案例指向同一个结论：<b>把原始案例或文档不加处理地直接放进知识库是远远不够的</b>。无论是存入向量数据库、检索后注入上下文，还是直接塞进长上下文，未经提炼和结构化的知识，模型都无法可靠地利用；必须在索引阶段投入计算资源，对原始知识主动提炼、抽象和结构化——把“100 个个体案例”压缩为统计摘要，把“散落在几百条工单里的个案”提炼为带边界的明确规则。左侧示意排序一换、答案就反。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">案例二：Xfinity 优惠资格的<em>边界问题</em></h2></header>
+  <div class="w6d-body">
+    <div class="w6d-l panel fx fx-left" style="--d:2">
+      <div class="w6d-q"><span class="lbl">护士来问</span><b>“我能不能享受优惠？”</b><span class="c3-shi">示意</span></div>
+      <div class="w6d-tk"></div>
+      <div class="w6d-a"></div>
+    </div>
+    <div class="w6d-r fx fx-right" style="--d:3">
+      <div class="w6d-ob"><div data-k="0"><b>最近邻偏置</b><span>排序一换，答案就反</span></div><div data-k="1"><b>边界语义的缺失</b><span>“仅限……，其他一律不适用”不在任何单条工单里——调大 k 也没用</span></div><div data-k="2"><b>完整性信号的缺失</b><span>不知道自己是否看全，于是不追问、自信作答</span></div></div>
+      <div class="w6d-card"><span class="lbl">离线通读整个工单库 → 规则卡</span><b>Xfinity 优惠适用于现役与退伍军人、持证医护人员（含护士）；教师等其他职业不适用</b></div>
+      <p class="w6d-con"><b>把原始案例或文档不加处理地直接放进知识库是远远不够的</b>：统计摘要 · 带边界的明确规则</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「超越扁平文本：知识的组织与检索」· 案例二：Xfinity 优惠资格的边界问题</div>
+</section>
+<style>
+.w6d-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.w6d-l{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.w6d-q{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.w6d-q b{font-size:21px}
+.w6d-q .c3-shi{margin-left:auto}
+.w6d-tk{display:flex;flex-direction:column;gap:8px}
+.w6d-t{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;font-size:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .5s var(--ease)}
+.w6d-t em{font:700 16px var(--num);font-style:normal;color:var(--text3)}
+.w6d-t i{font-style:normal;font-size:15px;font-weight:700}
+.w6d-t.y i{color:#6ee7b7}.w6d-t.n i{color:#fda4af}
+.w6d-t.top{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.w6d-a{margin-top:auto;min-height:76px;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55;border:1px solid}
+.w6d-a.y{color:#6ee7b7;border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.06)}
+.w6d-a.n{color:#fda4af;border-color:rgba(251,113,133,.5);background:rgba(251,113,133,.06)}
+.w6d-r{display:flex;flex-direction:column;gap:12px}
+.w6d-ob{display:flex;flex-direction:column;gap:8px}
+.w6d-ob div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.w6d-ob b{font-size:18px}
+.w6d-ob span{font-size:15px;color:var(--text2)}
+.w6d-ob div.on{border-color:rgba(251,146,60,.6);background:rgba(251,146,60,.07)}
+.w6d-ob div.on b{color:var(--warn)}
+.w6d-card{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:14px;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.w6d-card b{font-size:19px;line-height:1.5}
+.w6d-con{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+.w6d-con b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-xfinity'] = {
+  T: { s: ['医生 Sarah 拿到折扣', '获批', 'y'], j: ['退伍军人 John 通过审核', '获批', 'y'], m: ['教师 Mike 被告知不符合条件', '不符合', 'n'] },
+  O: [['s', 'j', 'm'], ['m', 's', 'j']],
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const box = s.querySelector('.w6d-tk'), a = s.querySelector('.w6d-a'), ob = [...s.querySelectorAll('.w6d-ob div')];
+    let r = 0;
+    while (ok()) {
+      const ord = this.O[r % 2];
+      box.innerHTML = ord.map((k, i) => { const [t, v, c] = this.T[k]; return `<div class="w6d-t ${c}${i === 0 ? ' top' : ''}"><em>#${i + 1}</em><span>${t}</span><i>${v}</i></div>`; }).join('');
+      ob.forEach((o, j) => o.classList.toggle('on', j === 0));
+      const first = this.T[ord[0]];
+      a.className = 'w6d-a ' + first[2];
+      a.textContent = first[2] === 'y' ? '“护士”与“医生”语义最近 → 推断：可以享受优惠' : '这次教师那条排在最前 → 推断：不符合条件';
+      await U.wait(ctx, 2600); if (!ok()) return;
+      ob.forEach((o, j) => o.classList.toggle('on', j === (r % 2 ? 2 : 1)));
+      await U.wait(ctx, 1800); if (!ok()) return;
+      r++;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 结构化索引：从信息检索到知识建模 ================= -->
+<section class="slide" id="c03-raptor" data-part="6" data-trans="rise" data-dur="18000" data-title="RAPTOR：树状层次索引" data-notes="结构化索引的思路是：索引之前先用 LLM 把知识整理一遍——归纳、抽象、建立关联，多花一些计算资源，换取更好的检索质量。业界目前主要有两条路：树状层次（RAPTOR）和实体关系图（GraphRAG）。<br><b>RAPTOR</b>（Recursive Abstractive Processing for Tree-Organized Retrieval）采用自下而上的递归抽象方式：先将长文档切分为小的文本块作为“叶子节点”，再通过聚类算法将语义相近的叶子节点分组——聚类类似于把图书馆的书按主题自动分堆。例如在技术文档检索中，关于 SSE 指令的多个叶子节点（如“SSE2 支持 128 位整数运算”“SSE4.1 新增字符串比较指令”）会被聚类到同一组，系统自动生成父节点摘要“x86 SIMD 指令集的各代演进”。系统利用语言模型为每个分组生成一个更高层次的摘要作为父节点，过程不断递归，最终形成一棵从具体细节（叶子）到高度概括总结（根）的知识树。这种树状结构使得检索可以在多个抽象层次上进行，既能精确回答细节问题，也能提供对宏观概念的理解。<br>图3-10：原始文档 → 叶子层（文本块 1–7）→ 中间层（聚类摘要 A、B、C）→ 根节点（全局摘要），自下而上递归抽象：细节 → 主题 → 全局概览。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-10 RAPTOR：<em>自下而上的树状层次索引</em></h2></header>
+  <div class="w6e-body">
+    <div class="w6e-tree panel fx fx-left" style="--d:2"><svg class="w6e-svg" viewBox="0 0 760 430"></svg><p class="w6e-cap">自下而上递归抽象：细节 → 主题 → 全局概览</p></div>
+    <div class="w6e-r fx fx-right" style="--d:3">
+      <div class="w6e-ex c3-data"><b>SSE 的例子</b><div class="w6e-lv"><span>叶子</span><code>SSE2 支持 128 位整数运算</code><code>SSE4.1 新增字符串比较指令</code></div><div class="w6e-ar">↓ 聚类到同一组 · LLM 生成摘要</div><div class="w6e-lv"><span>父节点</span><code class="p">x86 SIMD 指令集的各代演进</code></div></div>
+      <div class="w6e-qs"><div data-q="0"><b>细节问题</b><span>“SSE4.1 新增了什么？” → 命中叶子</span></div><div data-q="1"><b>宏观问题</b><span>“这份手册讲了哪些 SIMD 内容？” → 命中根 / 中间层</span></div></div>
+      <p class="w6e-nt">聚类 ≈ 把图书馆的书按主题<b>自动分堆</b></p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「结构化索引：从信息检索到知识建模」· 图3-10 RAPTOR 树状层次索引</div>
+</section>
+<style>
+.w6e-body{display:grid;grid-template-columns:1.3fr 1fr;gap:24px;flex:1;min-height:0}
+.w6e-tree{padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.w6e-svg{width:100%;flex:1;min-height:0}
+.w6e-n rect{fill:rgba(12,18,40,.95);stroke:var(--c);stroke-width:2;transition:all .3s}
+.w6e-n text{font-size:16px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central}
+.w6e-n{opacity:0;transition:opacity .4s}
+.w6e-n.on{opacity:1}
+.w6e-n.hot rect{fill:color-mix(in srgb,var(--c) 30%,rgba(12,18,40,.95));filter:drop-shadow(0 0 8px var(--c))}
+.w6e-e{stroke:rgba(255,255,255,.2);stroke-width:1.5;opacity:0;transition:opacity .4s}
+.w6e-e.on{opacity:1}
+.w6e-lb{font-size:15px;fill:var(--text3)}
+.w6e-cap{font-size:15px;color:var(--text3);text-align:center}
+.w6e-r{display:flex;flex-direction:column;gap:14px}
+.w6e-ex b{font-size:19px}
+.w6e-lv{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.w6e-lv span{font-size:15px;color:var(--text3);min-width:48px}
+.w6e-lv code{padding:5px 10px;border-radius:8px;font:15px var(--font);color:var(--text);border:1px solid var(--line2)}
+.w6e-lv code.p{border-color:var(--acc);color:var(--acc);font-weight:700}
+.w6e-ar{margin-top:8px;font-size:15px;color:var(--text3)}
+.w6e-qs{display:flex;flex-direction:column;gap:8px}
+.w6e-qs div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .3s}
+.w6e-qs b{font-size:17px}
+.w6e-qs span{font-size:15px;color:var(--text2)}
+.w6e-qs div.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.w6e-nt{margin-top:auto;font-size:17px;color:var(--text2)}
+.w6e-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-raptor'] = {
+  init(s) {
+    const sv = s.querySelector('.w6e-svg');
+    const leaves = Array.from({ length: 7 }, (_, i) => [60 + i * 106, 340]), mids = [[113, 210], [380, 210], [646, 210]], root = [380, 80];
+    const grp = [[0, 1], [2, 3, 4], [5, 6]];
+    let h = '<text class="w6e-lb" x="12" y="400">原始文档</text><rect x="20" y="380" width="720" height="34" rx="8" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.15)"/>';
+    h += '<text class="w6e-lb" x="12" y="300">叶子层</text><text class="w6e-lb" x="12" y="172">中间层</text><text class="w6e-lb" x="12" y="44">根节点</text>';
+    grp.forEach((g, gi) => g.forEach((li) => (h += `<line class="w6e-e" data-l="1" x1="${leaves[li][0]}" y1="${leaves[li][1] - 22}" x2="${mids[gi][0]}" y2="${mids[gi][1] + 22}"/>`)));
+    mids.forEach((m) => (h += `<line class="w6e-e" data-l="2" x1="${m[0]}" y1="${m[1] - 22}" x2="${root[0]}" y2="${root[1] + 22}"/>`));
+    h += leaves.map(([x, y], i) => `<g class="w6e-n" data-l="0" data-i="L${i}" style="--c:#60a5fa"><rect x="${x - 48}" y="${y - 22}" width="96" height="44" rx="10"/><text x="${x}" y="${y}">文本块 ${i + 1}</text></g>`).join('');
+    h += mids.map(([x, y], i) => `<g class="w6e-n" data-l="1" data-i="M${i}" style="--c:#a78bfa"><rect x="${x - 82}" y="${y - 22}" width="164" height="44" rx="10"/><text x="${x}" y="${y}">聚类摘要 ${'ABC'[i]}</text></g>`).join('');
+    h += `<g class="w6e-n" data-l="2" data-i="R" style="--c:#2dd4bf"><rect x="${root[0] - 90}" y="${root[1] - 22}" width="180" height="44" rx="10"/><text x="${root[0]}" y="${root[1]}">全局摘要</text></g>`;
+    sv.innerHTML = h;
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const sv = s.querySelector('.w6e-svg'), qs = [...s.querySelectorAll('.w6e-qs div')];
+    const lv = (l, on) => sv.querySelectorAll(`[data-l="${l}"]`).forEach((e) => e.classList.toggle('on', on));
+    while (ok()) {
+      [0, 1, 2].forEach((l) => lv(l, false)); sv.querySelectorAll('.w6e-n').forEach((n) => n.classList.remove('hot')); qs.forEach((q) => q.classList.remove('on'));
+      for (const l of [0, 1, 2]) { await U.wait(ctx, 900); if (!ok()) return; lv(l, true); }
+      await U.wait(ctx, 900); if (!ok()) return;
+      qs[0].classList.add('on'); sv.querySelector('[data-i="L3"]').classList.add('hot');
+      await U.wait(ctx, 1800); if (!ok()) return;
+      qs[0].classList.remove('on'); sv.querySelector('[data-i="L3"]').classList.remove('hot');
+      qs[1].classList.add('on'); sv.querySelector('[data-i="R"]').classList.add('hot');
+      await U.wait(ctx, 2200); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-graphrag" data-part="6" data-dur="20000" data-title="GraphRAG：实体—关系知识图谱" data-notes="<b>GraphRAG</b> 将文档知识建模为由实体（Entities）和关系（Relationships）构成的知识图谱。知识图谱通过实体-关系-实体三元组（Triple）构建信息网络：三元组用“主语-关系-宾语”的形式表达一条知识，例如（北京, 是首都, 中国）、（张三, 就职于, 腾讯）。知识图谱的核心优势体现在两个方面。1. <b>多跳关系推理。</b>这是知识图谱最不可替代的能力：当用户问“我的医生所在医院的地址”时，系统需要依次解析“用户 → 医生 → 医院 → 地址”这条关系链；在扁平化的记忆存储中，这类多跳查询要么需要多次独立检索再由 LLM 拼接（效率低且容易断链），要么根本无法表达；图结构天然支持沿关系边遍历。2. <b>实体消歧（Entity Disambiguation）。</b>注意它与“一词多义”不同：判断“bank”在句中指河岸还是银行，是词义消歧，靠上下文感知的嵌入即可解决；区分现实世界中两个同名的“张医生”，是实体消歧，需要维护关于实体本身的知识。在知识图谱中，（张医生-A, 科室, 牙科）与（张医生-B, 科室, 心脏科）是图中的不同节点，通过各自的关系边连接到不同的人和机构，消歧过程无需额外推理。<br>GraphRAG 先利用 LLM 从文本中提取关键实体和实体间的关系，再通过社区发现（Community Detection）算法找出语义紧密的实体集群并生成摘要，自动发现知识中自然形成的主题聚类，特别擅长回答涉及多实体复杂关系的问题。左侧是图3-11：“我的牙医所在医院的地址”沿关系边逐跳遍历。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-11 GraphRAG：<em>实体—关系知识图谱</em></h2></header>
+  <div class="w6f-body">
+    <div class="w6f-g panel fx fx-left" style="--d:2"><svg class="w6f-svg" viewBox="0 0 760 440"></svg><div class="w6f-q"></div></div>
+    <div class="w6f-r fx fx-right" style="--d:3">
+      <div class="w6f-k"><b>多跳关系推理</b><p>“我的牙医所在医院的地址” = 用户 → 张医生-A → 仁爱口腔医院 → 地址，沿关系边逐跳遍历</p></div>
+      <div class="w6f-k"><b>实体消歧</b><p>两个同名“张医生”是图中<em>不同的节点</em>，靠各自的关系边（牙科 / 心内科）区分——不是词义消歧</p></div>
+      <div class="w6f-tr"><span class="lbl">每条边 = 一个三元组（主语-关系-宾语）</span><code>（张医生-A, 就职于, 仁爱口腔医院）</code><code>（仁爱口腔医院, 地址, 徐汇区 XX 路）</code></div>
+      <p class="w6f-nt">社区发现：找出语义紧密的实体集群并生成摘要</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「结构化索引：从信息检索到知识建模」· 图3-11 GraphRAG 实体-关系知识图谱</div>
+</section>
+<style>
+.w6f-body{display:grid;grid-template-columns:1.35fr 1fr;gap:24px;flex:1;min-height:0}
+.w6f-g{padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.w6f-svg{width:100%;flex:1;min-height:0}
+.w6f-e{stroke:rgba(255,255,255,.22);stroke-width:2;fill:none;transition:all .35s}
+.w6f-e.on{stroke:var(--acc);stroke-width:4}
+.w6f-el{font-size:15px;fill:var(--text3);text-anchor:middle}
+.w6f-n rect{fill:rgba(12,18,40,.95);stroke:var(--c);stroke-width:2;transition:all .35s}
+.w6f-n text{font-size:16px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central}
+.w6f-n.on rect{fill:color-mix(in srgb,var(--c) 30%,rgba(12,18,40,.95));filter:drop-shadow(0 0 8px var(--c))}
+.w6f-q{min-height:30px;font-size:17px;text-align:center;color:var(--acc)}
+.w6f-r{display:flex;flex-direction:column;gap:12px}
+.w6f-k{padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:rgba(12,18,40,.72)}
+.w6f-k b{font-size:19px;color:var(--acc)}
+.w6f-k p{margin-top:6px;font-size:16px;line-height:1.55;color:var(--text2)}
+.w6f-k em{font-style:normal;font-weight:700;color:var(--text)}
+.w6f-tr{display:flex;flex-direction:column;gap:6px}
+.w6f-tr code{font:15px var(--mono);color:#fde68a}
+.w6f-nt{margin-top:auto;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c03-graphrag'] = {
+  N: { u: ['用户', 380, 220, '#fbbf24'], a: ['张医生-A', 200, 120, '#2dd4bf'], ad: ['科室：牙科', 60, 50, '#94a3b8'], h1: ['仁爱口腔医院', 160, 300, '#60a5fa'], ad1: ['徐汇区 XX 路', 140, 400, '#94a3b8'], b: ['张医生-B', 560, 120, '#f472b6'], bd: ['科室：心内科', 700, 50, '#94a3b8'], h2: ['华山医院', 600, 300, '#60a5fa'], c2: ['心血管中心', 620, 400, '#94a3b8'] },
+  E: [['u', 'a', '我的牙医'], ['a', 'ad', ''], ['a', 'h1', '就职于'], ['h1', 'ad1', '地址'], ['u', 'b', '我的心脏科医生'], ['b', 'bd', ''], ['b', 'h2', '就职于'], ['h2', 'c2', '']],
+  init(s) {
+    const N = this.N, sv = s.querySelector('.w6f-svg');
+    let h = this.E.map(([a, b, l], i) => { const [, x1, y1] = N[a], [, x2, y2] = N[b]; return `<line class="w6f-e" data-e="${i}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>${l ? `<text class="w6f-el" x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - 8}">${l}</text>` : ''}`; }).join('');
+    h += Object.entries(N).map(([k, [t, x, y, c]]) => `<g class="w6f-n" data-n="${k}" style="--c:${c}"><rect x="${x - t.length * 9 - 14}" y="${y - 20}" width="${t.length * 18 + 28}" height="40" rx="10"/><text x="${x}" y="${y}">${t}</text></g>`).join('');
+    sv.innerHTML = h;
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const q = s.querySelector('.w6f-q'), en = (i, on) => s.querySelector(`.w6f-e[data-e="${i}"]`).classList.toggle('on', on), nn = (k, on) => s.querySelector(`.w6f-n[data-n="${k}"]`).classList.toggle('on', on);
+    while (ok()) {
+      s.querySelectorAll('.w6f-e,.w6f-n').forEach((x) => x.classList.remove('on'));
+      q.textContent = '“我的牙医所在医院的地址？”';
+      for (const [k, e] of [['u', null], ['a', 0], ['h1', 2], ['ad1', 3]]) { if (e != null) en(e, true); nn(k, true); await U.wait(ctx, 900); if (!ok()) return; }
+      q.textContent = '答：徐汇区 XX 路——沿关系边逐跳遍历，没有拼接多次检索';
+      await U.wait(ctx, 2200); if (!ok()) return;
+      s.querySelectorAll('.w6f-e,.w6f-n').forEach((x) => x.classList.remove('on'));
+      q.textContent = '同名的“张医生”：两个不同的节点';
+      nn('a', true); nn('b', true); en(1, true); en(5, true); nn('ad', true); nn('bd', true);
+      await U.wait(ctx, 2600); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-graphlimit" data-part="6" data-trans="zoom" data-dur="16000" data-title="图谱的语义降级与分层互补" data-notes="然而，作为用户记忆的<b>通用</b>存储方案，知识图谱面临固有局限：将自然语言转为三元组不可避免地导致<b>语义降级</b>——“如果下周还下雨，我就取消去海边的计划，改成去博物馆”这句话包含条件判断和时间依赖，但被分解为三元组后只剩下孤立的事实片段（我, 有计划, 海滩旅行）和（我, 有备选计划, 博物馆旅行），核心的条件逻辑和时间依赖全部丢失了。此外，三元组提取的准确性高度依赖 LLM 的理解能力，错误提取会导致知识污染。<br>因此，实践中的推荐策略是<b>分层互补</b>：以完整自然语言保存核心信息（保留语义完整性），辅以结构化元数据进行索引和检索（兼顾查询效率）；在需要多跳推理和精确消歧的垂直场景（如医疗问诊、法律案件分析、家族关系管理），将知识图谱作为专项索引手段，与自然语言记忆协同工作。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图谱的<em>语义降级</em>与<em>分层互补</em></h2></header>
+  <div class="w6g-sen fx fx-up" style="--d:2"><span class="w6g-p c">如果下周还下雨，</span><span class="w6g-p">我就取消去海边的计划，</span><span class="w6g-p">改成去博物馆</span></div>
+  <div class="w6g-arw fx fx-up" style="--d:3">↓ 转成三元组</div>
+  <div class="w6g-tri fx fx-up" style="--d:3"><code>（我, 有计划, 海滩旅行）</code><code>（我, 有备选计划, 博物馆旅行）</code><div class="w6g-lost"><span>条件判断 · 掉了</span><span>时间依赖 · 掉了</span></div></div>
+  <div class="w6g-body">
+    <div class="w6g-c fx fx-left" style="--d:4"><b>另一个风险</b><p>三元组提取的准确性高度依赖 LLM 的理解能力，<em>错误提取会导致知识污染</em></p></div>
+    <div class="w6g-c ok fx fx-right" style="--d:5"><b>推荐：分层互补</b><p>以<em>完整自然语言</em>保存核心信息 + 结构化元数据做索引；在需要多跳推理和精确消歧的垂直场景，把知识图谱当作<em>专项索引</em></p><div class="w6g-sc"><span>医疗问诊</span><span>法律案件分析</span><span>家族关系管理</span></div></div>
+  </div>
+  <div class="src">第三章 ·「结构化索引：从信息检索到知识建模」· 语义降级与分层互补</div>
+</section>
+<style>
+.w6g-sen{display:flex;justify-content:center;gap:4px;font-size:30px;font-weight:700;padding:16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w6g-p{padding:2px 6px;border-radius:8px;transition:all .5s}
+.w6g-p.c{color:var(--warn);background:rgba(251,146,60,.12)}
+.w6g-sen.drop .w6g-p.c{opacity:.15;transform:translateY(20px)}
+.w6g-arw{text-align:center;font-size:18px;color:var(--text3);margin:8px 0}
+.w6g-tri{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:14px}
+.w6g-tri code{padding:10px 16px;border-radius:12px;font:19px var(--mono);color:#fde68a;border:1px solid rgba(251,191,36,.45)}
+.w6g-lost{display:flex;gap:8px}
+.w6g-lost span{padding:6px 12px;border-radius:999px;font-size:16px;color:#fda4af;border:1px dashed rgba(251,113,133,.6)}
+.w6g-body{display:grid;grid-template-columns:1fr 1.4fr;gap:20px;margin-top:20px;flex:1;min-height:0}
+.w6g-c{display:flex;flex-direction:column;gap:8px;padding:16px 20px;border-radius:16px;border:1px solid rgba(251,113,133,.45);background:rgba(251,113,133,.05)}
+.w6g-c.ok{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.05)}
+.w6g-c b{font-size:20px}
+.w6g-c p{font-size:17px;line-height:1.6;color:var(--text2)}
+.w6g-c em{font-style:normal;font-weight:700;color:var(--text)}
+.w6g-sc{display:flex;gap:8px;margin-top:auto}
+.w6g-sc span{padding:6px 14px;border-radius:999px;font-size:16px;color:var(--text);border:1px solid rgba(52,211,153,.5)}
+</style>
+<script>
+HOOKS['c03-graphlimit'] = {
+  enter(s, ctx) { const sen = s.querySelector('.w6g-sen'); const t = () => sen.classList.toggle('drop'); ctx.later(t, 1800); ctx.every(t, 3000); },
+  reset(s) { s.querySelector('.w6g-sen').classList.remove('drop'); },
+};
+</script>
+
+<section class="slide" id="c03-exp37" data-part="6" data-trans="flip" data-dur="24000" data-title="实验 3-7 ★★★：RAPTOR 与 GraphRAG 的知识组织哲学" data-notes="<b>实验 3-7 ★★★：结构化索引：RAPTOR 与 GraphRAG 的知识组织哲学。</b>structured-index 项目在统一框架下完整实现了两种方法，并将其用于索引和查询长达数千页的英特尔 CPU 架构技术手册——一类具有高度结构性、层次性和关联性的典型材料。以查询“请解释 SSE 指令集”为例：<b>RAPTOR</b> 进行“跨层穿梭”，可能先在较高层摘要中定位到“SIMD 指令集”宏观概念，然后沿树状结构向下钻取，在叶子节点中找到详细的 SSE 技术描述，适合从高层概念逐步深入细节的问题；<b>GraphRAG</b> 在“关系网”中漫游，首先定位图谱中的“SSE”实体，遍历关系边找到“XMM 寄存器”“浮点运算”及具体指令（如 ADDPS），通过分析所在社区还能提供其在 CPU 架构中所处位置的上下文，特别适合“谁和谁有关？A 如何影响 B？”这类关系性问题。两者解决不同问题，生产场景里组合使用通常比单选一种效果更好。<br>配套仓库的验收（2026-07-29，Intel SDM 第 1 卷 253665-092US，选取 14 个物理页，索引与问答用 doubao-seed-1-6-250615，评委 moonshot）：RAPTOR 建成 14 片叶子、3 个父节点（SSE、AVX、XSAVE）、1 个根节点；GraphRAG 抽出 124 个实体、123 条关系、8 个社区，并保留了真实的多跳路径，比如 CPUID 指令 → XSAVE 特性集 → CR4.OSXSAVE 第 18 位 → XCR0 → YMM 寄存器状态（4 跳）。8 道题（4 道概念与细节、4 道关系与多跳）上，两者引用召回都是 0.958；评委打分 RAPTOR 4.0、GraphRAG 3.5，差距来自概念与细节题（4.0 对 3.0），关系与多跳题持平（都是 4.0）。规模很小，结论以原书为准。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-7 ★★★：RAPTOR 与 GraphRAG 的<em>知识组织哲学</em></h2></div>
+    <div class="w6h-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="r">RAPTOR · 跨层穿梭</button><button data-v="g">GraphRAG · 关系网漫游</button></div></header>
+  <div class="w6h-body">
+    <div class="w6h-v panel fx fx-left" style="--d:3"><div class="w6h-h"><b class="w6h-t"></b><span class="w6h-st"></span></div><div class="w6h-vis"></div><p class="w6h-d"></p></div>
+    <div class="w6h-r c3-data fx fx-right" style="--d:4">
+      <div class="c3-data-h"><svg class="ic"><use href="#i-clipboard"/></svg>验收记录 · 8 道题 · 同一份手册</div>
+      <table class="c3-tbl w6h-tb"><thead><tr><th></th><th>RAPTOR</th><th>GraphRAG</th></tr></thead><tbody>
+        <tr><td>引用召回（总体）</td><td>0.958</td><td>0.958</td></tr>
+        <tr><td>评委打分（总体）</td><td>4.0</td><td>3.5</td></tr>
+        <tr><td>概念与细节 × 4</td><td>4.0</td><td>3.0</td></tr>
+        <tr><td>关系与多跳 × 4</td><td>4.0</td><td>4.0</td></tr>
+        <tr><td>平均查询延迟</td><td>13.8 s</td><td>13.5 s</td></tr>
+      </tbody></table>
+      <p class="w6h-nt">两者解决不同问题：前者适合<b>从概念逐步钻进细节</b>，后者适合<b>A 和 B 之间是什么关系</b>；组合使用通常更好</p>
+      <div class="c3-data-s">Intel SDM Vol.1（253665-092US）14 页 · doubao-seed-1-6-250615 · 评委 moonshot · 2026-07-29 · 小规模验收</div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「结构化索引：从信息检索到知识建模」· 实验 3-7</div>
+</section>
+<style>
+#c03-exp37 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-exp37 .seg button{padding:8px 16px;font-size:17px}
+.w6h-body{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;flex:1;min-height:0}
+.w6h-v{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.w6h-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.w6h-h b{font-size:20px}
+.w6h-st{font-size:15px;color:var(--text3)}
+.w6h-vis{flex:1;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.w6h-lv{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.w6h-lv span{padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.4;border:1px solid var(--line2);color:var(--text2);opacity:.35;transition:all .35s;max-width:100%}
+.w6h-lv span.on{opacity:1;border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.w6h-lb{font-size:15px;color:var(--text3);text-align:center}
+.w6h-path{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px}
+.w6h-path span{padding:8px 12px;border-radius:10px;font:600 15px var(--mono);border:1px solid var(--line2);color:var(--text2);opacity:.3;transition:all .35s}
+.w6h-path span.on{opacity:1;color:#06101f;background:var(--acc);border-color:var(--acc)}
+.w6h-path i{font-style:normal;font-size:15px;color:var(--text3);opacity:.3;transition:opacity .35s}
+.w6h-path i.on{opacity:1;color:var(--acc)}
+.w6h-d{font-size:16px;line-height:1.6;color:var(--text2)}
+.w6h-r{display:flex;flex-direction:column;gap:12px}
+.w6h-tb td{font:600 17px var(--num)}
+.w6h-tb td:first-child{font:500 15px var(--font);color:var(--text2)}
+.w6h-nt{font-size:15px;line-height:1.55;color:var(--text2)}
+.w6h-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-exp37'] = {
+  init(s) { this.set = U.seg(s.querySelector('.w6h-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  async show(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v);
+    const vis = s.querySelector('.w6h-vis');
+    if (v === 'r') {
+      s.querySelector('.w6h-t').textContent = 'RAPTOR：从宏观摘要向下钻取';
+      s.querySelector('.w6h-st').textContent = '实测：14 片叶子 → 3 个父节点 → 1 个根';
+      s.querySelector('.w6h-d').textContent = '先在较高层摘要定位“SIMD 指令集”这个宏观概念，再沿树向下，在叶子里找到 SSE 的技术细节（XMM 寄存器、MXCSR）。';
+      vis.innerHTML = '<div class="w6h-lb">根</div><div class="w6h-lv" data-l="0"><span>Intel SIMD 架构与状态管理：SSE、AVX、XSAVE</span></div><div class="w6h-lb">父节点</div><div class="w6h-lv" data-l="1"><span>SSE · 第 254–260 页</span><span>AVX · 第 360–365 页</span><span>XSAVE · 第 323 页</span></div><div class="w6h-lb">叶子（14 片中的 3 片）</div><div class="w6h-lv" data-l="2"><span>第 254 页：SSE 与 IA-32 软件完全兼容</span><span>第 255 页：64 位模式与 XMM 寄存器</span><span>第 256 页：MXCSR 控制 / 状态寄存器</span></div>';
+      const pick = [[0, 0], [1, 0], [2, 1], [2, 2]];
+      for (const [l, i] of pick) { await U.wait(ctx, 900); if (!ok()) return; vis.querySelectorAll(`.w6h-lv[data-l="${l}"] span`)[i].classList.add('on'); }
+    } else {
+      s.querySelector('.w6h-t').textContent = 'GraphRAG：沿关系边漫游';
+      s.querySelector('.w6h-st').textContent = '实测：124 个实体 · 123 条关系 · 8 个社区';
+      s.querySelector('.w6h-d').textContent = '验收中保留的一条真实 4 跳路径：CPUID 报告 XSAVE 支持；XSAVE 只有在 CR4.OSXSAVE 置 1 时才启用；它影响 XCR0；XCR0[2:1] = 11b 才启用 YMM 寄存器状态（来源第 323、363 页）。';
+      const P = [['CPUID 指令', 'Enumerates'], ['XSAVE 特性集', 'Prerequisite'], ['CR4.OSXSAVE[bit 18]', 'Affects'], ['XCR0', 'Enables'], ['YMM 寄存器状态', '']];
+      vis.innerHTML = `<div class="w6h-path">${P.map(([n, e]) => `<span>${n}</span>${e ? `<i>— ${e} →</i>` : ''}`).join('')}</div>`;
+      const els = [...vis.querySelectorAll('.w6h-path span, .w6h-path i')];
+      for (const e of els) { await U.wait(ctx, 600); if (!ok()) return; e.classList.add('on'); }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 'r'); ctx.every(() => { if (this.auto) this.show(s, this.v === 'r' ? 'g' : 'r'); }, 7500); },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-when" data-part="6" data-dur="16000" data-title="什么时候需要结构化索引？" data-notes="<b>什么时候需要结构化索引？</b>不是所有场景都需要 RAPTOR 或 GraphRAG。前面介绍的混合检索（稠密 + 稀疏 + 重排序）已经能覆盖大多数需求。一个简单的判断标准：如果你的查询主要是“找到包含某信息的文档片段”（如“退款政策是什么”），混合检索就够了；如果查询经常需要<b>跨文档综合</b>（如“CPU 的 SSE 指令集和 AVX 指令集在架构上有什么区别”）或<b>多层次导航</b>（如“从整体架构到具体指令的逐步深入”），结构化索引才值得投入。相比简单的混合检索方案，结构化索引的代价是在索引构建和查询时都需要更多次 LLM 调用，成本和延迟都显著增加。<br>左侧三条查询依次被分类；右侧成本条为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">什么时候需要<em>结构化索引</em>？</h2></header>
+  <div class="w6i-body">
+    <div class="w6i-l fx fx-left" style="--d:2"><div class="w6i-qs"></div></div>
+    <div class="w6i-r panel fx fx-right" style="--d:3">
+      <div class="w6i-h"><b>代价：更多次 LLM 调用</b><span class="c3-shi">示意</span></div>
+      <div class="c3-bar on" style="--v:18%;--c:#2dd4bf;--lw:140px"><span>混合检索</span><i><b></b></i><em>索引 · 查询</em></div>
+      <div class="c3-bar on" style="--v:72%;--c:#a78bfa;--lw:140px"><span>结构化索引</span><i><b></b></i><em>索引 · 查询</em></div>
+      <p class="w6i-nt">索引构建和查询时都需要更多次 LLM 调用，<b>成本和延迟都显著增加</b>；实验 3-7 中 GraphRAG 建图就用了约 13 分钟</p>
+      <div class="w6i-rule"><b>判断标准</b><span>“找到包含某信息的片段” → 混合检索就够</span><span>“跨文档综合”或“多层次导航” → 结构化索引才值得投入</span></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「结构化索引：从信息检索到知识建模」· 什么时候需要结构化索引？</div>
+</section>
+<style>
+.w6i-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.w6i-qs{display:flex;flex-direction:column;gap:12px}
+.w6i-q{display:flex;flex-direction:column;gap:6px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .4s}
+.w6i-q b{font-size:19px}
+.w6i-q span{align-self:flex-start;padding:4px 12px;border-radius:999px;font-size:15px;font-weight:700;opacity:0;transition:opacity .3s}
+.w6i-q.on span{opacity:1}
+.w6i-q.h span{color:#06101f;background:#2dd4bf}
+.w6i-q.s span{color:#06101f;background:#a78bfa}
+.w6i-q.on{border-color:var(--c)}
+.w6i-r{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.w6i-h{display:flex;align-items:center;justify-content:space-between}
+.w6i-h b{font-size:19px}
+.w6i-nt{font-size:16px;line-height:1.55;color:var(--text2)}
+.w6i-nt b{color:var(--text)}
+.w6i-rule{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.w6i-rule b{font-size:17px;color:var(--acc)}
+.w6i-rule span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-when'] = {
+  Q: [['“退款政策是什么？”', 'h', '找到包含某信息的片段 → 混合检索就够', '#2dd4bf'], ['“CPU 的 SSE 指令集和 AVX 指令集在架构上有什么区别？”', 's', '跨文档综合 → 结构化索引', '#a78bfa'], ['“从整体架构到具体指令，逐步深入地讲讲”', 's', '多层次导航 → 结构化索引', '#a78bfa']],
+  init(s) { s.querySelector('.w6i-qs').innerHTML = this.Q.map(([q, k, t, c]) => `<div class="w6i-q ${k}" style="--c:${c}"><b>${q}</b><span>${t}</span></div>`).join(''); },
+  enter(s, ctx) { const qs = [...s.querySelectorAll('.w6i-q')]; let k = 0; const tick = () => { const i = k % 5; qs.forEach((q, j) => q.classList.toggle('on', j <= i && i < 3)); k++; }; tick(); ctx.every(tick, 1500); },
+  reset(s) { s.querySelectorAll('.w6i-q').forEach((q) => q.classList.remove('on')); },
+};
+</script>

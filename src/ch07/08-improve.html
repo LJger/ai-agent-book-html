@@ -1,0 +1,497 @@
+<!-- ================= 第 8 部分分隔页 ================= -->
+<section class="slide chapter" id="c07-d8" data-part="8" data-title="PART 08 · 从数据到改进" data-notes="「评估结果的统计显著性」「Agent 的可观测性」「从 Benchmark 报告到系统改进」。评估集有限，模型输出又有随机性，分数差异可能只是抽样噪声——这一部分先讲怎样判断分差是不是噪声：标准误、配对分析、多随机种子与多重比较；再讲评估驱动的决策所依赖的运行数据怎么采集：追踪与 span（图7-7），以及可观测数据怎样回流为评估资产；最后用配套仓库里一次真实的 AndroidWorld 调优过程（图7-8、表7-5、实验 7-13），展示如何根据一轮结果决定下一轮只改什么。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">从数据到改进</h1>
+  <div class="ch-s fx fx-up" style="--d:3">分差要超过噪声，问题要看得见，改动要一次只改一处</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">分差要超过噪声、在配对分析中成立，并且能够复现，才值得据此切换模型或发布改动。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<!-- ================= 标准误与置信区间 ================= -->
+<section class="slide" id="c07-se" data-part="8" data-trans="zoom" data-dur="24000" data-title="评估结果的统计显著性：分差是不是噪声？" data-notes="评估集有限，模型输出又有随机性，因此分数差异可能只是抽样噪声。若在 n 个用例上测得成功率 p，标准误可粗略估计为 SE(p) ≈ √(p(1−p)/n)。例如 100 个用例、成功率 70% 时，95% 置信区间约为 70% ± 9 个百分点；<b>“新模型 73% 对旧模型 70%”不足以支持切换。</b><br>若预期收益只有 2–3 个百分点，而评估集只有几十题，应该<b>先扩大样本</b>，标准误会按 1/√n 缩小。<br>页面上的计算器使用正确公式：95% 置信区间 = p ± 1.96 × √(p(1−p)/n)。拖动用例数 n，看两个配置的区间何时不再重叠。注意：两个独立区间不重叠只是粗略判据，同一批任务上的比较应当用下一页的配对分析。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">73% 对 70%：<em>不足以支持切换</em></h2></header>
+  <div class="c7se-body">
+    <div class="c7se-l panel fx fx-left" style="--d:2">
+      <div class="c7se-f"><code>SE(p) ≈ √( p(1 − p) / n )</code><span>95% 置信区间 ≈ p ± 1.96 · SE</span></div>
+      <div class="c7se-sl">
+        <label><span>用例数 n</span><input type="range" class="rng c7se-n" min="20" max="3000" step="10" value="100"><b class="c7se-vn">100</b></label>
+        <label><span>旧模型 p₁</span><input type="range" class="rng c7se-p1" min="5" max="95" step="1" value="70"><b class="c7se-v1">70%</b></label>
+        <label><span>新模型 p₂</span><input type="range" class="rng c7se-p2" min="5" max="95" step="1" value="73"><b class="c7se-v2">73%</b></label>
+      </div>
+      <div class="c7se-ax"><div class="c7se-iv a"><i></i><b></b></div><div class="c7se-iv b"><i></i><b></b></div><div class="c7se-tk"></div></div>
+      <div class="c7se-out"><b class="c7se-v">—</b><p class="c7se-x"></p></div>
+    </div>
+    <div class="c7se-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7se-k">原书的例子</b><div class="c7se-ex"><span>n = 100</span><span>p = 70%</span><span>95% CI ≈ <b>±9</b> 个百分点</span></div></div>
+      <div class="c7-card"><b class="c7se-k">标准误按 1 / √n 缩小</b><div class="c7se-sq"></div><p>预期收益只有 2–3 个百分点、评估集只有几十题时，<b>先扩大样本</b></p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「评估结果的统计显著性」</div>
+</section>
+<style>
+.c7se-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c7se-l{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.c7se-f{display:flex;align-items:center;gap:18px}
+.c7se-f code{font:700 20px var(--num);padding:6px 14px;border-radius:10px;border:1px solid var(--line2);color:var(--acc2)}
+.c7se-f span{font-size:16px;color:var(--text2)}
+.c7se-sl{display:flex;flex-direction:column;gap:8px}
+.c7se-sl label{display:grid;grid-template-columns:120px 1fr 80px;gap:14px;align-items:center;font-size:16px;color:var(--text2)}
+.c7se-sl b{font:700 18px var(--num);text-align:right;color:var(--text)}
+.c7se-ax{position:relative;height:150px;margin:6px 10px 0}
+.c7se-iv{position:absolute;left:0;right:0;height:44px}
+.c7se-iv.a{top:8px}.c7se-iv.b{top:62px}
+.c7se-iv i{position:absolute;top:14px;height:16px;border-radius:8px;transition:left .5s var(--ease),width .5s var(--ease)}
+.c7se-iv.a i{background:rgba(251,146,60,.5);border:1px solid #fb923c}
+.c7se-iv.b i{background:rgba(96,165,250,.5);border:1px solid #60a5fa}
+.c7se-iv b{position:absolute;top:0;width:4px;height:44px;border-radius:2px;background:#fff;transition:left .5s var(--ease)}
+.c7se-iv b::after{position:absolute;left:10px;top:12px;white-space:nowrap;font:700 15px var(--num);color:var(--text)}
+.c7se-iv.a b::after{content:"旧"}.c7se-iv.b b::after{content:"新"}
+.c7se-tk{position:absolute;left:0;right:0;bottom:0;height:26px;border-top:1px solid var(--line2)}
+.c7se-tk span{position:absolute;top:4px;translate:-50% 0;font:15px var(--num);color:var(--text3)}
+.c7se-out{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7se-out.ok{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.07)}
+.c7se-out.no{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.07)}
+.c7se-v{font-size:22px}
+.c7se-out.ok .c7se-v{color:#6ee7b7}.c7se-out.no .c7se-v{color:#fda4af}
+.c7se-x{font-size:16px;line-height:1.55;color:var(--text2);margin-top:4px}
+.c7se-r{display:flex;flex-direction:column;gap:14px}
+.c7se-k{display:block;font-size:17px;color:var(--acc);margin-bottom:10px}
+.c7se-ex{display:flex;gap:8px;flex-wrap:wrap}
+.c7se-ex span{font:600 17px var(--num);padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c7se-ex b{color:var(--warn)}
+.c7se-sq{display:flex;flex-direction:column;gap:6px}
+.c7se-sq div{display:grid;grid-template-columns:80px 1fr 90px;gap:10px;align-items:center;font:15px var(--num);color:var(--text2)}
+.c7se-sq i{height:14px;border-radius:7px;background:linear-gradient(90deg,var(--acc),var(--acc2));opacity:.7}
+.c7se-r .c7-card p{font-size:15px;color:var(--text2);margin-top:10px}.c7se-r .c7-card p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-se'] = {
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.q = q;
+    ['n', 'p1', 'p2'].forEach((k) => q('.c7se-' + k).addEventListener('input', () => { this.manual = true; this.calc(); }));
+    q('.c7se-sq').innerHTML = [25, 100, 400, 1600].map((n) => { const h = 1.96 * Math.sqrt(0.21 / n) * 100; return `<div><span>n = ${n}</span><i style="width:${(h / 18) * 100}%"></i><span>±${h.toFixed(1)} pt</span></div>`; }).join('');
+  },
+  calc() {
+    const q = this.q, n = +q('.c7se-n').value, p1 = +q('.c7se-p1').value / 100, p2 = +q('.c7se-p2').value / 100;
+    q('.c7se-vn').textContent = n; q('.c7se-v1').textContent = Math.round(p1 * 100) + '%'; q('.c7se-v2').textContent = Math.round(p2 * 100) + '%';
+    const h1 = 1.96 * Math.sqrt((p1 * (1 - p1)) / n), h2 = 1.96 * Math.sqrt((p2 * (1 - p2)) / n);
+    const lo = 0.4, hi = 1.0, X = (v) => ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * 100;
+    const set = (cls, p, h) => { const e = q('.c7se-iv.' + cls); e.querySelector('i').style.left = X(p - h) + '%'; e.querySelector('i').style.width = X(p + h) - X(p - h) + '%'; e.querySelector('b').style.left = `calc(${X(p)}% - 2px)`; };
+    set('a', p1, h1); set('b', p2, h2);
+    const ov = Math.abs(p2 - p1) < h1 + h2;
+    const out = q('.c7se-out');
+    out.className = 'c7se-out ' + (ov ? 'no' : 'ok');
+    q('.c7se-v').textContent = ov ? '区间重叠：分差可能只是噪声' : '区间不重叠：分差超出噪声';
+    q('.c7se-x').innerHTML = `旧 ${(p1 * 100).toFixed(0)}% ± ${(h1 * 100).toFixed(1)} 个百分点 · 新 ${(p2 * 100).toFixed(0)}% ± ${(h2 * 100).toFixed(1)} 个百分点`;
+  },
+  enter(s, ctx) {
+    const q = this.q; this.manual = false;
+    q('.c7se-tk').innerHTML = [40, 50, 60, 70, 80, 90, 100].map((v) => `<span style="left:${((v / 100 - 0.4) / 0.6) * 100}%">${v}%</span>`).join('');
+    q('.c7se-n').value = 100; q('.c7se-p1').value = 70; q('.c7se-p2').value = 73; this.calc();
+    const seq = [100, 400, 1000, 2000, 3000, 100]; let k = 0;
+    ctx.every(() => { if (this.manual) return; q('.c7se-n').value = seq[(k = (k + 1) % seq.length)]; this.calc(); }, 2600);
+  },
+  reset() {},
+};
+</script>
+
+<!-- ================= 配对分析 ================= -->
+<section class="slide" id="c07-paired" data-part="8" data-trans="flip" data-dur="26000" data-title="配对分析、多随机种子与多重比较" data-notes="同一批任务比较两个配置时，应优先做<b>配对分析</b>：逐题记录谁胜出，用 McNemar 检验或配对 bootstrap 判断差异，而不是直接相减两个独立成功率。由于 Agent 每次运行也可能不同，每个配置最好用<b>多个随机种子（如 3–5 次）</b>，报告均值和波动范围；单次运行只能用来筛选方向。<br>伪代码：对每个配对任务、每个固定种子，分别运行配置 A 和 B，用同一个验证器记录配对差值，最后用配对 bootstrap 或 McNemar 检验汇总。<b>配对的含义是让两组共享任务与随机条件，而不是分别抽两批样本再比较平均值。</b><br>并行验证多个假设时还要考虑<b>多重比较</b>：收紧显著性阈值，或对正向结果做独立复跑。实务上的判断标准很简单：<b>分差要超过噪声、在配对分析中成立，并且能够复现</b>，才值得据此切换模型或发布改动。<br>页面上的 100 道题胜负为示意数据：两个配置都对或都错的题不提供信息，只有“不一致对”（一方对、一方错）进入 McNemar 统计量 χ² = (|b − c| − 1)² / (b + c)（含连续性校正，自由度 1），p 值按卡方分布正确计算。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">配对分析：<em>只有不一致的题</em>才说明差异</h2></div>
+    <div class="c7pa-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">B 只多对 3 题</button><button data-v="1">B 多对 12 题</button></div></header>
+  <div class="c7pa-body">
+    <div class="c7pa-l panel fx fx-left" style="--d:3">
+      <div class="c7pa-h"><b>同一批 100 道题，逐题对照</b><span class="c7-tag">示意数据</span></div>
+      <div class="c7pa-grid"></div>
+      <div class="c7pa-lg"><span class="tt"><i></i>都对</span><span class="ff"><i></i>都错</span><span class="tf"><i></i>A 对 B 错 · b</span><span class="ft"><i></i>A 错 B 对 · c</span></div>
+      <div class="c7pa-st"><div><span>A 成功率</span><b class="c7pa-pa">—</b></div><div><span>B 成功率</span><b class="c7pa-pb">—</b></div><div><span>不一致对 b / c</span><b class="c7pa-bc">—</b></div><div><span>McNemar χ²</span><b class="c7pa-x2">—</b></div><div><span>p 值</span><b class="c7pa-pv">—</b></div></div>
+    </div>
+    <div class="c7pa-r fx fx-right" style="--d:4">
+      <div class="win"><div class="win-bar"><i></i><i></i><i></i><span>paired_eval.py</span></div>
+        <pre class="code c7pa-code"><span class="ln"><span class="t-k">for</span> task <span class="t-k">in</span> paired_tasks:</span><span class="ln">    <span class="t-k">for</span> seed <span class="t-k">in</span> fixed_seeds:</span><span class="ln">        a = run(config_a, task, seed)</span><span class="ln">        b = run(config_b, task, seed)</span><span class="ln">        record_paired_delta(verifier(a), verifier(b))</span><span class="ln"></span><span class="ln"><span class="t-k">return</span> paired_bootstrap_or_mcnemar(all_deltas)</span></pre></div>
+      <div class="c7pa-cards">
+        <div class="c7-card"><b>多随机种子</b><p>每个配置 3–5 次，报告均值与波动范围；单次运行只能筛选方向</p></div>
+        <div class="c7-card"><b>多重比较</b><p>并行验证多个假设时收紧阈值，或对正向结果独立复跑</p></div>
+      </div>
+      <div class="c7pa-gate"><span>超过噪声</span><i>+</i><span>配对分析成立</span><i>+</i><span>能够复现</span><i>=</i><b>才值得切换或发布</b></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「评估结果的统计显著性」</div>
+</section>
+<style>
+.c7pa-seg button{font-size:16px}
+.c7pa-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;flex:1;min-height:0}
+.c7pa-l{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.c7pa-h{display:flex;align-items:center;gap:12px}.c7pa-h b{font-size:18px}
+.c7pa-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:4px}
+.c7pa-grid i{aspect-ratio:1;border-radius:4px;background:rgba(255,255,255,.06);transition:background .4s,box-shadow .4s}
+.c7pa-grid i.tt,.c7pa-lg .tt i{background:rgba(52,211,153,.35)}
+.c7pa-grid i.ff,.c7pa-lg .ff i{background:rgba(148,163,184,.22)}
+.c7pa-grid i.tf,.c7pa-lg .tf i{background:#fb923c}
+.c7pa-grid i.ft,.c7pa-lg .ft i{background:#60a5fa}
+.c7pa-grid i.tf,.c7pa-grid i.ft{box-shadow:0 0 8px rgba(255,255,255,.35)}
+.c7pa-lg{display:flex;gap:14px;flex-wrap:wrap}
+.c7pa-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7pa-lg i{width:14px;height:14px;border-radius:3px}
+.c7pa-st{margin-top:auto;display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.c7pa-st div{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;border:1px solid var(--line)}
+.c7pa-st span{font-size:15px;color:var(--text3)}
+.c7pa-st b{font:800 22px var(--num)}
+.c7pa-r{display:flex;flex-direction:column;gap:12px}
+.c7pa-code{font-size:16px;line-height:1.55}
+.c7pa-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7pa-cards .c7-card{padding:12px 16px}
+.c7pa-cards b{font-size:17px;color:var(--acc)}
+.c7pa-cards p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+.c7pa-gate{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.c7pa-gate span{font-size:15px;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.05)}
+.c7pa-gate i{font-style:normal;font-weight:800;color:var(--acc)}
+.c7pa-gate b{font-size:16px}
+</style>
+<script>
+HOOKS['c07-paired'] = {
+  // 两个示意场景：[都对, 都错, b(A 对 B 错), c(A 错 B 对)]
+  SC: [[62, 22, 6, 9], [60, 16, 3, 15]],
+  // 标准正态尾概率（Abramowitz-Stegun 7.1.26），χ²(1) 的 p 值 = erfc(√(χ²/2))
+  erfc(x) { const t = 1 / (1 + 0.3275911 * x), y = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))); return y * Math.exp(-x * x); },
+  init(s) {
+    s.querySelector('.c7pa-grid').innerHTML = '<i></i>'.repeat(100);
+    this.seg = U.seg(s.querySelector('.c7pa-seg'), (v) => { this.auto = false; this.show(s, +v); });
+    const r = U.rand(11); this.ord = [...Array(100).keys()].sort(() => r() - 0.5);
+  },
+  show(s, k) {
+    this.i = k;
+    const [tt, ff, b, c] = this.SC[k], cls = [...Array(tt).fill('tt'), ...Array(ff).fill('ff'), ...Array(b).fill('tf'), ...Array(c).fill('ft')];
+    const cells = s.querySelectorAll('.c7pa-grid i');
+    this.ord.forEach((pos, j) => (cells[pos].className = cls[j]));
+    const x2 = Math.pow(Math.abs(b - c) - 1, 2) / (b + c), p = this.erfc(Math.sqrt(x2 / 2));
+    s.querySelector('.c7pa-pa').textContent = tt + b + '%';
+    s.querySelector('.c7pa-pb').textContent = tt + c + '%';
+    s.querySelector('.c7pa-bc').textContent = `${b} / ${c}`;
+    s.querySelector('.c7pa-x2').textContent = x2.toFixed(2);
+    const pv = s.querySelector('.c7pa-pv');
+    pv.textContent = p.toFixed(3); pv.style.color = p < 0.05 ? '#6ee7b7' : '#fda4af';
+  },
+  enter(s, ctx) { C7.auto(this, ctx, 2, 5200, (i) => { this.seg(String(i)); this.show(s, i); }, 400); },
+  reset(s) { this.i = null; s.querySelectorAll('.c7pa-grid i').forEach((c) => (c.className = '')); },
+};
+</script>
+
+<!-- ================= 追踪与 span ================= -->
+<section class="slide" id="c07-trace" data-part="8" data-trans="rise" data-dur="26000" data-title="图7-7 可观测性技术栈：追踪与 span" data-notes="评估驱动的决策（无论是模型选型还是持续迭代）都依赖于高质量的运行数据。<b>可观测性</b>（Observability）这个概念借自分布式系统领域：你没法直接打开系统内部看它在做什么，只能通过它输出的日志、指标和追踪数据来推断发生了什么，就像医生不能直接看到患者体内的情况，只能通过体温、血压、影像等外部信号来诊断问题。Agent 系统把这件事变得更难：同样的输入可能产生不同的输出，多轮推理和工具调用使执行路径极其复杂，而模型的“思考”过程对外完全不透明。<br>Agent 可观测性的数据基础是<b>追踪（Trace）</b>，其数据结构直接沿用了分布式系统的 span 树模型：一次任务执行对应一条 trace，其中每个 LLM 调用、每次工具调用、每次检索都是一个 <b>span</b>（记录输入输出、起止时间、token 消耗、错误信息的执行单元），span 之间的父子关系构成一棵执行树。这一层已有标准化协议可用：<b>OpenTelemetry</b> 是通用的分布式追踪标准，<b>OpenInference</b> 等规范则在其上定义了 LLM 应用特有的语义约定（如何记录提示词、模型参数、token 用量等）。采用标准协议的好处是<b>采集与分析解耦</b>——同一份追踪数据可以对接不同的分析后端，避免被单一平台锁定。<br>图7-7 左边是一次“帮用户查北京明天天气”任务的执行追踪树，右边是监控仪表盘：成本追踪、性能监控、质量审计，以及“追踪数据 → 发现问题 → A/B 测试 → 提示词版本管理 → 持续优化”的闭环。图中的耗时、费用、仪表盘数字都是原书示例数字。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图7-7 一次任务 = 一条 trace，<em>每次调用 = 一个 span</em></h2></header>
+  <div class="c7tr-body">
+    <div class="c7tr-tree panel fx fx-left" style="--d:2">
+      <div class="c7tr-h"><b>执行追踪树（单次任务）</b><span class="c7-tag">原书示例数字</span></div>
+      <div class="c7tr-rows"></div>
+      <div class="c7tr-std"><span><b>OpenTelemetry</b>通用分布式追踪标准</span><span><b>OpenInference</b>LLM 应用的语义约定：提示词、模型参数、token 用量</span></div>
+    </div>
+    <div class="c7tr-dash fx fx-right" style="--d:3">
+      <div class="c7tr-p" data-p="0"><b><svg class="ic"><use href="#i-coin"/></svg>成本追踪</b><span>今日：$12.30（1,200 次）</span><span>本月：$340（34K 次）</span><span class="bad">异常：task#892 循环调用 search 14 次，耗 $2.1</span></div>
+      <div class="c7tr-p" data-p="1"><b><svg class="ic"><use href="#i-gauge"/></svg>性能监控</b><span>P50 / P95 / P99 延迟：2.1s / 8.4s / 15.2s</span><span>工具成功率：94.3%</span></div>
+      <div class="c7tr-p" data-p="2"><b><svg class="ic"><use href="#i-shield"/></svg>质量审计</b><span>任务成功率：87% · 幻觉触发：2.1%</span><span>安全违规：0（本月）· 用户满意度：4.3/5</span></div>
+      <div class="c7tr-loop"><span>追踪数据</span><i></i><span>发现问题</span><i></i><span>A/B 测试</span><i></i><span>提示词版本管理</span><i></i><span>持续优化</span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「Agent 的可观测性」· 图7-7 可观测性技术栈</div>
+</section>
+<style>
+.c7tr-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c7tr-tree{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.c7tr-h{display:flex;align-items:center;gap:12px}.c7tr-h b{font-size:18px}
+.c7tr-rows{display:flex;flex-direction:column;gap:6px}
+.c7tr-s{--c:var(--acc);display:grid;grid-template-columns:1fr 260px;gap:12px;align-items:center;padding:8px 12px;border-radius:10px;border-left:4px solid var(--c);background:rgba(255,255,255,.03);opacity:0;translate:-16px 0;transition:opacity .4s,translate .4s,background .3s}
+.c7tr-s.on{opacity:1;translate:0 0}
+.c7tr-s.cur{background:color-mix(in srgb,var(--c) 14%,transparent)}
+.c7tr-s div{display:flex;flex-direction:column;gap:1px}
+.c7tr-s b{font-size:16px}
+.c7tr-s small{font-size:15px;color:var(--text3)}
+.c7tr-s .bar{position:relative;height:16px;border-radius:4px;background:rgba(255,255,255,.04)}
+.c7tr-s .bar i{position:absolute;top:0;bottom:0;border-radius:4px;background:var(--c);opacity:.75}
+.c7tr-std{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c7tr-std span{display:flex;flex-direction:column;font-size:15px;line-height:1.45;color:var(--text3);padding:8px 12px;border-radius:10px;border:1px solid var(--line2)}
+.c7tr-std b{font-size:16px;color:var(--text)}
+.c7tr-dash{display:flex;flex-direction:column;gap:10px}
+.c7tr-p{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s}
+.c7tr-p b{display:flex;align-items:center;gap:8px;font-size:17px;color:var(--acc)}
+.c7tr-p b .ic{width:20px;height:20px}
+.c7tr-p span{font:15px var(--num);color:var(--text2)}
+.c7tr-p span.bad{color:#fda4af}
+.c7tr-p.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85))}
+.c7tr-loop{margin-top:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.c7tr-loop span{font-size:15px;padding:5px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.c7tr-loop i{width:16px;height:2px;background:var(--acc)}
+</style>
+<script>
+HOOKS['c07-trace'] = {
+  // [深度, 名称, 说明, 起点 s, 时长 s, 颜色]
+  T: [[0, 'Trace：帮用户查北京明天天气', '3.2s · $0.008', 0, 3.2, '#a78bfa'], [1, 'LLM Call：意图识别', 'Claude 4 Sonnet · 0.4s · 320 tokens', 0, 0.4, '#c084fc'], [1, 'Tool：get_weather(Beijing)', 'MCP Server · 1.8s · 200ms TTFT', 0.4, 1.8, '#fbbf24'], [2, 'HTTP Request', 'api.weather.com · 1.6s', 0.5, 1.6, '#fb923c'], [2, 'Response Parse', 'JSON → 结构化天气数据', 2.1, 0.1, '#fb923c'], [1, 'LLM Call：生成回复', 'Claude 4 Sonnet · 0.8s · 580 tokens', 2.2, 0.8, '#c084fc'], [1, 'Tool：send_message(user)', '0.2s · 包含天气摘要', 3.0, 0.2, '#fbbf24']],
+  init(s) {
+    s.querySelector('.c7tr-rows').innerHTML = this.T.map(([d, n, x, st, du, c]) => `<div class="c7tr-s" style="--c:${c};margin-left:${d * 34}px"><div><b>${n}</b><small>${x}</small></div><span class="bar"><i style="left:${(st / 3.2) * 100}%;width:${Math.max(1.5, (du / 3.2) * 100)}%"></i></span></div>`).join('');
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const rs = [...s.querySelectorAll('.c7tr-s')], ps = [...s.querySelectorAll('.c7tr-p')];
+    while (ok()) {
+      rs.forEach((r) => r.classList.remove('on', 'cur')); ps.forEach((p) => p.classList.remove('on'));
+      for (const r of rs) { await U.wait(ctx, 650); if (!ok()) return; rs.forEach((x) => x.classList.remove('cur')); r.classList.add('on', 'cur'); }
+      for (const p of ps) { await U.wait(ctx, 1500); if (!ok()) return; ps.forEach((x) => x.classList.remove('on')); p.classList.add('on'); }
+      await U.wait(ctx, 3000);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7tr-s,.c7tr-p').forEach((x) => x.classList.remove('on', 'cur')); },
+};
+</script>
+
+<!-- ================= 可观测数据回流 ================= -->
+<section class="slide" id="c07-obs" data-part="8" data-trans="iris" data-dur="22000" data-title="可观测性的价值与回流闭环" data-notes="可观测性的价值首先在于<b>问题诊断</b>：完整的轨迹让开发者能回放全过程，而非靠猜测。其次是<b>持续优化</b>的基础——你能看到哪些任务需要多轮迭代、哪些工具成功率最低、哪些检索查询总是返回空结果。在<b>成本管理</b>上，Agent 运行成本在不同任务上可能差一两个数量级，追踪可以识别出异常高成本的案例。最后，积累的轨迹数据也为<b>模型后训练</b>提供了基础。<br>LangSmith 是这一领域的代表性平台之一（类似定位的还有 Langfuse、Arize Phoenix 等），将可观测性、评估、优化整合为闭环。每次执行时都会创建一个追踪会话，其中的模型调用、工具使用、知识检索被记录为独立的执行单元，通过因果关系链接形成一棵执行树。每个单元记录完整的输入输出、时间信息、成本数据和错误信息。平台采用<b>异步批量数据采集</b>，确保追踪本身不影响 Agent 的响应延迟。平台还支持 A/B 测试（将一部分用户的流量路由到新版本，自动对比各项指标，支持快速回滚或渐进扩量）、提示词版本管理（每个版本都关联着运行时的性能数据）、以及协作式开发（团队成员可共享追踪数据和问题案例）。生产环境中的海量真实数据是持续改进的金矿——能发现未曾预料的场景，识别最需要优化的功能点。<br>可观测性数据最有价值的去向，是<b>回流并转化为评估资产</b>。一条实用的闭环是：从生产轨迹中筛选出失败与可疑案例 → 脱敏处理（去除用户隐私、密钥等敏感字段）→ 沉淀为评估集的新用例和回归测试。这样评估集就不再是一次性构造的静态集合，而是随产品演化、持续贴近真实用户分布的活资产。<b>今天线上暴露的失败模式，明天就成为守住这条底线的回归用例。</b>">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">今天线上的失败，<em>明天的回归用例</em></h2></header>
+  <div class="c7ob2-st fx fx-up" style="--d:2">
+    <div class="c7ob2-n" data-n="0"><svg class="ic"><use href="#i-server"/></svg><b>生产轨迹</b><small>海量真实数据</small></div>
+    <div class="c7ob2-n" data-n="1"><svg class="ic"><use href="#i-funnel"/></svg><b>筛选</b><small>失败与可疑案例</small></div>
+    <div class="c7ob2-n" data-n="2"><svg class="ic"><use href="#i-eyeoff"/></svg><b>脱敏</b><small>去除用户隐私、密钥</small></div>
+    <div class="c7ob2-n" data-n="3"><svg class="ic"><use href="#i-db"/></svg><b>评估集新用例</b><small>+ 回归测试</small></div>
+    <svg class="c7ob2-svg" viewBox="0 0 1660 200"><path class="c7ob2-p" d="M210 100 L520 100 L520 100 L830 100 L1140 100 L1450 100"/><path class="c7ob2-back" d="M1450 150 C1450 195 210 195 210 150"/></svg>
+  </div>
+  <div class="c7ob2-val fx fx-up" style="--d:3">
+    <div class="c7-card"><b>问题诊断</b><p>回放全过程，而非靠猜测</p></div>
+    <div class="c7-card"><b>持续优化</b><p>哪些任务需要多轮迭代、哪些工具成功率最低、哪些检索总返回空</p></div>
+    <div class="c7-card"><b>成本管理</b><p>不同任务成本差一两个数量级，找出异常高成本案例</p></div>
+    <div class="c7-card"><b>后训练基础</b><p>积累的轨迹数据</p></div>
+  </div>
+  <div class="c7ob2-pl fx fx-up" style="--d:4"><span class="lbl">平台</span><b>LangSmith</b><span>Langfuse</span><span>Arize Phoenix</span><em>异步批量采集，不影响响应延迟 · A/B 测试（快速回滚 / 渐进扩量）· 提示词版本管理 · 协作式开发</em></div>
+  <div class="src">第七章 ·「Agent 的可观测性」</div>
+</section>
+<style>
+#c07-obs .c7ob2-st{position:relative;height:250px;display:grid;grid-template-columns:repeat(4,1fr);gap:100px;padding:0 60px;align-items:start}
+.c7ob2-n{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 10px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.9);transition:border-color .35s,box-shadow .35s}
+.c7ob2-n .ic{width:34px;height:34px;color:var(--acc)}
+.c7ob2-n b{font-size:20px}
+.c7ob2-n small{font-size:15px;color:var(--text3)}
+.c7ob2-n.on{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 35%,transparent)}
+.c7ob2-svg{position:absolute;left:0;top:0;width:100%;height:200px;pointer-events:none}
+.c7ob2-p,.c7ob2-back{fill:none;stroke:var(--line2);stroke-width:2;stroke-dasharray:8 8}
+.c7ob2-back{stroke:color-mix(in srgb,var(--acc) 50%,transparent)}
+.c7ob2-dot{fill:var(--acc)}
+.c7ob2-val{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:6px}
+.c7ob2-val b{font-size:18px;color:var(--acc)}
+.c7ob2-val p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+.c7ob2-pl{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px;font-size:16px}
+.c7ob2-pl>span:not(.lbl),.c7ob2-pl>b{padding:4px 12px;border-radius:8px;border:1px solid var(--line2)}
+.c7ob2-pl em{font-style:normal;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c07-obs'] = {
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const svg = s.querySelector('.c7ob2-svg'), p = s.querySelector('.c7ob2-p'), bk = s.querySelector('.c7ob2-back'), ns = [...s.querySelectorAll('.c7ob2-n')];
+    while (ok()) {
+      ns.forEach((n) => n.classList.remove('on')); ns[0].classList.add('on');
+      const d = C7.S('circle', { r: 9, class: 'c7ob2-dot' }, svg);
+      const steps = [[0, 0.33, 1], [0.33, 0.66, 2], [0.66, 1, 3]];
+      const L = p.getTotalLength();
+      for (const [a, b, n] of steps) {
+        const t0 = performance.now();
+        await new Promise((res) => ctx.raf((now) => { const k = Math.min(1, (now - t0) / 900); const pt = p.getPointAtLength(L * (a + (b - a) * k)); d.setAttribute('cx', pt.x); d.setAttribute('cy', pt.y); if (k >= 1) { res(); return false; } return true; }));
+        if (!ok()) { d.remove(); return; }
+        ns.forEach((x) => x.classList.remove('on')); ns[n].classList.add('on');
+        await U.wait(ctx, 500); if (!ok()) { d.remove(); return; }
+      }
+      await U.fly(d, bk, 1600, { ctx, alive: ok });
+      d.remove(); if (!ok()) return;
+      await U.wait(ctx, 600);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7ob2-dot').forEach((d) => d.remove()); s.querySelectorAll('.c7ob2-n').forEach((n) => n.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 图7-8 先查评测系统 ================= -->
+<section class="slide" id="c07-bench2fix" data-part="8" data-steps="2" data-trans="zoom" data-title="图7-8 从 Benchmark 报告到系统改进" data-notes="下面来看配套仓库里一次真实的 AndroidWorld 调优过程。实验只跑了 API 35 模拟器上的 4 个 Wi-Fi 设置任务，每项任务做一次配对对照。这个案例的价值不在于证明系统整体提高了多少，而在于展示如何根据一轮结果，决定下一轮只改什么。<br>从 Harness 工程的视角看，这一节本质上讲的是 Harness 迭代优化的方法论——通过评估数据定位 Harness 中的薄弱环节（上下文不足？约束缺失？验证不够？反馈不及时？），有针对性地改进，再重新评估，形成 Harness 持续进化的闭环。<br>在开始分析 Benchmark 报告之前，有一条容易被忽视的原则：<b>看到 Agent 表现下降时，应先检查评测系统本身，再动 Agent</b>。一个常见误区是看到分数下降就立刻修改 Agent 代码，而忽略了评测系统本身可能先出了问题——基于失真的信号调整方向，修改方向可能从一开始就是错的。评测系统常见的错误来源包括：<b>运行环境的资源不足导致进程被杀（表现为随机失败）、验证器本身有 bug 把正确答案判为失败、测试用例与生产场景之间存在脱节</b>。这些问题在结果数字上都跟模型退化一模一样，只有审查完整的轨迹才能区分。<br>图7-8 的五阶段闭环：观察（诊断报告）→ 假设（三层改进框架：表层、中层、深层）→ 实验（分阶段验证）→ 决策（成本—收益权衡）→ 迭代（新一轮循环）。原图第③④⑤栏里的示例数字与正文表7-5 不一致，本页只保留闭环结构，数字以正文和配套仓库为准。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图7-8 分数下降时：<em>先查评测系统，再动 Agent</em></h2></header>
+  <div class="c7bf-chk fx fx-up" data-step="0">
+    <div class="c7bf-ck"><svg class="ic"><use href="#i-cpu"/></svg><b>运行环境资源不足</b><span>进程被杀，表现为<b>随机失败</b></span></div>
+    <div class="c7bf-ck"><svg class="ic"><use href="#i-bug"/></svg><b>验证器本身有 bug</b><span>把正确答案判为失败</span></div>
+    <div class="c7bf-ck"><svg class="ic"><use href="#i-unlink"/></svg><b>测试用例与生产脱节</b><span>测的不是真实场景</span></div>
+    <p class="c7bf-cn">这些问题在结果数字上<b>跟模型退化一模一样</b>，只有审查完整的轨迹才能区分</p>
+  </div>
+  <div class="c7bf-loop fx fx-up" data-step="1">
+    <div class="c7bf-s"><em>①</em><b>观察</b><span>诊断报告：失败集中在哪些任务和能力</span></div>
+    <div class="c7bf-s"><em>②</em><b>假设</b><span>三层框架：表层 → 中层 → 深层</span></div>
+    <div class="c7bf-s"><em>③</em><b>实验</b><span>分阶段验证，每轮只改一个变量</span></div>
+    <div class="c7bf-s"><em>④</em><b>决策</b><span>成本—收益权衡</span></div>
+    <div class="c7bf-s"><em>⑤</em><b>迭代</b><span>新报告显示新的失败模式</span></div>
+  </div>
+  <p class="c7bf-nt fx fx-up" data-step="2">Harness 视角：定位薄弱环节——<b>上下文不足？约束缺失？验证不够？反馈不及时？</b>——有针对性地改，再重新评估。下面的真实案例只跑了 API 35 模拟器上的 <b>4 个 Wi-Fi 设置任务</b>，价值在于展示<b>如何根据一轮结果决定下一轮只改什么</b></p>
+  <div class="src">第七章 ·「从 Benchmark 报告到系统改进」· 图7-8 Benchmark 到改进闭环（数字以正文为准）</div>
+</section>
+<style>
+.c7bf-chk{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.c7bf-ck{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;border:1px solid rgba(251,113,133,.4);background:rgba(251,113,133,.06)}
+.c7bf-ck .ic{width:28px;height:28px;color:#fb7185}
+.c7bf-ck b{font-size:19px}
+.c7bf-ck span{font-size:16px;color:var(--text2)}.c7bf-ck span b{font-size:16px;color:var(--text)}
+.c7bf-cn{grid-column:1/-1;font-size:17px;color:var(--text2)}.c7bf-cn b{color:var(--text)}
+.c7bf-loop{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:20px;position:relative}
+.c7bf-s{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);animation:c7bfP 5s infinite;animation-delay:calc(var(--k)*1s)}
+.c7bf-s:nth-child(1){--k:0}.c7bf-s:nth-child(2){--k:1}.c7bf-s:nth-child(3){--k:2}.c7bf-s:nth-child(4){--k:3}.c7bf-s:nth-child(5){--k:4}
+@keyframes c7bfP{0%,18%{border-color:var(--acc);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 35%,transparent)}22%,100%{border-color:var(--line);box-shadow:none}}
+.c7bf-s em{font-style:normal;font-size:24px;color:var(--acc)}
+.c7bf-s b{font-size:20px}
+.c7bf-s span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c7bf-nt{margin-top:20px;font-size:17px;line-height:1.65;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.c7bf-nt b{color:var(--text)}
+</style>
+
+<!-- ================= 读报告与构建假设 ================= -->
+<section class="slide" id="c07-report" data-part="8" data-steps="3" data-trans="flip" data-title="读懂报告，构建假设" data-notes="<b>读懂 Benchmark 报告：发现问题的艺术。</b>最初的报告记录了 116 项任务各跑一次的结果，总成功率约为 88%。但失败并不是零星散落的：四项 SystemWifiTurn* 任务里有三项失败，轨迹中还反复出现来回导航、无法确认最终状态等现象。这里至少有两种解释：可能是 Agent 不知道设置入口，也可能是它拿到的界面信息不完整。<br>如果只盯着 88% 这个总分，这个小而集中的失败簇很容易被忽略；如果只是增加最大步数，又可能把“看不见界面”误当成“不够耐心”。所以，<b>读报告时应先找失败集中在哪些任务和能力上，再回放轨迹，分清问题出在看、想、做还是验</b>。本例先把范围缩到四项 Wi-Fi 任务，目的只是用较低成本判断病因，不是估算系统的整体水平。<br><b>从数据到假设：构建改进路线图。</b>第一轮先试最便宜的改法。假设 H1 认为 Agent 只是“不知道路”，因此只给实验组补充 Wi-Fi 设置的导航提示和最终状态检查要求。结果成功率没有变化，说明问题不在提示词。第二轮转而检查 Agent 到底“看见了什么”。假设 H5 把 API 35 上不兼容的 accessibility feed 换成 AndroidWorld 已支持的 UIAutomator 元素树。成功率确实提高了，但完整元素树太长，token 用量大幅上升。于是第三轮 H5C 不再增加新信息，只把元素树中不可见、没有文字、也不能操作的容器节点删掉，看看能否在保留成功率的同时去掉噪声。<br>三轮实验始终使用相同的模型、任务参数、随机种子、步数上限和模拟器，并交替安排两组的运行顺序。这样一轮接一轮地缩小问题范围，比同时堆上许多改动更容易说清因果：<b>上一轮暴露的问题，恰好成为下一轮唯一要验证的改动</b>。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">88% 的总分里，藏着一个<em>小而集中的失败簇</em></h2></header>
+  <div class="c7rp2-body">
+    <div class="c7rp2-l panel fx fx-left" style="--d:2">
+      <div class="c7rp2-h"><b>116 项任务 × 1 次 · 总成功率约 88%</b><span class="c7-tag">格子位置示意</span></div>
+      <div class="c7rp2-grid"></div>
+      <div class="c7rp2-wf"><span>SystemWifiTurn* 4 项任务：<b>3 项失败</b></span><span>轨迹：来回导航、无法确认最终状态</span></div>
+      <div class="c7rp2-two"><span>解释 A：不知道设置入口</span><span>解释 B：拿到的界面信息不完整</span></div>
+      <p class="c7rp2-nt">先找失败集中在哪里，再回放轨迹，分清问题出在<b>看、想、做还是验</b>；只加最大步数，可能把“看不见界面”误当成“不够耐心”</p>
+    </div>
+    <div class="c7rp2-r">
+      <div class="c7rp2-hy fx fx-right" data-step="1"><em>H1</em><div><b>“不知道路”→ 补导航提示与最终状态检查</b><span>表层 · 最便宜的改法</span><p>成功率没有变化 → <b>问题不在提示词</b></p></div></div>
+      <div class="c7rp2-hy fx fx-right" data-step="2"><em>H5</em><div><b>“看见了什么”→ accessibility feed 换成 UIAutomator 元素树</b><span>中层 · 观察通道</span><p>成功率提高了，但完整元素树太长，<b>token 大幅上升</b></p></div></div>
+      <div class="c7rp2-hy fx fx-right" data-step="3"><em>H5C</em><div><b>不加新信息，只删不可见、无文字、不可操作的容器节点</b><span>中层 · 去噪</span><p>能否在保留成功率的同时去掉噪声？</p></div></div>
+      <div class="c7rp2-fx fx fx-up" data-step="1"><span>三轮固定</span><i>模型</i><i>任务参数</i><i>随机种子</i><i>步数上限</i><i>模拟器</i><i>两组交替运行</i></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「读懂 Benchmark 报告：发现问题的艺术」「从数据到假设：构建改进路线图」</div>
+</section>
+<style>
+.c7rp2-body{display:grid;grid-template-columns:1fr 1.05fr;gap:22px;flex:1;min-height:0}
+.c7rp2-l{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.c7rp2-h{display:flex;align-items:center;gap:12px}.c7rp2-h b{font-size:18px}
+.c7rp2-grid{display:grid;grid-template-columns:repeat(20,1fr);gap:4px}
+.c7rp2-grid i{aspect-ratio:1;border-radius:3px;background:rgba(52,211,153,.4);transition:background .4s,box-shadow .4s,outline-color .4s;outline:2px solid transparent}
+.c7rp2-grid i.f{background:rgba(251,113,133,.55)}
+.c7rp2-grid i.w{outline-color:var(--warn)}
+#c07-report.zoom .c7rp2-grid i:not(.w){opacity:.25}
+.c7rp2-wf{display:flex;flex-direction:column;gap:4px;font-size:16px;color:var(--text2)}
+.c7rp2-wf b{color:#fda4af}
+.c7rp2-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c7rp2-two span{font-size:15px;padding:8px 12px;border-radius:10px;border:1px dashed var(--line2);text-align:center}
+.c7rp2-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}.c7rp2-nt b{color:var(--text)}
+.c7rp2-r{display:flex;flex-direction:column;gap:12px}
+.c7rp2-hy{display:grid;grid-template-columns:90px 1fr;gap:14px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c7rp2-hy em{font:800 28px var(--num);font-style:normal;color:var(--acc)}
+.c7rp2-hy b{font-size:17px;line-height:1.45}
+.c7rp2-hy span{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+.c7rp2-hy p{font-size:16px;color:var(--text2);margin-top:6px}.c7rp2-hy p b{font-size:16px;color:var(--text)}
+.c7rp2-fx{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:15px}
+.c7rp2-fx span{font-weight:700;color:var(--acc)}
+.c7rp2-fx i{font-style:normal;padding:3px 10px;border-radius:8px;border:1px solid var(--line2)}
+</style>
+<script>
+HOOKS['c07-report'] = {
+  init(s) {
+    // 116 格，14 格失败（约 88%）；其中 4 格是 Wi-Fi 任务（3 败 1 成）。位置为示意
+    const r = U.rand(5), fail = new Set(), wifi = [84, 85, 86, 87];
+    [84, 85, 86].forEach((i) => fail.add(i));
+    while (fail.size < 14) fail.add(Math.floor(r() * 116));
+    s.querySelector('.c7rp2-grid').innerHTML = Array.from({ length: 116 }, (_, i) => `<i class="${fail.has(i) && !(i === 87) ? 'f' : ''}${wifi.includes(i) ? ' w' : ''}"></i>`).join('');
+  },
+  step(s, ctx, k) { s.classList.toggle('zoom', k >= 1); },
+  enter(s, ctx, k) { s.classList.toggle('zoom', k >= 1); },
+  reset(s) { s.classList.remove('zoom'); },
+};
+</script>
+
+<!-- ================= 表7-5 ================= -->
+<section class="slide" id="c07-tab75" data-part="8" data-steps="3" data-trans="rise" data-title="表7-5 AndroidWorld Wi-Fi 子集的三轮实验" data-notes="<b>从结果到决策：数据驱动的权衡。</b>三轮实测结果汇总在表7-5。每组都只有四项任务，所以这里的数字只能用来决定下一步是否值得扩大测试，不能用来推断整个 AndroidWorld 的成功率。<br>H1：只增加导航提示，对照组→实验组成功率 25%→25%，实验组/对照组 token 0.47×，没有提高成功率，沿用原提示。H5：accessibility feed 换成 UIAutomator，25%→100%，token 2.498×，效果明显但太费 token，继续优化。H5C：精简 UIAutomator 元素树，100%→100%，token 0.506×，成功率不变、token 减半，进入完整复测。<br>三轮结果串起来看，结论比某一个百分比更有用。第一，<b>提示写得更详细，也补不回 Agent 根本没有看到的信息</b>；遇到这类失败，应先检查输入，而不是继续堆提示词。第二，<b>输入也不是越多越好</b>。完整元素树解决了“看不见”的问题，却带来大量无用 token；删除无语义节点后，四项任务仍全部成功，token 又减少了约一半。整个过程中没有更换模型，仅仅调整 Harness 如何表示界面，就先后解决了“能不能做成”和“做成是否划算”两个问题。<br>配套仓库的晋级门槛：H1/H5 要求净成功增益为正、零配对退化、延迟与 token 都不超过对照的 1.5 倍；H5C 要求四个紧凑组全部成功、零退化、延迟不超过 1.5 倍、token 不超过原始 UIAutomator 的 0.75 倍。H5 因 token 2.498× 超过 1.5× 被拦下；H5C 的平均 token 从 139,439.5 降到 70,557.5，延迟 101.20 秒对 99.18 秒。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表7-5 三轮实验：<em>一轮证据，只支持一步</em></h2></header>
+  <div class="c7t5-tb fx fx-up" style="--d:2">
+    <div class="c7t5-hd"><span>实验</span><span>只改了什么</span><span>对照组 → 实验组成功率</span><span>实验组 / 对照组 token</span><span>门槛</span><span>下一步</span></div>
+    <div class="c7t5-r" data-step="1"><b>H1</b><span>增加导航提示</span><span class="c7t5-sr"><i style="--a:.25;--b:.25"></i>25% → 25%</span><span class="c7t5-tk"><i style="--v:.47"></i>0.47×</span><span class="c7t5-g no">无成功增益</span><span>没有提高成功率，沿用原提示</span></div>
+    <div class="c7t5-r" data-step="2"><b>H5</b><span>accessibility feed 换成 UIAutomator</span><span class="c7t5-sr"><i style="--a:.25;--b:1"></i>25% → 100%</span><span class="c7t5-tk over"><i style="--v:2.498"></i>2.498×</span><span class="c7t5-g no">token 超过 1.5×</span><span>效果明显但太费 token，继续优化</span></div>
+    <div class="c7t5-r" data-step="3"><b>H5C</b><span>精简 UIAutomator 元素树</span><span class="c7t5-sr"><i style="--a:1;--b:1"></i>100% → 100%</span><span class="c7t5-tk"><i style="--v:.506"></i>0.506×</span><span class="c7t5-g ok">≤ 0.75× · 通过</span><span>成功率不变、token 减半，进入完整复测</span></div>
+  </div>
+  <div class="c7t5-ls fx fx-up" style="--d:3">
+    <div class="c7-card"><b>提示补不回没看到的信息</b><p>遇到这类失败，先检查输入，而不是继续堆提示词</p></div>
+    <div class="c7-card"><b>输入也不是越多越好</b><p>完整元素树解决了“看不见”，却带来大量无用 token</p></div>
+    <div class="c7-card"><b>没有换模型</b><p>只调整 Harness 如何表示界面，先后解决“能不能做成”和“做成是否划算”</p></div>
+  </div>
+  <p class="c7-data fx fx-up" style="--d:4">每组只有 4 项任务：只能决定下一步是否值得扩大测试，<b>不能推断整个 AndroidWorld 的成功率</b> · 数据：原书表7-5；门槛与 H5C 的 token（139,439.5 → 70,557.5）来自配套仓库 chapter7/android-world/README.md</p>
+  <div class="src">第七章 ·「从结果到决策：数据驱动的权衡」· 表7-5 AndroidWorld Wi-Fi 子集的三轮实验</div>
+</section>
+<style>
+.c7t5-tb{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c7t5-hd,.c7t5-r{display:grid;grid-template-columns:90px 1.2fr 1.1fr 1fr .8fr 1.3fr;gap:14px;align-items:center;padding:8px 12px}
+.c7t5-hd span{font-size:15px;font-weight:700;color:var(--text3)}
+.c7t5-r{border-radius:12px;font-size:16px;color:var(--text2)}
+.c7t5-r b{font:800 24px var(--num);color:var(--acc)}
+.c7t5-r.on{background:rgba(255,255,255,.03)}
+.c7t5-sr,.c7t5-tk{display:flex;flex-direction:column;gap:4px;font:700 17px var(--num);color:var(--text)}
+.c7t5-sr i{position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.06)}
+.c7t5-sr i::before,.c7t5-sr i::after{content:"";position:absolute;left:0;height:4px;border-radius:2px}
+.c7t5-sr i::before{top:0;width:calc(var(--a)*100%);background:#94a3b8}
+.c7t5-sr i::after{bottom:0;width:calc(var(--b)*100%);background:#34d399}
+.c7t5-tk i{position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.06)}
+.c7t5-tk i::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(min(var(--v),2.5)/2.5*100%);border-radius:5px;background:#60a5fa}
+.c7t5-tk i::after{content:"";position:absolute;left:40%;top:-4px;bottom:-4px;width:2px;background:var(--text3)}
+.c7t5-tk.over{color:#fda4af}.c7t5-tk.over i::before{background:#fb7185}
+.c7t5-g{font-size:15px;font-weight:700;padding:4px 10px;border-radius:8px;justify-self:start}
+.c7t5-g.no{color:#fda4af;background:rgba(251,113,133,.1)}
+.c7t5-g.ok{color:#6ee7b7;background:rgba(52,211,153,.12)}
+.c7t5-ls{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+.c7t5-ls b{font-size:18px;color:var(--acc)}
+.c7t5-ls p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+#c07-tab75 .c7-data{margin-top:14px}
+</style>
+
+<!-- ================= 实验 7-13 ================= -->
+<section class="slide" id="c07-exp713" data-part="8" data-trans="zoom" data-dur="30000" data-title="实验 7-13 ★★★：AndroidWorld 的评估和改进" data-notes="<b>持续迭代：从第一次改进到系统演化。</b>H5C 通过了这四项任务的检查，只说明它值得进入下一轮，并不等于可以部署。下一步需要补齐第三方应用，在 Pixel 6 / API 33 标准环境中，对 116 项任务各跑 5 个随机种子；除了检查成功率不能下降，还要确认 token 不超过原方案的 75%，延迟不超过 1.5 倍。<b>在这轮完整复测之前，不能把子集上的 4/4 写成系统整体 100%。</b>这就是持续迭代真正的含义：<b>一轮证据只支持与它规模相称的下一步</b>。H1 失败，让我们不再继续堆提示词；H5 找到了正确方向，也暴露了成本问题；H5C 解决成本问题后，才获得扩大测试的资格。好的 Benchmark 报告不只给出一个分数，还应写清结论适用于哪里、哪些底线没有通过、下一轮要验证什么。<br><b>实验 7-13 ★★★：AndroidWorld 的评估和改进。</b>以 chapter7/android-world 中的历史报告和三组已保存的配对结果为起点。第一步诊断：交叉分析逐任务表格和能力标签矩阵，将表面的任务失败映射到深层的能力缺陷。第二步构建假设：按照三层框架（表层→中层→深层）形成改进假设，每个假设明确预期的成功率提升目标和验证方法。第三步分阶段实验：先复现 H1、H5 和 H5C，每轮只改变一个变量，记录 token、延迟和是否出现回退。第四步数据驱动决策：根据成本收益比做部署决策——低成本高收益的改进优先部署，高成本的改进限定在关键场景中使用。第五步迭代：小范围实验通过后，只能进入完整复测；在标准环境完成 116×5 次运行后，才能讨论是否部署。报告中必须保留环境差异、样本量和尚未完成的部分。<br>配套仓库后来真的跑完了这轮完整复测：580/580 条 episode（116 任务 × 5 轮）、零运行时错误、五个 Pixel 6/API-33 分片的 24 个必需应用版本一致。但严格成功只有 26/580（4.48%），77 条 evaluator 满分里很多没有显式宣告完成；更关键的是，候选运行用的是本地 qwen2.5-7b-instruct，而 H5C 配对源用的是 doubao-seed-1-6，<b>不是同模型延续，不能证明提升或非劣性</b>，部署批准仍为 false。这正是本节“一轮证据只支持与它规模相称的下一步”的活例子。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-13 <span class="c7-star">★★★</span>：子集上的 4/4，<em>不是</em>系统整体的 100%</h2></header>
+  <div class="c7ed-body">
+    <div class="c7ed-l fx fx-left" style="--d:2">
+      <div class="c7ed-steps"></div>
+    </div>
+    <div class="c7ed-r fx fx-right" style="--d:3">
+      <div class="c7-card c7ed-gate"><b class="c7ed-k">下一步：完整复测门槛</b><div class="c7ed-g"><span>Pixel 6 / API 33 标准环境，补齐第三方应用</span><span>116 项任务 × 5 个随机种子</span><span>成功率不能下降</span><span>token ≤ 原方案的 75%</span><span>延迟 ≤ 1.5 倍</span></div></div>
+      <div class="c7-card c7ed-real"><b class="c7ed-k">配套仓库后来真的跑完了</b>
+        <div class="c7ed-n"><div><b>580 / 580</b><span>episode · 零运行时错误</span></div><div><b class="bad">26 / 580</b><span>严格成功 4.48%</span></div><div><b>77</b><span>条 evaluator 满分（多数未显式宣告完成）</span></div></div>
+        <p>候选用本地 <b>qwen2.5-7b-instruct</b>，H5C 配对源用 <b>doubao-seed-1-6</b>：<b>不是同模型延续</b>，不能证明提升或非劣性——<b>部署批准仍为 false</b></p></div>
+      <p class="c7-data">数据：配套仓库 chapter7/android-world/README.md 与 validation/candidate_h5c_api33_local_qwen_20260804（2026-08-04）</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「持续迭代：从第一次改进到系统演化」· 实验 7-13</div>
+</section>
+<style>
+.c7ed-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7ed-steps{display:flex;flex-direction:column;gap:8px}
+.c7ed-s{display:grid;grid-template-columns:48px 1fr;gap:12px;padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);cursor:pointer;text-align:left;transition:border-color .35s,background .35s}
+.c7ed-s em{font:800 24px var(--num);font-style:normal;color:var(--acc)}
+.c7ed-s b{font-size:18px}
+.c7ed-s p{grid-column:2;font-size:15px;line-height:1.5;color:var(--text2);max-height:0;overflow:hidden;transition:max-height .45s var(--ease)}
+.c7ed-s.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85))}
+.c7ed-s.on p{max-height:120px}
+.c7ed-r{display:flex;flex-direction:column;gap:12px}
+.c7ed-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7ed-g{display:flex;flex-wrap:wrap;gap:6px}
+.c7ed-g span{font-size:15px;padding:4px 10px;border-radius:8px;border:1px solid var(--line2)}
+.c7ed-n{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.c7ed-n div{display:flex;flex-direction:column;gap:2px}
+.c7ed-n b{font:800 26px var(--num)}.c7ed-n b.bad{color:#fda4af}
+.c7ed-n span{font-size:15px;line-height:1.4;color:var(--text3)}
+.c7ed-real p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:10px}.c7ed-real p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp713'] = {
+  S: [['诊断', '交叉分析逐任务表格和能力标签矩阵，把表面的任务失败映射到深层的能力缺陷；找出成功率低于预期的能力标签和集中失败的任务区域'], ['构建假设', '按三层框架（表层 → 中层 → 深层）形成改进假设，每个假设写明预期的成功率提升目标和验证方法'], ['分阶段实验', '先复现 H1、H5 和 H5C，每轮只改变一个变量；除成功率外，还要记录 token、延迟和是否出现回退'], ['数据驱动决策', '不是采用所有有效的改进，而是权衡适用范围、延迟影响和成本开销：低成本高收益优先部署，高成本的限定在关键场景'], ['迭代', '小范围实验通过后只能进入完整复测；标准环境完成 116 × 5 次运行后才能讨论部署；报告必须保留环境差异、样本量和尚未完成的部分']],
+  init(s) {
+    s.querySelector('.c7ed-steps').innerHTML = this.S.map(([b, p], i) => `<button class="c7ed-s" data-i="${i}"><em>${i + 1}</em><b>${b}</b><p>${p}</p></button>`).join('');
+    s.querySelectorAll('.c7ed-s').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c7ed-s').forEach((b, j) => b.classList.toggle('on', j === i)); },
+  enter(s, ctx) { C7.auto(this, ctx, this.S.length, 3600, (i) => this.pick(s, i), 600); },
+  reset(s) { this.pick(s, null); },
+};
+</script>

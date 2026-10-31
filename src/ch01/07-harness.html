@@ -1,0 +1,533 @@
+<!-- ================= PART 07 Harness 工程 ================= -->
+<section class="slide chapter" id="c1-d7" data-part="7" data-title="PART 07 · Harness 工程" data-notes="到这里你已经理解了 Agent 的核心工作原理——LLM 通过 ReAct 循环，在上下文的辅助下使用工具完成任务。但前面的实验也暴露了明显的脆弱点：模型可能产生幻觉（编造不存在的工具或参数）、选错工具，或在遇到错误时无法自我恢复。<b>一个能跑的 Demo 和一个可靠的产品之间还有巨大的鸿沟，而这些脆弱点正是 Harness 工程要解决的问题。</b>本章前半部分回答了 Agent 是什么，下半部分回答 Agent 如何在生产环境中可靠运行。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">Harness 工程</h1>
+  <div class="ch-s fx fx-up" style="--d:3">模型之外的竞争力</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">一个能跑的 Demo 和一个可靠的产品之间还有巨大的鸿沟，这些脆弱点正是 Harness 工程要解决的问题。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<section class="slide" id="c1-hdef" data-part="7" data-steps="1" data-title="Harness：边界内、模型之外" data-notes="前面几节建立了 Agent = LLM + 上下文 + 工具的最小工程公式。从 Harness 工程的视角看，可以把 LLM 抽象为核心组件 Model，把 Agent 边界内负责支撑模型运行及模型与环境交互的代码、配置和服务统称为 Harness。两个视角并非替代关系，而是不同抽象层次上对同一 Agent 实现的描述。用方程展开生产形态下的完整组成：<b>Agent = Model + Harness；Harness = 上下文管理 + 工具接口 + 约束 + 验证 + 纠正；Agent ↔ Environment</b>。<br>更精确地说，<b>Harness 不是模型之外的一切，而是 Agent 边界内、模型之外的运行与治理层</b>。它负责协调 Model 与 Environment 的交互，但不包括与之交互的环境本身：工具定义、调用适配器、沙箱的权限与重置机制属于 Harness；沙箱内随行动变化的文件和进程、外部数据库、网页、用户及物理世界属于 Environment。<b>物理部署位置也不能决定概念归属</b>——即使仿真环境与 Agent 运行在同一进程中，它仍然是 Environment。<br>中间的卡片会自动归类，也可以点击任一张，看它属于哪一边。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Harness：<em>Agent 边界内、模型之外</em></h2></header>
+  <div class="hd-eq fx fx-up" style="--d:2">
+    <div><b>Agent</b><i>=</i><span class="c-llm">Model</span><i>+</i><span class="c-har">Harness</span></div>
+    <div><b class="c-har">Harness</b><i>=</i><span>上下文管理</span><i>+</i><span>工具接口</span><i>+</i><span>约束</span><i>+</i><span>验证</span><i>+</i><span>纠正</span></div>
+    <div><b>Agent</b><i>↔</i><span class="c-env">Environment</span></div>
+  </div>
+  <div class="hd-board fx fx-up" style="--d:3">
+    <div class="hd-z hd-h"><span class="hd-zl"><svg class="ic"><use href="#i-shield"/></svg>Harness · Agent 边界内、模型之外</span><div class="hd-in"></div></div>
+    <div class="hd-pool"></div>
+    <div class="hd-z hd-e"><span class="hd-zl"><svg class="ic"><use href="#i-globe"/></svg>Environment · 与 Agent 交互的外部对象</span><div class="hd-in"></div></div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:5">物理部署位置不能决定概念归属：<b>即使仿真环境与 Agent 运行在同一进程中，它仍然是 Environment</b></p>
+  <div class="src">第一章 ·「Harness 工程：模型之外的竞争力」</div>
+</section>
+<style>
+.hd-eq{display:flex;gap:40px;justify-content:center;font-size:26px;font-weight:700;margin-top:-6px}
+.hd-eq div{display:flex;align-items:center;gap:10px;padding:10px 20px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.hd-eq i{font-style:normal;color:var(--text3);font-weight:400}
+.hd-eq span{font-weight:600}
+.hd-board{display:grid;grid-template-columns:1fr 440px 1fr;gap:24px;margin:22px 0 20px;height:480px}
+.hd-z{position:relative;border-radius:22px;padding:58px 18px 18px;border:2px dashed;display:flex}
+.hd-h{border-color:color-mix(in srgb,var(--har) 60%,transparent);background:color-mix(in srgb,var(--har) 6%,transparent)}
+.hd-e{border-color:color-mix(in srgb,var(--env) 60%,transparent);background:color-mix(in srgb,var(--env) 6%,transparent)}
+.hd-zl{position:absolute;left:20px;top:16px;display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700}
+.hd-h .hd-zl{color:var(--har)}.hd-e .hd-zl{color:var(--env)}
+.hd-in{display:flex;flex-direction:column;gap:10px;width:100%}
+.hd-pool{display:flex;flex-direction:column;gap:8px;justify-content:center}
+.hd-c{display:flex;align-items:center;gap:10px;padding:9px 14px;border-radius:12px;font-size:17px;text-align:left;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:border-color .3s,background .3s}
+.hd-c:hover{border-color:var(--acc)}
+.hd-c .ic{flex:none;color:var(--text3)}
+.hd-h .hd-c{border-color:color-mix(in srgb,var(--har) 55%,transparent);background:color-mix(in srgb,var(--har) 12%,rgba(12,18,40,.92))}
+.hd-h .hd-c .ic{color:var(--har)}
+.hd-e .hd-c{border-color:color-mix(in srgb,var(--env) 55%,transparent);background:color-mix(in srgb,var(--env) 12%,rgba(12,18,40,.92))}
+.hd-e .hd-c .ic{color:var(--env)}
+.hd-c small{margin-left:auto;font-size:14px;color:var(--warn)}
+</style>
+<script>
+HOOKS['c1-hdef'] = {
+  I: [
+    ['工具定义', 'h'], ['外部数据库', 'e'], ['调用适配器', 'h'], ['沙箱内随行动变化的文件和进程', 'e'],
+    ['沙箱的权限与重置机制', 'h'], ['网页', 'e'], ['用户', 'e'], ['物理世界', 'e'],
+    ['与 Agent 同一进程运行的仿真环境', 'e', '易错'],
+  ],
+  init(s) {
+    this.pool = s.querySelector('.hd-pool');
+    this.zone = { h: s.querySelector('.hd-h .hd-in'), e: s.querySelector('.hd-e .hd-in') };
+    this.fill();
+    this.pool.addEventListener('click', (e) => { const c = e.target.closest('.hd-c'); if (c) { this.auto = false; this.move(c); } });
+  },
+  fill() {
+    this.pool.innerHTML = this.I.map(([t, z, tag], i) => `<button class="hd-c" data-z="${z}" data-i="${i}"><svg class="ic"><use href="#i-help"/></svg>${t}${tag ? `<small>${tag}</small>` : ''}</button>`).join('');
+    this.zone.h.innerHTML = this.zone.e.innerHTML = '';
+  },
+  // FLIP：先记下位置，移到目标区，再从旧位置过渡到新位置
+  move(c) {
+    const a = c.getBoundingClientRect();
+    this.zone[c.dataset.z].appendChild(c);
+    c.querySelector('use').setAttribute('href', '#i-check');
+    const b = c.getBoundingClientRect(), sc = U.scale || 1;
+    c.animate([{ transform: `translate(${(a.left - b.left) / sc}px,${(a.top - b.top) / sc}px)` }, { transform: 'none' }], { duration: 650, easing: 'cubic-bezier(.2,.8,.2,1)' });
+  },
+  sortAll(ctx) {
+    [...this.pool.querySelectorAll('.hd-c')].forEach((c, i) => ctx.later(() => { if (c.parentElement === this.pool) this.move(c); }, 300 + i * 420));
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.fill();
+    if (k >= 1) this.sortAll(ctx);
+    else ctx.later(() => this.auto && this.sortAll(ctx), 2400);
+  },
+  step(s, ctx, k) { if (k >= 1) this.sortAll(ctx); else this.fill(); },
+  leave() { this.ctx = null; },
+  reset() { this.fill(); },
+};
+</script>
+
+<section class="slide" id="c1-h5" data-part="7" data-trans="rise" data-title="Harness 的五项职责" data-dur="14000" data-notes="Harness 的核心是原公式中的“上下文管理 + 工具接口”，再加上三层保障机制：<b>约束</b>（限定 Agent 能做什么、不能做什么）、<b>验证</b>（检查 Agent 做得对不对）和<b>纠正</b>（做错了怎么补救）。<br>五项职责各有核心原则：<b>Context（上下文）</b>为模型提供感知信息，信息要充分；<b>Tools（工具接口）</b>为模型提供观察与行动手段，接口要清晰——命名直观、参数有例子、边界有说明；<b>Constrain（约束）</b>设定行为边界，采用故障安全默认值，所有能力默认关闭，必须显式开放（类似手机 App 权限管理）；<b>Verify（验证）</b>自动判断操作结果的对错，安全检查只看结构化数据（如工具返回的 JSON 字段），而不看模型自由生成的文本，因为后者可能已被提示注入操纵；<b>Correct（纠正）</b>发现问题时自动修正或回退，在确认无法恢复之前不暴露中间态，例如工具调用失败时先静默重试，不把半成品结果展示给用户。<br>最小 Demo 只需 Model 和能构造上下文、暴露工具的 Harness；生产系统还要在同一边界内加入约束、验证和纠正。下方是原书的退款 Agent 例子：把政策放进上下文、用权限和金额规则约束调用、用数据库状态验证结果，并在超时时重试或回退。<br>五个功能构成一个闭环：<b>上下文与工具让 Agent “能做事”；约束预防错误，验证发现偏差，纠正使闭环得以形成，三者共同让 Agent “不做错事”</b>。缺少任何一个环节，系统都会出现可靠性缺口。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Harness 的<em>五项职责</em></h2></header>
+  <div class="h5-groups fx fx-up" style="--d:2"><span class="g1">能做事 · 上下文与工具</span><span class="g2">不做错事 · 约束 · 验证 · 纠正</span></div>
+  <div class="h5-cards"></div>
+  <div class="h5-flow panel fx fx-up" style="--d:8">
+    <span class="lbl">退款 Agent</span>
+    <div class="h5-st"></div>
+  </div>
+  <div class="src">第一章 ·「Harness 工程：模型之外的竞争力」· 五项职责表</div>
+</section>
+<style>
+.h5-groups{display:grid;grid-template-columns:2fr 3fr;gap:20px;margin-top:-10px;margin-bottom:12px}
+.h5-groups span{text-align:center;padding:8px;border-radius:12px;font-size:18px;font-weight:700}
+.h5-groups .g1{color:var(--ctx);background:color-mix(in srgb,var(--ctx) 10%,transparent);border:1px solid color-mix(in srgb,var(--ctx) 35%,transparent)}
+.h5-groups .g2{color:var(--har);background:color-mix(in srgb,var(--har) 10%,transparent);border:1px solid color-mix(in srgb,var(--har) 35%,transparent)}
+.h5-cards{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+.h5-w{opacity:0;translate:0 30px;transition:opacity .7s var(--ease),translate .7s var(--ease);transition-delay:calc(var(--i)*110ms + 300ms)}
+.active .h5-w{opacity:1;translate:0 0}
+.h5-c{--c:var(--acc);height:430px;padding:20px 20px;border-radius:20px;display:flex;flex-direction:column;gap:10px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:linear-gradient(170deg,color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9)),rgba(12,18,40,.9) 60%);transition:border-color .4s,box-shadow .4s,translate .4s}
+.h5-c.on{border-color:var(--c);box-shadow:0 0 36px color-mix(in srgb,var(--c) 40%,transparent);translate:0 -6px}
+.h5-c .ic{font-size:34px;color:var(--c)}
+.h5-c b{font:800 22px var(--num);color:var(--c)}
+.h5-c b small{display:block;font:600 17px var(--font);color:var(--text)}
+.h5-c p{font-size:16px;line-height:1.6;color:var(--text)}
+.h5-c .h5-ex{font-size:15px;color:var(--text2);padding-top:10px;border-top:1px solid var(--line)}
+.h5-c .h5-ch{margin-top:auto;font-size:14px;color:var(--text3)}
+.h5-l{display:block;font-size:14px;letter-spacing:.1em;color:var(--text3)}
+.h5-flow{margin-top:18px;padding:16px 22px;display:flex;align-items:center;gap:20px}
+.h5-st{flex:1;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;position:relative}
+.h5-s{--c:var(--acc);padding:10px 12px;border-radius:12px;font-size:16px;line-height:1.45;text-align:center;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s}
+.h5-s.on{color:var(--text);border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 30%,transparent)}
+.h5-s.ok{border-color:color-mix(in srgb,var(--c) 45%,transparent);color:var(--text)}
+</style>
+<script>
+HOOKS['c1-h5'] = {
+  F: [
+    { n: 'Context', z: '上下文', ic: 'eye', c: '#22d3ee', p: '为模型提供感知信息；信息要充分，让 Agent 在每个决策点都基于足够的信息判断', ex: '系统提示词、知识库、Agent 状态栏、Sidecar 旁路查询', ch: '第二、三章', rf: '把退款政策放进上下文' },
+    { n: 'Tools', z: '工具接口', ic: 'wrench', c: '#fbbf24', p: '为模型提供观察与行动手段；接口要清晰：命名直观、参数有例子、边界有说明', ex: 'MCP 工具、代码解释器、搜索工具', ch: '第四章', rf: '暴露退款工具' },
+    { n: 'Constrain', z: '约束', ic: 'lock', c: '#60a5fa', p: '设定行为边界；故障安全默认值：所有能力默认关闭，必须显式开放（类似手机 App 权限管理）', ex: 'Claude Code 中每个工具默认需要用户授权才能执行', ch: '第四章', rf: '用权限和金额规则约束调用' },
+    { n: 'Verify', z: '验证', ic: 'check', c: '#34d399', p: '自动判断操作结果的对错；安全检查只看结构化数据（如工具返回的 JSON 字段），不看模型自由生成的文本——后者可能已被提示注入操纵', ex: 'Linter 检查、类型系统、工具调用结果校验', ch: '第五、六章', rf: '用数据库状态验证结果' },
+    { n: 'Correct', z: '纠正', ic: 'undo', c: '#f472b6', p: '发现问题时自动修正或回退；在确认无法恢复之前不暴露中间态，例如工具调用失败时先静默重试', ex: '静默重试、接续生成、连续失败时回退到人工判断（熔断机制）', ch: '第二、五章', rf: '超时时重试或回退' },
+  ],
+  init(s) {
+    s.querySelector('.h5-cards').innerHTML = this.F.map((f, i) => `
+      <div class="h5-w" style="--i:${i}"><div class="h5-c" data-i="${i}" style="--c:${f.c}"><svg class="ic"><use href="#i-${f.ic}"/></svg>
+        <b>${f.n}<small>${f.z}</small></b><span class="h5-l">职责与核心原则</span><p>${f.p}</p><p class="h5-ex"><span class="h5-l">实际例子</span>${f.ex}</p><span class="h5-ch">详见 ${f.ch}</span></div></div>`).join('');
+    s.querySelector('.h5-st').innerHTML = this.F.map((f, i) => `<div class="h5-s" data-i="${i}" style="--c:${f.c}">${f.rf}</div>`).join('');
+  },
+  enter(s, ctx) {
+    const cards = [...s.querySelectorAll('.h5-c')], st = [...s.querySelectorAll('.h5-s')];
+    let i = -1;
+    ctx.every(() => {
+      i = (i + 1) % 6;
+      cards.forEach((c, j) => c.classList.toggle('on', j === i));
+      st.forEach((x, j) => { x.classList.toggle('on', j === i); x.classList.toggle('ok', j < i); });
+    }, 1500);
+  },
+  reset(s) { s.querySelectorAll('.on,.ok').forEach((x) => x.classList.remove('on', 'ok')); },
+};
+</script>
+
+<section class="slide" id="c1-ctrl" data-part="7" data-trans="flip" data-title="模型控制循环" data-dur="16000" data-notes="模型控制循环的基本流程：从环境取得观察，Harness 构造上下文交给 Model；Model 给出动作，<b>没有动作就结束</b>；否则 Harness 先做<b>约束</b>（只放行允许的动作），交给 Environment 执行；执行后 Harness <b>验证</b>环境状态，验证不通过就<b>纠正</b>；最后把动作和观察追加到轨迹，进入下一轮。这段骨架刻意不展开具体实现：完整的 API 消息循环在第二章介绍，工具与自动验证分别在第四、五章展开。<br>右侧两个按钮可以手动制造事故：注入一个越权动作，看约束如何拦截；制造一次验证失败，看纠正如何接手。不点的话，循环会自动轮流演示。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型控制循环：<em>约束 · 验证 · 纠正</em>嵌在每一轮里</h2></div>
+    <div class="ct-btns fx fx-up" style="--d:2"><button class="btn ct-bad"><svg class="ic"><use href="#i-alert"/></svg>注入越权动作</button><button class="btn ct-fail"><svg class="ic"><use href="#i-x"/></svg>制造验证失败</button></div></header>
+  <div class="ct-body">
+    <div class="ct-code win fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>控制循环（伪代码）</span></div><div class="code ct-pre"></div></div>
+    <div class="ct-right">
+      <div class="ct-flow"></div>
+      <div class="ct-log panel"></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「Harness 工程：模型之外的竞争力」· 模型控制循环</div>
+</section>
+<style>
+#c1-ctrl .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.ct-btns{display:flex;gap:10px}
+.ct-bad:hover{color:var(--bad)}.ct-fail:hover{color:var(--warn)}
+.ct-body{display:flex;gap:28px;flex:1;min-height:0}
+.ct-code{width:880px;flex:none}
+.ct-pre{font-size:21px;line-height:1.8;padding:20px 24px}
+.ct-right{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
+.ct-flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.ct-n{--c:var(--text3);padding:12px 10px;border-radius:14px;text-align:center;font-size:16px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(12,18,40,.85);transition:all .3s}
+.ct-n b{display:block;font:700 16px var(--mono);color:var(--c)}
+.ct-n.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,rgba(12,18,40,.9));box-shadow:0 0 24px color-mix(in srgb,var(--c) 45%,transparent)}
+.ct-n.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,rgba(12,18,40,.9));animation:shake .4s ease}
+.ct-log{flex:1;padding:16px 20px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;overflow:hidden;font:16px/1.6 var(--mono)}
+.ct-log div{animation:upIn .4s var(--spring) both;color:#cbd5f5}
+.ct-log .r{color:#fda4af}.ct-log .y{color:#fdba74}.ct-log .g{color:#86efac}
+</style>
+<script>
+HOOKS['c1-ctrl'] = {
+  CODE: [
+    'observation = <span class="t-g">Environment</span>.observe()',
+    'trajectory = [observation]',
+    '<span class="t-k">while</span> true:',
+    '    actions = <span class="t-h">Model</span>(<span class="t-p">Harness</span>.build_context(trajectory))',
+    '    <span class="t-k">if</span> len(actions) == 0:',
+    '        <span class="t-k">break</span>',
+    '    allowed_actions = <span class="t-p">Harness</span>.constrain(actions)',
+    '    observation = <span class="t-g">Environment</span>.apply(allowed_actions)',
+    '    <span class="t-k">if not</span> <span class="t-p">Harness</span>.verify(<span class="t-g">Environment</span>):',
+    '        observation = <span class="t-p">Harness</span>.correct(<span class="t-g">Environment</span>)',
+    '    trajectory.append(allowed_actions, observation)',
+  ],
+  N: [['observe', '取得观察', '#34d399'], ['build_context', '构造上下文', '#60a5fa'], ['Model', '给出动作', '#a78bfa'], ['constrain', '只放行允许的', '#60a5fa'], ['apply', '环境执行', '#34d399'], ['verify', '检查结果', '#60a5fa'], ['correct', '修正或回退', '#f472b6'], ['append', '追加轨迹', '#60a5fa']],
+  init(s) {
+    s.querySelector('.ct-pre').innerHTML = this.CODE.map((l) => `<span class="ln">${l}</span>`).join('');
+    s.querySelector('.ct-flow').innerHTML = this.N.map(([b, t, c]) => `<div class="ct-n" data-n="${b}" style="--c:${c}"><b>${b}</b>${t}</div>`).join('');
+    s.querySelector('.ct-bad').addEventListener('click', () => { this.next = 'bad'; });
+    s.querySelector('.ct-fail').addEventListener('click', () => { this.next = 'fail'; });
+  },
+  enter(s, ctx) {
+    const lines = [...s.querySelectorAll('.ct-pre .ln')], nodes = [...s.querySelectorAll('.ct-n')], log = s.querySelector('.ct-log');
+    const say = (t, c = '') => { log.insertAdjacentHTML('beforeend', `<div class="${c}">${t}</div>`); while (log.children.length > 9) log.firstElementChild.remove(); };
+    const at = async (li, n, ms = 650) => { lines.forEach((l, j) => l.classList.toggle('hl', j === li)); nodes.forEach((x) => x.classList.toggle('on', x.dataset.n === n)); await U.wait(ctx, ms); };
+    this.next = null;
+    log.innerHTML = '';
+    const run = async () => {
+      let round = 0;
+      await at(0, 'observe'); say('observe → 初始观察');
+      await at(1, null, 400);
+      while (ctx.alive) {
+        round++;
+        // 不点按钮时，每三轮自动演示一次事故
+        const kind = this.next || (round % 3 === 2 ? 'bad' : round % 3 === 0 ? 'fail' : 'ok');
+        this.next = null;
+        await at(2, null, 350);
+        await at(3, 'build_context', 500);
+        await at(3, 'Model', 700);
+        say(kind === 'bad' ? `第 ${round} 轮：Model 提出 [refund(99999), rm -rf /data]` : `第 ${round} 轮：Model 提出 [query_order(#1024)]`);
+        await at(4, null, 350);
+        await at(6, 'constrain', 700);
+        if (kind === 'bad') { nodes.find((x) => x.dataset.n === 'constrain').classList.add('bad'); say('constrain：越权动作 rm -rf /data 被拦截；退款金额超出上限，转人工确认', 'r'); await U.wait(ctx, 900); }
+        else say('constrain：动作在许可范围内，放行', 'g');
+        await at(7, 'apply', 700);
+        await at(8, 'verify', 700);
+        if (kind === 'fail') {
+          nodes.find((x) => x.dataset.n === 'verify').classList.add('bad');
+          say('verify：数据库状态与预期不符（例如写入超时）', 'y');
+          await at(9, 'correct', 900);
+          say('correct：静默重试 / 回滚到上一稳定状态，不暴露中间态', 'g');
+        } else say('verify：结构化结果校验通过', 'g');
+        await at(10, 'append', 600);
+        nodes.forEach((x) => x.classList.remove('bad'));
+        if (round % 4 === 0) { await at(3, 'Model', 600); say('Model 返回空动作 → break，任务结束'); await at(5, null, 1600); log.innerHTML = ''; round = 0; await at(0, 'observe'); say('observe → 新任务的初始观察'); }
+      }
+    };
+    run();
+  },
+  reset(s) { s.querySelectorAll('.hl,.on,.bad').forEach((x) => x.classList.remove('hl', 'on', 'bad')); s.querySelector('.ct-log').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c1-cc" data-part="7" data-title="生产级 Harness 的重心" data-dur="14000" data-notes="早期的 Agent 框架主要关注上下文与工具：给模型工具、给模型上下文，让它“能做事”。而生产级 Agent 系统的重心已经转向<b>约束、验证与纠正</b>：确保工具调用是安全的、上下文是经过管理的、错误是可纠正的。在 Agent 产品的成熟度曲线上，两类功能的重要性是不对称的。<br>以 <b>Claude Code</b> 为例，它的 Harness 中绝大部分代码都是约束、验证与纠正，而非上下文与工具——工具本身只是一小部分，围绕这些工具构建的保障机制才是真正的核心：<b>流程状态管理</b>（追踪 Agent 当前执行到哪一步）、<b>多层上下文压缩</b>（信息太多时自动精简）、<b>权限分类</b>（控制哪些操作需要用户确认）、<b>熔断器</b>（Circuit Breaker：当错误连续发生时自动“断电”停止重试——就像家里电路短路时保险丝会自动跳闸）、<b>错误恢复机制</b>（捕获异常、回滚到上一稳定状态、重试或交还给人类）。中间可以手动触发错误，观察熔断器跳闸。<br>这一判断在工程实践中得到验证：LangChain 在 <b>Terminal Bench 2.0</b> 上的得分从 52.8% 提升到 66.5%（从排行榜 30 名开外跃升至前 5），<b>改变的不是模型，而是 Harness</b>——让 Agent 自动检查自己的执行结果、检测是否陷入重复循环、优化思考策略。<br><b>行业正在从“能做事”向“可靠地做事”转变，Harness 工程因此成为 Agent 系统的核心竞争力。</b>">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从“能做事”到<em>“可靠地做事”</em></h2></header>
+  <div class="cc-body">
+    <div class="cc-col panel fx fx-left" style="--d:2">
+      <span class="lbl">Claude Code 的 Harness：重心在保障机制</span>
+      <ul class="cc-ms">
+        <li><svg class="ic"><use href="#i-route"/></svg><b>流程状态管理</b><span>追踪当前执行到哪一步</span></li>
+        <li><svg class="ic"><use href="#i-compress"/></svg><b>多层上下文压缩</b><span>信息太多时自动精简</span></li>
+        <li><svg class="ic"><use href="#i-key"/></svg><b>权限分类</b><span>哪些操作需要用户确认</span></li>
+        <li class="cc-hl"><svg class="ic"><use href="#i-zap"/></svg><b>熔断器</b><span>连续出错时自动“断电”</span></li>
+        <li><svg class="ic"><use href="#i-undo"/></svg><b>错误恢复机制</b><span>捕获异常、回滚、重试或交还人类</span></li>
+      </ul>
+    </div>
+    <div class="cc-col panel fx fx-up" style="--d:3">
+      <span class="lbl">熔断器（Circuit Breaker）</span>
+      <div class="cc-cb">
+        <svg viewBox="0 0 360 170" width="360" height="170">
+          <path class="cc-w" d="M20 120 H130"/><path class="cc-w" d="M230 120 H340"/>
+          <circle cx="130" cy="120" r="7" class="cc-pt"/><circle cx="230" cy="120" r="7" class="cc-pt"/>
+          <line class="cc-sw" x1="130" y1="120" x2="228" y2="120"/>
+          <text x="20" y="100" class="cc-t">Agent 重试</text><text x="340" y="100" class="cc-t" text-anchor="end">工具调用</text>
+        </svg>
+        <div class="cc-fails"><i></i><i></i><i></i></div>
+        <p class="cc-st">电路闭合：失败后自动重试</p>
+      </div>
+      <div class="cc-bt"><button class="btn cc-err"><svg class="ic"><use href="#i-x"/></svg>触发一次错误</button><button class="btn cc-ok"><svg class="ic"><use href="#i-check"/></svg>成功一次</button><button class="btn cc-rs"><svg class="ic"><use href="#i-refresh"/></svg>重置</button></div>
+      <span class="cap">示意：连续 3 次失败即跳闸，停止重试并交还人类</span>
+    </div>
+    <div class="cc-col panel fx fx-right" style="--d:4">
+      <span class="lbl">LangChain · Terminal Bench 2.0</span>
+      <div class="cc-sc"><b><span data-count="52.8" data-dec="1" data-delay="900">52.8</span>%</b><svg class="ic"><use href="#i-arrow"/></svg><b class="grad"><span data-count="66.5" data-dec="1" data-delay="1500" data-dur="2200">66.5</span>%</b></div>
+      <div class="cc-rank"><span>30 名开外</span><svg class="ic"><use href="#i-trend"/></svg><span class="c-ok">前 5</span></div>
+      <p class="cc-nm">改变的不是模型，<b>而是 Harness</b></p>
+      <div class="cc-what"><span>自动检查自己的执行结果</span><span>检测是否陷入重复循环</span><span>优化思考策略</span></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6">行业正在从“能做事”向“可靠地做事”转变，<b>Harness 工程因此成为 Agent 系统的核心竞争力</b></p>
+  <div class="src">第一章 ·「Harness 工程：模型之外的竞争力」</div>
+</section>
+<style>
+.cc-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;flex:1;min-height:0;margin-bottom:22px}
+.cc-col{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.cc-ms{display:flex;flex-direction:column;gap:10px}
+.cc-ms li{display:grid;grid-template-columns:34px 1fr;grid-template-rows:auto auto;column-gap:10px;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.cc-ms .ic{grid-row:1/3;font-size:26px;color:var(--acc);align-self:center}
+.cc-ms b{font-size:19px}
+.cc-ms span{font-size:15px;color:var(--text2)}
+.cc-ms .cc-hl{border-color:color-mix(in srgb,var(--warn) 50%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+.cc-cb{display:flex;flex-direction:column;align-items:center;gap:10px}
+.cc-w{stroke:var(--ok);stroke-width:4;stroke-dasharray:8 8;animation:flow 1s linear infinite}
+.cc-pt{fill:#0a1024;stroke:var(--text2);stroke-width:3}
+.cc-sw{stroke:var(--ok);stroke-width:6;stroke-linecap:round;transform-origin:130px 120px;transition:transform .5s var(--spring),stroke .3s}
+.cc-t{fill:var(--text3);font-size:15px}
+#c1-cc.trip .cc-sw{transform:rotate(-38deg);stroke:var(--bad)}
+#c1-cc.trip .cc-w{stroke:var(--bad);animation:none;opacity:.5}
+.cc-fails{display:flex;gap:10px}
+.cc-fails i{width:30px;height:30px;border-radius:50%;border:2px solid var(--line2);transition:all .3s}
+.cc-fails i.on{background:var(--bad);border-color:var(--bad);box-shadow:0 0 14px var(--bad)}
+.cc-st{font-size:18px;color:var(--ok);text-align:center;min-height:28px}
+#c1-cc.trip .cc-st{color:var(--bad)}
+.cc-bt{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.cc-bt .btn{font-size:16px;padding:8px 12px}
+.cc-sc{display:flex;align-items:center;gap:16px;font:800 58px var(--num)}
+.cc-sc>b:first-child{color:var(--text2)}
+.cc-sc .ic{font-size:36px;color:var(--text3)}
+.cc-rank{display:flex;align-items:center;gap:14px;font-size:22px;font-weight:700;color:var(--text2)}
+.cc-rank .ic{color:var(--ok)}
+.cc-nm{font-size:24px}
+.cc-nm b{color:var(--acc)}
+.cc-what{display:flex;flex-direction:column;gap:8px}
+.cc-what span{padding:10px 14px;border-radius:12px;font-size:17px;background:color-mix(in srgb,var(--acc) 10%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+</style>
+<script>
+HOOKS['c1-cc'] = {
+  init(s) {
+    s.querySelector('.cc-err').addEventListener('click', () => { this.auto = false; this.fail(s); });
+    s.querySelector('.cc-ok').addEventListener('click', () => { this.auto = false; this.ok(s); });
+    s.querySelector('.cc-rs').addEventListener('click', () => { this.auto = false; this.rs(s); });
+  },
+  paint(s) {
+    s.querySelectorAll('.cc-fails i').forEach((x, i) => x.classList.toggle('on', i < this.n));
+    const trip = this.n >= 3;
+    s.classList.toggle('trip', trip);
+    s.querySelector('.cc-st').textContent = trip ? '跳闸：停止重试，交还人类判断' : this.n ? `连续失败 ${this.n} 次，自动重试中` : '电路闭合：失败后自动重试';
+  },
+  fail(s) { if (this.n < 3) this.n++; this.paint(s); },
+  ok(s) { if (this.n < 3) this.n = 0; this.paint(s); },
+  rs(s) { this.n = 0; this.paint(s); },
+  enter(s, ctx) {
+    this.auto = true;
+    this.rs(s);
+    // 自动演示：失败、成功、连续三次失败跳闸、重置
+    const seq = ['fail', 'ok', 'fail', 'fail', 'fail', 'wait', 'rs'];
+    let i = 0;
+    ctx.every(() => { if (!this.auto) return; const a = seq[i++ % seq.length]; if (a !== 'wait') this[a](s); }, 1300);
+  },
+  reset(s) { this.n = 0; s.classList.remove('trip'); },
+};
+</script>
+
+<section class="slide" id="c1-eras" data-part="7" data-trans="iris" data-title="从提示工程到 Graph 工程" data-notes="回顾 AI 应用工程的发展，可以看到一条清晰的演进弧线：<b>提示工程</b>是第一波创新——通过优化输入给模型的自然语言指令来提升输出质量。<b>上下文工程</b>是第二波——人们认识到单纯优化提示词还不够，需要系统性地管理模型能看到的所有信息（系统指令、工具定义、对话历史、外部知识）。<b>Harness 工程</b>是第三波——将视野从“模型能看到什么”进一步扩展到“Agent 如何组织模型运行并与环境交互”。随后出现的 <b>Loop 工程</b>又把视野从单次运行扩展到跨轮次的持续自主运转：谁来发现下一件该做的事、何时验证、何时才算真正完成（第十章）。2026 年 7 月，业界又开始用 <b>Graph 工程</b>描述一种更高层的编排视角：把 Agent 循环、确定性程序和人工审批组织成显式的执行图，其中节点承担具体能力，边规定路由与依赖，结构化状态沿边传递并在关键边界处持久化（Josh C. Simmons 7 月 4 日的文章较早明确使用这一名称；相关实践早于名称：LangGraph、Microsoft Agent Framework、Google ADK 分别称其为图编排或 graph-based workflow）。<br>这五个阶段<b>不是替代关系，而是层层包含的</b>：提示工程是上下文工程的子集，上下文工程是 Harness 工程的子集，Harness 工程是 Loop 工程的子集，Loop 工程又是 Graph 工程的子集——单个 Agent 循环正是执行图中的一个节点。<b>当各家模型的能力越来越接近、不再是决定性的差异因素时，竞争优势就转移到了模型之外的工程实践。</b>点击任一圈查看说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">工程范式的演进：<em>层层包含</em></h2></header>
+  <div class="er-body">
+    <div class="er-rings fx fx-scale" style="--d:2"></div>
+    <div class="er-card panel fx fx-right" style="--d:3">
+      <span class="lbl er-w"></span><b class="er-n"></b><p class="er-d"></p>
+      <div class="er-graph"><svg viewBox="0 0 520 170" width="520" height="170">
+        <path class="er-e" d="M70 85 C 140 30, 190 30, 250 50"/><path class="er-e" d="M70 85 C 140 140, 190 140, 250 120"/><path class="er-e" d="M300 50 C 360 50, 380 80, 440 85"/><path class="er-e" d="M300 120 C 360 120, 380 90, 440 85"/>
+        <g class="er-nd"><rect x="20" y="62" width="100" height="46" rx="12"/><text x="70" y="90">Agent 循环</text></g>
+        <g class="er-nd"><rect x="200" y="28" width="110" height="46" rx="12"/><text x="255" y="56">确定性程序</text></g>
+        <g class="er-nd"><rect x="200" y="98" width="110" height="46" rx="12"/><text x="255" y="126">人工审批</text></g>
+        <g class="er-nd"><rect x="400" y="62" width="100" height="46" rx="12"/><text x="450" y="90">持久化状态</text></g>
+      </svg><span class="cap">节点承担能力 · 边规定路由与依赖 · 状态沿边传递并在关键边界持久化</span></div>
+      <div class="runbar er-bar"><i></i></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:5">当各家模型的能力越来越接近，竞争优势就转移到了<b>模型之外的工程实践</b></p>
+  <div class="src">第一章 ·「从提示工程到 Loop 工程：工程范式的演进」</div>
+</section>
+<style>
+.er-body{display:flex;gap:40px;align-items:center;flex:1;min-height:0;margin-bottom:20px}
+.er-rings{position:relative;width:680px;height:640px;flex:none}
+.er-r{--c:var(--acc);position:absolute;left:50%;top:50%;border-radius:50%;border:2px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 6%,transparent);transform:translate(-50%,-50%) scale(0);cursor:pointer;transition:background .35s,border-color .35s,box-shadow .35s}
+.active .er-r{animation:erIn .9s var(--spring) forwards;animation-delay:calc(var(--i)*260ms + 300ms)}
+@keyframes erIn{to{transform:translate(-50%,-50%) scale(1)}}
+.er-r span{position:absolute;left:50%;top:14px;transform:translateX(-50%);white-space:nowrap;font-size:19px;font-weight:700;color:var(--c)}
+.er-r.on{background:color-mix(in srgb,var(--c) 16%,transparent);border-color:var(--c);box-shadow:0 0 40px color-mix(in srgb,var(--c) 40%,transparent),inset 0 0 40px color-mix(in srgb,var(--c) 20%,transparent)}
+.er-r[data-i="0"] span{top:50%;transform:translate(-50%,-50%)}
+.er-card{flex:1;padding:28px 32px;display:flex;flex-direction:column;gap:14px;min-height:520px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.er-n{font-size:36px;color:var(--c)}
+.er-d{font-size:21px;line-height:1.7}
+.er-graph{display:none;flex-direction:column;gap:8px}
+.er-card[data-g] .er-graph{display:flex}
+.er-e{fill:none;stroke:var(--c);stroke-width:2.5;stroke-dasharray:6 7;animation:flow 1s linear infinite}
+.er-nd rect{fill:color-mix(in srgb,var(--c) 14%,#0a1024);stroke:var(--c);stroke-width:2}
+.er-nd text{fill:var(--text);font-size:15px;text-anchor:middle}
+.er-bar{margin-top:auto}
+.er-card.sw .er-n,.er-card.sw .er-d{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c1-eras'] = {
+  E: [
+    { n: '提示工程', w: '第一波', c: '#fbbf24', d: '通过优化输入给模型的自然语言指令来提升输出质量。' },
+    { n: '上下文工程', w: '第二波', c: '#22d3ee', d: '单纯优化提示词还不够，需要系统性地管理模型能看到的所有信息：系统指令、工具定义、对话历史、外部知识。' },
+    { n: 'Harness 工程', w: '第三波', c: '#60a5fa', d: '从“模型能看到什么”扩展到“Agent 如何组织模型运行并与环境交互”：上下文与工具接口、约束机制、验证手段、反馈循环和错误恢复。' },
+    { n: 'Loop 工程', w: '随后', c: '#a78bfa', d: '把视野从单次运行扩展到跨轮次的持续自主运转：谁来发现下一件该做的事、何时验证、何时才算真正完成（第十章）。' },
+    { n: 'Graph 工程', w: '2026 年 7 月', c: '#f472b6', d: '把 Agent 循环、确定性程序和人工审批组织成显式的执行图——单个 Agent 循环正是执行图中的一个节点。相关实践早于名称：LangGraph、Microsoft Agent Framework、Google ADK。', g: true },
+  ],
+  init(s) {
+    const host = s.querySelector('.er-rings');
+    host.innerHTML = this.E.map((e, i) => { const d = 170 + i * 115; return `<div class="er-r" data-i="${i}" style="--i:${i};--c:${e.c};width:${d}px;height:${d}px;z-index:${10 - i}"><span>${e.n}</span></div>`; }).join('');
+    host.addEventListener('click', (ev) => { const r = ev.target.closest('.er-r'); if (r) { this.auto = false; this.show(s, +r.dataset.i); } });
+  },
+  show(s, i) {
+    const e = this.E[i], c = s.querySelector('.er-card');
+    this.i = i;
+    s.querySelectorAll('.er-r').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+    c.style.setProperty('--c', e.c);
+    c.querySelector('.er-w').textContent = e.w;
+    c.querySelector('.er-n').textContent = e.n;
+    c.querySelector('.er-d').textContent = e.d;
+    if (e.g) c.dataset.g = '1'; else delete c.dataset.g;
+    U.restart(c, 'sw');
+    const b = c.querySelector('.er-bar');
+    b.classList.remove('run'); void b.offsetWidth;
+    if (this.auto) b.classList.add('run');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 1700);
+    ctx.every(() => { if (this.auto && this.i != null) this.show(s, (this.i + 1) % this.E.length); }, 4200);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.er-r').forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c1-aci" data-part="7" data-title="构建有效 Agent 的核心原则" data-notes="根据 Anthropic 的经验（Building effective agents，2024 年 12 月），成功的 Agent 系统遵循三个核心原则。<br><b>保持简单</b>：从最简单的方案开始，只在确实必要时才增加复杂度。直接的 API 调用优于复杂的框架，清晰的代码优于聪明的抽象——因为每多一层抽象都会成为以后调试时新的盲区。<br><b>保持透明</b>：明确显示 Agent 的规划步骤、执行日志和决策轨迹——这不只是为了调试方便，也是让用户建立信任的前提。黑箱里的错误一旦发生，外部观察者既无法定位也无法纠正。<br><b>设计好工具接口（ACI，Agent-Computer Interface）</b>：从 Agent 视角设计接口（让 Agent 容易理解和使用），而非传统 API 从程序员视角设计接口。工具的命名和参数要直观，容易误用的地方要从设计上让错误无法发生——比如 SIM 卡的缺角让卡片只能从一个方向插进卡槽；微波炉门没关好就绝不加热。这种“用设计消除错误”的思路在制造业里叫<b>防呆</b>（Poka-yoke），源自丰田生产体系。设计不好的工具会让再强的模型也频繁出错——<b>模型与工具之间唯一的沟通通道就是接口本身，模糊的接口会被模型放大成系统性的错误</b>。右侧可以试着插一下 SIM 卡。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">构建有效 Agent 的<em>三个原则</em></h2></header>
+  <div class="ac-body">
+    <div class="ac-cards">
+      <div class="ac-c panel fx fx-up" style="--d:2"><svg class="ic"><use href="#i-sliders"/></svg><b>保持简单</b><p>从最简单的方案开始，只在确实必要时才增加复杂度；直接的 API 调用优于复杂的框架</p><small>每多一层抽象，都是以后调试时新的盲区</small></div>
+      <div class="ac-c panel fx fx-up" style="--d:3"><svg class="ic"><use href="#i-eye"/></svg><b>保持透明</b><p>明确显示规划步骤、执行日志和决策轨迹——也是让用户建立信任的前提</p><small>黑箱里的错误，外部既无法定位也无法纠正</small></div>
+      <div class="ac-c panel fx fx-up" style="--d:4"><svg class="ic"><use href="#i-plug"/></svg><b>设计好工具接口（ACI）</b><p>Agent-Computer Interface：从 Agent 的视角设计接口，命名和参数要直观</p><small>容易误用的地方，从设计上让错误无法发生</small></div>
+    </div>
+    <div class="ac-demo panel fx fx-right" style="--d:5">
+      <span class="lbl">防呆（Poka-yoke）· 源自丰田生产体系</span>
+      <div class="ac-sim">
+        <svg class="ac-slot" viewBox="0 0 180 130" width="180" height="130"><path d="M4 4 H130 L176 50 V126 H4 Z"/><text x="90" y="150">卡槽</text></svg>
+        <div class="ac-card"><i></i><span>SIM</span></div>
+      </div>
+      <div class="ac-row"><button class="btn ac-try"><svg class="ic"><use href="#i-refresh"/></svg>换个方向插入</button><span class="ac-msg"></span></div>
+      <div class="ac-mw"><svg class="ic"><use href="#i-box"/></svg><span>微波炉：门没关好</span><button class="btn" disabled>加热</button><em>按钮不可用</em></div>
+      <p class="ac-k">模型与工具之间唯一的沟通通道就是接口本身：<b>模糊的接口会被模型放大成系统性的错误</b></p>
+    </div>
+  </div>
+  <div class="src">第一章 ·「构建有效 Agent 的核心原则」</div>
+</section>
+<style>
+.ac-body{display:flex;gap:30px;flex:1;min-height:0}
+.ac-cards{width:760px;flex:none;display:flex;flex-direction:column;gap:16px}
+.ac-c{padding:22px 26px;display:grid;grid-template-columns:56px 1fr;column-gap:16px;row-gap:6px}
+.ac-c .ic{grid-row:1/4;font-size:40px;color:var(--acc);align-self:center}
+.ac-c b{font-size:25px}
+.ac-c p{font-size:18px;line-height:1.6}
+.ac-c small{font-size:16px;color:var(--warn)}
+.ac-demo{flex:1;padding:24px 28px;display:flex;flex-direction:column;gap:16px}
+.ac-sim{position:relative;height:200px;display:flex;align-items:center;justify-content:center;gap:0}
+.ac-slot{overflow:visible}
+.ac-slot path{fill:rgba(255,255,255,.03);stroke:var(--line2);stroke-width:3;stroke-dasharray:8 6}
+.ac-slot text{fill:var(--text3);font-size:15px;text-anchor:middle}
+.ac-card{position:absolute;left:calc(50% - 300px);top:50%;width:160px;height:114px;margin-top:-57px;border-radius:12px;display:grid;place-items:center;font:800 26px var(--num);color:#06101f;background:linear-gradient(135deg,#fde68a,#fbbf24);clip-path:polygon(0 0,72% 0,100% 38%,100% 100%,0 100%);transition:transform .8s var(--spring)}
+.ac-card i{position:absolute;left:30px;top:30px;width:48px;height:40px;border-radius:6px;background:linear-gradient(135deg,#d4d4d8,#a1a1aa)}
+.ac-card span{position:relative}
+.ac-card.flip{transform:scaleY(-1)}
+.ac-card.in{transform:translateX(220px)}
+.ac-card.flip.bump{animation:acBump .7s ease}
+@keyframes acBump{40%{transform:scaleY(-1) translateX(120px)}60%{transform:scaleY(-1) translateX(100px)}}
+.ac-row{display:flex;align-items:center;gap:14px}
+.ac-msg{font-size:18px}
+.ac-msg.ok{color:var(--ok)}.ac-msg.no{color:var(--bad)}
+.ac-mw{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;font-size:17px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ac-mw .ic{font-size:24px;color:var(--warn)}
+.ac-mw em{font-style:normal;font-size:15px;color:var(--text3)}
+.ac-k{font-size:19px;line-height:1.65;margin-top:auto}
+.ac-k b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c1-aci'] = {
+  init(s) { s.querySelector('.ac-try').addEventListener('click', () => { this.auto = false; this.attempt(s, !this.right); }); },
+  attempt(s, right) {
+    const card = s.querySelector('.ac-card'), msg = s.querySelector('.ac-msg');
+    this.right = right;
+    card.className = 'ac-card';
+    void card.offsetWidth;
+    if (right) { card.classList.add('in'); msg.className = 'ac-msg ok'; msg.textContent = '缺角对上了：只能从这个方向插进去'; }
+    else { card.classList.add('flip', 'bump'); msg.className = 'ac-msg no'; msg.textContent = '方向反了：缺角对不上，根本插不进去'; }
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.right = true;
+    ctx.later(() => this.attempt(s, false), 1200);
+    ctx.every(() => { if (this.auto) this.attempt(s, !this.right); }, 2600);
+  },
+  reset(s) { s.querySelector('.ac-card').className = 'ac-card'; s.querySelector('.ac-msg').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c1-pick" data-part="7" data-title="如何选择模型" data-notes="模型是 Agent 的智能基座，<b>选对模型往往比优化提示词更有效</b>。由于模型迭代极快，原书不推荐具体的模型版本，而是提供选型思路：<br><b>闭源模型</b>：最常用的两大厂商是 OpenAI（GPT/o 系列）和 Anthropic（Claude 系列），通常在能力上领先，但成本较高且受限于厂商的 API 策略。选模型时不要只看排行榜，<b>要在你自己的任务上做评估</b>（第七章）。<br><b>开源模型</b>：在本书编写时与闭源模型的差距在 6 个月以内，但成本显著更低，可私有化部署、支持微调定制，适合对成本敏感或有数据合规要求的场景；DeepSeek、Kimi、GLM 是国内 Agent 能力较强的模型；不同模型在工具调用方面的能力差异很大，选型前务必在具体场景中测试。<br><b>能力之外，还要考虑模型的策略边界</b>：模型在基准测试中具备某种能力，并不意味着承载它的产品一定允许用户调用这种能力。不同厂商会对网络安全、模型蒸馏、模型提取、隐私数据和高风险操作设置不同的策略边界；同一个任务在聊天产品、Coding Agent 和 API 中也可能得到不同结果。要在真实任务上测试：模型是否愿意执行、接口是否暴露所需能力、服务条款是否允许这种使用方式；业务关键任务还应提前准备人工接管或其他合规模型作为替代路径。<br><b>绝大多数 Agent 需要支持思考（Reasoning）的模型</b>；只有极少数场景例外，例如只执行单步简单任务，或在 Computer Use 中仅需点击固定位置的简单 GUI 操作。<br><b>关注输出速度和多模态能力</b>：一是<b>输出 token 的速度</b>——Agent 往往需要多轮推理，每轮都要等待模型输出完成才能执行下一步，所以输出速度直接决定端到端的响应延迟——如果一个 Agent 任务需要 20 轮推理，每轮慢 2 秒就意味着总共多等 40 秒（右下角可以拖动试算）；二是<b>多模态支持</b>——如果 Agent 需要理解图片、音频或视频，多模态能力就是硬性要求，不同模型在这方面差异很大。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">如何选择模型：<em>在自己的任务上评估</em></h2></header>
+  <div class="pk-grid">
+    <div class="pk-c panel fx fx-up" style="--d:2"><b><svg class="ic"><use href="#i-lock"/></svg>闭源模型</b><p>OpenAI（GPT / o 系列）、Anthropic（Claude 系列）：能力通常领先，但成本较高、受限于厂商的 API 策略</p><small>不要只看排行榜，要在你自己的任务上做评估（第七章）</small></div>
+    <div class="pk-c panel fx fx-up" style="--d:3"><b><svg class="ic"><use href="#i-unlock"/></svg>开源模型</b><p>与闭源的差距在 6 个月以内，成本显著更低；可私有化部署、支持微调；DeepSeek、Kimi、GLM 是国内 Agent 能力较强的模型</p><small>工具调用能力差异很大，选型前务必实测</small></div>
+    <div class="pk-c panel fx fx-up" style="--d:4"><b><svg class="ic"><use href="#i-ban"/></svg>策略边界</b><p>有能力 ≠ 产品允许你调用：网络安全、模型蒸馏、模型提取、隐私数据、高风险操作，各家边界不同</p><small>测试是否愿意执行、接口是否暴露、条款是否允许；备好人工接管或替代模型</small></div>
+    <div class="pk-c panel fx fx-up" style="--d:5"><b><svg class="ic"><use href="#i-brain"/></svg>支持思考（Reasoning）</b><p>绝大多数 Agent 需要支持思考的模型：多步思考、工具选择都依赖它</p><small>例外：单步简单任务；固定位置点击的简单 GUI 操作</small></div>
+    <div class="pk-c panel fx fx-up" style="--d:6"><b><svg class="ic"><use href="#i-image"/></svg>多模态能力</b><p>需要理解图片、音频或视频时，多模态就是硬性要求，不同模型差异很大</p><small>选型时把它当作门槛条件，而不是加分项</small></div>
+    <div class="pk-c pk-calc panel fx fx-up" style="--d:7"><b><svg class="ic"><use href="#i-timer"/></svg>输出速度：延迟会逐轮累加</b>
+      <div class="pk-r"><span>推理轮数</span><input class="rng pk-n" type="range" min="1" max="60" value="20"><em class="pk-nv">20</em></div>
+      <div class="pk-r"><span>每轮慢几秒</span><input class="rng pk-s" type="range" min="0" max="10" step="0.5" value="2"><em class="pk-sv">2</em></div>
+      <div class="pk-out">总共多等 <b class="pk-t">40</b> 秒</div></div>
+  </div>
+  <div class="src">第一章 ·「如何选择模型」</div>
+</section>
+<style>
+.pk-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr 1fr;gap:20px;flex:1;min-height:0}
+.pk-c{padding:22px 24px;display:flex;flex-direction:column;gap:10px}
+.pk-c b{display:flex;align-items:center;gap:10px;font-size:23px;color:var(--acc)}
+.pk-c p{font-size:18px;line-height:1.6}
+.pk-c small{margin-top:auto;font-size:16px;color:var(--warn);line-height:1.5}
+.pk-calc{border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.pk-r{display:grid;grid-template-columns:110px 1fr 48px;align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.pk-r em{font:700 20px var(--num);font-style:normal;color:var(--text);text-align:right}
+.pk-out{margin-top:auto;font-size:20px}
+.pk-out b{font:800 48px var(--num);background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+</style>
+<script>
+HOOKS['c1-pick'] = {
+  init(s) {
+    const n = s.querySelector('.pk-n'), sec = s.querySelector('.pk-s');
+    const upd = () => {
+      s.querySelector('.pk-nv').textContent = n.value;
+      s.querySelector('.pk-sv').textContent = sec.value;
+      s.querySelector('.pk-t').textContent = +(n.value * sec.value).toFixed(1);
+      n.style.setProperty('--p', ((n.value - 1) / 59) * 100 + '%');
+      sec.style.setProperty('--p', (sec.value / 10) * 100 + '%');
+    };
+    [n, sec].forEach((r) => { r.addEventListener('input', upd); r.addEventListener('change', () => r.blur()); });
+    this.upd = upd;
+    upd();
+  },
+  enter() { this.upd(); },
+};
+</script>

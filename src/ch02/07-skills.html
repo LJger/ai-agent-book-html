@@ -1,0 +1,663 @@
+<!-- ================= PART 07 动态提示词与 Agent Skills ================= -->
+<section class="slide chapter" id="c02-d7" data-part="7" data-title="PART 07 · 动态提示词与 Agent Skills" data-notes="随着 Agent 覆盖的业务场景越来越多，系统提示词会不断膨胀。这一部分讲从静态提示工程到动态提示词的自然演进：<b>不是把所有知识一次性塞给 Agent，而是让它按需加载</b>。依次看：Skills 的三层渐进式披露、description 如何写成路由条件、第二层的两种触发方式与第三层的深入、如何编写一份可用的 Skill、Skill 生态，Skills 在不同 Harness 上下文中的位置、启用 Skills 后的完整轨迹与 KV Cache 演化、Skills 与工具的关系，以及实验 2-6、2-7。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">动态提示词<br>与 Agent Skills</h1>
+  <div class="ch-s fx fx-up" style="--d:3">少量目录常驻，完整正文按需加载</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">不是把所有知识一次性塞给 Agent，而是让它按需加载。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<section class="slide" id="c02-skwhy" data-part="7" data-trans="zoom" data-dur="14000" data-title="提示词膨胀的两个问题" data-notes="随着 Agent 覆盖的业务场景越来越多，系统提示词会不断膨胀——客服场景的退款规则、编程场景的代码规范、文档场景的格式要求……全部塞进一个提示词，会带来两个问题：<b>浪费 token</b>——大部分内容与当前任务无关；<b>注意力被稀释</b>——上下文中无关信息过多会稀释模型对关键内容的注意力（这一问题将在后文上下文压缩策略部分以“上下文腐化”的概念详细讨论）。<br>这就是从静态提示工程到动态提示词的自然演进：<b>不是把所有知识一次性塞给 Agent，而是让它按需加载</b>。Agent Skills 系统正是这一理念的工程化实现。<br>演示中场景模块一个个塞进系统提示词，常驻 token 上涨、留给当前任务关键内容的注意力下降（数值为示意）；切到“按需加载”后，常驻的只有目录和当前需要的模块。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">提示词越写越长：<em>浪费 token，稀释注意力</em></h2></div>
+    <div class="seg sw-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">全部塞进一个提示词</button><button data-v="1">按需加载</button></div></header>
+  <div class="sw-body">
+    <div class="sw-p panel fx fx-left" style="--d:2"><span class="lbl">系统提示词</span><div class="sw-mods"></div><div class="sw-task"><b>当前任务</b>帮客户处理一笔退款</div></div>
+    <div class="sw-r fx fx-right" style="--d:3">
+      <div class="sw-m"><span>常驻上下文</span><b class="sw-tk">0</b><div class="meter"><i class="sw-tv"></i></div></div>
+      <div class="sw-m"><span>留给关键内容的注意力</span><div class="meter"><i class="sw-av"></i></div></div>
+      <div class="sw-c"><b>浪费 token</b><p>大部分内容与当前任务无关</p></div>
+      <div class="sw-c"><b>注意力被稀释</b><p>无关信息过多，稀释对关键内容的注意力——后文的“上下文腐化”</p></div>
+      <span class="chip warn sw-sim">示意</span>
+    </div>
+  </div>
+  <div class="src">第二章 ·「动态提示词与 Agent Skills」</div>
+</section>
+<style>
+#c02-skwhy .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-skwhy .sw-seg button{font-size:18px;padding:9px 18px}
+#c02-skwhy .sw-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:660px}
+#c02-skwhy .sw-p{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c02-skwhy .sw-mods{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-content:start}
+#c02-skwhy .sw-md{padding:10px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line2);background:rgba(255,255,255,.03);animation:upIn .35s var(--ease) both;transition:opacity .4s,border-color .4s}
+#c02-skwhy .sw-md small{display:block;font-size:15px;color:var(--text3)}
+#c02-skwhy .sw-md.key{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c02-skwhy .sw-md.cat{border-style:dashed;grid-column:1/-1;color:var(--acc)}
+#c02-skwhy .sw-task{padding:12px 16px;border-radius:12px;font-size:18px;border:1px solid var(--ctx);background:color-mix(in srgb,var(--ctx) 8%,transparent)}
+#c02-skwhy .sw-task b{margin-right:12px;color:var(--ctx)}
+#c02-skwhy .sw-r{position:relative;display:flex;flex-direction:column;gap:14px}
+#c02-skwhy .sw-m{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:8px}
+#c02-skwhy .sw-m span{font-size:17px;color:var(--text2)}
+#c02-skwhy .sw-m b{font:800 34px var(--num);color:var(--warn)}
+#c02-skwhy .sw-tv{--c:var(--warn)}#c02-skwhy .sw-av{--c:var(--ok)}
+#c02-skwhy .sw-c{padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+#c02-skwhy .sw-c b{font-size:19px;color:var(--bad)}
+#c02-skwhy .sw-c p{font-size:16px;color:var(--text2);margin-top:4px}
+#c02-skwhy .sw-sim{position:absolute;right:0;bottom:0;font-size:15px;padding:2px 10px}
+</style>
+<script>
+HOOKS['c02-skwhy'] = {
+  M: [['客服 · 退款规则', 1200, 1], ['编程 · 代码规范', 1500], ['文档 · 格式要求', 900], ['数据分析 · 指标口径', 1100], ['PPT · 版式规范', 800], ['法务 · 合同审查', 1400], ['销售 · 报价流程', 700], ['运维 · 发布流程', 1000], ['招聘 · 面试评估', 600], ['财务 · 报销规则', 900]],
+  init(s) { this.set = U.seg(s.querySelector('.sw-seg'), (v) => { this.auto = false; this.mode(s, +v); }); },
+  mode(s, v) { this.v = v; this.set(String(v)); this.run(s); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, box = s.querySelector('.sw-mods'), tkEl = s.querySelector('.sw-tk'), tv = s.querySelector('.sw-tv'), av = s.querySelector('.sw-av');
+    box.innerHTML = '';
+    let tot = 0;
+    const upd = (key) => { tkEl.textContent = tot.toLocaleString('en-US') + ' tokens'; tv.style.setProperty('--v', Math.min(100, (tot / 11000) * 100) + '%'); av.style.setProperty('--v', Math.round(100 * key / Math.max(key, tot)) + '%'); };
+    if (this.v === 0) {
+      for (const [n, k, key] of this.M) { box.insertAdjacentHTML('beforeend', `<div class="sw-md${key ? ' key' : ''}">${n}<small>约 ${k} tokens</small></div>`); tot += k; upd(1200); await U.wait(ctx, 500); if (!ok()) return; }
+    } else {
+      box.insertAdjacentHTML('beforeend', '<div class="sw-md cat">Skills 目录：每项只有 name + description<small>常驻，约数百 tokens</small></div>'); tot = 300; upd(1200);
+      await U.wait(ctx, 900); if (!ok()) return;
+      box.insertAdjacentHTML('beforeend', '<div class="sw-md key">客服 · 退款规则<small>任务需要时才加载，约 1200 tokens</small></div>'); tot += 1200; upd(1200);
+    }
+    await U.wait(ctx, 3200); if (!ok()) return;
+    if (this.auto) this.mode(s, 1 - this.v); else this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.mode(s, 0); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-sk3" data-part="7" data-trans="rise" data-dur="16000" data-title="三层渐进式披露 · 图2-11" data-notes="Agent Skills 的核心思想是将 Agent 的能力模块化为独立的、可按需加载的知识包。每个 Skill 本质上是一套包含专业领域指导的提示词集合，就像为新员工准备的某个专项任务的操作手册。与传统的将所有指令塞入单一系统提示词的做法不同，Skills 采用了<b>渐进式披露</b>（Progressive Disclosure）的设计哲学——先给 Agent 看一份目录摘要，需要时再加载完整内容，就像你不会把公司所有部门的操作手册都堆到新员工桌上，而是先给一份总目录，需要哪本再去取。<br>按图2-11：<b>第一层（元数据）</b>启动时加载，约 300 tokens——每个 Skill 的 SKILL.md 开头是 YAML frontmatter，包含 name 和 description；目录应在主体正文加载前对 Agent 可见，使它能先判断当前任务是否需要某项能力。任务触发“从论文生成 PPT”后，<b>第二层（SKILL.md 核心流程）</b>按需加载，约 2K tokens：markitdown 提取文本 → 解压 PPTX 访问 XML → 修改 slide{N}.xml 内容 → 重新打包为 .pptx，并引用 html2pptx.md、reference.md 与 scripts/。需要详细方法时（“用 HTML 模板创建 PPT”），<b>第三层（子文档）</b>选择性深入：html2pptx.md（HTML 模板到 PPT 的完整工作流）、reference.md（XML 格式规范和技术细节）、scripts/*.py（可执行工具，如 thumbnail.py）。元数据固定 → KV Cache 友好；动态内容追加 → 不破坏缓存。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skills：<em>三层渐进式披露</em></h2>
+  <p class="lead fx fx-up" style="--d:2">先给一份总目录，需要哪本再去取——不把所有部门的操作手册都堆到新员工桌上</p></header>
+  <div class="k3-body">
+    <div class="k3-ls fx fx-left" style="--d:3">
+      <div class="k3-l" data-l="0"><div class="k3-h"><b>第一层：元数据</b><span>启动时加载 · ~300 tokens</span></div><code>skills: [{name: "PPTX", desc: "Create PowerPoint presentations from content"},<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{name: "PDF", desc: "Extract and analyze PDF documents"}, ...]</code></div>
+      <div class="k3-tr"><i></i>任务触发：“从论文生成 PPT”</div>
+      <div class="k3-l" data-l="1"><div class="k3-h"><b>第二层：SKILL.md 核心流程</b><span>按需加载 · ~2K tokens</span></div><code>1. markitdown 提取文本 → 2. 解压 PPTX 访问 XML<br>3. 修改 slide{N}.xml 内容 → 4. 重新打包为 .pptx<br>引用：→ html2pptx.md | → reference.md | → scripts/</code></div>
+      <div class="k3-tr"><i></i>需要详细方法：“用 HTML 模板创建 PPT”</div>
+      <div class="k3-l" data-l="2"><div class="k3-h"><b>第三层：子文档</b><span>选择性深入 · 按需加载</span></div><div class="k3-sub"><span><b>html2pptx.md</b>HTML 模板 → PPT 的完整工作流</span><span><b>reference.md</b>XML 格式规范和技术细节</span><span><b>scripts/*.py</b>可执行工具：thumbnail.py 等</span></div></div>
+    </div>
+    <div class="k3-r fx fx-right" style="--d:4">
+      <div class="k3-k"><span>本次任务加载的上下文</span><b class="k3-n">~300</b><small>tokens</small></div>
+      <div class="k3-cmp"><span>对比：所有 Skill 正文在启动时全量加载</span><div class="k3-bar"><i class="a"></i><i class="b"></i></div><small>示意</small></div>
+      <div class="k3-rule"><p><b>元数据固定</b> → KV Cache 友好</p><p><b>动态内容追加</b> → 不破坏缓存</p></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Skills：领域能力的可组合单元」· 图2-11</div>
+</section>
+<style>
+#c02-sk3 .k3-body{display:grid;grid-template-columns:1080px 1fr;gap:26px;height:640px}
+#c02-sk3 .k3-ls{display:flex;flex-direction:column;gap:8px}
+#c02-sk3 .k3-l{padding:12px 18px;border-radius:16px;border:1.5px solid var(--line2);background:rgba(12,18,40,.72);opacity:.4;transition:all .5s}
+#c02-sk3 .k3-l.on{opacity:1;border-color:var(--acc);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 22%,transparent)}
+#c02-sk3 .k3-h{display:flex;align-items:baseline;gap:14px;margin-bottom:8px}
+#c02-sk3 .k3-h b{font-size:21px;color:var(--acc)}
+#c02-sk3 .k3-h span{font-size:16px;color:var(--text3)}
+#c02-sk3 .k3-l code{display:block;font:16px/1.6 var(--mono);color:var(--text2)}
+#c02-sk3 .k3-sub{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+#c02-sk3 .k3-sub span{padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.45;color:var(--text2);border:1px solid var(--line2)}
+#c02-sk3 .k3-sub b{display:block;font:700 16px var(--mono);color:var(--text)}
+#c02-sk3 .k3-tr{display:flex;align-items:center;gap:12px;padding-left:24px;font-size:17px;color:var(--warn);opacity:.35;transition:opacity .4s}
+#c02-sk3 .k3-tr.on{opacity:1}
+#c02-sk3 .k3-tr i{width:3px;height:24px;background:var(--warn)}
+#c02-sk3 .k3-r{display:flex;flex-direction:column;gap:16px}
+#c02-sk3 .k3-k{padding:18px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sk3 .k3-k span{display:block;font-size:17px;color:var(--text2)}
+#c02-sk3 .k3-k b{font:800 48px var(--num);color:var(--acc)}
+#c02-sk3 .k3-k small{font-size:17px;color:var(--text3);margin-left:6px}
+#c02-sk3 .k3-cmp{padding:14px 18px;border-radius:14px;border:1px dashed var(--line2)}
+#c02-sk3 .k3-cmp span{font-size:16px;color:var(--text2)}
+#c02-sk3 .k3-bar{position:relative;height:22px;margin:10px 0 4px;border-radius:6px;background:rgba(255,255,255,.05)}
+#c02-sk3 .k3-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:6px;transition:width .6s var(--ease)}
+#c02-sk3 .k3-bar .b{width:100%;background:rgba(251,113,133,.35)}
+#c02-sk3 .k3-bar .a{width:3%;background:var(--ok);z-index:1}
+#c02-sk3 .k3-cmp small{font-size:15px;color:var(--text3)}
+#c02-sk3 .k3-rule{margin-top:auto;padding:14px 18px;border-radius:14px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c02-sk3 .k3-rule p{font-size:19px;line-height:1.7}
+#c02-sk3 .k3-rule b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c02-sk3'] = {
+  init(s) { this.ls = [...s.querySelectorAll('.k3-l')]; this.ts = [...s.querySelectorAll('.k3-tr')]; },
+  enter(s, ctx) {
+    const n = s.querySelector('.k3-n'), a = s.querySelector('.k3-bar .a');
+    let i = 0;
+    const st = [['~300', 3], ['~2.3K', 12], ['~2.3K + 子文档', 22]];
+    const go = () => { const k = i % 4; this.ls.forEach((l, j) => l.classList.toggle('on', j <= k && k < 3)); this.ts.forEach((t, j) => t.classList.toggle('on', j < k && k < 3)); if (k < 3) { n.textContent = st[k][0]; a.style.width = st[k][1] + '%'; } i++; };
+    go();
+    ctx.every(go, 2400);
+  },
+  reset() { this.ls.forEach((l) => l.classList.remove('on')); this.ts.forEach((t) => t.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-skdesc" data-part="7" data-trans="flip" data-dur="16000" data-title="description 是路由条件" data-notes="元数据中的 description 字段是路由决策的关键——它应当足够短（控制常驻的 token 量），但写法要像路由条件而非功能介绍。可以明确写出“何时使用”和“何时不使用”的边界，并给出几条典型<b>反例</b>，以减少宽泛匹配带来的误触发；这是路由提示的写作建议，不是额外的格式字段。描述太宽泛（如 help with backend）等于任何后端相关的工作都能触发，路由就会失准；真正有效的描述是路由条件——<b>“何时该用我”比“我能做什么”重要得多</b>。目录的共同作用是提供可发现性，而不是承载完整的领域流程。<br>演示中一串请求流经路由，比较两种 description 写法的触发结果（请求与描述内容为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">description 是<em>路由条件</em>，不是功能介绍</h2></div>
+    <div class="seg dc-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">宽泛描述</button><button data-v="1">路由条件式描述</button></div></header>
+  <div class="dc-body">
+    <div class="dc-l fx fx-left" style="--d:2"><span class="lbl">api-handler Skill 的 description</span><code class="dc-d"></code><div class="dc-tips"><span>足够短：控制常驻 token</span><span>写清何时用、何时不用</span><span>给几条典型反例（写作建议，不是额外字段）</span></div></div>
+    <div class="dc-r fx fx-right" style="--d:3"><div class="dc-reqs"></div><div class="dc-sum"><span>误触发</span><b class="dc-bad">0</b><span>正确触发</span><b class="dc-ok">0</b><span class="chip warn">示意</span></div></div>
+  </div>
+  <p class="tagline dc-tag fx fx-up" style="--d:5"><b>“何时该用我”比“我能做什么”重要得多</b>——目录提供可发现性，而不是承载完整的领域流程</p>
+  <div class="src">第二章 ·「Skills：领域能力的可组合单元」· 第一层（元数据）</div>
+</section>
+<style>
+#c02-skdesc .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-skdesc .dc-seg button{font-size:18px;padding:9px 18px}
+#c02-skdesc .dc-body{display:grid;grid-template-columns:700px 1fr;gap:26px;height:600px}
+#c02-skdesc .dc-l{display:flex;flex-direction:column;gap:14px}
+#c02-skdesc .dc-d{display:block;min-height:250px;padding:16px 20px;border-radius:14px;font:17px/1.7 var(--mono);white-space:pre-wrap;border:1.5px solid var(--line2);background:rgba(8,12,30,.6)}
+#c02-skdesc .dc-tips{display:flex;flex-direction:column;gap:8px}
+#c02-skdesc .dc-tips span{padding:8px 14px;border-radius:10px;font-size:17px;border-left:4px solid var(--acc);background:rgba(255,255,255,.03)}
+#c02-skdesc .dc-r{display:flex;flex-direction:column;gap:12px}
+#c02-skdesc .dc-reqs{display:flex;flex-direction:column;gap:8px}
+#c02-skdesc .dc-q{display:grid;grid-template-columns:1fr 160px;gap:12px;align-items:center;padding:10px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line);opacity:.3;transition:all .35s}
+#c02-skdesc .dc-q.on{opacity:1}
+#c02-skdesc .dc-q em{font-style:normal;font-size:16px;text-align:center;padding:4px 8px;border-radius:8px}
+#c02-skdesc .dc-q.hit em{color:#06101f;background:var(--ok)}
+#c02-skdesc .dc-q.fp{border-color:var(--bad)}#c02-skdesc .dc-q.fp em{color:#fff;background:var(--bad)}
+#c02-skdesc .dc-q.skip em{color:var(--text3);border:1px solid var(--line2)}
+#c02-skdesc .dc-sum{display:flex;align-items:baseline;gap:12px;margin-top:auto;font-size:17px;color:var(--text2)}
+#c02-skdesc .dc-sum b{font:800 34px var(--num)}
+#c02-skdesc .dc-bad{color:var(--bad)}#c02-skdesc .dc-ok{color:var(--ok)}
+#c02-skdesc .dc-sum .chip{margin-left:auto;font-size:15px;padding:2px 10px}
+#c02-skdesc .dc-tag{margin-top:16px;font-size:22px}
+#c02-skdesc .dc-tag b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-skdesc'] = {
+  D: ['description: help with backend', 'description: |\n  Use when: 新增或修改 REST API 的路由与处理函数。\n  Not for: 数据库迁移（用 db-migrate）、\n           前端样式、部署脚本。\n  反例：“给订单表加索引”“改 CI 配置”'],
+  Q: [['修一下登录接口返回 500 的问题', 1], ['给订单表加一个索引', 0], ['新增一个 /refunds 接口', 1], ['改一下 CI 的缓存配置', 0], ['调整首页按钮的颜色', 0], ['后端日志太多，帮我降级到 warn', 0]],
+  init(s) { this.set = U.seg(s.querySelector('.dc-seg'), (v) => { this.auto = false; this.mode(s, +v); }); },
+  mode(s, v) { this.v = v; this.set(String(v)); s.querySelector('.dc-d').textContent = this.D[v]; this.run(s); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, box = s.querySelector('.dc-reqs');
+    box.innerHTML = this.Q.map(([q]) => `<div class="dc-q"><span>${q}</span><em>—</em></div>`).join('');
+    const qs = [...box.children]; let bad = 0, good = 0;
+    const wide = [1, 1, 1, 1, 0, 1];
+    for (let i = 0; i < qs.length; i++) {
+      await U.wait(ctx, 600); if (!ok()) return;
+      const want = this.Q[i][1], fire = this.v ? want : wide[i];
+      qs[i].classList.add('on', fire ? (want ? 'hit' : 'fp') : 'skip');
+      qs[i].querySelector('em').textContent = fire ? (want ? '触发 ✓' : '误触发 ✗') : '不触发';
+      if (fire && !want) bad++; if (fire && want) good++;
+      s.querySelector('.dc-bad').textContent = bad; s.querySelector('.dc-ok').textContent = good;
+    }
+    await U.wait(ctx, 2800); if (!ok()) return;
+    if (this.auto) this.mode(s, 1 - this.v); else this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.mode(s, 0); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-sktrig" data-part="7" data-trans="zoom" data-dur="16000" data-title="第二层的触发与第三层的深入" data-notes="<b>第二层（核心流程）</b>：当 Agent 判断某个任务需要特定的 Skill 时，运行时才加载完整的 SKILL.md。触发加载的方式有两种：用户显式输入斜杠命令（如 /pptx）时，由客户端在本地拦截并展开，模型不必先发起一次工具调用；模型读过元数据目录后自己判断需要某个 Skill 时，则调用专用的 Skill 工具，比前者多一次 ReAct 往返。两条路径的落点相同——Claude Code 都在调用位置把 Skill 正文作为 user message 加入会话，模型自主触发时返回的那条 tool result 只是一句“正在启动 Skill”的占位符，并不承载正文。没有专用激活工具的运行时则用通用文件读取工具去读 SKILL.md，正文以 tool result 的形式进入上下文。以 PPTX Skill 为例，其中包含处理 PowerPoint 文件的核心流程：如何通过 markitdown（Microsoft 开源的文档转 Markdown 工具）提取文本，如何解压 PPTX 文件访问原始的 XML 结构，以及关键文件的路径约定。<br><b>第三层（细则）</b>：通过文件引用深入到更详细的子文档。主文件引用了 html2pptx.md（通过 HTML 模板创建 PowerPoint 的详细工作流）、reference.md（格式技术细节）等。Agent 会根据具体的需求选择性地深入阅读相关的子文档。<br>右上角切换三种加载路径，看消息序列的差别。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第二层怎么触发，<em>正文落在哪里</em></h2></div>
+    <div class="seg tg-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">用户输入 /pptx</button><button data-v="1">模型调用 Skill 工具</button><button data-v="2">通用文件读取</button></div></header>
+  <div class="tg-body">
+    <div class="tg-ms panel fx fx-left" style="--d:2"><div class="tg-list"></div></div>
+    <div class="tg-r fx fx-right" style="--d:3">
+      <div class="tg-c"><b class="tg-t">—</b><p class="tg-d">—</p></div>
+      <div class="tg-l3"><span class="lbl">第三层：通过文件引用继续深入</span><div><code>html2pptx.md</code><small>HTML 模板创建 PPT 的详细工作流</small></div><div><code>reference.md</code><small>格式技术细节</small></div><p>按需选择性阅读，而不是一次读完</p></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Skills：领域能力的可组合单元」· 第二层（核心流程）· 第三层（细则）</div>
+</section>
+<style>
+#c02-sktrig .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-sktrig .tg-seg button{font-size:17px;padding:8px 14px}
+#c02-sktrig .tg-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:640px}
+#c02-sktrig .tg-ms{padding:16px 20px}
+#c02-sktrig .tg-list{display:flex;flex-direction:column;gap:8px}
+#c02-sktrig .tg-m{display:grid;grid-template-columns:110px 1fr;gap:12px;padding:10px 14px;border-radius:12px;font-size:17px;border-left:5px solid var(--c);background:rgba(255,255,255,.03);animation:upIn .4s var(--ease) both}
+#c02-sktrig .tg-m b{font:600 15px var(--mono);color:var(--c)}
+#c02-sktrig .tg-m code{font:15px var(--mono);color:var(--text)}
+#c02-sktrig .tg-m.body{background:color-mix(in srgb,var(--ok) 10%,transparent);border-color:var(--ok)}
+#c02-sktrig .tg-m.ph{opacity:.75;font-style:italic}
+#c02-sktrig .tg-r{display:flex;flex-direction:column;gap:16px}
+#c02-sktrig .tg-c{padding:16px 20px;border-radius:16px;border:1px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c02-sktrig .tg-c b{font-size:21px;color:var(--acc)}
+#c02-sktrig .tg-c p{margin-top:6px;font-size:17px;line-height:1.6;color:var(--text2)}
+#c02-sktrig .tg-c p b{font-size:inherit;color:var(--text)}
+#c02-sktrig .tg-l3{padding:14px 18px;border-radius:16px;border:1px dashed var(--line2);display:flex;flex-direction:column;gap:8px}
+#c02-sktrig .tg-l3 div{display:flex;flex-direction:column}
+#c02-sktrig .tg-l3 code{font:700 16px var(--mono);color:var(--ctx)}
+#c02-sktrig .tg-l3 small{font-size:15px;color:var(--text2)}
+#c02-sktrig .tg-l3 p{font-size:16px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c02-sktrig'] = {
+  P: [
+    { t: '斜杠命令：客户端本地拦截并展开', d: '用户输入 <b>/pptx</b>：客户端在本地展开，<b>模型不必先发起一次工具调用</b>；正文作为 user message 进入会话', m: [['user', '/pptx 把 paper.pdf 做成演示文稿', '#22d3ee'], ['user', '# PPTX Skill · Workflow: 1. Use markitdown…', '#34d399', 'body']] },
+    { t: '模型自主触发：调用专用的 Skill 工具', d: '读过元数据目录后自己判断需要：<b>比斜杠命令多一次 ReAct 往返</b>；tool result 只是一句占位符，正文作为<b>独立的 user message</b> 追加（Claude Code）', m: [['user', '帮我把 paper.pdf 做成演示文稿', '#22d3ee'], ['assistant', 'Skill(skill: "pptx")', '#a78bfa'], ['tool', 'Launching skill: pptx  ← 占位符', '#fbbf24', 'ph'], ['user', '# PPTX Skill · Workflow: 1. Use markitdown…', '#34d399', 'body']] },
+    { t: '没有专用激活工具：用通用文件读取', d: '运行时用 Read 之类的通用工具读取 SKILL.md：<b>正文以 tool result 的形式</b>进入上下文', m: [['user', '帮我把 paper.pdf 做成演示文稿', '#22d3ee'], ['assistant', 'Read("skills/pptx/SKILL.md")', '#a78bfa'], ['tool', '# PPTX Skill · Workflow: 1. Use markitdown…', '#34d399', 'body']] },
+  ],
+  init(s) { this.set = U.seg(s.querySelector('.tg-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  async show(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.i = i; this.set(String(i));
+    const p = this.P[i], box = s.querySelector('.tg-list');
+    s.querySelector('.tg-t').textContent = p.t; s.querySelector('.tg-d').innerHTML = p.d;
+    box.innerHTML = '<div class="tg-m" style="--c:#60a5fa"><b>system</b><code>…Skills 目录：pdf, pptx, docx…</code></div>';
+    for (const [r, t, c, x] of p.m) { if (!ctx) return; await U.wait(ctx, 650); if (!ctx.alive || tk !== this.tk) return; box.insertAdjacentHTML('beforeend', `<div class="tg-m ${x || ''}" style="--c:${c}"><b>${r}</b><code>${t}</code></div>`); }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 5000); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-skwrite" data-part="7" data-trans="rise" data-dur="16000" data-title="如何编写一份可用的 Skill" data-notes="Skills 的运行时结构解决了“什么时候加载、加载多少”的问题，内容本身还需要有人把经验写成模型能执行的指令。一份实用的 Skill 不应只是背景知识或一次成功对话的摘要，而应让一个刚加入团队的员工知道：<b>遇到什么任务时使用它，应该按什么顺序行动，哪些情况需要停下来确认，什么结果才算完成</b>。<br>根据宝玉的《图解 Skill》，Skill 建议包含四个部分：<b>角色与读者</b>说明这份 Skill 服务谁、面向什么任务，以及输出应达到什么标准；<b>核心原则</b>只保留三到五条最重要的判断，并为关键原则配正例和反例；<b>禁止清单</b>记录高频错误、越权动作和容易误解的表达，同时写清合法例外；<b>参考资料</b>放术语表、模板、范文和更详细的子文档。规则应尽量写成“作用域 + 动作 + 例外 + 验证方式”，避免把所有可能的情况堆成一张越来越长的禁用词表。<br>左侧逐段搭起一份 SKILL.md（内容为示意）；右侧是检验一份 Skill 是否可用的四个问题。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">如何编写一份<em>可用的</em> Skill</h2></header>
+  <div class="wr-body">
+    <div class="wr-doc win fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>SKILL.md</span><span class="chip warn wr-sim">示意</span></div><div class="wr-sec"></div></div>
+    <div class="wr-r fx fx-right" style="--d:3">
+      <span class="lbl">让刚加入团队的员工知道</span>
+      <div class="wr-q"><em>?</em>遇到什么任务时使用它</div><div class="wr-q"><em>?</em>应该按什么顺序行动</div><div class="wr-q"><em>?</em>哪些情况需要停下来确认</div><div class="wr-q"><em>?</em>什么结果才算完成</div>
+      <div class="wr-rule"><span class="lbl">每条规则的写法</span><div><i>作用域</i>+<i>动作</i>+<i>例外</i>+<i>验证方式</i></div><p>而不是一张越来越长的禁用词表</p></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「如何编写一份可用的 Skill」</div>
+</section>
+<style>
+#c02-skwrite .wr-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:690px}
+#c02-skwrite .wr-sim{margin-left:auto;font-size:15px;padding:1px 8px}
+#c02-skwrite .wr-sec{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+#c02-skwrite .wr-s{padding:10px 14px;border-radius:12px;border-left:5px solid var(--c);background:rgba(255,255,255,.03);animation:upIn .45s var(--ease) both}
+#c02-skwrite .wr-s b{font:700 18px var(--mono);color:var(--c)}
+#c02-skwrite .wr-s small{margin-left:10px;font-size:15px;color:var(--text3)}
+#c02-skwrite .wr-s p{margin-top:4px;font:15.5px/1.6 var(--mono);color:var(--text2);white-space:pre-wrap}
+#c02-skwrite .wr-r{display:flex;flex-direction:column;gap:10px}
+#c02-skwrite .wr-q{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;font-size:19px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+#c02-skwrite .wr-q em{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#06101f;background:var(--acc)}
+#c02-skwrite .wr-q.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c02-skwrite .wr-rule{margin-top:auto;padding:14px 18px;border-radius:14px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c02-skwrite .wr-rule div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0;font-size:18px;color:var(--text3)}
+#c02-skwrite .wr-rule i{font-style:normal;padding:4px 10px;border-radius:8px;color:#06101f;background:var(--ok)}
+#c02-skwrite .wr-rule p{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c02-skwrite'] = {
+  S: [
+    ['## 角色与读者', '服务谁 · 面向什么任务 · 输出标准', '#22d3ee', '服务对象：技术博客读者（熟悉编程，不熟悉 Agent）\n输出：2000 字以内，结论先行'],
+    ['## 核心原则', '三到五条最重要的判断 · 配正例和反例', '#a78bfa', '1. 每段一个论点\n   ✓ 先给结论再给例子   ✗ 铺垫三段才进正题'],
+    ['## 禁止清单', '高频错误 · 越权动作 · 易误解表达 · 写清合法例外', '#fb7185', '作用域：正文；动作：不用“赋能”“抓手”\n例外：引用原话时保留；验证：全文搜索为 0'],
+    ['## 参考资料', '术语表 · 模板 · 范文 · 子文档', '#fbbf24', 'glossary.md · template.md · examples/*.md'],
+  ],
+  init(s) { this.qs = [...s.querySelectorAll('.wr-q')]; },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, box = s.querySelector('.wr-sec');
+    while (ok()) {
+      box.innerHTML = '<div class="wr-s" style="--c:#94a3b8"><b>---</b><p>name: tech-blog-writing\ndescription: Use when 撰写技术博客正文；Not for 新闻稿</p></div>';
+      for (const [h, d, c, p] of this.S) { await U.wait(ctx, 1500); if (!ok()) return; box.insertAdjacentHTML('beforeend', `<div class="wr-s" style="--c:${c}"><b>${h}</b><small>${d}</small><p>${p}</p></div>`); }
+      await U.wait(ctx, 3500);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); let i = 0; ctx.every(() => { this.qs.forEach((q, j) => q.classList.toggle('on', j === i % 4)); i++; }, 1500); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.qs.forEach((q) => q.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-skeco" data-part="7" data-trans="zoom" data-dur="15000" data-title="Skill 生态与厂商对齐" data-notes="Skill 不仅包含指导性的文档，还可以捆绑可执行的代码工具和模板文件，例如 PPT Skill 可以包含 PPT 模板和解析 PPT 的脚本。<br>Skills 的价值不仅在于优雅的上下文管理，更在于为领域知识的积累提供了一条可持续的路径。每个 Skill 都是自包含的知识模块，可以独立开发和测试，也可以单独进行版本控制，便于分享。这种模块化使得 Agent 的能力扩展从集中式的系统提示词编辑，转变为分布式的、社区驱动的 Skill 生态构建——这与开源软件的包管理系统（如 Python 的 pip、Node.js 的 npm）有深刻的相似性，每个 Skill 封装了某个领域的最佳实践。Anthropic 官方的 Skills 仓库已涵盖文档处理（PPTX、PDF、DOCX）、数据分析、代码生成等领域，开发者可以直接使用、定制或创建全新的 Skill。<br>这揭示了一个对 Agent 开发者很重要的原则：<b>选择 Agent 交互模式时，应与模型厂商的训练方法保持一致</b>。基础模型公司推行的 Agent 用法，本质上是它们专门训练过的模式，这使得同一生态内的模型天然具有最佳表现。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skill 生态：<em>像 pip、npm 一样积累领域知识</em></h2></header>
+  <div class="ec-body">
+    <div class="ec-pkg panel fx fx-left" style="--d:2"><span class="lbl">一个 Skill 目录</span><pre class="ec-tree">pptx/
+├─ SKILL.md          指导性文档
+├─ html2pptx.md      子文档
+├─ reference.md
+├─ scripts/
+│  └─ thumbnail.py   可执行工具
+└─ templates/
+   └─ base.pptx      模板文件</pre><p>不仅有文档，还可以<b>捆绑可执行代码和模板</b></p></div>
+    <div class="ec-reg fx fx-up" style="--d:3"><span class="lbl">从集中式编辑提示词 → 分布式、社区驱动的 Skill 生态</span><div class="ec-grid"></div><div class="ec-props"><span>独立开发和测试</span><span>单独版本控制</span><span>便于分享</span><span>封装领域最佳实践</span></div></div>
+  </div>
+  <div class="ec-pr fx fx-up" style="--d:5"><svg class="ic"><use href="#i-target"/></svg><p><b>选择 Agent 交互模式时，应与模型厂商的训练方法保持一致</b>：厂商推行的 Agent 用法，本质上是它们专门训练过的模式，同一生态内的模型天然具有最佳表现</p></div>
+  <div class="src">第二章 ·「如何编写一份可用的 Skill」· Skill 生态</div>
+</section>
+<style>
+#c02-skeco .ec-body{display:grid;grid-template-columns:560px 1fr;gap:26px;height:540px}
+#c02-skeco .ec-pkg{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c02-skeco .ec-tree{font:18px/1.7 var(--mono);color:var(--text)}
+#c02-skeco .ec-pkg p{margin-top:auto;font-size:17px;color:var(--text2)}
+#c02-skeco .ec-pkg p b{color:var(--acc)}
+#c02-skeco .ec-reg{display:flex;flex-direction:column;gap:14px}
+#c02-skeco .ec-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+#c02-skeco .ec-p{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:14px;border:1px solid var(--line2);background:rgba(12,18,40,.72);transition:all .35s}
+#c02-skeco .ec-p .ic{font-size:28px;color:var(--c)}
+#c02-skeco .ec-p b{display:block;font-size:18px}
+#c02-skeco .ec-p small{font-size:15px;color:var(--text3)}
+#c02-skeco .ec-p em{margin-left:auto;font-style:normal;font:15px var(--mono);color:var(--text3)}
+#c02-skeco .ec-p.on{border-color:var(--c);box-shadow:0 0 24px color-mix(in srgb,var(--c) 30%,transparent)}
+#c02-skeco .ec-p.on em{color:var(--ok)}
+#c02-skeco .ec-props{display:flex;flex-wrap:wrap;gap:10px;margin-top:auto}
+#c02-skeco .ec-props span{padding:8px 16px;border-radius:999px;font-size:17px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+#c02-skeco .ec-pr{display:flex;gap:16px;align-items:center;margin-top:18px;padding:16px 22px;border-radius:16px;border:1.5px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+#c02-skeco .ec-pr .ic{flex:none;font-size:34px;color:var(--warn)}
+#c02-skeco .ec-pr p{font-size:19px;line-height:1.6}
+#c02-skeco .ec-pr b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c02-skeco'] = {
+  P: [['pptx', '文档处理', 'file', '#fb923c'], ['pdf', '文档处理', 'file', '#fb7185'], ['docx', '文档处理', 'file', '#60a5fa'], ['data-analysis', '数据分析', 'chart', '#34d399'], ['code-gen', '代码生成', 'code', '#a78bfa'], ['你的 Skill', '使用 · 定制 · 新建', 'edit', '#fbbf24']],
+  init(s) { s.querySelector('.ec-grid').innerHTML = this.P.map(([n, d, ic, c]) => `<div class="ec-p" style="--c:${c}"><svg class="ic"><use href="#i-${ic}"/></svg><div><b>${n}</b><small>${d}</small></div><em>install</em></div>`).join(''); this.ps = [...s.querySelectorAll('.ec-p')]; },
+  enter(s, ctx) { let i = 0; ctx.every(() => { const p = this.ps[i % 6]; p.classList.add('on'); p.querySelector('em').textContent = 'installed ✓'; if (i % 6 === 5) ctx.later(() => this.ps.forEach((x) => { x.classList.remove('on'); x.querySelector('em').textContent = 'install'; }), 1200); i++; }, 900); },
+  reset() { this.ps.forEach((x) => { x.classList.remove('on'); x.querySelector('em').textContent = 'install'; }); },
+};
+</script>
+
+<section class="slide" id="c02-skpos" data-part="7" data-trans="flip" data-dur="15000" data-title="Skills 在上下文中的位置：三种实现" data-notes="理解 Skills 的上下文成本时，必须把“元数据目录”和“完整 Skill 指令”分开：<br>• <b>标准层</b>：规范规定的是加载时序，而不是消息角色——目录必须先于正文可发现，正文在 Skill 被选中后按需加载；具体消息角色、包装方式以及目录是否在每轮重建，都由 Agent Harness 决定。<br>• <b>Claude Code 的实现</b>：采用渐进式目录与调用时追加正文的方式——目录作为运行时上下文消息提供，完整指令则在 Skill 被调用的位置作为 user message 注入。这里的“system prompt”可以用来描述逻辑上的稳定指令层，但不应被理解为所有客户端都使用 API 的 role: system。<br>• <b>OpenAI Codex 的实现</b>：Codex 在每轮上下文构造阶段重新渲染 Skills catalog，并将其作为 developer 上下文片段提供；显式选中的 Skill 正文则以带 &lt;skill&gt; 标记的 user 片段注入。其他来源的 Skill 也可以通过专用工具按需读取。<br>需要注意，目前 Agent Harness 发展非常快，你读到本书时，它们的实现可能已经改变。尽管不同 Agent Harness 的实现方式不同，但都遵循<b>“少量目录常驻、完整正文按需加载”</b>的设计原则。这是 Skills 兼顾动态加载能力与上下文开销的关键。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skills 在上下文中的位置：<em>目录在哪、正文在哪</em></h2></header>
+  <div class="sp-cols fx fx-up" style="--d:2">
+    <div class="sp-c"><b>标准层</b><small>规范只规定加载时序</small><div class="sp-r"><span class="lbl">目录</span><p>必须<b>先于正文</b>可发现</p></div><div class="sp-r"><span class="lbl">正文</span><p>被选中后<b>按需加载</b></p></div><div class="sp-r"><span class="lbl">其余</span><p>消息角色、包装方式、目录是否每轮重建——<b>由 Harness 决定</b></p></div></div>
+    <div class="sp-c"><b>Claude Code</b><small>渐进式目录 + 调用时追加正文</small><div class="sp-r"><span class="lbl">目录</span><p>作为<b>运行时上下文消息</b>提供</p></div><div class="sp-r"><span class="lbl">正文</span><p>在调用位置作为 <b>user message</b> 注入</p></div><div class="sp-r"><span class="lbl">注意</span><p>“system prompt”指逻辑上的稳定指令层，<b>不等于</b>所有客户端都用 role: system</p></div></div>
+    <div class="sp-c"><b>OpenAI Codex</b><small>每轮重新渲染目录</small><div class="sp-r"><span class="lbl">目录</span><p>每轮作为 <b>developer</b> 上下文片段</p></div><div class="sp-r"><span class="lbl">正文</span><p>带 <code>&lt;skill&gt;</code> 标记的 <b>user</b> 片段</p></div><div class="sp-r"><span class="lbl">其他来源</span><p>通过<b>专用工具</b>按需读取</p></div></div>
+  </div>
+  <p class="tagline sp-tag fx fx-up" style="--d:4">Harness 发展很快，实现可能已经改变；不变的是：<b>少量目录常驻、完整正文按需加载</b></p>
+  <div class="src">第二章 ·「Skills 在上下文中的位置」</div>
+</section>
+<style>
+#c02-skpos .sp-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;height:580px}
+#c02-skpos .sp-c{padding:18px 22px;border-radius:18px;border:1.5px solid var(--line2);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:12px;transition:all .4s}
+#c02-skpos .sp-c>b{font-size:26px;color:var(--acc)}
+#c02-skpos .sp-c>small{font-size:16px;color:var(--text3)}
+#c02-skpos .sp-r{padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03)}
+#c02-skpos .sp-r p{margin-top:4px;font-size:18px;line-height:1.5;color:var(--text2)}
+#c02-skpos .sp-r p b{color:var(--text)}
+#c02-skpos .sp-r code{font:16px var(--mono);color:var(--ctx)}
+#c02-skpos .sp-c.on{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 25%,transparent);translate:0 -4px}
+#c02-skpos .sp-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c02-skpos'] = {
+  init(s) { this.cs = [...s.querySelectorAll('.sp-c')]; this.cs.forEach((c, i) => c.addEventListener('click', () => { this.auto = false; this.hl(i); })); },
+  hl(i) { this.i = i; this.cs.forEach((c, j) => c.classList.toggle('on', j === i)); },
+  enter(s, ctx) { this.auto = true; this.hl(0); ctx.every(() => { if (this.auto) this.hl((this.i + 1) % 3); }, 3200); },
+  reset() { this.cs.forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-sktraj" data-part="7" data-trans="rise" data-dur="17000" data-title="启用 Skills 后的完整轨迹 · 图2-12" data-notes="图2-12 画的是 Claude Code 中模型自主触发 Skill 的情形，轨迹里能看到完整的一次往返：system 与 tools（Skill, Read, Bash, Edit, Write 等）固定不变、进入 KV Cache；用户请求“帮我从这个 PDF 生成 PPT”；ⓐ Skill listing 作为一条 isMeta 的 user 消息（system-reminder：Available skills: pdf, pptx…），由 Harness 只发一次，约 300 tokens；随后 assistant 发起 Skill(skill: pptx) 的 tool_use，tool 返回一条占位符“Launching skill: pptx”；ⓑ Skill content 作为又一条 isMeta 的 user 消息追加（Base directory 与 PPTX Skill 的 Workflow），由 Skill 工具只发一次，约 2k tokens；之后是 Read(input.pdf)、Write(slides.html) 等工具调用持续追加到末尾。ⓐ 与 ⓑ 都是 emit-once：付一次 cache_creation 后永久驻留缓存前缀，不会随后续 tool_use 移动。<br>如果用户直接输入 /pptx，客户端在本地完成展开，轨迹里就没有这一对工具调用，只剩下最后那条 user 消息。右上角切换两种情形。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">启用 Skills 后的<em>完整轨迹</em></h2></div>
+    <div class="seg tj-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">模型自主触发</button><button data-v="1">用户输入 /pptx</button></div></header>
+  <div class="tj-body">
+    <div class="tj-tr panel fx fx-left" style="--d:2"><div class="tj-list"></div></div>
+    <div class="tj-r fx fx-right" style="--d:3">
+      <div class="tj-c a"><b>ⓐ Skill listing</b><span>Harness emit-once · ~300 tokens</span></div>
+      <div class="tj-c b"><b>ⓑ Skill content</b><span>Skill 工具 emit-once · ~2k tokens</span></div>
+      <p class="tj-k">ⓐ 与 ⓑ 都是 <b>emit-once</b>：付一次 cache_creation 后永久驻留缓存前缀，<b>不会随后续 tool_use 移动</b></p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Skills 在上下文中的位置」· 图2-12</div>
+</section>
+<style>
+#c02-sktraj .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-sktraj .tj-seg button{font-size:18px;padding:9px 18px}
+#c02-sktraj .tj-body{display:grid;grid-template-columns:1120px 1fr;gap:26px;height:690px}
+#c02-sktraj .tj-tr{padding:14px 18px}
+#c02-sktraj .tj-list{display:flex;flex-direction:column;gap:6px;font:15.5px/1.5 var(--mono)}
+#c02-sktraj .tj-m{display:grid;grid-template-columns:44px 1fr;gap:8px;padding:7px 12px;border-radius:10px;border-left:4px solid var(--c);background:rgba(255,255,255,.03);animation:upIn .35s var(--ease) both}
+#c02-sktraj .tj-m em{font-style:normal;font-weight:800;color:var(--c)}
+#c02-sktraj .tj-m span{color:var(--text)}
+#c02-sktraj .tj-m.fix{background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c02-sktraj .tj-m.a{background:color-mix(in srgb,var(--ctx) 12%,transparent)}
+#c02-sktraj .tj-m.b{background:color-mix(in srgb,var(--warn) 12%,transparent)}
+#c02-sktraj .tj-r{display:flex;flex-direction:column;gap:14px}
+#c02-sktraj .tj-c{padding:14px 18px;border-radius:14px;border:1.5px solid var(--c)}
+#c02-sktraj .tj-c.a{--c:var(--ctx)}#c02-sktraj .tj-c.b{--c:var(--warn)}
+#c02-sktraj .tj-c b{display:block;font-size:21px;color:var(--c)}
+#c02-sktraj .tj-c span{font-size:16px;color:var(--text2)}
+#c02-sktraj .tj-k{margin-top:auto;font-size:19px;line-height:1.6}
+#c02-sktraj .tj-k b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-sktraj'] = {
+  M: [
+    ['', '#60a5fa', '{ role: "system", content: "你是 Claude Code 助手..." }', 'fix'],
+    ['', '#60a5fa', 'tools: [Skill, Read, Bash, Edit, Write, ...]   ← 固定不变（KV Cache 缓存）', 'fix'],
+    ['', '#22d3ee', '{ role: "user", content: "帮我从这个 PDF 生成 PPT" }'],
+    ['ⓐ', '#22d3ee', '{ role: "user", isMeta: true, content: "&lt;system-reminder&gt; Available skills: pdf, pptx, ... &lt;/system-reminder&gt;" }', 'a'],
+    ['', '#a78bfa', '{ role: "assistant", tool_calls: [Skill(skill: "pptx")] }', '', 1],
+    ['', '#fbbf24', '{ role: "tool", content: "Launching skill: pptx" }   ← 占位符', '', 1],
+    ['ⓑ', '#fbbf24', '{ role: "user", isMeta: true, content: "Base directory: ...\\n# PPTX Skill\\n## Workflow: 1. Use markitdown..." }', 'b'],
+    ['', '#a78bfa', '{ role: "assistant", tool_calls: [Read(file: "input.pdf")] }'],
+    ['', '#34d399', '{ role: "tool", content: "...PDF 文本内容..." }'],
+    ['', '#a78bfa', '{ role: "assistant", tool_calls: [Write(file: "slides.html")] }'],
+    ['', '#34d399', '{ role: "tool", content: "Wrote 12345 bytes" }'],
+    ['', '#94a3b8', '... 后续 tool_use / tool_result 持续 append 到末尾 ...'],
+  ],
+  init(s) { this.set = U.seg(s.querySelector('.tj-seg'), (v) => { this.auto = false; this.v = +v; this.run(s); }); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, box = s.querySelector('.tj-list');
+    this.set(String(this.v));
+    box.innerHTML = '';
+    for (const [n, c, t, cls, pair] of this.M) {
+      if (pair && this.v === 1) continue;
+      const tt = this.v === 1 && n === '' && t.includes('帮我从') ? '{ role: "user", content: "/pptx 帮我从这个 PDF 生成 PPT" }' : t;
+      box.insertAdjacentHTML('beforeend', `<div class="tj-m ${cls || ''}" style="--c:${c}"><em>${n}</em><span>${tt}</span></div>`);
+      await U.wait(ctx, 500); if (!ok()) return;
+    }
+    await U.wait(ctx, 2800); if (!ok()) return;
+    if (this.auto) this.v = 1 - this.v;
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.v = 0; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-skkv" data-part="7" data-steps="2" data-trans="zoom" data-dur="9000" data-title="KV Cache 随轨迹增长的演化 · 图2-13" data-notes="图2-13 从 KV Cache 的视角追踪同一条轨迹。Turn 1 完成时（首次加载 PPTX skill）：system、tools、user_q1、★ skill_listing、asst: Skill(pptx)、tool_result、★ skill_content 全部是 NEW，本轮 cache_creation 约 2.5k tokens。Turn 2 完成时（读取 PDF 文件）：前面所有内容 HIT，只有 asst: Read(pdf) 与它的 tool_result 是 NEW，本轮 cache_creation 约 0.5k tokens。Turn 3 完成时（写出 HTML）：再新增 asst: Write(html) 与 tool_result，本轮 cache_creation 约 0.4k tokens。NEW 表示该轮新增 token、付一次 cache_creation；HIT 表示已在缓存前缀、本轮免费命中。★ 标记 emit-once 的 attachment：仅 Turn 1 付一次 cache_creation，之后所有轮次永久 HIT，边际成本为零。每条消息的索引位置一旦插入就不再移动；新内容只追加到数组末尾。<br>需要厘清一个常见误解：<b>“对 KV Cache 友好”并非“零成本”</b>。目录首次进入请求需要处理，完整 Skill 正文首次加载时也会产生新增计算；当前缀保持稳定时，后续请求才可以复用缓存。不同 Harness 对目录的重建方式不同，但 Skills 的共同收益是：无需在启动时加载所有 Skill 正文，也无需在每次调用新 Skill 时回头改写已经建立的上下文。<br>按 → 逐轮推进。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">KV Cache 随轨迹增长的演化：<em>友好不等于零成本</em></h2></header>
+  <div class="kv-cols fx fx-up" style="--d:2"></div>
+  <div class="kv-lg fx fx-up" style="--d:3"><span class="n">NEW：该轮新增，付一次 cache_creation</span><span class="h">HIT：已在缓存前缀，本轮免费命中</span><span class="s">★ emit-once：只在 Turn 1 付一次，之后永久 HIT</span></div>
+  <div class="src">第二章 ·「Skills 在上下文中的位置」· 图2-13</div>
+</section>
+<style>
+#c02-skkv .kv-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;height:620px}
+#c02-skkv .kv-col{padding:14px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:6px;opacity:.25;transition:opacity .5s}
+#c02-skkv .kv-col.on{opacity:1}
+#c02-skkv .kv-col>b{font-size:21px}
+#c02-skkv .kv-col>small{font-size:15px;color:var(--text3);margin-bottom:6px}
+#c02-skkv .kv-r{display:grid;grid-template-columns:1fr 64px;gap:8px;align-items:center;padding:6px 10px;border-radius:9px;font:15.5px var(--mono);background:rgba(255,255,255,.03)}
+#c02-skkv .kv-r i{font-style:normal;text-align:center;padding:2px 0;border-radius:6px;font:700 15px var(--num)}
+#c02-skkv .kv-r.n i{color:#06101f;background:var(--warn)}
+#c02-skkv .kv-r.h i{color:#06101f;background:var(--ok)}
+#c02-skkv .kv-r.e{opacity:.35}#c02-skkv .kv-r.e i{color:var(--text3)}
+#c02-skkv .kv-r.st span{color:var(--warn)}
+#c02-skkv .kv-cc{margin-top:auto;padding:10px 14px;border-radius:12px;border:1px solid var(--line2)}
+#c02-skkv .kv-cc span{font-size:15px;color:var(--text3)}
+#c02-skkv .kv-cc b{display:block;font:800 30px var(--num);color:var(--warn)}
+#c02-skkv .kv-lg{display:flex;gap:30px;margin-top:16px;font-size:17px;color:var(--text2)}
+#c02-skkv .kv-lg span::before{content:"";display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:8px;vertical-align:-2px}
+#c02-skkv .kv-lg .n::before{background:var(--warn)}#c02-skkv .kv-lg .h::before{background:var(--ok)}#c02-skkv .kv-lg .s::before{background:transparent;border:2px solid var(--warn)}
+</style>
+<script>
+HOOKS['c02-skkv'] = {
+  R: ['system', 'tools', 'user_q1', '★ skill_listing', 'asst: Skill(pptx)', 'tool_result', '★ skill_content', 'asst: Read(pdf)', 'tool_result', 'asst: Write(html)', 'tool_result'],
+  T: [['Turn 1 完成时', '首次加载 PPTX skill', 7, '≈ 2.5k tokens'], ['Turn 2 完成时', '读取 PDF 文件', 9, '≈ 0.5k tokens'], ['Turn 3 完成时', '写出 HTML', 11, '≈ 0.4k tokens']],
+  init(s) {
+    s.querySelector('.kv-cols').innerHTML = this.T.map(([t, d, n, cc], k) => {
+      const prev = k ? this.T[k - 1][2] : 0;
+      return `<div class="kv-col"><b>${t}</b><small>（${d}）</small>${this.R.map((r, i) => { const st = i >= n ? 'e' : i >= prev ? 'n' : 'h'; return `<div class="kv-r ${st}${r[0] === '★' ? ' st' : ''}"><span>${r}</span><i>${st === 'e' ? '—' : st === 'n' ? 'NEW' : 'HIT'}</i></div>`; }).join('')}<div class="kv-cc"><span>本轮 cache_creation</span><b>${cc}</b></div></div>`;
+    }).join('');
+    this.cols = [...s.querySelectorAll('.kv-col')];
+  },
+  apply(k) { this.cols.forEach((c, i) => c.classList.toggle('on', i <= k)); },
+  enter(s, ctx, k) { this.apply(k); },
+  step(s, ctx, k) { this.apply(k); },
+  reset() { this.cols.forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-sktools" data-part="7" data-trans="flip" data-dur="15000" data-title="Skills 与工具的关系" data-notes="从上下文管理的角度看，Skills 机制对 KV Cache 极为友好。如果把所有专用代码工具的定义都放在系统提示词中，数量膨胀会消耗大量的 token，而且会干扰模型的注意力；而在 Skill + 通用执行器的模式下，工具数量始终很少（如第五章所示仅需七个核心工具），Skill 的内容通过前述的渐进式披露机制按需加载，不会影响已缓存的前缀。两种形态的详细对比和选择框架见第四章，第九章则探讨 Agent 在持续进化中如何判断一项经验应写成知识、指令、程序还是模型参数。<br>拖动滑块增加专用能力的数量，比较两种形态下常驻前缀的体积（数值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skills 与工具：<em>专用工具定义 vs Skill + 通用执行器</em></h2></header>
+  <div class="tt-ctl fx fx-up" style="--d:2"><span>专用能力的数量</span><input class="rng tt-rng" type="range" min="5" max="200" value="20"><b class="tt-n">20</b><span class="chip warn">示意</span></div>
+  <div class="tt-body fx fx-up" style="--d:3">
+    <div class="tt-c bad"><b>每项能力都做成专用工具定义</b><div class="tt-g a"></div><div class="tt-m"><span>常驻前缀中的工具定义</span><b class="tt-va">—</b></div><p>数量膨胀消耗大量 token，还会干扰模型的注意力</p></div>
+    <div class="tt-c ok"><b>Skill + 通用执行器</b><div class="tt-g b"></div><div class="tt-m"><span>常驻：七个核心工具 + Skills 目录</span><b class="tt-vb">—</b></div><p>工具数量始终很少（第五章：七个核心工具）；Skill 正文按需加载，<b>不影响已缓存的前缀</b></p></div>
+  </div>
+  <p class="tt-x fx fx-up" style="--d:5">详细对比与选择框架见<b>第四章</b>；一项经验该写成知识、指令、程序还是模型参数，见<b>第九章</b></p>
+  <div class="src">第二章 ·「Skills 与工具的关系」</div>
+</section>
+<style>
+#c02-sktools .tt-ctl{display:flex;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+#c02-sktools .tt-ctl .rng{width:600px}
+#c02-sktools .tt-ctl b{font:800 30px var(--num);color:var(--acc);min-width:60px}
+#c02-sktools .tt-ctl .chip{font-size:15px;padding:2px 10px}
+#c02-sktools .tt-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:18px;height:540px}
+#c02-sktools .tt-c{padding:18px 22px;border-radius:18px;display:flex;flex-direction:column;gap:12px;background:rgba(12,18,40,.72)}
+#c02-sktools .tt-c.bad{border:1.5px solid color-mix(in srgb,var(--bad) 50%,transparent)}
+#c02-sktools .tt-c.ok{border:1.5px solid color-mix(in srgb,var(--ok) 50%,transparent)}
+#c02-sktools .tt-c>b{font-size:22px}
+#c02-sktools .tt-g{flex:1;display:flex;flex-wrap:wrap;gap:4px;align-content:flex-start;overflow:hidden}
+#c02-sktools .tt-g i{width:22px;height:22px;border-radius:5px}
+#c02-sktools .tt-g.a i{background:rgba(251,113,133,.6)}
+#c02-sktools .tt-g.b i.t{width:60px;background:var(--ok)}
+#c02-sktools .tt-g.b i.s{width:22px;height:10px;background:rgba(34,211,238,.5)}
+#c02-sktools .tt-m{display:flex;align-items:baseline;justify-content:space-between}
+#c02-sktools .tt-m span{font-size:17px;color:var(--text2)}
+#c02-sktools .tt-m b{font:800 30px var(--num)}
+#c02-sktools .bad .tt-m b{color:var(--bad)}#c02-sktools .ok .tt-m b{color:var(--ok)}
+#c02-sktools .tt-c p{font-size:17px;line-height:1.55;color:var(--text2)}
+#c02-sktools .tt-c p b{color:var(--text)}
+#c02-sktools .tt-x{margin-top:16px;font-size:19px;color:var(--text2)}
+#c02-sktools .tt-x b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-sktools'] = {
+  init(s) { this.r = s.querySelector('.tt-rng'); this.r.addEventListener('input', () => { this.auto = false; this.draw(s, +this.r.value); }); },
+  draw(s, n) {
+    this.r.value = n; this.r.style.setProperty('--p', ((n - 5) / 195) * 100 + '%');
+    s.querySelector('.tt-n').textContent = n;
+    s.querySelector('.tt-g.a').innerHTML = '<i></i>'.repeat(n);
+    s.querySelector('.tt-g.b').innerHTML = '<i class="t"></i>'.repeat(7) + '<i class="s"></i>'.repeat(n);
+    s.querySelector('.tt-va').textContent = `≈ ${(n * 400).toLocaleString('en-US')} tokens`;
+    s.querySelector('.tt-vb').textContent = `≈ ${(7 * 400 + n * 30).toLocaleString('en-US')} tokens`;
+  },
+  enter(s, ctx) { this.auto = true; let n = 20, d = 1; this.draw(s, n); ctx.every(() => { if (!this.auto) return; n += d * 30; if (n >= 200) { n = 200; d = -1; } if (n <= 20) { n = 20; d = 1; } this.draw(s, n); }, 1100); },
+  reset(s) { this.draw(s, 20); },
+};
+</script>
+
+<section class="slide" id="c02-exp6" data-part="7" data-trans="zoom" data-dur="17000" data-title="实验 2-6 ★★：从论文生成演示文稿" data-notes="<b>实验 2-6 ★★：使用 Agent Skills 从论文生成演示文稿。</b><b>实验目标</b>：验证 Agent 通过动态加载专业领域 Skill 完成复杂任务的能力。使用 Claude Code（或任意支持 SKILL.md 渐进式披露的等价 Agent 运行时，如 Kimi Code）+ Anthropic 官方 PPTX Skill，从一篇学术论文的 PDF 生成一份 10-15 页的演示文稿。Skill 的内容是实验对象，运行时可以替换——只要运行时具备“元数据目录 + 按需加载”的 Skills 机制即可。执行流程体现了渐进式加载：1. 在运行时提供的 Skill 元数据目录中看到 PPTX Skill 的描述；2. 识别出任务需要该 Skill；3. 调用 Skill（或读取 SKILL.md）加载完整指令，获得核心流程；4. 选择性加载 html2pptx.md 获取详细方法；5. 使用捆绑的工具脚本（如 scripts/thumbnail.py）生成预览，使用模板文件作为设计的起点。<br><b>验收标准</b>：生成的 PowerPoint 覆盖论文的主要内容（标题页、问题背景、方法概述、关键结果、结论），至少包含 3 张从论文中提取的图表且与文字说明一致，格式正确且可在 PowerPoint 或兼容软件中正常打开。<br>配套仓库的正式运行（exp2-6-kimi-pptx-20260731-v1，15 道门禁全部通过）：Kimi Code CLI 0.31.0、模型 kimi-code/k3，25 个 assistant 轮次中共 114 次工具调用；模型真实调用了 pptx Skill（元数据 → 完整 SKILL.md），再读取 html2pptx.md、使用官方 html2pptx.js 工作流、运行 thumbnail.py，并根据缩略图修正重叠和截断；生成 13 页，覆盖标题、背景、方法与架构、训练、关键结果、泛化、可解释性与结论；四张图（Figure 1、Figure 2、Table 2、Figure 3）用 pdftoppm 从原 PDF 裁出，与 PPTX 中嵌入的媒体字节一致。更早的 Claude Code 尝试在推理前就因 Anthropic 凭据无效被阻断，记录保留为证据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-6 ★★：用 Agent Skills <em>从论文生成演示文稿</em></h2></header>
+  <div class="x6-body">
+    <div class="x6-l fx fx-left" style="--d:2"><span class="lbl">渐进式加载的五步</span><div class="x6-steps"></div><div class="x6-acc"><b>验收标准</b><p>覆盖标题页、问题背景、方法概述、关键结果、结论；<b>至少 3 张</b>从论文提取的图表且与文字一致；格式正确、能正常打开</p></div></div>
+    <div class="x6-r fx fx-right" style="--d:3">
+      <div class="x6-run"><div class="x6-h"><b>正式运行</b><span class="x6-pass">15/15 门禁 · PASSED</span></div><div class="x6-kpi"><div><b data-count="114">0</b><small>次工具调用</small></div><div><b data-count="25">0</b><small>个 assistant 轮次</small></div><div><b data-count="13">0</b><small>页</small></div><div><b data-count="4">0</b><small>张原图</small></div></div><p>Kimi Code CLI 0.31.0 · <code>kimi-code/k3</code></p></div>
+      <div class="x6-deck"><span class="lbl">13 页覆盖</span><div class="x6-sl"></div></div>
+      <div class="x6-fig"><span class="lbl">从原 PDF 用 pdftoppm 裁出、与 PPTX 嵌入媒体字节一致</span><div><span>Figure 1</span><span>Figure 2</span><span>Table 2</span><span>Figure 3</span></div></div>
+      <p class="x6-note">更早的 Claude Code 尝试在推理前因凭据无效被阻断，记录保留为证据</p>
+      <div class="x6-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter2/agent-skills-ppt（exp2-6-kimi-pptx-20260731-v1）</div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Skills 与工具的关系」· 实验 2-6</div>
+</section>
+<style>
+#c02-exp6 .x6-body{display:grid;grid-template-columns:720px 1fr;gap:26px;height:690px}
+#c02-exp6 .x6-l{display:flex;flex-direction:column;gap:10px}
+#c02-exp6 .x6-steps{display:flex;flex-direction:column;gap:8px}
+#c02-exp6 .x6-s{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:center;padding:10px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line);opacity:.4;transition:all .35s}
+#c02-exp6 .x6-s em{font-style:normal;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--num);color:#06101f;background:var(--acc)}
+#c02-exp6 .x6-s code{font:15px var(--mono);color:var(--ctx)}
+#c02-exp6 .x6-s.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c02-exp6 .x6-acc{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px dashed var(--line2)}
+#c02-exp6 .x6-acc b{font-size:18px;color:var(--acc)}
+#c02-exp6 .x6-acc p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:4px}
+#c02-exp6 .x6-acc p b{font-size:inherit;color:var(--text)}
+#c02-exp6 .x6-r{display:flex;flex-direction:column;gap:12px}
+#c02-exp6 .x6-run{padding:14px 18px;border-radius:16px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c02-exp6 .x6-h{display:flex;justify-content:space-between;align-items:center}
+#c02-exp6 .x6-h b{font-size:20px}
+#c02-exp6 .x6-pass{font:700 16px var(--num);color:var(--ok)}
+#c02-exp6 .x6-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0 6px}
+#c02-exp6 .x6-kpi b{display:block;font:800 36px var(--num);color:var(--acc)}
+#c02-exp6 .x6-kpi small{font-size:15px;color:var(--text2)}
+#c02-exp6 .x6-run p{font-size:16px;color:var(--text2)}
+#c02-exp6 .x6-run code{font:15px var(--mono);color:var(--ctx)}
+#c02-exp6 .x6-sl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+#c02-exp6 .x6-sl span{padding:8px;border-radius:8px;text-align:center;font-size:15px;border:1px solid var(--line2);animation:pop .35s var(--spring) both;transform:scale(.7)}
+#c02-exp6 .x6-fig div{display:flex;gap:8px;margin-top:8px}
+#c02-exp6 .x6-fig div span{flex:1;padding:8px;border-radius:8px;text-align:center;font:600 15px var(--num);border:1px solid var(--warn);color:var(--warn)}
+#c02-exp6 .x6-note{font-size:15px;color:var(--text3)}
+#c02-exp6 .x6-src{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text3)}
+#c02-exp6 .x6-src .ic{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-exp6'] = {
+  S: ['在 Skill 元数据目录中看到 PPTX Skill 的描述', '识别出任务需要该 Skill', '调用 Skill（或读取 <code>SKILL.md</code>）加载完整指令', '选择性加载 <code>html2pptx.md</code> 获取详细方法', '用捆绑脚本 <code>scripts/thumbnail.py</code> 生成预览，用模板作起点'],
+  D: ['标题', '背景', '方法', '架构', '训练', '关键结果', '关键结果', '泛化', '泛化', '可解释性', '可解释性', '结论', '致谢 / 结尾'],
+  init(s) { s.querySelector('.x6-steps').innerHTML = this.S.map((t, i) => `<div class="x6-s"><em>${i + 1}</em><span>${t}</span></div>`).join(''); this.ss = [...s.querySelectorAll('.x6-s')]; },
+  enter(s, ctx) {
+    let i = 0;
+    const sl = s.querySelector('.x6-sl');
+    ctx.every(() => { this.ss.forEach((x, j) => x.classList.toggle('on', j <= i % 6 && i % 6 < 5)); i++; }, 1100);
+    let k = 0; sl.innerHTML = '';
+    ctx.every(() => { if (k >= 13) { k = 0; sl.innerHTML = ''; return; } sl.insertAdjacentHTML('beforeend', `<span>${k + 1}. ${this.D[k]}</span>`); k++; }, 600);
+  },
+  reset(s) { this.ss.forEach((x) => x.classList.remove('on')); s.querySelector('.x6-sl').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c02-exp7" data-part="7" data-trans="rise" data-dur="16000" data-title="实验 2-7 ★★：“去 AI 味”写作 Skill" data-notes="写作型 Skill 可以从三到五篇自己最满意的原创文章开始。让 Agent 归纳用词、句式、段落结构和语气，生成一份二十行左右的初版；再用它处理一项真实的写作任务，由作者逐句改稿。原文与修改稿的差异比抽象地说“更自然一点”更有信息量：它能告诉 Agent 哪些词被删掉、哪些长句被拆开、哪些地方需要补充事实。把反复出现的改动整理回 Skill，并为每条规则保留正例、反例和适用范围。<br><b>实验 2-7 ★★：从个人范文创建“去 AI 味”写作 Skill。</b><b>实验目标</b>：用少量人工范文生成一份可加载、可检查的写作 Skill，并观察它能否在新文章中复现作者的主要表达偏好。<b>实验说明</b>：准备三到五篇原创文章，让支持 Agent Skills 的运行时生成初版 SKILL.md；选择一个新题目起草文章，作者手动修改后，比较 before/after 并把稳定规律写回 Skill。验收只要求 Skill 具备清晰的触发条件、三到五条带示例的原则、作用域和例外，不把一次主观判断当作普遍规则。<b>实验说明了什么</b>：Skill 的价值在于把个人经验外化为按需加载的指令。一个短小、可读、能通过真实任务检验的初版，比一开始罗列几十条规则更适合作为后续迭代的起点。<br>右侧改稿前后的对照为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-7 ★★：从个人范文创建<em>“去 AI 味”写作 Skill</em></h2></header>
+  <div class="x7-body">
+    <div class="x7-loop fx fx-left" style="--d:2"></div>
+    <div class="x7-r fx fx-right" style="--d:3">
+      <div class="x7-diff"><span class="lbl">原文 vs 作者改稿 <span class="chip warn">示意</span></span><p class="x7-b">在当今快速发展的人工智能时代，<s>值得注意的是，</s>Agent 技术<s>正在深刻地赋能</s>各行各业，<s>为我们带来了前所未有的机遇与挑战。</s></p><p class="x7-a">Agent 已经能替人打电话、填表、改代码。<ins>上周我让它退掉一个订阅，它花了 11 分钟。</ins></p><div class="x7-lessons"><span>删掉“值得注意的是”</span><span>不用“赋能”</span><span>长句拆短</span><span>补一个具体事实</span></div></div>
+      <div class="x7-acc"><b>验收只要求</b><p>清晰的触发条件 · 三到五条带示例的原则 · 作用域和例外——<b>不把一次主观判断当作普遍规则</b></p></div>
+      <p class="x7-k">短小、可读、能通过真实任务检验的初版，<b>比一开始罗列几十条规则更适合作为迭代起点</b></p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「如何编写一份可用的 Skill」· 实验 2-7</div>
+</section>
+<style>
+#c02-exp7 .x7-body{display:grid;grid-template-columns:720px 1fr;gap:26px;height:690px}
+#c02-exp7 .x7-loop{position:relative;height:640px}
+#c02-exp7 .x7-n{position:absolute;width:230px;padding:12px 14px;border-radius:16px;text-align:center;border:1.5px solid var(--line2);background:rgba(12,18,40,.85);translate:-50% -50%;transition:all .35s}
+#c02-exp7 .x7-n b{display:block;font-size:18px}
+#c02-exp7 .x7-n small{font-size:15px;color:var(--text2)}
+#c02-exp7 .x7-n.on{border-color:var(--acc);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 35%,transparent);scale:1.05}
+#c02-exp7 .x7-ring{position:absolute;left:360px;top:320px;width:440px;height:440px;margin:-220px 0 0 -220px;border-radius:50%;border:3px dashed color-mix(in srgb,var(--acc) 40%,transparent);animation:spin 40s linear infinite}
+#c02-exp7 .x7-r{display:flex;flex-direction:column;gap:14px}
+#c02-exp7 .x7-diff{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c02-exp7 .x7-diff .chip{font-size:15px;padding:1px 8px}
+#c02-exp7 .x7-b{font-size:18px;line-height:1.7;color:var(--text2)}
+#c02-exp7 .x7-b s{color:var(--bad);text-decoration-thickness:2px}
+#c02-exp7 .x7-a{font-size:18px;line-height:1.7}
+#c02-exp7 .x7-a ins{text-decoration:none;color:var(--ok)}
+#c02-exp7 .x7-lessons{display:flex;flex-wrap:wrap;gap:8px}
+#c02-exp7 .x7-lessons span{padding:5px 12px;border-radius:999px;font-size:16px;border:1px solid var(--acc);color:var(--acc)}
+#c02-exp7 .x7-acc{padding:14px 18px;border-radius:14px;border:1.5px solid var(--ok);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c02-exp7 .x7-acc b{font-size:18px;color:var(--ok)}
+#c02-exp7 .x7-acc p{font-size:17px;line-height:1.55;margin-top:4px}
+#c02-exp7 .x7-acc p b{font-size:inherit;color:var(--text)}
+#c02-exp7 .x7-k{margin-top:auto;font-size:18px;line-height:1.55;color:var(--text2)}
+#c02-exp7 .x7-k b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-exp7'] = {
+  N: [['三到五篇范文', '自己最满意的原创文章'], ['初版 SKILL.md', '归纳用词、句式、段落、语气 · 约二十行'], ['起草新题目', '用 Skill 处理一项真实写作任务'], ['作者逐句改稿', '比“更自然一点”更有信息量'], ['比较 before / after', '删了哪些词、拆了哪些句、补了哪些事实'], ['写回 Skill', '每条规则保留正例、反例、适用范围']],
+  init(s) {
+    const cx = 360, cy = 320, r = 230;
+    s.querySelector('.x7-loop').innerHTML = '<div class="x7-ring"></div>' + this.N.map(([b, d], i) => { const a = -Math.PI / 2 + (i / 6) * Math.PI * 2; return `<div class="x7-n" style="left:${(cx + r * Math.cos(a)).toFixed(0)}px;top:${(cy + r * Math.sin(a)).toFixed(0)}px"><b>${b}</b><small>${d}</small></div>`; }).join('');
+    this.ns = [...s.querySelectorAll('.x7-n')];
+  },
+  enter(s, ctx) { let i = 0; ctx.every(() => { this.ns.forEach((n, j) => n.classList.toggle('on', j === i % 6)); i++; }, 1300); },
+  reset() { this.ns.forEach((n) => n.classList.remove('on')); },
+};
+</script>

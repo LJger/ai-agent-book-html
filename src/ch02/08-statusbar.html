@@ -1,0 +1,707 @@
+<!-- ================= PART 08 Agent 状态栏 ================= -->
+<section class="slide chapter" id="c02-d8" data-part="8" data-title="PART 08 · Agent 状态栏" data-notes="上一部分的 Skills 解决的是“Agent 具备哪些可按需加载的能力”；这一部分讨论另一个独立问题：如何让 Agent 随时看到任务进度、环境变化和工具调用计数等<b>运行时状态</b>。依次看：状态栏是什么、它为什么有效（只有一半的检索引擎、注意力的位置效应）、实验 2-8 的注意力可视化、研究结论、状态栏的三类信息、它在消息列表中的位置、两种更新方式与缓存代价的取舍、实验 2-9 的五种状态栏技术，以及维护状态栏的两点注意。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">Agent 状态栏</h1>
+  <div class="ch-s fx fx-up" style="--d:3">把分散在上下文各处的隐式状态，提炼为可直接使用的显式知识</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">上下文窗口是一台只有一半的检索引擎。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<section class="slide" id="c02-sbwhat" data-part="8" data-trans="zoom" data-dur="16000" data-title="手机状态栏与 Agent 状态栏 · 图2-14" data-notes="提示工程给的是静态指令，而 Agent 在执行过程中还需要动态感知自身状态与任务进展。Agent 框架把这些动态信息整理成结构化摘要并注入上下文，这种机制称为 <b>Agent 状态栏（Agent Status Bar）</b>。在构建生产级的 Agent 系统时，仅依赖大模型的原生能力往往是不够的：Agent 执行复杂任务时容易陷入无限循环、状态遗忘、目标偏离，根源都在于它缺乏对环境当前状态的感知和对任务进展的跟踪。状态栏通过在上下文中嵌入结构化的元信息，为 Agent 补上自我感知和自我调节的机制。<br>这个概念最好的类比是操作系统的<b>状态栏</b>。当你使用手机时，屏幕顶部始终显示着时间、电量、信号强度、通知数量——这些信息不是 App 的主界面内容，但你随时可以瞥一眼就掌握设备的当前状态。Agent 状态栏对模型起着完全相同的作用：它不是对话的主体内容（不属于用户消息、模型输出或工具结果），而是 Agent 框架在上下文末尾持续注入的<b>状态摘要</b>——“你已经打了 3 次电话”、“当前时间是 10:30”、“TODO 还剩 2 项未完成”。模型每次生成新回复时都能“瞥一眼”这些状态。<br>按图2-14：同一条“帮我联系 Xfinity 砍价”的轨迹，无状态栏时模型需要扫描全部上下文来“数”拨打了几次电话，容易数错；有状态栏时直接读取已提炼的状态，准确遵守约束，不再拨打。右上角切换两种情形。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">像手机顶部那一行：<em>Agent 状态栏</em></h2></div>
+    <div class="seg wh-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">无状态栏</button><button data-v="1">有状态栏</button></div></header>
+  <div class="wh-body">
+    <div class="wh-ph fx fx-left" style="--d:2"><div class="wh-bar"><span class="wh-t">10:30</span><span><svg class="ic"><use href="#i-wave"/></svg><svg class="ic"><use href="#i-bell"/></svg> 3 · 82%</span></div><div class="wh-app">App 主界面</div><p>不是主界面内容，但<b>随时瞥一眼</b>就知道设备状态</p></div>
+    <div class="wh-tr panel fx fx-up" style="--d:3"><div class="wh-ms"></div><p class="wh-k">—</p></div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏：通过元信息增强 Agent 轨迹管理」· 图2-14</div>
+</section>
+<style>
+#c02-sbwhat .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-sbwhat .wh-seg button{font-size:18px;padding:9px 20px}
+#c02-sbwhat .wh-body{display:grid;grid-template-columns:360px 1fr;gap:26px;height:680px}
+#c02-sbwhat .wh-ph{display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:34px;border:3px solid var(--line2);background:#0b1020;height:600px}
+#c02-sbwhat .wh-bar{display:flex;justify-content:space-between;align-items:center;padding:8px 14px;border-radius:14px;font:700 17px var(--num);color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);animation:glowPulse 3s ease-in-out infinite}
+#c02-sbwhat .wh-bar .ic{font-size:16px;margin-left:4px}
+#c02-sbwhat .wh-app{flex:1;display:grid;place-items:center;border-radius:18px;font-size:20px;color:var(--text3);border:1px dashed var(--line2)}
+#c02-sbwhat .wh-ph p{font-size:16px;line-height:1.5;color:var(--text2);text-align:center}
+#c02-sbwhat .wh-ph p b{color:var(--acc)}
+#c02-sbwhat .wh-tr{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+#c02-sbwhat .wh-ms{display:flex;flex-direction:column;gap:6px}
+#c02-sbwhat .wh-m{display:grid;grid-template-columns:110px 1fr 80px;gap:10px;align-items:center;padding:7px 12px;border-radius:10px;font-size:16px;background:rgba(255,255,255,.03);border-left:4px solid var(--c);transition:all .25s}
+#c02-sbwhat .wh-m b{font:600 15px var(--mono);color:var(--c)}
+#c02-sbwhat .wh-m em{font-style:normal;text-align:center;font:800 18px var(--num);color:var(--warn)}
+#c02-sbwhat .wh-m.scan{background:color-mix(in srgb,var(--warn) 18%,transparent)}
+#c02-sbwhat .wh-m.st{grid-template-columns:110px 1fr;background:color-mix(in srgb,var(--ok) 10%,transparent);border-color:var(--ok)}
+#c02-sbwhat .wh-m.st span{font:15px/1.6 var(--mono);white-space:pre-wrap}
+#c02-sbwhat .wh-m.dim{opacity:.4}
+#c02-sbwhat .wh-k{margin-top:auto;min-height:60px;padding:10px 14px;border-radius:12px;font-size:18px;line-height:1.5;background:rgba(255,255,255,.04)}
+#c02-sbwhat .wh-k.bad{color:#fecdd3;border:1px solid var(--bad)}#c02-sbwhat .wh-k.ok{color:#a7f3d0;border:1px solid var(--ok)}
+</style>
+<script>
+HOOKS['c02-sbwhat'] = {
+  M: [['system', 'System Prompt + Tools（每个商家最多拨打 3 次）', '#60a5fa'], ['user', '“帮我联系 Xfinity 砍价”', '#22d3ee'], ['assistant', 'phone_call(Xfinity)', '#a78bfa', 1], ['tool', '等待 45 分钟，未接通', '#34d399'], ['assistant', 'web_search("Xfinity deals")', '#a78bfa'], ['tool', '[大量搜索内容…]', '#34d399'], ['assistant', 'phone_call(Xfinity)', '#a78bfa', 1], ['tool', '接通，报价 $65/月', '#34d399'], ['assistant', 'phone_call(Xfinity)', '#a78bfa', 1], ['tool', '确认降价到 $59/月', '#34d399'], ['user', '“能不能再打一次催一下？”', '#22d3ee']],
+  ST: '<agent_status>\nphone_call 已调用 3 次 (Xfinity: 3)\n约束检查: 已达上限 (3/3) ✗\nTODO: [✓]联系Xfinity [✓]确认降价\n当前时间: 2025-09-14 10:30\n</agent_status>',
+  init(s) { this.set = U.seg(s.querySelector('.wh-seg'), (v) => { this.auto = false; this.v = +v; this.run(s); }); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, box = s.querySelector('.wh-ms'), k = s.querySelector('.wh-k');
+    this.set(String(this.v));
+    box.innerHTML = this.M.map(([r, t, c]) => `<div class="wh-m" style="--c:${c}"><b>${r}</b><span>${t}</span><em></em></div>`).join('');
+    k.className = 'wh-k'; k.textContent = this.v ? '有状态栏：直接读取已提炼的状态' : '无状态栏：模型要扫描全部上下文去“数”';
+    const ms = [...box.children];
+    if (this.v === 0) {
+      let n = 0;
+      for (let i = 0; i < ms.length; i++) {
+        ms[i].classList.add('scan'); await U.wait(ctx, 260); if (!ok()) return; ms[i].classList.remove('scan');
+        if (this.M[i][3]) { n++; ms[i].querySelector('em').textContent = n === 3 ? '2?' : n; }
+      }
+      k.className = 'wh-k bad'; k.textContent = '数到一半被大量搜索内容干扰：“好像才打了 2 次？” → 又打了第 4 次';
+    } else {
+      ms.forEach((m, i) => { if (i > 1 && i < ms.length - 1) m.classList.add('dim'); });
+      box.insertAdjacentHTML('beforeend', `<div class="wh-m st" style="--c:var(--ok)"><b>状态栏</b><span>${this.ST.replace(/</g, '&lt;')}</span></div>`);
+      await U.wait(ctx, 1200); if (!ok()) return;
+      k.className = 'wh-k ok'; k.textContent = '直接读到“已达上限 (3/3)” → 准确遵守约束，不再拨打';
+    }
+    await U.wait(ctx, 3200); if (!ok()) return;
+    if (this.auto) this.v = 1 - this.v;
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.v = 0; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c02-sbtheory" data-part="8" data-steps="2" data-trans="rise" data-dur="10000" data-title="只有一半的检索引擎" data-notes="Agent 状态栏之所以有效，源于注意力机制的一个本质特性：上下文学习更像检索而非推理——模型擅长从已有内容中查找信息，但不擅长主动归纳和总结。这里说的是模型在单次前向传播中如何处理已经在上下文里的信息，并不否定模型可以通过生成思维链来完成多步思考。<br>一个更形象的说法是：<b>上下文窗口是一台只有一半的检索引擎</b>。它“检索”的这一半非常强——你问什么，注意力就能从成千上万个 token 里把相关的原始记录捞出来，相当于把检索增强生成（RAG）内置进了每一次前向传播。但它缺了另一半：<b>没有“提炼层”</b>。上下文里的东西从来不会被自动数一遍、建个索引、或就地总结成一条结论；任何“关于这些内容的结论”——一共多少条、有没有超标、进展到哪一步——模型每次要用，都得从原始记录里现算一遍。而“现算一遍”的代价，会随上下文里堆积的内容量（记作 N）一起往上涨。<br>考虑一个实际场景：Agent 需要打电话处理业务，系统提示词要求拨打每个商家不超过 3 次。但打了 3 次之后，Agent 经常数不清到底打了几次，又打了第 4 次，甚至陷入循环反复拨打同一个电话。问题的根源在于：关于“已经打了几次”的知识没有被自动提炼出来，而是以原始通话记录的形式分散在 KV Cache 的向量表示中。模型每次做决策都必须花费额外的思考 token 去扫描上下文重新统计，这个过程效率极低且错误率很高。而当我们在每次电话工具的调用结果中直接标明累计呼叫次数（如“本次是第 3 次呼叫该商家”），模型就能立即发现已达到限制，不再继续呼叫，错误率大幅降低。<br>这种机制的本质是<b>把分散在上下文各处的隐式状态提炼为可直接使用的显式知识</b>。原始轨迹中的信息是高度冗余的——大量的 token 中只包含少量关键的状态信息。Agent 状态栏主动提取这些关键状态，以极低的额外 token 成本，呈现出原本需要扫描数千个 token 才能获得的信息。<br>按 → 依次看：检索强、提炼缺 → 数不清第几次 → 在结果里直接标出“第 3 次”。现算代价曲线为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">上下文窗口是一台<em>只有一半的检索引擎</em></h2></header>
+  <div class="th-st fx fx-up" style="--d:2">
+    <div class="th-v v0">
+      <div class="th-half ok"><b>检索：非常强</b><p>你问什么，注意力就能从成千上万个 token 里把相关的原始记录捞出来——<b>RAG 内置进了每一次前向传播</b></p><div class="th-hits"></div></div>
+      <div class="th-half no"><b>提炼层：没有</b><p>不会被自动<b>数一遍、建索引、就地总结</b>；任何结论每次都要从原始记录里现算</p><svg class="th-svg" viewBox="0 0 520 230" width="520" height="230"><path d="M40 200H500M40 200V20" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/><path d="M40 190 C 200 170, 330 110, 490 30" fill="none" stroke="#fb7185" stroke-width="4"/><text x="496" y="222" text-anchor="end" fill="#94a3b8" font-size="15">上下文内容量 N →</text><text x="48" y="18" fill="#94a3b8" font-size="15">现算一遍的代价（示意）</text></svg></div>
+    </div>
+    <div class="th-v v1">
+      <div class="th-calls"></div>
+      <div class="th-say bad"><svg class="ic"><use href="#i-phone"/></svg><p>规定每个商家不超过 3 次；“已经打了几次”散落在原始通话记录里——每次决策都要花思考 token 扫描、重新统计，<b>经常数不清，又打了第 4 次</b></p></div>
+    </div>
+    <div class="th-v v2">
+      <div class="th-calls b"></div>
+      <div class="th-say ok"><svg class="ic"><use href="#i-check"/></svg><p>在每次调用结果里直接标明“本次是第 3 次呼叫该商家”：模型<b>立即发现已达到限制</b>，错误率大幅降低</p></div>
+      <p class="th-core">本质：<b>把分散在上下文各处的隐式状态，提炼为可直接使用的显式知识</b>——用极低的额外 token，呈现原本要扫描数千个 token 才能得到的信息</p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏的理论基础」</div>
+</section>
+<style>
+#c02-sbtheory .th-st{position:relative;height:700px}
+#c02-sbtheory .th-v{position:absolute;inset:0;display:flex;flex-direction:column;gap:18px;opacity:0;visibility:hidden;translate:0 16px;transition:opacity .5s,visibility .5s,translate .5s var(--ease)}
+#c02-sbtheory[data-k="0"] .v0,#c02-sbtheory[data-k="1"] .v1,#c02-sbtheory[data-k="2"] .v2{opacity:1;visibility:visible;translate:0 0}
+#c02-sbtheory .v0{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+#c02-sbtheory .th-half{padding:20px 24px;border-radius:20px;display:flex;flex-direction:column;gap:12px;background:rgba(12,18,40,.72)}
+#c02-sbtheory .th-half.ok{border:1.5px solid var(--ok)}#c02-sbtheory .th-half.no{border:1.5px dashed var(--bad)}
+#c02-sbtheory .th-half>b{font-size:28px}
+#c02-sbtheory .th-half.ok>b{color:var(--ok)}#c02-sbtheory .th-half.no>b{color:var(--bad)}
+#c02-sbtheory .th-half p{font-size:19px;line-height:1.6;color:var(--text2)}
+#c02-sbtheory .th-half p b{color:var(--text)}
+#c02-sbtheory .th-hits{display:grid;grid-template-columns:repeat(16,1fr);gap:4px}
+#c02-sbtheory .th-hits i{height:26px;border-radius:4px;background:rgba(255,255,255,.08);transition:background .3s}
+#c02-sbtheory .th-hits i.on{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+#c02-sbtheory .th-calls{display:flex;flex-direction:column;gap:6px}
+#c02-sbtheory .th-c{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 14px;border-radius:10px;font-size:17px;background:rgba(255,255,255,.03);border-left:4px solid var(--c)}
+#c02-sbtheory .th-c b{font:600 15px var(--mono);color:var(--c)}
+#c02-sbtheory .th-c mark{background:color-mix(in srgb,var(--ok) 30%,transparent);color:var(--text);padding:0 6px;border-radius:5px}
+#c02-sbtheory .th-say{display:flex;gap:14px;align-items:flex-start;padding:16px 20px;border-radius:16px}
+#c02-sbtheory .th-say .ic{flex:none;font-size:30px}
+#c02-sbtheory .th-say p{font-size:19px;line-height:1.6}
+#c02-sbtheory .th-say.bad{border:1px solid var(--bad);background:rgba(251,113,133,.08)}#c02-sbtheory .th-say.bad .ic{color:var(--bad)}#c02-sbtheory .th-say.bad b{color:#fecdd3}
+#c02-sbtheory .th-say.ok{border:1px solid var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent)}#c02-sbtheory .th-say.ok .ic{color:var(--ok)}#c02-sbtheory .th-say.ok b{color:var(--ok)}
+#c02-sbtheory .th-core{font-size:20px;line-height:1.6;color:var(--text2)}
+#c02-sbtheory .th-core b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-sbtheory'] = {
+  C: [['assistant', 'phone_call("商家 A")', '#a78bfa'], ['tool', '未接通', '#34d399', '本次是第 1 次呼叫该商家'], ['assistant', 'web_search(…)', '#a78bfa'], ['tool', '[搜索结果 2,000 字…]', '#34d399'], ['assistant', 'phone_call("商家 A")', '#a78bfa'], ['tool', '转人工后挂断', '#34d399', '本次是第 2 次呼叫该商家'], ['assistant', 'read_file(…)', '#a78bfa'], ['tool', '[文件内容 3,000 字…]', '#34d399'], ['assistant', 'phone_call("商家 A")', '#a78bfa'], ['tool', '答应下周回电', '#34d399', '本次是第 3 次呼叫该商家（已达上限）']],
+  init(s) {
+    s.querySelector('.th-hits').innerHTML = '<i></i>'.repeat(64);
+    this.hs = [...s.querySelectorAll('.th-hits i')];
+    s.querySelector('.th-calls').innerHTML = this.C.map(([r, t, c]) => `<div class="th-c" style="--c:${c}"><b>${r}</b><span>${t}</span></div>`).join('');
+    s.querySelector('.th-calls.b').innerHTML = this.C.map(([r, t, c, m]) => `<div class="th-c" style="--c:${c}"><b>${r}</b><span>${t}${m ? ` <mark>${m}</mark>` : ''}</span></div>`).join('');
+  },
+  apply(s, k) { s.dataset.k = k; },
+  enter(s, ctx, k) {
+    this.apply(s, k);
+    ctx.every(() => { const r = U.rand((Math.random() * 1e6) | 0); this.hs.forEach((h) => h.classList.toggle('on', r() < 0.08)); }, 900);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.dataset.k = 0; },
+};
+</script>
+
+<section class="slide" id="c02-sbattn" data-part="8" data-trans="flip" data-dur="15000" data-title="把关键状态放到末尾" data-notes="此外，在长上下文场景中，模型的注意力资源是有限的。随着上下文长度的增加，模型必须把注意力分配给更多信息片段，关键信息可能因此得不到足够的权重。特别是在复杂的 Agent 轨迹中，早期设定的任务目标和关键约束容易被后续大量的工具调用结果所淹没。模型会过度关注最近的上下文内容，而对位于上下文中部的信息产生“注意力衰减”现象。<br>Agent 状态栏正是通过显式地操纵注意力分配来解决这一问题。当我们将关键的元信息以结构化的形式放置在上下文末尾时，这些信息在空间上更接近模型即将生成的新 token，因而能获得更高的注意力权重——这是一种<b>“强制性的注意力引导”</b>。<br>拖动滑块，把“约束卡片”沿上下文移动，看它能分到的注意力（曲线为示意形状，不是测量值）；不操作时卡片会自动来回移动。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">把关键状态放到末尾：<em>强制性的注意力引导</em></h2></header>
+  <div class="at-st fx fx-scale" style="--d:2">
+    <svg class="at-svg" viewBox="0 0 1600 420" width="1600" height="420">
+      <rect x="40" y="320" width="1520" height="60" rx="12" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.12)"/>
+      <path class="at-curve" fill="none" stroke="#a78bfa" stroke-width="4"/>
+      <path class="at-fill" fill="rgba(167,139,250,.12)"/>
+      <text x="44" y="30" fill="#94a3b8" font-size="16">注意力权重（示意）</text>
+      <text x="60" y="356" fill="#94a3b8" font-size="16">系统提示词 · 早期目标与约束</text>
+      <text x="800" y="356" fill="#94a3b8" font-size="16" text-anchor="middle">大量工具调用结果 → 中部“注意力衰减”</text>
+      <text x="1540" y="356" fill="#94a3b8" font-size="16" text-anchor="end">即将生成的新 token →</text>
+      <g class="at-card"><rect x="-90" y="300" width="180" height="40" rx="10" fill="#fbbf24"/><text x="0" y="326" text-anchor="middle" fill="#06101f" font-size="17" font-weight="700">每个商家 ≤ 3 次</text><line class="at-ln" x1="0" y1="300" x2="0" y2="0" stroke="#fbbf24" stroke-width="2" stroke-dasharray="6 6"/><circle class="at-dot" r="9" fill="#fbbf24"/></g>
+    </svg>
+    <div class="at-ctl"><span>约束卡片的位置</span><input class="rng at-rng" type="range" min="0" max="1000" value="100"><b class="at-v">—</b></div>
+  </div>
+  <div class="at-cs fx fx-up" style="--d:4"><div><b>长上下文</b><p>注意力要分给更多片段，早期目标和关键约束被后续大量工具结果淹没</p></div><div><b>位置效应</b><p>过度关注最近的内容，中部信息出现“注意力衰减”</p></div><div class="ok"><b>放在末尾</b><p>空间上紧邻即将生成的 token，获得更高的注意力权重</p></div></div>
+  <div class="src">第二章 ·「Agent 状态栏的理论基础」· 注意力分配</div>
+</section>
+<style>
+#c02-sbattn .at-st{position:relative;height:500px;padding:10px 0;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c02-sbattn .at-svg{display:block;margin:0 auto}
+#c02-sbattn .at-ctl{display:grid;grid-template-columns:auto 1fr 200px;gap:16px;align-items:center;padding:0 40px;font-size:17px;color:var(--text2)}
+#c02-sbattn .at-ctl b{font:700 18px var(--num);color:var(--warn);text-align:right}
+#c02-sbattn .at-cs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+#c02-sbattn .at-cs>div{padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbattn .at-cs b{font-size:19px;color:var(--acc)}
+#c02-sbattn .at-cs p{margin-top:4px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c02-sbattn .at-cs .ok{border-color:var(--ok)}#c02-sbattn .at-cs .ok b{color:var(--ok)}
+</style>
+<script>
+HOOKS['c02-sbattn'] = {
+  w(u) { return 0.18 + 0.32 * Math.exp(-u * 9) + 0.75 * Math.exp(-(1 - u) * 7); },
+  init(s) {
+    const X = (u) => 60 + u * 1480, Y = (w) => 300 - w * 260;
+    let d = '';
+    for (let i = 0; i <= 120; i++) { const u = i / 120; d += (i ? 'L' : 'M') + X(u).toFixed(1) + ' ' + Y(this.w(u)).toFixed(1); }
+    s.querySelector('.at-curve').setAttribute('d', d);
+    s.querySelector('.at-fill').setAttribute('d', d + 'L1540 300L60 300Z');
+    this.X = X; this.Y = Y;
+    this.r = s.querySelector('.at-rng');
+    this.r.addEventListener('input', () => { this.auto = false; this.place(s, this.r.value / 1000); });
+  },
+  place(s, u) {
+    this.u = u; this.r.value = Math.round(u * 1000); this.r.style.setProperty('--p', u * 100 + '%');
+    const x = this.X(u), y = this.Y(this.w(u));
+    s.querySelector('.at-card').setAttribute('transform', `translate(${x.toFixed(1)} 0)`);
+    s.querySelector('.at-dot').setAttribute('cy', y.toFixed(1)); s.querySelector('.at-ln').setAttribute('y2', y.toFixed(1));
+    s.querySelector('.at-v').textContent = u > 0.9 ? '末尾：注意力最高' : u < 0.12 ? '开头：随后被淹没' : '中部：注意力衰减';
+  },
+  enter(s, ctx) {
+    this.auto = true; this.place(s, 0.08);
+    let u = 0.08, d = 1, last = 0;
+    ctx.raf((t) => { const dt = last ? Math.min(60, t - last) : 0; last = t; if (!this.auto) return; u += d * dt / 6000; if (u > 0.97) { u = 0.97; d = -1; } if (u < 0.05) { u = 0.05; d = 1; } this.place(s, u); });
+  },
+  reset(s) { this.place(s, 0.08); },
+};
+</script>
+
+<section class="slide" id="c02-exp8" data-part="8" data-trans="zoom" data-dur="16000" data-title="实验 2-8 ★★：注意力可视化验证状态栏" data-notes="<b>实验 2-8 ★★：通过注意力可视化验证 Agent 状态栏的效果。</b>基于 attention_visualization 项目，设计一个客服 Agent 处理退款请求的对照实验。Agent 已经拨打了 Xfinity 3 次电话，中间穿插了网络搜索。用户追问：“能不能再打电话催促一下？”<br><b>对照组 A（无状态栏）</b>：上下文包含完整的轨迹但没有聚合状态信息。热力图显示注意力分布高度分散，在三次电话调用的区域形成明显的“聚焦点”，思考 token 体现出数数和统计的过程——模型在从原始信息中做归纳。<br><b>对照组 B（有状态栏）</b>：在轨迹末尾添加 agent_status 块：Tool call summary: phone_call has been invoked 3 times (Xfinity: 3 times)；Constraint check: Maximum calls to Xfinity reached (3/3)。注意力高度集中在状态栏信息上，思考过程直接使用已提炼好的信息，不再从原始数据中做统计。对于 Qwen3-0.6B 这样小的模型，对照组 A 经常违反约束继续拨打，而对照组 B 则能稳定地遵从约束。<br>配套仓库的真实运行（目录沿用旧编号 exp2-7-qwen3-0.6b-20260730-v2，Qwen3-0.6B，每组 3 次）：无状态栏组 3 次中 2 次拒绝拨打第 4 次、1 次没有拒绝；有状态栏组 3 次全部拒绝；上下文分别为 745 与 799 token。左侧注意力条与思考文字为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-8 ★★：用<em>注意力可视化</em>验证状态栏</h2></div>
+    <div class="seg x8-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">对照组 A：无状态栏</button><button data-v="1">对照组 B：有状态栏</button></div></header>
+  <div class="x8-body">
+    <div class="x8-l panel fx fx-left" style="--d:2">
+      <div class="x8-h"><span class="lbl">注意力分布（示意）</span><span class="chip warn">示意</span></div>
+      <div class="x8-heat"></div>
+      <div class="x8-think"><span class="lbl">思考 token（示意）</span><p class="x8-tt"></p></div>
+      <code class="x8-sb">&lt;agent_status&gt;
+Current State:
+- Tool call summary: 'phone_call' has been invoked 3 times (Xfinity: 3 times)
+- Constraint check: Maximum calls to Xfinity reached (3/3)
+&lt;/agent_status&gt;</code>
+    </div>
+    <div class="x8-r fx fx-right" style="--d:3">
+      <span class="lbl">真实运行：Qwen3-0.6B，每组 3 次</span>
+      <div class="x8-g"><b>无状态栏</b><div class="x8-runs a"><i class="y">拒绝</i><i class="n">继续拨打</i><i class="y">拒绝</i></div><small>上下文 745 token</small></div>
+      <div class="x8-g"><b>有状态栏</b><div class="x8-runs"><i class="y">拒绝</i><i class="y">拒绝</i><i class="y">拒绝</i></div><small>上下文 799 token</small></div>
+      <p class="x8-k">小模型在无状态栏时会违反约束继续拨打；有状态栏时<b>稳定遵从约束</b></p>
+      <div class="x8-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter2/attention_visualization（exp2-7-qwen3-0.6b-20260730-v2，目录沿用旧编号）</div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏的理论基础」· 实验 2-8</div>
+</section>
+<style>
+#c02-exp8 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-exp8 .x8-seg button{font-size:17px;padding:8px 16px}
+#c02-exp8 .x8-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:670px}
+#c02-exp8 .x8-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c02-exp8 .x8-h{display:flex;justify-content:space-between;align-items:center}
+#c02-exp8 .x8-h .chip{font-size:15px;padding:1px 8px}
+#c02-exp8 .x8-heat{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+#c02-exp8 .x8-cell{height:120px;border-radius:6px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-size:15px;text-align:center;line-height:1.2;color:var(--text2);background:rgba(167,139,250,var(--a));transition:background .6s}
+#c02-exp8 .x8-think{padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);min-height:120px}
+#c02-exp8 .x8-tt{margin-top:6px;font-size:17px;line-height:1.6;color:#ddd6fe;font-style:italic}
+#c02-exp8 .x8-sb{display:block;padding:12px 14px;border-radius:12px;font:15px/1.55 var(--mono);white-space:pre-wrap;border:1.5px solid var(--ok);color:#a7f3d0;opacity:.15;transition:opacity .5s}
+#c02-exp8[data-v="1"] .x8-sb{opacity:1}
+#c02-exp8 .x8-r{display:flex;flex-direction:column;gap:14px}
+#c02-exp8 .x8-g{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-exp8 .x8-g b{font-size:19px}
+#c02-exp8 .x8-runs{display:flex;gap:10px;margin:10px 0 6px}
+#c02-exp8 .x8-runs i{flex:1;padding:12px;border-radius:10px;text-align:center;font-style:normal;font-size:17px;font-weight:700}
+#c02-exp8 .x8-runs .y{color:#06101f;background:var(--ok)}
+#c02-exp8 .x8-runs .n{color:#fff;background:var(--bad)}
+#c02-exp8 .x8-g small{font-size:15px;color:var(--text3)}
+#c02-exp8 .x8-k{font-size:18px;line-height:1.55;color:var(--text2)}
+#c02-exp8 .x8-k b{color:var(--ok)}
+#c02-exp8 .x8-src{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+#c02-exp8 .x8-src .ic{flex:none;color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-exp8'] = {
+  SEG: ['system', 'user', '电话 1', 'tool', '搜索', 'tool', '电话 2', 'tool', '电话 3', 'tool', '追问', '状态栏'],
+  A: [[0.15, 0.1, 0.55, 0.15, 0.1, 0.1, 0.6, 0.15, 0.62, 0.15, 0.4, 0], [0.1, 0.05, 0.08, 0.05, 0.05, 0.05, 0.08, 0.05, 0.1, 0.05, 0.3, 0.9]],
+  T: ['“要先数一下：第一次 phone_call……然后是搜索……第二次……第三次？还是两次？我再看一遍……”', '“状态栏写着已达上限 3/3，不能再拨打，告诉用户需要等待回电。”'],
+  init(s) { this.set = U.seg(s.querySelector('.x8-seg'), (v) => { this.auto = false; this.show(s, +v); }); s.querySelector('.x8-heat').innerHTML = this.SEG.map((n) => `<div class="x8-cell" style="--a:0">${n}</div>`).join(''); this.cs = [...s.querySelectorAll('.x8-cell')]; },
+  show(s, v) { this.v = v; s.dataset.v = v; this.set(String(v)); this.cs.forEach((c, i) => c.style.setProperty('--a', this.A[v][i])); s.querySelector('.x8-tt').textContent = this.T[v]; },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, 1 - this.v); }, 4200); },
+  reset(s) { this.show(s, 0); },
+};
+</script>
+
+<section class="slide" id="c02-sbres" data-part="8" data-trans="rise" data-dur="14000" data-title="提前算好的状态栏：研究结论" data-notes="实验表明，为模型提供一条<b>提前算好的状态栏</b>后，<b>较小开源模型的准确率可以接近前沿大模型</b>。此外，<b>状态栏可以大大提高模型的思考效率</b>，让每次 Agent 迭代的思考 token 量、延迟和花费均降低约一个数量级。不带状态栏时，每次查询的思考量随上下文变长而<b>持续增长</b>；带上状态栏后，它变得<b>基本恒定</b>。（Li, Bojie and Noah Shi. Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning. 2026）<br>左侧曲线只示意两种情形的形状（随上下文增长 vs 基本恒定），不是论文中的测量值。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">提前算好的状态栏：<em>小模型接近大模型，思考量降一个数量级</em></h2></header>
+  <div class="rs-body">
+    <div class="rs-ch panel fx fx-left" style="--d:2">
+      <svg viewBox="0 0 900 460" width="900" height="460"><path d="M60 420H880M60 420V20" stroke="rgba(255,255,255,.22)" stroke-width="2" fill="none"/><text x="876" y="448" text-anchor="end" fill="#94a3b8" font-size="16">上下文长度 →</text><text x="68" y="18" fill="#94a3b8" font-size="16">每次查询的思考 token（示意形状）</text><path class="rs-a" fill="none" stroke="#fb7185" stroke-width="5"/><path class="rs-b" fill="none" stroke="#34d399" stroke-width="5"/><text class="rs-la" fill="#fda4af" font-size="18" font-weight="700">不带状态栏：持续增长</text><text class="rs-lb" fill="#6ee7b7" font-size="18" font-weight="700">带状态栏：基本恒定</text></svg>
+      <span class="chip warn rs-sim">示意</span>
+    </div>
+    <div class="rs-r fx fx-right" style="--d:3">
+      <div class="rs-c"><svg class="ic"><use href="#i-scale"/></svg><p>较小开源模型的准确率<b>可以接近前沿大模型</b></p></div>
+      <div class="rs-c"><svg class="ic"><use href="#i-zap"/></svg><p>每次迭代的思考 token、延迟和花费<b>均降低约一个数量级</b></p></div>
+      <div class="rs-c"><svg class="ic"><use href="#i-trend"/></svg><p>思考量从<b>随上下文持续增长</b>变为<b>基本恒定</b></p></div>
+      <p class="rs-ref">Li & Shi, <i>Distill, Don't Retrieve: Inference-Time Context Distillation for LLM Agent Reasoning</i>, 2026</p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏的理论基础」· 研究结论</div>
+</section>
+<style>
+#c02-sbres .rs-body{display:grid;grid-template-columns:960px 1fr;gap:26px;height:640px}
+#c02-sbres .rs-ch{position:relative;padding:18px 20px}
+#c02-sbres .rs-sim{position:absolute;right:16px;top:14px;font-size:15px;padding:2px 10px}
+#c02-sbres .rs-r{display:flex;flex-direction:column;gap:14px}
+#c02-sbres .rs-c{display:flex;gap:14px;align-items:center;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c02-sbres .rs-c .ic{flex:none;font-size:34px;color:var(--ok)}
+#c02-sbres .rs-c p{font-size:20px;line-height:1.55}
+#c02-sbres .rs-c b{color:var(--ok)}
+#c02-sbres .rs-ref{margin-top:auto;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c02-sbres'] = {
+  enter(s, ctx) {
+    const a = s.querySelector('.rs-a'), b = s.querySelector('.rs-b'), la = s.querySelector('.rs-la'), lb = s.querySelector('.rs-lb'), t0 = performance.now();
+    ctx.raf((t) => {
+      const k = Math.min(1, ((t - t0) % 8000) / 5000), pa = [], pb = [];
+      for (let i = 0; i <= 60; i++) { const u = (i / 60) * k, x = 60 + u * 800; pa.push(`${x.toFixed(1)} ${(400 - 40 - 300 * Math.pow(u, 1.2)).toFixed(1)}`); pb.push(`${x.toFixed(1)} ${(380 - 8 * Math.sin(u * 20)).toFixed(1)}`); }
+      a.setAttribute('d', 'M' + pa.join('L')); b.setAttribute('d', 'M' + pb.join('L'));
+      const ex = 60 + k * 800;
+      la.setAttribute('x', Math.max(260, ex - 260)); la.setAttribute('y', (360 - 300 * Math.pow(k, 1.2) - 10).toFixed(1));
+      lb.setAttribute('x', Math.max(260, ex - 200)); lb.setAttribute('y', 368);
+    });
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c02-sbparts" data-part="8" data-trans="zoom" data-dur="15000" data-title="状态栏的三类信息" data-notes="Agent 状态栏包括以下几种类型的信息：<br><b>任务规划</b>：当 Agent 处理复杂的多步骤任务时，轨迹会变得很长。Agent 容易过分关注当前的局部子任务，而忘记用户的原始诉求、核心约束以及后续工作。可以引入 TODO 列表，将任务分解为清晰的步骤，再把列表放在轨迹末尾，不断提醒模型当前的进展和后续目标，确保行动与总体规划保持一致。<br><b>事件的侧信道信息（Side-channel Information）</b>：为每个事件附加元数据——精确的时间、地理位置、距上次 Agent 回复的时间间隔等。侧信道信息是指不在主要数据通道中传递、但对理解事件很有帮助的辅助信息。这些信息帮助模型理解事件的时序关系和环境背景，从而做出更符合情境的决策。<br><b>环境当前状态的观察摘要</b>：包括动态的环境信息（系统时间、工作目录等）、异常操作提醒（“该工具已被重复调用 N 次”）、以及从隐式状态到显式观察的转换。这一设计原则同样适用于人类界面——命令行（CLI）和图形界面（GUI）都致力于让用户清晰地感知系统的当前状态。<br>事件的侧信道信息通常随对应事件一起追加；任务规划和环境状态则会随任务推进不断更新。这些动态信息如何写入会话历史，直接关系到 KV Cache 的代价。<br>示例内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">状态栏里放什么：<em>三类信息</em></h2></header>
+  <div class="pa-body">
+    <div class="pa-srcs fx fx-left" style="--d:2">
+      <div class="pa-s" style="--c:#a78bfa"><b>任务规划</b><p>TODO 列表：防止只盯局部子任务而忘了原始诉求、核心约束和后续工作</p><small>随任务推进不断更新</small></div>
+      <div class="pa-s" style="--c:#22d3ee"><b>事件的侧信道信息</b><p>为每个事件附加元数据：精确时间、地理位置、距上次回复的间隔——不在主数据通道里，却有助于理解时序与背景</p><small>随对应事件一起追加</small></div>
+      <div class="pa-s" style="--c:#fbbf24"><b>环境当前状态的观察摘要</b><p>系统时间、工作目录；异常操作提醒“该工具已被重复调用 N 次”；隐式状态 → 显式观察——CLI、GUI 也都在做这件事</p><small>随任务推进不断更新</small></div>
+    </div>
+    <div class="pa-out fx fx-right" style="--d:3">
+      <div class="pa-ev"><span class="lbl">事件 + 侧信道元数据</span><code>[2025-09-14 10:28:02 · 上海 · 距上次回复 4 分 12 秒]<br>user: 那帮我查一下通话记录</code></div>
+      <div class="pa-sb"><span class="lbl">状态栏</span><code class="pa-code"></code><span class="chip warn pa-sim">示意</span></div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏的构成」</div>
+</section>
+<style>
+#c02-sbparts .pa-body{display:grid;grid-template-columns:760px 1fr;gap:26px;height:680px}
+#c02-sbparts .pa-srcs{display:flex;flex-direction:column;gap:14px}
+#c02-sbparts .pa-s{padding:16px 20px;border-radius:16px;border:1.5px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(12,18,40,.72);transition:all .35s}
+#c02-sbparts .pa-s b{font-size:22px;color:var(--c)}
+#c02-sbparts .pa-s p{margin-top:6px;font-size:17px;line-height:1.55;color:var(--text2)}
+#c02-sbparts .pa-s small{display:block;margin-top:6px;font-size:15px;color:var(--text3)}
+#c02-sbparts .pa-s.on{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent);translate:8px 0}
+#c02-sbparts .pa-out{display:flex;flex-direction:column;gap:16px}
+#c02-sbparts .pa-ev,#c02-sbparts .pa-sb{position:relative;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbparts .pa-ev code{display:block;margin-top:8px;font:16px/1.6 var(--mono);color:var(--text)}
+#c02-sbparts .pa-sb{flex:1;border-color:var(--ok)}
+#c02-sbparts .pa-code{display:block;margin-top:8px;font:17px/1.75 var(--mono);white-space:pre-wrap}
+#c02-sbparts .pa-code .l{display:block;opacity:.3;transition:opacity .4s}
+#c02-sbparts .pa-code .l.on{opacity:1}
+#c02-sbparts .pa-sim{position:absolute;right:12px;top:12px;font-size:15px;padding:1px 8px}
+</style>
+<script>
+HOOKS['c02-sbparts'] = {
+  L: [['&lt;agent_status&gt;', -1], ['TODO: [✓] 取消套餐 · [ ] 查询通话记录（进行中）', 0], ['当前时间: 2025-09-14 10:28:02', 2], ['工作目录: /srv/telecom-agent', 2], ['提醒: query_records 已被重复调用 3 次', 2], ['已呼叫 3/3 次（已达上限）', 2], ['&lt;/agent_status&gt;', -1]],
+  init(s) { s.querySelector('.pa-code').innerHTML = this.L.map(([t, g]) => `<span class="l" data-g="${g}">${t}</span>`).join(''); this.ls = [...s.querySelectorAll('.pa-code .l')]; this.ss = [...s.querySelectorAll('.pa-s')]; },
+  enter(s, ctx) {
+    let i = 0;
+    const go = () => { const k = i % 4; this.ss.forEach((x, j) => x.classList.toggle('on', j === k)); this.ls.forEach((l) => { const g = +l.dataset.g; l.classList.toggle('on', g === -1 || g === k || k === 3); }); i++; };
+    go(); ctx.every(go, 2200);
+  },
+  reset() { this.ss.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-sbpos" data-part="8" data-trans="flip" data-dur="16000" data-title="状态栏插在哪里 · 图2-15" data-notes="一个重要的实现细节是：Agent 状态栏在 API 层面实际上是作为<b>一条 user 角色的消息</b>插入到上下文末尾的——而不是修改开头的 system 消息。原因正是前面讨论的 KV Cache 约束：修改 system 消息会破坏整个前缀的缓存。这里需要澄清一个容易混淆的地方：这里的 user 角色只是 API 协议层面的技术选择，并不等同于第一章定义的“来自终端用户的输入”。换句话说，Harness 是在借用 user 角色这个消息槽位，向模型注入由 Agent 框架自动生成的系统状态信息——内容并非来自真实用户，只是复用了 user 角色的消息格式来挂到上下文末尾。<br>按图2-15：system 与 tools 固定不变、进入 KV Cache；中间是若干轮对话；用户追问“那帮我查一下通话记录”之后，Agent 框架插入一条内容为 agent_status（已呼叫 3/3 次 · TODO：取消套餐进行中）的 user 消息，模型从此处开始生成。这条消息用 agent_status 标签包裹以便模型识别其特殊性质；它紧邻模型即将生成的新 token，因此能获得最高的注意力权重。同时，因为它是追加而非修改，前面所有已缓存的内容都不受影响。这正是 KV Cache 一节核心结论中“动态信息追加末尾、静态信息保持不动”原则在状态栏场景的应用。<br>右上角切换两种做法：把状态写进 system，或在末尾追加一条 user 消息。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">状态栏插在哪里：<em>末尾追加一条 user 消息</em></h2></div>
+    <div class="seg ps-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">改 system 消息</button><button data-v="1">末尾追加 user 消息</button></div></header>
+  <div class="ps-body">
+    <div class="ps-ms panel fx fx-left" style="--d:2"><div class="ps-list"></div></div>
+    <div class="ps-r fx fx-right" style="--d:3">
+      <div class="ps-k"><span>需要重算的部分</span><b class="ps-n">—</b></div>
+      <div class="ps-c"><b>借用 user 角色的消息槽位</b><p>只是 API 协议层面的技术选择，<b>不等同于</b>来自终端用户的输入；用 <code>&lt;agent_status&gt;</code> 标签包裹，便于模型识别</p></div>
+      <div class="ps-c"><b>为什么在末尾</b><p>紧邻即将生成的 token → 最高注意力；追加而非修改 → 前缀缓存不受影响</p></div>
+      <p class="ps-x">动态信息追加末尾、静态信息保持不动</p>
+    </div>
+  </div>
+  <div class="src">第二章 ·「Agent 状态栏在上下文中的具体位置」· 图2-15</div>
+</section>
+<style>
+#c02-sbpos .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c02-sbpos .ps-seg button{font-size:18px;padding:9px 18px}
+#c02-sbpos .ps-body{display:grid;grid-template-columns:1040px 1fr;gap:26px;height:670px}
+#c02-sbpos .ps-ms{padding:14px 18px}
+#c02-sbpos .ps-list{display:flex;flex-direction:column;gap:6px}
+#c02-sbpos .ps-m{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:8px 12px;border-radius:10px;font:15.5px/1.5 var(--mono);border-left:5px solid var(--c);background:rgba(255,255,255,.03);transition:all .4s}
+#c02-sbpos .ps-m b{color:var(--c)}
+#c02-sbpos .ps-m.hit{--c:var(--ok)}
+#c02-sbpos .ps-m.miss{--c:var(--bad);background:rgba(251,113,133,.08)}
+#c02-sbpos .ps-m.new{--c:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+#c02-sbpos .ps-r{display:flex;flex-direction:column;gap:14px}
+#c02-sbpos .ps-k{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbpos .ps-k span{display:block;font-size:17px;color:var(--text2)}
+#c02-sbpos .ps-k b{font-size:26px}
+#c02-sbpos .ps-c{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbpos .ps-c b{font-size:19px;color:var(--acc)}
+#c02-sbpos .ps-c p{margin-top:4px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c02-sbpos .ps-c p b{font-size:inherit;color:var(--text)}
+#c02-sbpos .ps-c code{font:15px var(--mono);color:var(--ctx)}
+#c02-sbpos .ps-x{margin-top:auto;font-size:21px;font-weight:700;color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-sbpos'] = {
+  M: [['system', '"你是电信客服..."'], ['tools', '[cancel_plan, query_records, ...]'], ['user', '"帮我取消套餐"'], ['assistant', 'tool_calls: [cancel_plan(...)]'], ['tool', '"该套餐有合约期..."'], ['assistant', '"您的套餐在合约期内..."'], ['…', '更多对话轮次'], ['user', '"那帮我查一下通话记录"   ← 用户追问']],
+  init(s) { this.set = U.seg(s.querySelector('.ps-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  show(s, v) {
+    this.v = v; this.set(String(v));
+    const box = s.querySelector('.ps-list'), n = s.querySelector('.ps-n');
+    let h = this.M.map(([r, t], i) => {
+      const cls = v === 0 ? (i === 0 ? 'new' : 'miss') : 'hit';
+      const tt = v === 0 && i === 0 ? '"你是电信客服... &lt;agent_status&gt;已呼叫 3/3 次&lt;/agent_status&gt;"' : t;
+      return `<div class="ps-m ${cls}"><b>${r}</b><span>${tt}</span></div>`;
+    }).join('');
+    if (v === 1) h += '<div class="ps-m new"><b>user</b><span>"&lt;agent_status&gt; 已呼叫 3/3 次 · TODO: 取消套餐(进行中) &lt;/agent_status&gt;"   ← Agent 框架插入</span></div>';
+    box.innerHTML = h;
+    n.innerHTML = v === 0 ? '<span style="color:var(--bad)">整个前缀全部失效</span>' : '<span style="color:var(--ok)">只有新追加的这一条</span>';
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 1); ctx.every(() => { if (this.auto) this.show(s, 1 - this.v); }, 3800); },
+  reset(s) { this.show(s, 1); },
+};
+</script>
+
+<section class="slide" id="c02-sbupd" data-part="8" data-trans="rise" data-dur="17000" data-title="状态更新的两种实现" data-notes="“追加不破坏缓存”只在单次注入时成立。状态是会变的——下一轮 TODO 完成了一项、工具计数加了一次，状态消息就过时了。更新状态有两种实现方式，各有明确的缓存代价：<br><b>实现一：每轮替换</b>。每次 API 调用前，从消息列表中移除上一轮的状态消息，在末尾追加最新状态。这保证了上下文中只有一份状态、永远是最新的。但代价是：移除旧状态会使其位置之后的所有缓存失效——这与本章批评的“动态时间戳”是同一个失效机制，区别只在于状态消息位于上下文末尾，失效范围只覆盖上次注入后新增的消息（通常是一轮），整个前缀仍可复用。<br><b>实现二：持久追加</b>。状态消息一旦注入就永久留在轨迹中，每轮只在末尾追加新的状态。Claude Code 的 system-reminder 采用的就是这种方式——历史状态消息保留在会话记录（transcript）中，从不删改。这种方式对缓存完全友好：所有消息只追加、不修改，前缀始终稳定。代价是陈旧的状态会在上下文中累积，既占用 token，也要求模型自己关注“最新一条”状态而忽略已过时的旧状态。<br>两条泳道同步演示四轮：红色是该轮因移除旧状态而失效、需要重算的部分；灰色斜纹是累积下来的陈旧状态。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">状态会变：<em>每轮替换</em> vs <em>持久追加</em></h2></header>
+  <div class="up-body">
+    <div class="up-ln panel fx fx-left" style="--d:2"><div class="up-h"><b>实现一：每轮替换</b><span>上下文里只有一份、永远最新的状态</span></div><div class="up-tr a"></div><p class="up-p">移除旧状态 → 它之后的缓存失效；但它在末尾，失效只覆盖<b>上次注入后新增的那一轮</b></p></div>
+    <div class="up-ln panel fx fx-right" style="--d:3"><div class="up-h"><b>实现二：持久追加</b><span>Claude Code 的 &lt;system-reminder&gt; 采用这种方式</span></div><div class="up-tr b"></div><p class="up-p">只追加、不修改：<b>对缓存完全友好</b>；代价是陈旧状态累积，模型要自己找“最新一条”</p></div>
+  </div>
+  <div class="up-rd fx fx-up" style="--d:4"><span>第 <b class="up-n">1</b> 轮</span><span class="up-lg"><i class="h"></i>缓存命中 <i class="x"></i>失效重算 <i class="n"></i>本轮新增 <i class="o"></i>陈旧状态</span></div>
+  <div class="src">第二章 ·「状态更新的两种实现与缓存代价」</div>
+</section>
+<style>
+#c02-sbupd .up-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:600px}
+#c02-sbupd .up-ln{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c02-sbupd .up-h b{display:block;font-size:22px;color:var(--acc)}
+#c02-sbupd .up-h span{font-size:16px;color:var(--text3)}
+#c02-sbupd .up-tr{flex:1;display:flex;flex-direction:column;gap:5px}
+#c02-sbupd .up-m{padding:7px 12px;border-radius:9px;font:15px var(--mono);border-left:5px solid var(--c);background:rgba(255,255,255,.03);animation:upIn .3s var(--ease) both}
+#c02-sbupd .up-m.h{--c:var(--ok)}
+#c02-sbupd .up-m.x{--c:var(--bad);background:rgba(251,113,133,.1)}
+#c02-sbupd .up-m.n{--c:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+#c02-sbupd .up-m.o{--c:#64748b;background:repeating-linear-gradient(135deg,rgba(148,163,184,.12) 0 8px,transparent 8px 16px);color:var(--text3)}
+#c02-sbupd .up-p{font-size:17px;line-height:1.55;color:var(--text2)}
+#c02-sbupd .up-p b{color:var(--text)}
+#c02-sbupd .up-rd{display:flex;align-items:center;gap:30px;margin-top:14px;font-size:18px;color:var(--text2)}
+#c02-sbupd .up-rd b{font:800 26px var(--num);color:var(--acc)}
+#c02-sbupd .up-lg{display:flex;align-items:center;gap:8px}
+#c02-sbupd .up-lg i{display:inline-block;width:14px;height:14px;border-radius:3px;margin-left:12px}
+#c02-sbupd .up-lg .h{background:var(--ok)}#c02-sbupd .up-lg .x{background:var(--bad)}#c02-sbupd .up-lg .n{background:var(--warn)}#c02-sbupd .up-lg .o{background:#64748b}
+</style>
+<script>
+HOOKS['c02-sbupd'] = {
+  build(r, mode) {
+    // 第 r 轮请求时的消息列表（0 起）；每轮新增两条对话消息 + 一条状态
+    const rows = [['h', 'system + tools'], ['h', 'user: 帮我取消套餐']];
+    for (let i = 0; i < r; i++) {
+      const cur = i === r - 1;
+      rows.push([cur && mode === 'a' ? 'x' : 'h', `assistant / tool（第 ${i + 1} 轮）`]);
+      if (mode === 'b') rows.push([cur ? 'h' : 'o', `&lt;status&gt; 第 ${i + 1} 轮的状态`]);
+    }
+    rows.push(['n', `assistant / tool（第 ${r + 1} 轮）`]);
+    rows.push(['n', `&lt;status&gt; 第 ${r + 1} 轮的最新状态`]);
+    if (mode === 'b' && r > 0) rows.forEach((x, i) => { if (x[0] === 'h' && x[1].includes('status') && i < rows.length - 3) x[0] = 'o'; });
+    return rows;
+  },
+  draw(s, r) {
+    s.querySelector('.up-n').textContent = r + 1;
+    ['a', 'b'].forEach((m) => { s.querySelector('.up-tr.' + m).innerHTML = this.build(r, m).map(([c, t]) => `<div class="up-m ${c}">${t}</div>`).join(''); });
+  },
+  enter(s, ctx) { let r = 0; this.draw(s, 0); ctx.every(() => { r = (r + 1) % 4; this.draw(s, r); }, 3000); },
+  reset(s) { this.draw(s, 0); },
+};
+</script>
+
+<section class="slide" id="c02-sbcost" data-part="8" data-trans="zoom" data-dur="15000" data-title="取舍：粗略成本模型" data-notes="取舍需要综合考虑轨迹长度、状态消息大小、两次更新间新增的后缀长度和预计更新次数。<b>状态很小、两次更新间产生的消息很多，且会话长度受控时，选择实现二</b>——保留旧状态通常比反复重算长后缀便宜；<b>状态较大、更新频繁或轨迹很长时，选择实现一</b>——它通常只使上次注入后的短后缀失效，同时避免陈旧状态持续累积。<br>可以用一个粗略模型估算分界点：设每条状态为 S token，两次更新间新增后缀为 R token，预计更新 N 次，缓存输入单价为普通输入的 α 倍。忽略两种方案共有的成本，C 替换 ≈ (N−1)(1−α)R，C 追加 ≈ αSN(N−1)/2。因此，当 αSN/2 &lt; (1−α)R 时倾向实现二，否则倾向实现一。该估算未计上下文占用和陈旧状态带来的歧义，实际选择还应结合服务商的缓存计费与实测命中率。<br>拖动四个滑块，右侧实时计算两种方案的代价（单位：等价于普通输入的 token 数）。不操作时会在几组参数之间切换。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">取舍：一个<em>粗略的成本模型</em></h2></header>
+  <div class="co-body">
+    <div class="co-l panel fx fx-left" style="--d:2">
+      <div class="co-sl"><span>S 每条状态</span><input class="rng" data-k="S" type="range" min="20" max="2000" value="100"><b></b></div>
+      <div class="co-sl"><span>R 两次更新间的新后缀</span><input class="rng" data-k="R" type="range" min="100" max="20000" value="3000"><b></b></div>
+      <div class="co-sl"><span>N 预计更新次数</span><input class="rng" data-k="N" type="range" min="2" max="200" value="20"><b></b></div>
+      <div class="co-sl"><span>α 缓存输入相对单价</span><input class="rng" data-k="A" type="range" min="1" max="50" value="10"><b></b></div>
+      <div class="co-f"><code>C<sub>替换</sub> ≈ (N−1)(1−α)R</code><code>C<sub>追加</sub> ≈ αSN(N−1)/2</code><code>αSN/2 &lt; (1−α)R → 倾向实现二</code></div>
+    </div>
+    <div class="co-r fx fx-right" style="--d:3">
+      <div class="co-b"><span>实现一：每轮替换</span><div class="co-bar"><i class="a"></i></div><b class="co-va"></b></div>
+      <div class="co-b"><span>实现二：持久追加</span><div class="co-bar"><i class="b"></i></div><b class="co-vb"></b></div>
+      <div class="co-pick"></div>
+      <p class="co-n">未计上下文占用和陈旧状态带来的歧义；实际选择还应结合服务商的缓存计费与实测命中率</p>
+    </div>
+  </div>
+  <div class="co-rule fx fx-up" style="--d:5"><div><b>状态很小、两次更新间消息很多、会话长度受控</b><span>→ 实现二：保留旧状态比反复重算长后缀便宜</span></div><div><b>状态较大、更新频繁或轨迹很长</b><span>→ 实现一：只失效短后缀，避免陈旧状态累积</span></div></div>
+  <div class="src">第二章 ·「状态更新的两种实现与缓存代价」· 粗略成本模型</div>
+</section>
+<style>
+#c02-sbcost .co-body{display:grid;grid-template-columns:860px 1fr;gap:26px;height:520px}
+#c02-sbcost .co-l{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c02-sbcost .co-sl{display:grid;grid-template-columns:240px 1fr 110px;gap:14px;align-items:center;font-size:17px;color:var(--text2)}
+#c02-sbcost .co-sl b{font:800 22px var(--num);color:var(--acc);text-align:right}
+#c02-sbcost .co-f{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.04)}
+#c02-sbcost .co-f code{font:18px var(--mono);color:var(--text)}
+#c02-sbcost .co-r{display:flex;flex-direction:column;gap:16px}
+#c02-sbcost .co-b{display:grid;grid-template-columns:1fr;gap:6px;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbcost .co-b span{font-size:18px}
+#c02-sbcost .co-bar{height:26px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+#c02-sbcost .co-bar i{display:block;height:100%;border-radius:8px;transition:width .4s var(--ease)}
+#c02-sbcost .co-bar .a{background:#60a5fa}#c02-sbcost .co-bar .b{background:#a78bfa}
+#c02-sbcost .co-b b{font:800 24px var(--num)}
+#c02-sbcost .co-pick{padding:14px 18px;border-radius:14px;font-size:21px;font-weight:700;text-align:center;border:2px solid var(--ok);color:var(--ok)}
+#c02-sbcost .co-n{margin-top:auto;font-size:15px;line-height:1.5;color:var(--text3)}
+#c02-sbcost .co-rule{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+#c02-sbcost .co-rule>div{padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-sbcost .co-rule b{display:block;font-size:18px;color:var(--acc)}
+#c02-sbcost .co-rule span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c02-sbcost'] = {
+  PRE: [{ S: 100, R: 3000, N: 20, A: 10 }, { S: 1500, R: 400, N: 120, A: 10 }, { S: 300, R: 8000, N: 40, A: 10 }, { S: 800, R: 1500, N: 80, A: 25 }],
+  init(s) {
+    this.rs = {};
+    s.querySelectorAll('.co-sl input').forEach((r) => { this.rs[r.dataset.k] = r; r.addEventListener('input', () => { this.auto = false; this.calc(s); }); });
+  },
+  set(s, p) { for (const k in p) this.rs[k].value = p[k]; this.calc(s); },
+  calc(s) {
+    const S = +this.rs.S.value, R = +this.rs.R.value, N = +this.rs.N.value, a = +this.rs.A.value / 100;
+    for (const k in this.rs) { const r = this.rs[k]; r.style.setProperty('--p', ((r.value - r.min) / (r.max - r.min)) * 100 + '%'); r.parentElement.querySelector('b').textContent = k === 'A' ? a.toFixed(2) : (+r.value).toLocaleString('en-US'); }
+    const ca = (N - 1) * (1 - a) * R, cb = (a * S * N * (N - 1)) / 2, mx = Math.max(ca, cb) || 1;
+    s.querySelector('.co-bar .a').style.width = (ca / mx) * 100 + '%'; s.querySelector('.co-bar .b').style.width = (cb / mx) * 100 + '%';
+    s.querySelector('.co-va').textContent = Math.round(ca).toLocaleString('en-US');
+    s.querySelector('.co-vb').textContent = Math.round(cb).toLocaleString('en-US');
+    s.querySelector('.co-pick').textContent = (a * S * N) / 2 < (1 - a) * R ? '倾向实现二：持久追加' : '倾向实现一：每轮替换';
+  },
+  enter(s, ctx) { this.auto = true; let i = 0; this.set(s, this.PRE[0]); ctx.every(() => { if (this.auto) { i = (i + 1) % this.PRE.length; this.set(s, this.PRE[i]); } }, 3000); },
+  reset(s) { this.set(s, this.PRE[0]); },
+};
+</script>
+
+<section class="slide" id="c02-exp9" data-part="8" data-trans="flip" data-dur="17000" data-title="实验 2-9 ★★：五种状态栏技术" data-notes="<b>实验 2-9 ★★：几种好用的 Agent 状态栏技术。</b>agent-status-bar 实验框架实现了五种状态栏技术，每种都可以独立启用或禁用：<br><b>时间戳跟踪</b>：以 [2025-09-14 10:30:45] 格式作为前缀添加到用户消息和工具响应中（注意：不是放在系统提示词中，否则会破坏 KV Cache）。这使 Agent 能够理解时序关系，也为调试和审计提供了信息；还实现了时间模拟功能，Agent 可以理解“昨天的文件”和“今天的修改”之间的关系。<br><b>工具调用计数器</b>：维护一个全局字典，记录每个工具被调用的次数，并在响应中标注“Tool call #3 for 'read_file'”。显式的计数能触发模型的模式识别能力：第一次失败后检查路径，第二次失败后列出目录，第三次就主动放弃并寻找替代方案。其深层价值在于实现了隐式的成本感知。<br><b>TODO 列表管理</b>：借鉴 Manus 的“通过复述操纵注意力”理念，提供 rewrite_todo_list 和 update_todo_status 两个专门的工具。每个 TODO 项包含唯一标识符、内容、状态（pending/in_progress/completed/cancelled）和时间戳。从认知负荷理论来看，TODO 列表起到了外部记忆的作用。原书报告：启用 TODO 的 Agent 平均 15 次迭代就能完成任务，而禁用时则需要 21 次且经常遗漏子任务。<br><b>详细错误信息</b>：包含四层内容——错误类型和描述、完整参数的 JSON、调用栈信息，以及针对性的修复建议（如遇到 FileNotFoundError 时建议验证路径、检查工作目录、使用绝对路径）。原书报告：启用后，Agent 在错误场景中找到替代方案的成功率从 60% 提升到了 95%。<br><b>系统状态感知</b>：注入当前时间、工作目录、操作系统类型、Shell 环境和 Python 版本等信息。工作目录的跟踪尤其关键——Agent 执行 cd 命令后会自动更新；操作系统信息使 Agent 能做出平台相关的决策（如 Linux 上用 apt、macOS 上用 brew）。<br>点击五个开关，左侧实时拼出这条工具响应上的状态信息（内容为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-9 ★★：<em>五种状态栏技术</em>，各自可开关</h2></header>
+  <div class="x9-body">
+    <div class="x9-msg win fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>一条工具响应（示意）</span></div><div class="x9-out"></div></div>
+    <div class="x9-r fx fx-right" style="--d:3"><div class="x9-tg"></div><div class="x9-c"><b class="x9-ct">—</b><p class="x9-cd">—</p></div></div>
+  </div>
+  <div class="src">第二章 ·「状态更新的两种实现与缓存代价」· 实验 2-9</div>
+</section>
+<style>
+#c02-exp9 .x9-body{display:grid;grid-template-columns:900px 1fr;gap:26px;height:690px}
+#c02-exp9 .x9-out{padding:16px 20px;font:16.5px/1.75 var(--mono);white-space:pre-wrap}
+#c02-exp9 .x9-out .p{color:var(--text)}
+#c02-exp9 .x9-out .t{color:#67e8f9}#c02-exp9 .x9-out .c{color:#fbbf24}#c02-exp9 .x9-out .d{color:#c4b5fd}#c02-exp9 .x9-out .e{color:#fda4af}#c02-exp9 .x9-out .s{color:#6ee7b7}
+#c02-exp9 .x9-out span{animation:fadeIn .4s both;opacity:0}
+#c02-exp9 .x9-r{display:flex;flex-direction:column;gap:12px}
+#c02-exp9 .x9-tg{display:flex;flex-direction:column;gap:8px}
+#c02-exp9 .x9-tg .tgl{justify-content:flex-start;font-size:18px}
+#c02-exp9 .x9-c{flex:1;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-exp9 .x9-c b{font-size:20px;color:var(--acc)}
+#c02-exp9 .x9-c p{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+#c02-exp9 .x9-c code{font:15px var(--mono);color:var(--ctx)}
+</style>
+<script>
+HOOKS['c02-exp9'] = {
+  F: [
+    ['时间戳跟踪', '#67e8f9', 't', '以 <code>[2025-09-14 10:30:45]</code> 前缀加到用户消息和工具响应上——<b>不放进系统提示词</b>，否则破坏 KV Cache；能理解时序，也便于调试审计；支持时间模拟（“昨天的文件”与“今天的修改”）'],
+    ['工具调用计数器', '#fbbf24', 'c', '全局字典记录每个工具的调用次数，标注 <code>Tool call #3 for \'read_file\'</code>：第一次失败查路径、第二次列目录、第三次主动放弃找替代——<b>隐式的成本感知</b>'],
+    ['TODO 列表管理', '#c4b5fd', 'd', '借鉴 Manus“通过复述操纵注意力”：<code>rewrite_todo_list</code>、<code>update_todo_status</code>；每项有 ID、内容、状态（pending / in_progress / completed / cancelled）、时间戳——<b>外部记忆</b>。原书：启用后平均 15 次迭代完成，禁用时 21 次且常遗漏子任务'],
+    ['详细错误信息', '#fda4af', 'e', '四层：错误类型与描述、完整参数 JSON、调用栈、针对性修复建议（FileNotFoundError → 验证路径、检查工作目录、用绝对路径）。原书：找到替代方案的成功率 60% → 95%'],
+    ['系统状态感知', '#6ee7b7', 's', '当前时间、工作目录、操作系统、Shell、Python 版本；<code>cd</code> 后工作目录自动更新；Linux 用 <code>apt</code>、macOS 用 <code>brew</code>'],
+  ],
+  init(s) {
+    s.querySelector('.x9-tg').innerHTML = this.F.map(([n, c], i) => `<button class="tgl" data-i="${i}" style="--tc:${c}"><i></i>${n}</button>`).join('');
+    this.bs = [...s.querySelectorAll('.x9-tg .tgl')];
+    this.on = [0, 0, 0, 0, 0];
+    this.bs.forEach((b, i) => b.addEventListener('click', () => { this.auto = false; this.on[i] = 1 - this.on[i]; this.draw(s, i); }));
+  },
+  draw(s, last) {
+    this.bs.forEach((b, i) => b.classList.toggle('on', !!this.on[i]));
+    const o = this.on, L = [];
+    L.push(`<span class="p">${o[0] ? '<span class="t">[2025-09-14 10:30:45] </span>' : ''}tool_result: read_file("config/app.yaml")</span>`);
+    L.push(`<span class="p">FileNotFoundError: config/app.yaml</span>`);
+    if (o[3]) L.push('<span class="e">  args: {"path": "config/app.yaml"}\n  trace: tools/fs.py:42 in read_file\n  建议: 验证路径 · 检查工作目录 · 使用绝对路径</span>');
+    if (o[1]) L.push(`<span class="c">Tool call #3 for 'read_file'</span>`);
+    if (o[2]) L.push('<span class="d">TODO: [✓] t1 读取配置  [~] t2 修复端口  [ ] t3 重启服务</span>');
+    if (o[4]) L.push('<span class="s">cwd: /srv/app/src · os: Linux · shell: bash · python 3.12</span>');
+    s.querySelector('.x9-out').innerHTML = L.join('\n');
+    if (last != null) { const [n, , , d] = this.F[last]; s.querySelector('.x9-ct').textContent = n; s.querySelector('.x9-cd').innerHTML = d; }
+  },
+  enter(s, ctx) {
+    this.auto = true; this.on = [0, 0, 0, 0, 0]; this.draw(s, 0);
+    let i = 0;
+    ctx.every(() => { if (!this.auto) return; if (i < 5) { this.on[i] = 1; this.draw(s, i); } else { this.on = [0, 0, 0, 0, 0]; this.draw(s, 0); } i = (i + 1) % 7; }, 2000);
+  },
+  reset(s) { this.on = [0, 0, 0, 0, 0]; this.draw(s, 0); },
+};
+</script>
+
+<section class="slide" id="c02-exp9b" data-part="8" data-trans="rise" data-dur="17000" data-title="实验 2-9：协同效应与复跑数据" data-notes="这些技术协同工作会产生涌现效应（即单独使用时效果有限，组合起来却能产生超出预期的效果）。时间戳和工具计数器的结合使 Agent 能够理解操作的频率和时间分布；TODO 列表和系统状态的结合使 Agent 能根据环境调整任务策略；详细错误信息和工具计数器的结合使 Agent 在多次失败后不仅能改变策略，还能理解失败的原因。完全启用这些技术的 Agent 不再是机械执行指令的工具，而更像是一个有自我意识的助手——遇到文件不存在时先检查目录，再列出可用的文件，仍然找不到就在 TODO 中标记 cancelled 并添加替代任务。这种自适应的行为是单独的某一项技术无法实现的。<br>Agent 状态栏技术有一个实用的优点：所有元信息都以人类可读的形式出现在上下文里，开发者随时可以检查 Agent 获得了哪些信息、做了什么决定。更重要的是，它对模型没有侵入性——不需要微调，直接在任何语言模型上都能起效。<br>配套仓库的复跑（目录沿用旧编号 exp2-8-kimi-k3-20260730-v1，真实 Kimi K3，每组 5 对，启用 vs 禁用，按工具动作与文件系统状态客观评分）：时间戳 5/5 vs 3/5；计数器 5/5 vs 5/5；TODO 0/5 vs 1/5；详细错误 4/5 vs 5/5；系统状态 5/5 vs 5/5；全部组合 5/5 vs 3/5。原书历史上的“15 vs 21 次迭代”“60% → 95%”没有被这套更小的测试复现，仓库也没有把它们改标成本次结果。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 2-9：<em>协同效应</em>与复跑数据</h2></header>
+  <div class="x9b-body">
+    <div class="x9b-l fx fx-left" style="--d:2">
+      <span class="lbl">组合起来的涌现效应</span>
+      <div class="x9b-p"><b>时间戳 + 计数器</b><span>理解操作的频率和时间分布</span></div>
+      <div class="x9b-p"><b>TODO + 系统状态</b><span>根据环境调整任务策略</span></div>
+      <div class="x9b-p"><b>详细错误 + 计数器</b><span>多次失败后不仅换策略，还理解失败原因</span></div>
+      <div class="x9b-flow"><span>文件不存在</span><i>→</i><span>先检查目录</span><i>→</i><span>列出可用文件</span><i>→</i><span>TODO 标记 cancelled，添加替代任务</span></div>
+      <div class="x9b-adv"><b>两个实用优点</b><p>人类可读：开发者随时能检查 Agent 看到了什么、做了什么决定 · <b>无侵入</b>：不需要微调，任何语言模型上都能起效</p></div>
+    </div>
+    <div class="x9b-r fx fx-right" style="--d:3">
+      <span class="lbl">配套仓库复跑：Kimi K3 · 每组 5 对 · 启用 vs 禁用</span>
+      <div class="x9b-tb"></div>
+      <div class="x9b-n"><svg class="ic"><use href="#i-alert"/></svg><p>原书的“15 vs 21 次迭代”“60% → 95%”<b>没有被这套更小的测试复现</b>，仓库也没有把它们改标成本次结果</p></div>
+      <div class="x9b-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter2/system-hint（exp2-8-kimi-k3-20260730-v1，目录沿用旧编号）</div>
+    </div>
+  </div>
+  <div class="src">第二章 ·「状态更新的两种实现与缓存代价」· 实验 2-9 · 状态栏的优点</div>
+</section>
+<style>
+#c02-exp9b .x9b-body{display:grid;grid-template-columns:800px 1fr;gap:26px;height:690px}
+#c02-exp9b .x9b-l{display:flex;flex-direction:column;gap:10px}
+#c02-exp9b .x9b-p{display:grid;grid-template-columns:240px 1fr;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c02-exp9b .x9b-p b{font-size:18px;color:var(--acc)}
+#c02-exp9b .x9b-p span{font-size:17px;color:var(--text2)}
+#c02-exp9b .x9b-flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px;border-radius:12px;border:1px dashed var(--ok)}
+#c02-exp9b .x9b-flow span{padding:6px 12px;border-radius:9px;font-size:16px;border:1px solid var(--line2);opacity:.35;transition:all .35s}
+#c02-exp9b .x9b-flow span.on{opacity:1;border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c02-exp9b .x9b-flow i{font-style:normal;color:var(--text3)}
+#c02-exp9b .x9b-adv{margin-top:auto;padding:14px 18px;border-radius:14px;border:1.5px solid var(--acc);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+#c02-exp9b .x9b-adv b{font-size:18px;color:var(--acc)}
+#c02-exp9b .x9b-adv p{margin-top:4px;font-size:16px;line-height:1.55}
+#c02-exp9b .x9b-adv p b{font-size:inherit}
+#c02-exp9b .x9b-r{display:flex;flex-direction:column;gap:12px}
+#c02-exp9b .x9b-tb{display:flex;flex-direction:column;gap:8px}
+#c02-exp9b .x9b-row{display:grid;grid-template-columns:150px 1fr 1fr;gap:12px;align-items:center;font-size:17px}
+#c02-exp9b .x9b-row.h{font-size:15px;color:var(--text3)}
+#c02-exp9b .x9b-row .d{display:flex;gap:4px}
+#c02-exp9b .x9b-row .d i{flex:1;height:22px;border-radius:5px;background:rgba(255,255,255,.08)}
+#c02-exp9b .x9b-row .d i.p{background:var(--ok)}
+#c02-exp9b .x9b-row .d.c i.p{background:#94a3b8}
+#c02-exp9b .x9b-n{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--warn) 50%,transparent);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+#c02-exp9b .x9b-n .ic{flex:none;font-size:22px;color:var(--warn);margin-top:3px}
+#c02-exp9b .x9b-n p{font-size:17px;line-height:1.55}
+#c02-exp9b .x9b-n b{color:var(--warn)}
+#c02-exp9b .x9b-src{margin-top:auto;display:flex;align-items:center;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+#c02-exp9b .x9b-src .ic{flex:none;color:var(--acc)}
+</style>
+<script>
+HOOKS['c02-exp9b'] = {
+  D: [['时间戳', 5, 3], ['工具计数器', 5, 5], ['TODO 列表', 0, 1], ['详细错误', 4, 5], ['系统状态', 5, 5], ['全部组合', 5, 3]],
+  init(s) {
+    const dots = (n, c) => `<div class="d${c ? ' c' : ''}">${[0, 1, 2, 3, 4].map((i) => `<i class="${i < n ? 'p' : ''}"></i>`).join('')}</div>`;
+    s.querySelector('.x9b-tb').innerHTML = '<div class="x9b-row h"><span></span><span>启用（通过数 / 5）</span><span>禁用</span></div>' + this.D.map(([n, a, b]) => `<div class="x9b-row"><span>${n}</span>${dots(a)}${dots(b, 1)}</div>`).join('');
+    this.fs = [...s.querySelectorAll('.x9b-flow span')];
+  },
+  enter(s, ctx) { let i = 0; ctx.every(() => { this.fs.forEach((f, j) => f.classList.toggle('on', j <= i % 5 && i % 5 < 4)); i++; }, 1000); },
+  reset() { this.fs.forEach((f) => f.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c02-sbmaint" data-part="8" data-trans="zoom" data-dur="16000" data-title="状态栏的维护" data-notes="状态栏的维护有两点需要注意：<br>1. <b>状态栏尽量用代码维护，实在要用 LLM，也要逐条抽取、再由代码汇总，绝不要让它一次性批量统计</b>。实验发现：<b>模型几乎无条件地相信状态栏</b>——你写“打了 3 次电话”，它就当真是 3 次，不会自己重算。LLM 做数量统计本来就容易出错。这也意味着前面提过的<b>状态栏投毒</b>风险值得认真对待。<br>2. <b>谨慎删除原始上下文</b>。状态栏是对原始上下文的一次<b>有损投影</b>——它只提前算了“你预想会被问到”的那些维度。如果状态栏够用（计数、状态跟踪这类任务就是如此），可以把原始记录整段删掉，只保留状态栏，节省大量 token；但只要有一个问题涉及状态栏未计算的维度，仅保留状态栏就会导致准确率断崖式下降。<br>Agent 状态栏是<b>上下文压缩</b>（Context Compression）技术之一。下面一节将介绍更多的上下文压缩技术。<br>左侧演示一个计数 bug 如何被模型照单全收；右侧示意删掉原始记录后，问到未计算维度时的断崖（数值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">维护状态栏：<em>模型几乎无条件地相信它</em></h2></header>
+  <div class="mt-body">
+    <div class="mt-c panel fx fx-left" style="--d:2">
+      <div class="mt-h"><b>① 尽量用代码维护</b><button class="tgl mt-bug"><i></i>状态栏计数出了 bug</button></div>
+      <div class="mt-real"><span class="lbl">真实通话记录</span><div><i>第 1 次</i><i>第 2 次</i></div></div>
+      <code class="mt-sb">—</code>
+      <div class="mt-ans">—</div>
+      <p class="mt-p">LLM 做数量统计本来就容易出错：要用 LLM 也只<b>逐条抽取、再由代码汇总</b>，绝不一次性批量统计；<b>状态栏投毒</b>的风险要认真对待</p>
+    </div>
+    <div class="mt-c panel fx fx-right" style="--d:3">
+      <div class="mt-h"><b>② 谨慎删除原始上下文</b><span class="chip warn">示意</span></div>
+      <p class="mt-p">状态栏是一次<b>有损投影</b>：只提前算了“你预想会被问到”的维度</p>
+      <div class="mt-qs"></div>
+    </div>
+  </div>
+  <p class="tagline mt-tag fx fx-up" style="--d:5">Agent 状态栏是<b>上下文压缩</b>技术之一——下一部分介绍更多</p>
+  <div class="src">第二章 ·「状态更新的两种实现与缓存代价」· 状态栏的维护有两点需要注意</div>
+</section>
+<style>
+#c02-sbmaint .mt-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:620px}
+#c02-sbmaint .mt-c{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c02-sbmaint .mt-h{display:flex;align-items:center;justify-content:space-between}
+#c02-sbmaint .mt-h b{font-size:22px;color:var(--acc)}
+#c02-sbmaint .mt-h .chip{font-size:15px;padding:2px 10px}
+#c02-sbmaint .mt-real div{display:flex;gap:10px;margin-top:6px}
+#c02-sbmaint .mt-real i{font-style:normal;padding:8px 14px;border-radius:10px;font-size:17px;border:1px solid var(--line2)}
+#c02-sbmaint .mt-sb{display:block;padding:12px 16px;border-radius:12px;font:17px var(--mono);border:1.5px solid var(--ok);color:#a7f3d0;transition:all .4s}
+#c02-sbmaint .mt-sb.bad{border-color:var(--bad);color:#fecdd3}
+#c02-sbmaint .mt-ans{padding:12px 16px;border-radius:12px;font-size:18px;line-height:1.5;background:rgba(255,255,255,.04)}
+#c02-sbmaint .mt-p{font-size:17px;line-height:1.55;color:var(--text2)}
+#c02-sbmaint .mt-p b{color:var(--text)}
+#c02-sbmaint .mt-c .mt-p:last-child{margin-top:auto}
+#c02-sbmaint .mt-qs{display:flex;flex-direction:column;gap:10px}
+#c02-sbmaint .mt-q{display:grid;grid-template-columns:1fr 200px;gap:12px;align-items:center;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+#c02-sbmaint .mt-q span{font-size:17px}
+#c02-sbmaint .mt-q small{display:block;font-size:15px;color:var(--text3)}
+#c02-sbmaint .mt-q .meter i{transition:width .8s var(--ease)}
+#c02-sbmaint .mt-tag{margin-top:16px;font-size:22px}
+</style>
+<script>
+HOOKS['c02-sbmaint'] = {
+  Q: [['“已经给 Xfinity 打了几次？”', '状态栏算过：计数', 1], ['“TODO 还剩几项？”', '状态栏算过：进度', 1], ['“第二次通话时对方报了什么价？”', '状态栏没算过这个维度', 0], ['“哪次通话等待时间最长？”', '状态栏没算过这个维度', 0]],
+  init(s) {
+    this.bb = s.querySelector('.mt-bug');
+    this.bb.addEventListener('click', () => { this.auto = false; this.bug = !this.bug; this.draw(s); });
+    s.querySelector('.mt-qs').innerHTML = this.Q.map(([q, d]) => `<div class="mt-q"><span>${q}<small>${d}</small></span><div class="meter"><i></i></div></div>`).join('');
+    this.qs = [...s.querySelectorAll('.mt-q')];
+  },
+  draw(s) {
+    this.bb.classList.toggle('on', this.bug);
+    const sb = s.querySelector('.mt-sb'), an = s.querySelector('.mt-ans');
+    sb.textContent = this.bug ? '<agent_status> phone_call: 3/3（已达上限）</agent_status>' : '<agent_status> phone_call: 2/3 </agent_status>';
+    sb.classList.toggle('bad', this.bug);
+    an.innerHTML = this.bug ? '模型：“已经打满 3 次，不能再打了。”——<b style="color:var(--bad)">照单全收，不会自己重算</b>' : '模型：“还可以再打一次。”';
+  },
+  enter(s, ctx) {
+    this.auto = true; this.bug = false; this.draw(s);
+    ctx.every(() => { if (this.auto) { this.bug = !this.bug; this.draw(s); } }, 3200);
+    let del = false;
+    const go = () => { del = !del; this.qs.forEach((q, i) => { const m = q.querySelector('.meter'), ok = this.Q[i][2]; m.style.setProperty('--c', ok || !del ? 'var(--ok)' : 'var(--bad)'); m.querySelector('i').style.width = (ok ? 95 : del ? 15 : 90) + '%'; }); s.querySelector('.mt-c:last-child .mt-h b').textContent = del ? '② 删掉原始记录，只留状态栏' : '② 保留原始记录 + 状态栏'; };
+    go(); ctx.every(go, 3200);
+  },
+  reset(s) { this.bug = false; this.draw(s); },
+};
+</script>

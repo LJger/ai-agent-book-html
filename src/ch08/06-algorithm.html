@@ -1,0 +1,319 @@
+<!-- ================= 第 6 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d6" data-part="6" data-title="PART 06 · RL 算法与在轨训练" data-notes="「RL 算法：从 16 次 rollout 到一次参数更新」。<b>GRPO（Group Relative Policy Optimization）</b>是 DeepSeek 提出的、今天 RL 训练最常用的算法之一。这一部分用一条 SWE-bench 任务把一次参数更新拆成四步（图8-13），估算一个 step 的墙钟时间，对比 PPO、GRPO 与 DPO 的“拿谁来比较”；再讲为什么 LLM RL 通常优先 On-Policy，以及看似 On-Policy 的训练为什么仍会被数值误差拖垮。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:92px">RL 算法与在轨训练</h1>
+  <div class="ch-s fx fx-up" style="--d:3">16 次 rollout → 奖励 → 相对优势 → 一次梯度下降</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">算法决定如何比较轨迹和更新参数；奖励决定“什么算成功”；环境和数据决定模型能经历哪些问题。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<!-- ================= 图8-13 GRPO ================= -->
+<section class="slide" id="c08-grpo" data-part="6" data-steps="3" data-trans="zoom" data-title="图8-13 16 次 rollout 如何产生一次更新" data-notes="可以借助一个例子直观理解 GRPO：假设 SWE-bench 中有一条任务——某个 Python 项目的 parser.py 在输入为空时会触发 IndexError，要求 Agent 修复代码，并且不能修改测试。训练系统会经历四步。<br><b>第一步：让策略模型重复尝试。</b>系统把同一份初始代码、同一条问题描述分别复制到 16 个相互隔离的沙箱中，让模型独立解决 16 次。每一次都包含完整的“阅读代码 → 修改文件 → 运行测试 → 提交结果”，这整条过程就叫一次 <b>rollout</b>。问题和初始环境完全相同，但采样具有随机性，所以 16 次尝试可能走出不同路径：有的正确补上边界检查，有的只捕获异常掩盖问题，有的改错文件，还有的试图修改测试。<br><b>第二步：计算奖励。</b>每条 rollout 结束后，验证器在干净环境中应用补丁并运行测试。假设 4 次通过全部测试且没有修改测试文件，得到奖励 1，另外 12 次得到奖励 0。在这种 coding 任务里，“奖励计算”并不神秘，就是用测试和规则判断这次修复到底对不对；开放式任务没有确定测试时，才需要人类偏好或奖励模型。<br><b>第三步：计算相对优势。</b>奖励只说明单条轨迹成功或失败，<b>相对优势</b>则说明它相对于同组其他尝试有多好。组内平均成功率 4/16：通过的 4 条得到正优势，失败的 12 条得到负优势。<b>若 16 条全部失败或全部成功，就比较不出谁更好，相对优势也会消失。</b>RLVP 的路径信号、过程奖励和部分进展奖励，解决的正是如何在这些组里恢复有意义的差异。<br><b>第四步：用梯度下降更新策略。</b>训练程序把相对优势转成损失，计算梯度，再由优化器（如 AdamW、Muon）执行梯度下降，提高正优势轨迹中模型所做选择的概率、降低负优势轨迹中选择的概率。它不是把某个成功补丁原样背下来，而是在许多任务和 rollout 上逐步调整：“先复现问题、检查边界条件、修改实现并运行测试”会更容易出现，“掩盖异常、改测试、没有验证就提交”会更少出现。<br>可以点击任意 rollout 切换成功 / 失败，观察相对优势如何变化；全败或全胜时优势归零。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-13 同一任务 16 次 rollout，<em>组内比较</em>出优势</h2></header>
+  <div class="c8gr-top fx fx-up" style="--d:2"><div class="c8gr-task"><span class="lbl">同一任务 + 初始代码</span><b>parser.py 空输入触发 IndexError</b><small>不能修改测试文件</small></div><div class="c8gr-st"><span class="on" data-k="0">① 16 个沙箱独立 rollout</span><span data-k="1">② 验证器给奖励</span><span data-k="2">③ 组内比较 → 相对优势</span><span data-k="3">④ 梯度下降更新</span></div></div>
+  <div class="c8gr-grid fx fx-up" style="--d:3"></div>
+  <div class="c8gr-bot fx fx-up" style="--d:4"><div class="c8gr-m"><span>组内平均奖励</span><b class="c8gr-mean">—</b></div><div class="c8gr-m"><span>通过 / 失败</span><b class="c8gr-pf">—</b></div><p class="c8gr-nt"></p></div>
+  <div class="src">第八章 ·「RL 算法：从 16 次 rollout 到一次参数更新」· 图8-13 同一 SWE-bench 任务的 16 次 rollout、验证与相对优势</div>
+</section>
+<style>
+.c8gr-top{display:grid;grid-template-columns:330px 1fr;gap:16px;align-items:center}
+.c8gr-task{display:flex;flex-direction:column;gap:2px;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c8gr-task b{font-size:17px}.c8gr-task small{font-size:15px;color:var(--warn)}
+.c8gr-st{display:flex;gap:8px}
+.c8gr-st span{flex:1;font-size:16px;text-align:center;padding:10px;border-radius:12px;border:1px solid var(--line2);opacity:.45;transition:all .35s}
+.c8gr-st span.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.c8gr-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px;margin-top:16px}
+.c8gr-c{display:flex;flex-direction:column;gap:4px;padding:10px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.75);cursor:pointer;text-align:left;transition:border-color .35s,background .35s}
+.c8gr-c em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.c8gr-c span{font-size:15px;line-height:1.35;color:var(--text2);min-height:40px}
+.c8gr-c b{font:700 16px var(--num);opacity:0;transition:opacity .3s}
+.c8gr-c u{text-decoration:none;font:700 16px var(--num);opacity:0;transition:opacity .3s}
+#c08-grpo.k1 .c8gr-c b,#c08-grpo.k2 .c8gr-c u{opacity:1}
+#c08-grpo.k1 .c8gr-c.ok{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.08)}
+#c08-grpo.k1 .c8gr-c.no{border-color:rgba(251,113,133,.4)}
+.c8gr-c.ok b,.c8gr-c u.p{color:#6ee7b7}.c8gr-c.no b,.c8gr-c u.n{color:#fda4af}
+.c8gr-c i{height:6px;border-radius:3px;background:var(--acc);width:50%;transition:width .8s var(--ease),background .4s}
+#c08-grpo.k3 .c8gr-c.ok i{width:90%;background:#34d399}#c08-grpo.k3 .c8gr-c.no i{width:15%;background:#fb7185}
+.c8gr-bot{display:grid;grid-template-columns:200px 200px 1fr;gap:12px;margin-top:16px;align-items:center}
+.c8gr-m{display:flex;flex-direction:column;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.c8gr-m span{font-size:15px;color:var(--text3)}.c8gr-m b{font:800 26px var(--num)}
+.c8gr-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c08-grpo'] = {
+  P: ['补上边界检查 ✓', '捕获异常掩盖问题', '改错了文件', '试图修改测试'],
+  init(s) {
+    const ok0 = [1, 6, 10, 15];
+    this.R = Array.from({ length: 16 }, (_, i) => (ok0.includes(i) ? 1 : 0));
+    const desc = (i) => (this.R[i] ? this.P[0] : this.P[1 + (i % 3)]);
+    s.querySelector('.c8gr-grid').innerHTML = this.R.map((r, i) => `<button class="c8gr-c" data-i="${i}"><em>#${String(i + 1).padStart(2, '0')}</em><span>${desc(i)}</span><b></b><u></u><i></i></button>`).join('');
+    s.querySelectorAll('.c8gr-c').forEach((b) => b.addEventListener('click', () => { const i = +b.dataset.i; this.R[i] = 1 - this.R[i]; b.querySelector('span').textContent = desc(i); this.upd(s); }));
+    this.upd(s);
+  },
+  upd(s) {
+    const n = this.R.reduce((a, b) => a + b, 0), m = n / 16, sd = Math.sqrt(m * (1 - m));
+    s.querySelectorAll('.c8gr-c').forEach((c, i) => {
+      const r = this.R[i], A = sd > 0 ? (r - m) / sd : 0;
+      c.classList.toggle('ok', !!r); c.classList.toggle('no', !r);
+      c.querySelector('b').textContent = 'R = ' + r;
+      const u = c.querySelector('u'); u.textContent = 'A = ' + (A > 0 ? '+' : '') + A.toFixed(2); u.className = A > 0 ? 'p' : A < 0 ? 'n' : '';
+    });
+    s.querySelector('.c8gr-mean').textContent = `${n}/16 = ${m.toFixed(3)}`;
+    s.querySelector('.c8gr-pf').textContent = `${n} / ${16 - n}`;
+    s.querySelector('.c8gr-nt').innerHTML = n === 0 || n === 16 ? `<b style="color:#fda4af">全部${n ? '成功' : '失败'}：奖励完全一样，相对优势全部为 0，这一组不产生学习信号</b>` : '高于组内平均 → 正优势 → 这些选择的概率上升；低于平均 → 负优势 → 概率下降（优势按组内均值与标准差归一化）';
+  },
+  step(s, ctx, k) { ['k1', 'k2', 'k3'].forEach((c, j) => s.classList.toggle(c, k >= j + 1)); s.querySelectorAll('.c8gr-st span').forEach((x, j) => x.classList.toggle('on', j <= k)); },
+  enter(s, ctx, k) { this.step(s, ctx, k); },
+  reset(s) { s.classList.remove('k1', 'k2', 'k3'); },
+};
+</script>
+
+<!-- ================= step 与墙钟时间 ================= -->
+<section class="slide" id="c08-step" data-part="6" data-trans="rise" data-dur="22000" data-title="一个 step 与墙钟时间" data-notes="这四步合起来构成一次<b>训练迭代</b>，也就是一个 <b>step</b>：第 k 个 step 用当前策略生成一批 rollout，完成奖励、优势和梯度计算，再由优化器更新参数；第 k+1 个 step 随即使用更新后的策略重新 rollout。训练 100 steps，就是把这个闭环重复约 100 轮。具体 RL 训练框架可能把内部的多个 minibatch 更新另行计数，因此看训练日志时仍需确认其 step 定义。<br>做一个粗略的时间估算。复杂 Agent rollout 会生成数十轮工具调用，即使 16 条并行运行，<b>一个 rollout 阶段的墙钟时间也由最慢的那条决定</b>。假设最慢 rollout 用时约 2,000 秒，随后梯度下降和优化器更新用时约 600 秒，那么一个 step 大约需要 2,000 + 600 = 2,600 秒，即约 43 分钟；连续训练 100 steps 就接近 72 小时。<br>配套仓库 ReTool 的真实训练日志是同一现象的例子：第一个 step 的 rollout 阶段耗时 2529 秒，其中最慢的单个响应生成耗时 2492 秒（达到 16384 tokens 的上限），几乎决定了整个 rollout 阶段的总耗时——典型的“木桶效应”；平均每个响应约 7.82 轮交互。<br>左侧甘特图中各条 rollout 的时长为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一个 step 的墙钟时间，<em>由最慢的 rollout 决定</em></h2></header>
+  <div class="c8sp-body">
+    <div class="c8sp-l panel fx fx-left" style="--d:2"><span class="c8-sx">各条时长示意</span><div class="c8sp-g"></div><div class="c8sp-ax"><span>0 s</span><span>1,000 s</span><span>2,000 s</span><span>2,600 s</span></div></div>
+    <div class="c8sp-r fx fx-right" style="--d:3">
+      <div class="c8sp-eq"><div><b>2,000 s</b><span>最慢 rollout</span></div><em>+</em><div><b>600 s</b><span>梯度下降 + 优化器</span></div><em>=</em><div class="t"><b>2,600 s</b><span>≈ 43 分钟 / step</span></div></div>
+      <div class="c8sp-100"><b>100 steps ≈ 72 小时</b><span>训练 100 steps = 把这个闭环重复约 100 轮；看日志时先确认框架的 step 定义</span></div>
+      <div class="c8-card c8sp-rt"><b>配套仓库 ReTool 第一个 step</b><div class="c8sp-n"><div><b>2529 s</b><span>rollout 阶段</span></div><div><b>2492 s</b><span>最慢的单个响应（达到 16384 tokens 上限）</span></div><div><b>7.82</b><span>平均每响应交互轮数</span></div></div><p>最慢那一条几乎决定了整个阶段：<b>木桶效应</b></p></div>
+      <p class="c8-data">chapter8/retool/README.md 的训练日志统计</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「RL 算法：从 16 次 rollout 到一次参数更新」</div>
+</section>
+<style>
+.c8sp-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8sp-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:6px}
+.c8sp-g{flex:1;display:flex;flex-direction:column;justify-content:space-between;margin-top:24px}
+.c8sp-g div{position:relative;height:20px;border-radius:5px;background:rgba(255,255,255,.03)}
+.c8sp-g i{position:absolute;left:0;top:0;bottom:0;border-radius:5px;background:color-mix(in srgb,var(--acc) 55%,transparent);width:0}
+.c8sp-g div.slow i{background:#fb7185}
+.c8sp-g div.up i{left:76.9%;background:#fbbf24}
+.c8sp-g div.up::before{content:"更新";position:absolute;right:calc(23.1% + 8px);top:0;font-size:15px;color:var(--warn);line-height:20px}
+.c8sp-ax{display:flex;justify-content:space-between;font:15px var(--num);color:var(--text3)}
+.c8sp-r{display:flex;flex-direction:column;gap:12px}
+.c8sp-eq{display:flex;align-items:center;gap:8px}
+.c8sp-eq div{flex:1;display:flex;flex-direction:column;padding:12px;border-radius:12px;border:1px solid var(--line)}
+.c8sp-eq div.t{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c8sp-eq b{font:800 26px var(--num)}.c8sp-eq span{font-size:15px;color:var(--text3)}
+.c8sp-eq em{font-style:normal;font-size:26px;color:var(--acc)}
+.c8sp-100{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.03)}
+.c8sp-100 b{font-size:22px}.c8sp-100 span{font-size:15px;color:var(--text2)}
+.c8sp-rt>b{font-size:17px;color:var(--acc)}
+.c8sp-n{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+.c8sp-n div{display:flex;flex-direction:column}.c8sp-n b{font:800 24px var(--num)}.c8sp-n span{font-size:15px;color:var(--text3);line-height:1.35}
+.c8sp-rt p{font-size:15px;color:var(--text2)}.c8sp-rt p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-step'] = {
+  init(s) {
+    const r = U.rand(8);
+    this.T = Array.from({ length: 16 }, (_, i) => (i === 11 ? 2000 : 500 + r() * 1100));
+    s.querySelector('.c8sp-g').innerHTML = this.T.map((t, i) => `<div class="${i === 11 ? 'slow' : ''}"><i></i></div>`).join('') + '<div class="up"><i></i></div>';
+  },
+  enter(s, ctx) {
+    const rows = s.querySelectorAll('.c8sp-g div');
+    rows.forEach((d, i) => { const e = d.querySelector('i'); e.style.transition = 'none'; e.style.width = 0; });
+    requestAnimationFrame(() => rows.forEach((d, i) => { const e = d.querySelector('i'); if (i < 16) { e.style.transition = `width ${(this.T[i] / 2000) * 3}s linear`; e.style.width = (this.T[i] / 2600) * 100 + '%'; } else { e.style.transition = 'width 1s linear 3s'; e.style.width = '23.1%'; } }));
+  },
+  reset(s) { s.querySelectorAll('.c8sp-g i').forEach((e) => { e.style.transition = 'none'; e.style.width = 0; }); },
+};
+</script>
+
+<!-- ================= PPO GRPO DPO ================= -->
+<section class="slide" id="c08-ppo" data-part="6" data-trans="flip" data-dur="24000" data-title="PPO、GRPO 与 DPO：拿谁来比较" data-notes="PPO 与 GRPO 都遵循“rollout → 验证 → 比较 → 更新”的闭环，区别主要在“<b>拿谁来比较</b>”。<b>GRPO</b> 直接比较同一问题的多条 rollout，不需要额外的价值模型；<b>PPO</b> 会训练一个价值模型，估计在轨迹的每一步“通常能做到多好”，再判断当前动作是否比这个预期更好，因此更适合需要细粒度信用分配的长轨迹。两者都会限制单次更新幅度，避免模型因为一小批样本突然改变过多。<b>DPO</b> 则不同：它直接学习事先收集好的“较好回答—较差回答”偏好对，不让当前策略在线生成这组 rollout。<br>在本章案例中，AdaptThink 使用自定义约束目标，GeneralPoints 与 V-IRL 使用带价值模型的 PPO，SimpleVLA-RL 与 RLVP 使用 GRPO，ReTool 使用 PPO。<b>算法决定如何比较轨迹和更新参数；奖励决定“什么算成功”；环境和数据决定模型能经历哪些问题。</b><br>左侧曲线是 PPO 裁剪代理目标 min(ρA, clip(ρ, 1−ε, 1+ε)A) 随概率比 ρ 的变化，按公式实时计算：A &gt; 0 时 ρ 超过 1+ε 后不再增加收益；A &lt; 0 时 ρ 低于 1−ε 后不再增加收益。可以切换优势的正负、拖动 ε。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">区别在于<em>拿谁来比较</em></h2></header>
+  <div class="c8pp-body">
+    <div class="c8pp-l panel fx fx-left" style="--d:2">
+      <div class="c8pp-h"><b class="c8-m">min(<i>ρA</i>, clip(<i>ρ</i>, 1−<i>ε</i>, 1+<i>ε</i>)<i>A</i>)</b><div class="c8pp-seg seg"><i class="knob"></i><button data-v="1">A &gt; 0</button><button data-v="-1">A &lt; 0</button></div></div>
+      <svg class="c8pp-svg" viewBox="0 0 640 330"></svg>
+      <label class="c8pp-e"><span>ε</span><input type="range" class="rng c8pp-er" min="5" max="40" value="20"><b class="c8pp-ev">0.20</b></label>
+      <p class="c8pp-nt">裁剪抑制大步更新，但<b>不是对策略变化的硬约束</b></p>
+    </div>
+    <div class="c8pp-r fx fx-right" style="--d:3">
+      <div class="c8pp-cols">
+        <div><b>GRPO</b><span>同一问题的多条 rollout 互相比较</span><small>不需要价值模型</small></div>
+        <div><b>PPO</b><span>价值模型估计每一步“通常能做到多好”</span><small>细粒度信用分配，适合长轨迹</small></div>
+        <div><b>DPO</b><span>事先收集的“较好—较差”偏好对</span><small>不让当前策略在线 rollout</small></div>
+      </div>
+      <div class="c8-card c8pp-use"><b>本章案例用的算法</b><div><span>AdaptThink<em>自定义约束目标</em></span><span>GeneralPoints · V-IRL<em>带价值模型的 PPO</em></span><span>SimpleVLA-RL · RLVP<em>GRPO</em></span><span>ReTool<em>PPO</em></span></div></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「RL 算法：从 16 次 rollout 到一次参数更新」</div>
+</section>
+<style>
+.c8pp-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8pp-l{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8pp-h{display:flex;justify-content:space-between;align-items:center}.c8pp-h .c8-m{font-size:24px}
+.c8pp-seg button{font-size:15px}
+.c8pp-svg{width:100%;height:330px}
+.c8pp-svg .ax{stroke:var(--line2)}.c8pp-svg text{fill:var(--text3);font-size:15px}
+.c8pp-svg .raw{fill:none;stroke:rgba(255,255,255,.3);stroke-width:2;stroke-dasharray:6 6}
+.c8pp-svg .clip{fill:none;stroke:var(--acc);stroke-width:4}
+.c8pp-svg .band{fill:rgba(251,191,36,.08)}
+.c8pp-e{display:grid;grid-template-columns:30px 1fr 60px;gap:12px;align-items:center;font-size:17px}.c8pp-e b{font:700 18px var(--num)}
+.c8pp-nt{font-size:15px;color:var(--text2)}.c8pp-nt b{color:var(--text)}
+.c8pp-r{display:flex;flex-direction:column;gap:14px}
+.c8pp-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c8pp-cols div{display:flex;flex-direction:column;gap:6px;padding:14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8pp-cols b{font-size:22px;color:var(--acc)}.c8pp-cols span{font-size:15px;line-height:1.5}.c8pp-cols small{font-size:15px;color:var(--text3)}
+.c8pp-use>b{font-size:17px;color:var(--acc)}
+.c8pp-use div{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.c8pp-use span{display:flex;justify-content:space-between;font-size:15px;padding:7px 12px;border-radius:9px;background:rgba(255,255,255,.03)}
+.c8pp-use em{font-style:normal;color:var(--text3)}
+</style>
+<script>
+HOOKS['c08-ppo'] = {
+  init(s) {
+    this.A = 1; this.q = (x) => s.querySelector(x);
+    this.seg = U.seg(s.querySelector('.c8pp-seg'), (v) => { this.manual = true; this.A = +v; this.draw(); });
+    this.q('.c8pp-er').addEventListener('input', () => { this.manual = true; this.draw(); });
+    this.seg('1');
+  },
+  draw() {
+    const svg = this.q('.c8pp-svg'), e = +this.q('.c8pp-er').value / 100, A = this.A, S = C7S;
+    this.q('.c8pp-ev').textContent = e.toFixed(2);
+    svg.innerHTML = '';
+    const X = (r) => 50 + (r / 2) * 570, Y = (v) => 165 - v * 70;
+    S('rect', { x: X(1 - e), y: 10, width: X(1 + e) - X(1 - e), height: 300, class: 'band' }, svg);
+    S('line', { x1: 50, y1: 165, x2: 620, y2: 165, class: 'ax' }, svg); S('line', { x1: X(1), y1: 10, x2: X(1), y2: 310, class: 'ax' }, svg);
+    let raw = '', cl = '';
+    for (let i = 0; i <= 200; i++) { const r = (i / 200) * 2, v = r * A, c = Math.min(r * A, Math.min(Math.max(r, 1 - e), 1 + e) * A); raw += (i ? 'L' : 'M') + X(r) + ' ' + Y(v); cl += (i ? 'L' : 'M') + X(r) + ' ' + Y(c); }
+    S('path', { d: raw, class: 'raw' }, svg); S('path', { d: cl, class: 'clip' }, svg);
+    [[0, '0'], [1, '1'], [2, '2']].forEach(([r, l]) => { const t = S('text', { x: X(r) - 4, y: 328 }, svg); t.textContent = l; });
+    const t1 = S('text', { x: 560, y: 155 }, svg); t1.textContent = 'ρ';
+    const t2 = S('text', { x: X(1 - e) + 4, y: 26 }, svg); t2.textContent = '1−ε … 1+ε';
+  },
+  enter(s, ctx) { this.manual = false; ctx.every(() => { if (this.manual) return; this.A = -this.A; this.seg(String(this.A)); this.draw(); }, 3500); },
+  reset() {},
+};
+</script>
+
+<!-- ================= On-Policy ================= -->
+<section class="slide" id="c08-onpolicy" data-part="6" data-trans="iris" data-dur="24000" data-title="为什么 LLM RL 通常优先 On-Policy" data-notes="先区分两个容易混用的词。<b>Online（在线）</b>只表示数据在训练过程中不断通过与环境交互产生；<b>On-policy（在轨）</b>要求生成 rollout 的行为策略 μ 与当前要优化的策略 π_θ 相同或足够接近。异步集群即使持续在线生成，只要 rollout worker 落后了几个 checkpoint，数据就已经陈旧，训练在统计意义上也已经带有 off-policy（离轨）成分。回放旧轨迹、使用旧模型数据或教师完整生成的数据，则是更明显的 off-policy。本章的 PPO / GRPO 配方通常每个 step 都用最新策略重新生成 rollout，因而以近似 on-policy 为目标；PPO 在同一批数据上做多轮 minibatch 更新时，后几轮已经开始偏离生成数据的 old_policy，这正是它需要概率比与 clipping 的原因。<br>策略梯度要估计当前策略 π_θ 下的期望奖励。如果数据由另一个策略 μ 采样，就要用重要性比率纠正：ρ_t = π_θ(a_t|s_t) / μ(a_t|s_t) = exp(log π_θ − log μ)。真正的新鲜 on-policy rollout 在<b>参数更新之前</b>应满足 π_θ = μ，所以 ρ_t = 1。这使训练集中在“当前模型实际会进入的状态”，也避免为分布错位付出高方差修正。Off-policy 的优点是旧数据可复用、采样与训练可异步，吞吐量更高；代价是<b>策略越陈旧，ρ_t 的分布越重尾</b>。对自回归长序列，严格的前缀或轨迹修正还会连乘许多 token 比率：少量偏差可能累积成极大或极小权重。PPO 的 clipping 能限制离群更新，却不能无损恢复丢失的分布覆盖；裁得太多会丢梯度，不裁又可能被少数样本主导。因此，<b>“On-policy 更好”不是普遍定理</b>，而是在当前 LLM 策略梯度中通常意味着更低的分布偏差和更稳定的优化；稳定大模型 RL 的实证研究也发现，减少策略陈旧度与训练—推理差异是代理目标有效的重要条件。<br>左侧直方图是示意：拖动“策略陈旧度”，看 ρ 的分布从 1 处的尖峰变成重尾。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">策略越陈旧，<em>ρ 的分布越重尾</em></h2></header>
+  <div class="c8op-body">
+    <div class="c8op-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span>
+      <div class="c8op-f"><span class="c8-m"><i>ρ<sub>t</sub></i> = <span class="c8-frac"><span><i>π<sub>θ</sub></i>(<i>a<sub>t</sub></i>|<i>s<sub>t</sub></i>)</span><span><i>μ</i>(<i>a<sub>t</sub></i>|<i>s<sub>t</sub></i>)</span></span> = exp(log <i>π<sub>θ</sub></i> − log <i>μ</i>)</span></div>
+      <canvas class="c8op-cv"></canvas>
+      <label class="c8op-sl"><span>策略陈旧度</span><input type="range" class="rng c8op-r" min="0" max="100" value="0"><b class="c8op-v">新鲜</b></label>
+      <div class="c8op-st"><span>最大 ρ <b class="c8op-mx">—</b></span><span>被裁剪比例（ε = 0.2） <b class="c8op-cl">—</b></span></div>
+    </div>
+    <div class="c8op-r fx fx-right" style="--d:3">
+      <div class="c8op-def"><div><b>Online 在线</b><span>数据在训练过程中不断与环境交互产生</span></div><div><b>On-policy 在轨</b><span>生成 rollout 的 μ 与当前优化的 π<sub style="font-size:14px">θ</sub> 相同或足够接近</span></div></div>
+      <div class="c8op-cases"><span class="g">每个 step 用最新策略重新 rollout · 近似 on-policy</span><span class="y">异步 worker 落后几个 checkpoint · 已带 off-policy 成分</span><span class="y">PPO 同批多轮 minibatch · 后几轮偏离 old_policy</span><span class="r">回放旧轨迹 / 旧模型 / 教师生成 · 明显 off-policy</span></div>
+      <p class="c8op-nt">“On-policy 更好”<b>不是普遍定理</b>：它在当前 LLM 策略梯度中通常意味着更低的分布偏差和更稳定的优化；off-policy 换来的是数据复用与吞吐</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「为什么 LLM RL 通常优先 On-Policy」</div>
+</section>
+<style>
+.c8op-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8op-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8op-f .c8-m{font-size:24px}
+.c8op-sl{display:grid;grid-template-columns:110px 1fr 80px;gap:12px;align-items:center;font-size:16px}.c8op-sl b{font:700 17px var(--num);text-align:right}
+.c8op-st{display:flex;gap:18px;font-size:16px;color:var(--text2)}.c8op-st b{font-family:var(--num);color:var(--text)}
+.c8op-r{display:flex;flex-direction:column;gap:12px}
+.c8op-def{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8op-def div{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.c8op-def b{font-size:18px}.c8op-def span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8op-cases{display:flex;flex-direction:column;gap:6px}
+.c8op-cases span{font-size:15px;padding:9px 12px;border-radius:10px;border-left:4px solid}
+.c8op-cases .g{border-color:#34d399;background:rgba(52,211,153,.07)}.c8op-cases .y{border-color:#fbbf24;background:rgba(251,191,36,.06)}.c8op-cases .r{border-color:#fb7185;background:rgba(251,113,133,.07)}
+.c8op-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8op-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-onpolicy'] = {
+  init(s) {
+    this.g = C8.cv(s.querySelector('.c8op-cv'), 720, 330); this.q = (x) => s.querySelector(x);
+    const r = U.rand(3); this.z = Array.from({ length: 3000 }, () => { let u = 0; for (let k = 0; k < 6; k++) u += r(); return (u - 3) / Math.sqrt(0.5); });
+    this.t = Array.from({ length: 3000 }, () => r());
+    this.q('.c8op-r').addEventListener('input', () => { this.manual = true; this.draw(); });
+  },
+  draw() {
+    const st = +this.q('.c8op-r').value / 100, g = this.g, W = 720, H = 330, bins = 60, mx = 3;
+    // log ρ ~ 正态(0, σ)，陈旧度越大 σ 越大，并混入少量重尾样本（示意）
+    const sig = 0.01 + st * 0.45;
+    const rho = this.z.map((z, i) => Math.exp(z * sig + (this.t[i] < st * 0.05 ? z * 2.2 : 0)));
+    const h = new Array(bins).fill(0); rho.forEach((v) => { const b = Math.floor((v / mx) * bins); if (b < bins) h[b]++; else h[bins - 1]++; });
+    const top = Math.max(...h);
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = 'rgba(251,191,36,.08)'; g.fillRect((0.8 / mx) * W, 0, (0.4 / mx) * W, H - 24);
+    h.forEach((v, i) => { const x = (i / bins) * W, bh = (Math.sqrt(v / top)) * (H - 40); const r = (i + 0.5) / bins * mx; g.fillStyle = r < 0.8 || r > 1.2 ? 'rgba(251,113,133,.75)' : 'rgba(129,140,248,.8)'; g.fillRect(x + 1, H - 24 - bh, W / bins - 2, bh); });
+    g.fillStyle = 'rgba(255,255,255,.55)'; g.font = '15px sans-serif'; [0, 1, 2, 3].forEach((v) => g.fillText(String(v), (v / mx) * W - (v === 3 ? 12 : 0), H - 4)); g.fillText('ρ（柱高取平方根以显示尾部）', W - 230, 18);
+    const clip = rho.filter((v) => v < 0.8 || v > 1.2).length / rho.length;
+    this.q('.c8op-mx').textContent = Math.max(...rho).toFixed(2);
+    this.q('.c8op-cl').textContent = (clip * 100).toFixed(1) + '%';
+    this.q('.c8op-v').textContent = st < 0.02 ? '新鲜' : st < 0.4 ? '略陈旧' : st < 0.75 ? '陈旧' : '很陈旧';
+  },
+  enter(s, ctx) { this.manual = false; const t0 = performance.now(); ctx.raf((n) => { if (!this.manual) this.q('.c8op-r').value = 50 - 50 * Math.cos((n - t0) / 2200); this.draw(); return true; }); },
+  reset() {},
+};
+</script>
+
+<!-- ================= 数值误差 ================= -->
+<section class="slide" id="c08-mismatch" data-part="6" data-trans="zoom" data-dur="26000" data-title="看似 On-Policy，为什么仍会被数值误差拖垮" data-notes="大规模 LLM RL 往往用 vLLM / SGLang 一类推理引擎生成 rollout，再用 FSDP / Megatron 一类训练引擎重算 log probability 和梯度。即使两边加载同一份权重，浮点精度、归约顺序、张量并行方式、批大小、KV cache 与 fused kernel 的差异，也可能让同一 token 的 log probability 略有不同。于是更新前本应为 1 的 ρ_t 已经偏离 1：<b>系统名义上同步了权重，数值上却把 on-policy 训练变成了 off-policy</b>。已有受控实验表明，单独存在的微小 token 级训练—推理差异就可能引发训练崩溃。<br>敏感性来自一个放大链条：<b>log probability 小误差 → 指数化的概率比偏差 → 长前缀上的累积 → clipping / 优势加权改变 → 梯度方向与有效样本数改变</b>。例如，若 4,000 个 token 的 log ratio 都有同方向的 10⁻³ 偏差，轨迹级比率会累积到 e⁴ ≈ 54.6；真实误差未必同号，但这个例子说明长序列为何会把“每个 token 看起来很小”的误差放大。早期 token 的微小概率差还可能改变实际采样出的 token，使后续整条状态轨迹分叉。最终表现不只是“同一提示偶尔生成不同答案”，还可能是重要性比率尖峰、大量 token 被裁剪、梯度或响应长度突变，继而奖励和熵一起坍塌。批大小改变计算归约方式、破坏数值的 batch invariance，也已被直接观察到会把本应 on-policy 的 RL 变成隐式 off-policy。<br>工程上应把它当作核心问题，而不是普通的浮点噪声：① 在<b>任何参数更新之前</b>，用同一批轨迹比较 sampler 与 trainer 的 token log probability，监控 ρ_t 的均值、分位数、最大值、近似 KL 和被裁剪比例——这是最直接的 on-policy 单元测试；② 同步的不只是权重，还包括 LoRA adapter、tokenizer、chat template、模型 revision 和位置编码配置；rollout 应保存生成时的 behavior log probability，不能事后拿当前模型冒充；③ 尽可能对齐采样与训练的精度、并行布局和关键计算内核；若不能做到，就把差异明确视作 off-policy，采用重要性修正并监控有效样本数，而不是假设 PPO clipping 会自动兜底；④ 保持 rollout 新鲜，限制每批数据上的更新轮数和异步 staleness——重用旧数据能换吞吐，但应作为经过测量的偏差—效率取舍。<br>左侧计算器按 exp(T·δ) 实时计算轨迹级比率。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">名义上同步了权重，<em>数值上却变成了 off-policy</em></h2></header>
+  <div class="c8mm-chain fx fx-up" style="--d:2"></div>
+  <div class="c8mm-body">
+    <div class="c8mm-l panel fx fx-left" style="--d:3">
+      <div class="c8mm-src"><div><b>推理引擎</b><span>vLLM / SGLang 生成 rollout</span></div><em>≠</em><div><b>训练引擎</b><span>FSDP / Megatron 重算 log prob</span></div></div>
+      <small class="c8mm-why">浮点精度 · 归约顺序 · 张量并行 · 批大小 · KV cache · fused kernel</small>
+      <label><span>每 token 偏差 δ</span><input type="range" class="rng c8mm-d" min="1" max="30" value="10"><b class="c8mm-dv">1.0 × 10⁻³</b></label>
+      <label><span>序列长度 T</span><input type="range" class="rng c8mm-t" min="100" max="8000" step="100" value="4000"><b class="c8mm-tv">4,000</b></label>
+      <div class="c8mm-out"><span class="c8-m">exp(<i>T</i> · <i>δ</i>) =</span><b class="c8mm-o">54.6</b></div>
+      <p class="c8mm-nt">同号误差的极端例子：原书 4,000 × 10⁻³ → e⁴ ≈ 54.6；真实误差未必同号</p>
+    </div>
+    <div class="c8mm-r fx fx-right" style="--d:4"><b class="c8mm-k">工程做法</b><div class="c8mm-ck"></div></div>
+  </div>
+  <div class="src">第八章 ·「看似 On-Policy，为什么仍会被数值误差拖垮」</div>
+</section>
+<style>
+.c8mm-chain{display:flex;align-items:center;gap:6px}
+.c8mm-chain span{flex:1;font-size:15px;text-align:center;padding:9px 6px;border-radius:10px;border:1px solid var(--line2);transition:all .35s}
+.c8mm-chain span.on{border-color:#fb7185;background:rgba(251,113,133,.12);color:#fda4af}
+.c8mm-chain i{width:16px;height:2px;background:#fb7185}
+.c8mm-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0;margin-top:14px}
+.c8mm-l{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8mm-src{display:grid;grid-template-columns:1fr 30px 1fr;gap:8px;align-items:center}
+.c8mm-src div{display:flex;flex-direction:column;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.c8mm-src b{font-size:17px}.c8mm-src span{font-size:15px;color:var(--text3)}
+.c8mm-src em{font-style:normal;font-size:26px;color:#fb7185;text-align:center}
+.c8mm-why{font-size:15px;color:var(--text3)}
+.c8mm-l label{display:grid;grid-template-columns:130px 1fr 120px;gap:12px;align-items:center;font-size:16px}
+.c8mm-l label b{font:700 17px var(--num);text-align:right}
+.c8mm-out{display:flex;align-items:baseline;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid rgba(251,113,133,.5)}
+.c8mm-out .c8-m{font-size:26px}.c8mm-out b{font:800 44px var(--num);color:#fb7185}
+.c8mm-nt{font-size:15px;color:var(--text3)}
+.c8mm-r{display:flex;flex-direction:column;gap:10px}
+.c8mm-k{font-size:18px;color:var(--acc)}
+.c8mm-ck{display:flex;flex-direction:column;gap:8px}
+.c8mm-ck .chk{padding:12px 14px;border-radius:14px;font-size:15px;line-height:1.5}
+.c8mm-ck .chk b{font-size:16px}
+</style>
+<script>
+HOOKS['c08-mismatch'] = {
+  C: ['log prob 小误差', '指数化的概率比偏差', '长前缀上的累积', 'clipping / 优势加权改变', '梯度方向与有效样本数改变', '奖励与熵一起坍塌'],
+  K: [['更新前先做 on-policy 单元测试', '同一批轨迹比较 sampler 与 trainer 的 token log prob：ρ 的均值、分位数、最大值、近似 KL、被裁剪比例'], ['同步的不只是权重', 'LoRA adapter、tokenizer、chat template、模型 revision、位置编码配置；保存生成时的 behavior log prob'], ['对齐精度、并行布局与关键内核', '做不到就明确当作 off-policy：重要性修正 + 监控有效样本数，别指望 clipping 兜底'], ['保持 rollout 新鲜', '限制每批数据的更新轮数与异步 staleness；重用旧数据是经过测量的偏差—效率取舍']],
+  init(s) {
+    s.querySelector('.c8mm-chain').innerHTML = this.C.map((c) => `<span>${c}</span>`).join('<i></i>');
+    s.querySelector('.c8mm-ck').innerHTML = this.K.map(([a, b]) => `<div class="chk"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>${a}</b><p>${b}</p></div></div>`).join('');
+    s.querySelectorAll('.c8mm-ck .chk').forEach((c) => c.addEventListener('click', () => c.classList.toggle('done')));
+    this.q = (x) => s.querySelector(x);
+    ['.c8mm-d', '.c8mm-t'].forEach((k) => this.q(k).addEventListener('input', () => this.calc()));
+    this.calc();
+  },
+  calc() {
+    const d = +this.q('.c8mm-d').value / 10, T = +this.q('.c8mm-t').value, v = Math.exp(T * d * 1e-3);
+    this.q('.c8mm-dv').textContent = d.toFixed(1) + ' × 10⁻³'; this.q('.c8mm-tv').textContent = T.toLocaleString('en-US');
+    this.q('.c8mm-o').textContent = v > 1e6 ? v.toExponential(1) : v.toFixed(1);
+  },
+  enter(s, ctx) {
+    let k = 0; const cs = s.querySelectorAll('.c8mm-chain span');
+    ctx.every(() => { cs.forEach((c, j) => c.classList.toggle('on', j <= k % (cs.length + 2))); k++; }, 700);
+    s.querySelectorAll('.c8mm-ck .chk').forEach((c, i) => ctx.later(() => c.classList.add('done'), 2000 + i * 900));
+  },
+  reset(s) { s.querySelectorAll('.c8mm-ck .chk').forEach((c) => c.classList.remove('done')); },
+};
+</script>

@@ -1,0 +1,595 @@
+<!-- ================= PART 02 · 整体流程 ================= -->
+<section class="slide chapter" id="c05-d2" data-part="2" data-title="PART 02 · 整体流程" data-notes="Coding Agent 的工作不是一上来就改代码，而是一套有顺序的工程化流程：项目文档化 → 任务理解与需求澄清 → 编写设计文档 → 代码实现与测试 → 文档同步与交付（图5-2）。<br>这套流程体现了软件工程的核心原则：<b>计划先于行动，验证贯穿始终，文档与代码共同演化</b>。需要注意，它是推荐的工程化流程；现实中的 Coding Agent 会按任务复杂度裁剪，不同模型裁剪的方式也不一样——这是本部分最后一页的内容。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">Coding Agent 的<br>整体流程</h1>
+  <div class="ch-s fx fx-up" style="--d:3">文档化 → 澄清 → 设计 → 实现与测试 → 审查与交付</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">计划先于行动，验证贯穿始终，文档与代码共同演化。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c05-fig52" data-part="2" data-dur="40000" data-title="图5-2 Coding Agent 工作流程" data-notes="<b>图5-2</b> 把 Coding Agent 的工作流程画成五个阶段，每个阶段都落到具体的工具调用上：<br>① 项目文档化：read_file 读 README.md、ARCHITECTURE.md，glob 扫 **/*.py、**/*.ts，关键文档缺失时 write_file 生成 CLAUDE.md 项目指南；② 需求理解：ask_user 问“优化目标是延迟还是吞吐？”，grep 搜 latency|throughput，read_file 读 src/config.py 的当前参数；③ 设计文档：write_file 写 design.md（方案对比），ask_user 提交设计、等待审批，人类审查后才继续；④ 编码与测试：edit_file 用 old_str → new_str 修改代码，bash 运行 pytest tests/ -v，测试失败就 edit_file 修复再重跑；⑤ 审查与交付：bash 运行 ruff check src/，read_file 自审可读性、安全、性能，edit_file 更新 ARCHITECTURE.md。<br>图中还有三条闭环反馈：④ 内循环（测试失败 → 修改代码 → 重新测试，原图标注平均 2-3 轮收敛）；⑤ 内循环（Lint 错误 → 即时修复 → 再检查，编辑后自动触发）；⑤ → ④ 回退（审查发现问题回到 ④ 修改，保证交付质量）。贯穿全程的支撑是第二、四章的技术：Agent 状态栏注入 cwd、git branch 和未暂存变更，工具输出做头尾截断，命令在持久化终端会话里执行。<br>终端里逐行回放的是一次“优化系统性能”任务（文件名取自原图，命令输出为示意）；点击上方任一阶段可以从那里重播。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图5-2 工作流程：<em>读 → 改 → 测 → 修</em>，直到真正完成</h2></div>
+    <div class="p2b-ctl fx fx-up" style="--d:2"><span class="c5-tag demo">命令输出为示意</span><button class="btn p2b-re"><svg class="ic"><use href="#i-refresh"/></svg>重播</button></div></header>
+  <div class="p2b-pipe fx fx-up" style="--d:2"></div>
+  <div class="p2b-body">
+    <div class="p2b-run win fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>coding-agent · ~/repo · 任务：优化系统性能</span></div><div class="c5-term p2b-term"></div></div>
+    <div class="p2b-side fx fx-right" style="--d:4">
+      <div class="p2b-box"><span class="lbl">闭环反馈机制</span>
+        <div class="p2b-lp" data-l="l4"><b>④ 内循环</b><span>测试失败 → 修改代码 → 重新测试</span><small>原图：平均 2-3 轮收敛 · 本次第 <em class="p2b-c4">0</em> 轮</small></div>
+        <div class="p2b-lp" data-l="l5"><b>⑤ 内循环</b><span>Lint 错误 → 即时修复 → 再检查</span><small>编辑后自动触发</small></div>
+        <div class="p2b-lp" data-l="back"><b>⑤ → ④ 回退</b><span>审查发现问题 → 回到 ④ 修改</span><small>保证交付质量</small></div>
+      </div>
+      <div class="p2b-box"><span class="lbl">贯穿全程的支撑</span>
+        <div class="p2b-hs"><span data-h="bar1">Agent 状态栏：cwd, git branch</span><span data-h="bar2">Agent 状态栏：未暂存变更</span><span data-h="trunc">工具输出：头尾截断</span><span data-h="shell">持久化终端会话</span></div>
+      </div>
+    </div>
+  </div>
+  <p class="p2b-tg fx fx-up" style="--d:6">计划先于行动 · 验证贯穿始终 · 文档与代码共同演化</p>
+  <div class="src">第五章 ·「Coding Agent 的整体流程」· 图5-2</div>
+</section>
+<style>
+#c05-fig52 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.p2b-ctl{display:flex;align-items:center;gap:12px}
+.p2b-pipe{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
+.p2b-st{position:relative;display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.78);transition:all .4s var(--ease)}
+.p2b-st em{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font:800 16px var(--num);font-style:normal;border:2px solid var(--line2);color:var(--text2);transition:all .4s}
+.p2b-st b{display:block;font-size:19px}
+.p2b-st small{display:block;font-size:15px;color:var(--text3);font-family:var(--mono)}
+.p2b-st:not(:last-child)::after{content:"";position:absolute;right:-12px;top:50%;width:10px;height:2px;background:var(--line2)}
+.p2b-st.done em{border-color:var(--acc);color:var(--acc)}
+.p2b-st.cur{border-color:color-mix(in srgb,var(--acc) 70%,transparent);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.85));box-shadow:0 0 24px color-mix(in srgb,var(--acc) 30%,transparent)}
+.p2b-st.cur em{background:var(--acc);border-color:var(--acc);color:#06101f}
+.p2b-body{display:grid;grid-template-columns:1fr 520px;gap:22px;height:486px}
+.p2b-run{display:flex;flex-direction:column;min-height:0}
+.p2b-term{flex:1;min-height:0;font-size:16px;line-height:1.58}
+.p2b-side{display:flex;flex-direction:column;gap:14px;min-height:0}
+.p2b-box{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:9px}
+.p2b-lp{display:grid;grid-template-columns:120px 1fr;column-gap:12px;row-gap:2px;padding:9px 12px;border-radius:12px;border:1px solid var(--line);transition:all .4s}
+.p2b-lp b{grid-row:1/3;font-size:18px;color:var(--text2);align-self:center}
+.p2b-lp span{font-size:16px}
+.p2b-lp small{font-size:15px;color:var(--text3)}
+.p2b-lp em{font-style:normal;font-weight:800;color:var(--acc);font-family:var(--num)}
+.p2b-lp.on{border-color:color-mix(in srgb,var(--acc) 65%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.p2b-lp.on b{color:var(--acc)}
+.p2b-hs{display:flex;flex-wrap:wrap;gap:8px}
+.p2b-hs span{padding:6px 12px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid color-mix(in srgb,var(--har) 40%,transparent);background:color-mix(in srgb,var(--har) 7%,transparent);transition:all .4s}
+.p2b-hs span.on{color:#fff;border-color:var(--har);background:color-mix(in srgb,var(--har) 24%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--har) 45%,transparent)}
+.p2b-tg{margin-top:16px;text-align:center;font-size:21px;letter-spacing:.12em;color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-fig52'] = {
+  // 五个阶段：名称、原图里的代表性工具；lines 为回放的终端行（a = 点亮的标注，l = 点亮的闭环）
+  S: [
+    { n: '项目文档化', t: 'read · glob · write', lines: [
+      { c: 'sys', t: '[状态栏] cwd: ~/repo · git branch: feat/perf · 未暂存变更: 无', a: 'bar1' },
+      { c: 'cmd', t: 'cd ~/repo && source .venv/bin/activate', a: 'shell' },
+      { c: 'call', t: 'read_file("README.md")' }, { c: 'res', t: '# perf-service：订单查询服务（48 行）' },
+      { c: 'call', t: 'read_file("ARCHITECTURE.md")' }, { c: 'err', t: '文件不存在' },
+      { c: 'call', t: 'glob("**/*.py, **/*.ts")' }, { c: 'res', t: 'src/api.py  src/config.py  src/cache.py … 共 37 个文件' },
+      { c: 'ag', t: '关键文档缺失：先读代码，生成项目指南，再动手。' },
+      { c: 'call', t: 'write_file("CLAUDE.md")' }, { c: 'res', t: '已写入：架构概览 · 目录结构 · 测试运行指南' },
+    ] },
+    { n: '需求理解', t: 'ask_user · grep · read', lines: [
+      { c: 'ag', t: '“优化系统性能”不够具体：降低延迟、减少内存，还是提高吞吐？' },
+      { c: 'call', t: 'ask_user("优化目标是延迟还是吞吐？")' }, { c: 'res', t: '用户：降低接口延迟，接口签名不能改' },
+      { c: 'call', t: 'grep("latency|throughput", "src/")' }, { c: 'res', t: 'src/api.py:88   src/cache.py:12' },
+      { c: 'call', t: 'read_file("src/config.py")' }, { c: 'res', t: 'CACHE_TTL = 0      # 当前参数：缓存未启用' },
+    ] },
+    { n: '设计文档', t: 'write · ask_user', lines: [
+      { c: 'call', t: 'write_file("design.md")' }, { c: 'res', t: '方案对比：A 读缓存 / B 批量查询 → 推荐 A，无新依赖' },
+      { c: 'call', t: 'ask_user("设计已提交，请审批")' }, { c: 'dim', t: '—— 人类审查设计文档 ——' }, { c: 'ok', t: '已批准，继续实现' },
+    ] },
+    { n: '编码与测试', t: 'edit · bash', lines: [
+      { c: 'call', t: 'edit_file("src/cache.py", old_str → new_str)' }, { c: 'res', t: '已修改 1 处' },
+      { c: 'cmd', t: 'pytest tests/ -v', l: 'l4', n4: 1 },
+      { c: 'dim', t: '… 输出 1,204 行，保留前 20 行与后 20 行；完整输出见 /tmp/pytest.log', a: 'trunc' },
+      { c: 'err', t: 'FAILED tests/test_cache.py::test_ttl_expiry   2 failed, 41 passed' },
+      { c: 'ag', t: '失败原因：TTL 的单位是秒，我按毫秒写了。修复后重跑。' },
+      { c: 'call', t: 'edit_file("src/cache.py", old_str → new_str)' }, { c: 'res', t: '已修复' },
+      { c: 'cmd', t: 'pytest tests/ -v', l: 'l4', n4: 2 }, { c: 'ok', t: '43 passed' },
+    ] },
+    { n: '审查与交付', t: 'ruff · 自审 · 更新文档', lines: [
+      { c: 'cmd', t: 'ruff check src/', l: 'l5' }, { c: 'err', t: "src/cache.py:3  F401 'time' imported but unused" },
+      { c: 'call', t: 'edit_file("src/cache.py")', l: 'l5' }, { c: 'cmd', t: 'ruff check src/' }, { c: 'ok', t: 'All checks passed!' },
+      { c: 'call', t: 'read_file("src/cache.py")' }, { c: 'ag', t: '自审：缓存失效时缺少并发保护 → 回到 ④ 修改', l: 'back' },
+      { c: 'call', t: 'edit_file("src/cache.py")', l: 'back' }, { c: 'cmd', t: 'pytest tests/ -v' }, { c: 'ok', t: '44 passed' },
+      { c: 'call', t: 'edit_file("ARCHITECTURE.md")' }, { c: 'res', t: '已同步：新增缓存层说明' },
+      { c: 'sys', t: '[状态栏] 未暂存变更: src/cache.py · tests/test_cache.py · CLAUDE.md · ARCHITECTURE.md', a: 'bar2' },
+      { c: 'say', t: '完成：接口延迟优化已实现，测试全部通过，文档已同步。' },
+    ] },
+  ],
+  init(s) {
+    s.querySelector('.p2b-pipe').innerHTML = this.S.map((st, i) => `<button class="p2b-st" data-i="${i}"><em>${i + 1}</em><div><b>${st.n}</b><small>${st.t}</small></div></button>`).join('');
+    this.T = C5.term(s.querySelector('.p2b-term'), { max: 17 });
+    s.querySelector('.p2b-pipe').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) this.run(s, +b.dataset.i); });
+    s.querySelector('.p2b-re').addEventListener('click', () => this.run(s, 0));
+  },
+  mark(s, i) { s.querySelectorAll('.p2b-st').forEach((b, j) => { b.classList.toggle('cur', j === i); b.classList.toggle('done', j < i); }); },
+  clearMarks(s) {
+    s.querySelectorAll('.p2b-lp,.p2b-hs span').forEach((e) => e.classList.remove('on'));
+    s.querySelector('.p2b-c4').textContent = '0';
+  },
+  async run(s, from) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    this.T.clear();
+    this.clearMarks(s);
+    for (let i = from; i < this.S.length; i++) {
+      this.mark(s, i);
+      const lines = this.S[i].lines.map((L) => ({ ...L, w: L.c === 'cmd' ? 500 : L.c === 'ag' ? 650 : 330, fn: () => {
+        if (L.a) s.querySelector(`.p2b-hs [data-h="${L.a}"]`).classList.add('on');
+        if (L.l) { s.querySelectorAll('.p2b-lp').forEach((e) => e.classList.toggle('on', e.dataset.l === L.l)); }
+        if (L.n4) s.querySelector('.p2b-c4').textContent = L.n4;
+      } }));
+      if (!(await C5.play(this.T, lines, ctx, ok, { speed: 22 }))) return;
+      await U.wait(ctx, 900);
+      if (!ok()) return;
+    }
+    this.mark(s, this.S.length);
+    await U.wait(ctx, 4200);
+    if (ok()) this.run(s, 0);
+  },
+  enter(s, ctx) { this.ctx = ctx; ctx.later(() => this.run(s, 0), 800); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.T.clear(); this.clearMarks(s); this.mark(s, -1); },
+};
+</script>
+
+<section class="slide" id="c05-docs" data-part="2" data-steps="1" data-trans="zoom" data-dur="16000" data-title="项目文档化与项目指令文件" data-notes="<b>项目文档化。</b>Coding Agent 的工作始于对项目的系统性理解。首次接触一个代码仓库时，首要任务不是马上动手改代码，而是先建立对整个项目的认知框架——就像一位新入职的工程师，第一天不会直接提交代码。Agent 会首先检查项目是否存在文档；如果关键文档缺失，就不应在盲目状态下开始工作，而应主动承担文档化的责任：系统性地阅读代码库，识别主要模块、核心抽象、组件间依赖关系，生成包含架构概览、目录结构、测试运行指南的初始文档。这体现了一个关键原则：知识的显式化是高效协作的前提。<br>项目文档化如今有了一种 Agent 专用的形态：<b>项目指令文件</b>。CLAUDE.md、AGENTS.md、.cursorrules 等文件已成为业界事实标准——在每次会话开始时被自动注入上下文，相当于项目级的系统提示词。与面向人类读者的 README 不同，指令文件承载的是面向 Agent 的行为约定：构建与测试命令（“用 pnpm test 而不是 npm test”）、代码风格（“禁用 any 类型”）、明确的禁区（“不要改动 migrations/ 目录”）。这与 OpenClaw 的 SOUL.md（定义 Agent 的身份与行为规则）、MEMORY.md（沉淀跨会话经验）是同一思路在不同层面的应用：SOUL.md 约定“Agent 是谁”，项目指令文件约定“在这个项目里该怎么干活”。从上下文工程的角度看，指令文件还是最经济的稳定前缀——内容不随任务变化，天然对 KV Cache 友好；它也是“知识必须存在于代码库本身”原则最直接的落地。<br>按 → 看第二步：这正是第二章“对远程工作友好的团队往往也对 AI Agent 友好”在代码库层面的落点——决策记录在文档里，上下文写在 issue 和 PR 描述里，内部经验沉淀在开发者指南里，Agent 才读得到。由此得到一个评估团队“AI-ready”程度的简单指标：<b>一个远程新人只靠代码仓库和文档，能不能独立开展工作。</b>">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">项目文档化：<em>指令文件</em>是项目级的系统提示词</h2>
+  <p class="lead fx fx-up" style="--d:2">知识的显式化是高效协作的前提——Agent 看得到的知识，才算存在</p></header>
+  <div class="p2c-wrap">
+    <div class="p2c-a">
+      <div class="p2c-ctx panel fx fx-left" style="--d:3">
+        <div class="p2c-ch"><b>每次会话的上下文</b><span class="p2c-turn">第 <em>1</em> 次会话</span></div>
+        <div class="mr p2c-m" data-r="system"><span class="rl">system</span><span class="tx">系统提示词</span></div>
+        <div class="mr p2c-m p2c-ins" data-r="system"><span class="rl">CLAUDE.md</span><span class="tx">项目指令文件 · 自动注入</span></div>
+        <div class="mr p2c-m" data-r="tools"><span class="rl">tools</span><span class="tx">工具定义</span></div>
+        <div class="p2c-cache"><svg class="ic"><use href="#i-zap"/></svg>稳定前缀：内容不随任务变化 → KV Cache 命中</div>
+        <div class="p2c-msgs"></div>
+      </div>
+      <div class="p2c-cmp fx fx-right" style="--d:4">
+        <div class="p2c-card"><b>README</b><small>面向人类读者</small><p>项目介绍 · 安装 · 使用方式</p></div>
+        <div class="p2c-card hi"><b>CLAUDE.md · AGENTS.md · .cursorrules</b><small>面向 Agent 的行为约定 · 业界事实标准</small>
+          <ul><li data-r="0"><i>构建与测试命令</i>用 pnpm test 而不是 npm test</li><li data-r="1"><i>代码风格</i>禁用 any 类型</li><li data-r="2"><i>明确的禁区</i>不要改动 migrations/ 目录</li></ul></div>
+        <div class="p2c-row"><div class="p2c-card sm"><b>SOUL.md</b><small>约定“Agent 是谁”</small></div><div class="p2c-card sm"><b>MEMORY.md</b><small>沉淀跨会话经验</small></div><div class="p2c-card sm hi2"><b>项目指令文件</b><small>约定“在这个项目里该怎么干活”</small></div></div>
+        <div class="p2c-mini win"><div class="win-bar"><i></i><i></i><i></i><span>按指令文件干活</span><span class="c5-tag demo">示意</span></div><div class="c5-term p2c-term"></div></div>
+      </div>
+    </div>
+    <div class="p2c-b">
+      <div class="p2c-q fx fx-up"><span class="lbl">AI-ready 指标</span><b>一个远程新人只靠代码仓库和文档，能不能独立开展工作？</b></div>
+      <div class="p2c-chk"></div>
+      <div class="p2c-who"><div class="p2c-av"><svg class="ic"><use href="#i-user"/></svg></div><p class="p2c-say"></p></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的整体流程」·「项目文档化。」</div>
+</section>
+<style>
+.p2c-wrap{position:relative;flex:1;min-height:0}
+.p2c-a,.p2c-b{position:absolute;inset:0;transition:opacity .6s var(--ease),translate .6s var(--ease)}
+.p2c-a{display:grid;grid-template-columns:620px 1fr;gap:26px}
+.p2c-b{opacity:0;pointer-events:none;translate:0 24px;display:flex;flex-direction:column;align-items:center;gap:20px;padding-top:10px}
+#c05-docs[data-k="1"] .p2c-a{opacity:0;pointer-events:none;translate:0 -24px}
+#c05-docs[data-k="1"] .p2c-b{opacity:1;pointer-events:auto;translate:0 0}
+.p2c-ctx{padding:18px 20px;display:flex;flex-direction:column;gap:8px}
+.p2c-ch{display:flex;align-items:baseline;justify-content:space-between}
+.p2c-ch b{font-size:21px}
+.p2c-turn{font-size:16px;color:var(--text3)}
+.p2c-turn em{font-style:normal;font:800 20px var(--num);color:var(--acc)}
+.p2c-ins{border-style:dashed}
+.p2c-ins.on{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 40%,transparent)}
+.p2c-cache{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;font-size:16px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent);opacity:.4;transition:opacity .4s}
+.p2c-cache.on{opacity:1}
+.p2c-msgs{display:flex;flex-direction:column;gap:6px}
+.p2c-msgs .mr{font-size:16px;padding:7px 14px}
+.p2c-cmp{display:flex;flex-direction:column;gap:10px;min-width:0}
+.p2c-card{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.p2c-card b{font-size:19px}
+.p2c-card small{margin-left:10px;font-size:15px;color:var(--text3)}
+.p2c-card p{font-size:16px;color:var(--text2);margin-top:4px}
+.p2c-card.hi{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.8))}
+.p2c-card ul{display:flex;flex-direction:column;gap:5px;margin-top:8px}
+.p2c-card li{font-size:16px;padding:4px 10px;border-radius:9px;transition:all .4s}
+.p2c-card li i{font-style:normal;display:inline-block;min-width:140px;color:var(--acc)}
+.p2c-card li.on{background:color-mix(in srgb,var(--acc) 18%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+.p2c-row{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px}
+.p2c-card.sm{padding:10px 12px}
+.p2c-card.sm b{display:block;font-size:17px;font-family:var(--mono)}
+.p2c-card.sm small{display:block;margin:2px 0 0;font-size:15px}
+.p2c-card.hi2{border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.p2c-card.hi2 b{font-family:var(--font)}
+.p2c-mini{flex:1;min-height:0;display:flex;flex-direction:column}
+.p2c-mini .win-bar span:nth-child(4){flex:1}
+.p2c-term{flex:1;min-height:0;font-size:16px;padding:8px 14px}
+.p2c-q{text-align:center;display:flex;flex-direction:column;gap:8px}
+.p2c-q b{font-size:34px;line-height:1.4}
+.p2c-chk{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;width:1500px}
+.p2c-chk .chk{min-height:120px}
+.p2c-chk .chk b{font-size:20px}
+.p2c-chk .chk p{font-size:16px;color:var(--text2);margin-top:4px;line-height:1.5}
+.p2c-who{display:flex;align-items:center;gap:18px;padding:14px 26px;border-radius:999px;border:1px solid var(--line2);background:rgba(12,18,40,.8)}
+.p2c-av{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;font-size:30px;color:var(--acc);border:2px solid var(--acc);transition:all .5s}
+.p2c-who.bad .p2c-av{color:var(--bad);border-color:var(--bad)}
+.p2c-say{font-size:21px;min-width:640px}
+</style>
+<script>
+HOOKS['c05-docs'] = {
+  CK: [
+    ['决策记录在文档里', '为什么这样设计、放弃了什么方案'],
+    ['上下文写在 issue 和 PR 描述里', '改动的来龙去脉随代码一起留存'],
+    ['内部经验沉淀在开发者指南里', '踩过的坑写下来，而不是留在口头'],
+  ],
+  init(s) {
+    this.T = C5.term(s.querySelector('.p2c-term'), { max: 6 });
+    const box = s.querySelector('.p2c-chk');
+    box.innerHTML = this.CK.map(([b, p], i) => `<div class="chk" data-i="${i}"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>${b}</b><p>${p}</p></div></div>`).join('');
+    box.addEventListener('click', (e) => { const c = e.target.closest('.chk'); if (!c) return; this.auto = false; c.classList.toggle('done'); this.judge(s); });
+  },
+  judge(s) {
+    const n = s.querySelectorAll('.p2c-chk .chk.done').length, who = s.querySelector('.p2c-who');
+    who.classList.toggle('bad', n < 3);
+    s.querySelector('.p2c-say').textContent = n === 3 ? '远程新人：只靠仓库和文档就能独立开工 —— Agent 同样读得到' : n === 0 ? '远程新人：只能去问旁边的同事 —— Agent 读不到口头约定' : `还差 ${3 - n} 项：有些知识仍只在口头和白板上`;
+  },
+  // 第一步：会话一次次开始，指令文件作为稳定前缀注入；终端演示按约定改用 pnpm test
+  async a(s) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    const ins = s.querySelector('.p2c-ins'), cache = s.querySelector('.p2c-cache'), msgs = s.querySelector('.p2c-msgs'), turn = s.querySelector('.p2c-turn em');
+    for (let n = 1; ok(); n++) {
+      turn.textContent = n;
+      msgs.innerHTML = '';
+      ins.classList.add('on');
+      cache.classList.toggle('on', n > 1);
+      this.T.clear();
+      s.querySelectorAll('.p2c-card li').forEach((l) => l.classList.remove('on'));
+      msgs.insertAdjacentHTML('beforeend', '<div class="mr new" data-r="user"><span class="rl">user</span><span class="tx">跑一下测试，再修掉失败的用例</span></div>');
+      const li = (i) => () => s.querySelector(`.p2c-card li[data-r="${i}"]`).classList.add('on');
+      const done = await C5.play(this.T, [
+        { c: 'ag', t: '准备运行测试：npm test …', w: 700 },
+        { c: 'sys', t: 'CLAUDE.md：用 pnpm test 而不是 npm test', w: 700, fn: li(0) },
+        { c: 'cmd', t: 'pnpm test', w: 500 },
+        { c: 'ag', t: '修复类型错误：不能用 any（CLAUDE.md）', w: 600, fn: li(1) },
+        { c: 'ok', t: '已修复；migrations/ 目录未改动', w: 400, fn: li(2) },
+      ], ctx, ok);
+      if (!done) return;
+      msgs.insertAdjacentHTML('beforeend', '<div class="mr new" data-r="assistant"><span class="rl">assistant</span><span class="tx">测试已通过</span></div>');
+      await U.wait(ctx, 2600);
+    }
+  },
+  // 第二步：清单依次勾选，新人从“问同事”变成“独立开工”
+  b(s) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1);
+    const cks = [...s.querySelectorAll('.p2c-chk .chk')];
+    cks.forEach((c) => c.classList.remove('done'));
+    this.judge(s);
+    cks.forEach((c, i) => ctx.later(() => { if (tk === this.tk && this.auto) { c.classList.add('done'); this.judge(s); } }, 1200 + i * 1300));
+  },
+  apply(s, k) { s.dataset.k = k; this.auto = true; if (k >= 1) this.b(s); else this.a(s); },
+  enter(s, ctx, k) { this.ctx = ctx; ctx.later(() => this.apply(s, k), 600); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.k = 0;
+    this.T.clear();
+    s.querySelector('.p2c-msgs').innerHTML = '';
+    s.querySelectorAll('.p2c-chk .chk').forEach((c) => c.classList.remove('done'));
+    s.querySelectorAll('.p2c-ins,.p2c-cache,.p2c-card li').forEach((e) => e.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-clarify" data-part="2" data-trans="flip" data-dur="17000" data-title="任务理解与需求澄清 · 编写设计文档" data-notes="<b>任务理解与需求澄清。</b>对于边界清晰、影响范围有限的简单需求——例如修正一个已知的 bug、调整某个函数的参数——Agent 可直接进入实现阶段。然而软件开发中的大多数任务并非如此简单。对于复杂需求，Agent 必须更加谨慎和有条理。复杂性可能源于多个维度：需求本身的模糊性（用户知道想要什么但无法精确表达）、实现路径的多样性（多种技术方案可选，各有权衡）、或影响范围的广泛性（需修改多个模块，可能破坏现有功能）。Agent 应通过探索性调研来澄清边界，必要时主动与用户对话。例如用户要求“优化系统性能”时，Agent 需要先搞清楚：优化的具体目标是什么（降低响应时间、减少内存占用还是提高吞吐量）、可接受的权衡是什么（是否允许修改接口、是否允许降低用户易用性）、以及当前瓶颈在哪里。在需求模糊的状态下就开始编码，往往导致大量返工。<br><b>编写设计文档。</b>设计文档是将抽象需求转化为具体实现计划的桥梁，应回答：修改哪些模块及原因，采用什么方案及其相对优势，需引入哪些新依赖，预期对系统的影响。编写设计文档本身迫使 Agent 深度思考，在投入大量编码前先在概念层面验证方案可行性。更重要的是，设计文档为人类提供了高效的介入点——审查简洁的设计文档比审查数百行代码容易得多。Agent 完成设计文档后应提交给用户审查，等待批准后再继续。<br>左侧任务卡会自动分流（复杂度判断为示意）；右侧以“优化系统性能”为例走完澄清与设计。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先弄清要做什么，<em>再写下打算怎么做</em></h2>
+  <p class="lead fx fx-up" style="--d:2">在需求模糊的状态下就开始编码，往往导致大量返工</p></header>
+  <div class="p2d-body">
+    <div class="p2d-tri panel fx fx-left" style="--d:3">
+      <div class="p2d-th"><b>任务分流</b><span class="c5-tag demo">示意</span></div>
+      <div class="p2d-in"><span class="p2d-task"></span></div>
+      <div class="p2d-dims"><span data-d="0">需求本身的模糊性</span><span data-d="1">实现路径的多样性</span><span data-d="2">影响范围的广泛性</span></div>
+      <div class="p2d-lanes">
+        <div class="p2d-lane" data-l="0"><b>边界清晰 · 影响有限</b><span>直接进入实现</span><div class="p2d-q"></div></div>
+        <div class="p2d-lane" data-l="1"><b>复杂需求</b><span>探索性调研 + 澄清 → 设计文档 → 审批</span><div class="p2d-q"></div></div>
+      </div>
+    </div>
+    <div class="p2d-flow fx fx-right" style="--d:4">
+      <div class="p2d-ask"><svg class="ic"><use href="#i-user"/></svg><b>“优化系统性能”</b></div>
+      <div class="p2d-qs">
+        <div class="p2d-qq" data-q="0"><em>目标</em>降低响应时间、减少内存占用，还是提高吞吐量？</div>
+        <div class="p2d-qq" data-q="1"><em>权衡</em>是否允许修改接口？是否允许降低用户易用性？</div>
+        <div class="p2d-qq" data-q="2"><em>瓶颈</em>当前瓶颈在哪里？</div>
+      </div>
+      <div class="p2d-doc">
+        <div class="p2d-dh"><svg class="ic"><use href="#i-file"/></svg><b>design.md</b><span class="stamp p2d-stp">等待批准 → 已批准</span></div>
+        <div class="p2d-dl" data-r="0"><i>修改哪些模块及原因</i><span></span></div>
+        <div class="p2d-dl" data-r="1"><i>采用什么方案及其相对优势</i><span></span></div>
+        <div class="p2d-dl" data-r="2"><i>需引入哪些新依赖</i><span></span></div>
+        <div class="p2d-dl" data-r="3"><i>预期对系统的影响</i><span></span></div>
+      </div>
+      <p class="p2d-note">设计文档为人类提供了高效的介入点：<b>审查简洁的设计文档，比审查数百行代码容易得多</b></p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的整体流程」·「任务理解与需求澄清。」「编写设计文档。」</div>
+</section>
+<style>
+.p2d-body{display:grid;grid-template-columns:700px 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p2d-tri{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.p2d-th{display:flex;align-items:center;justify-content:space-between}
+.p2d-th b{font-size:21px}
+.p2d-in{height:62px;display:flex;align-items:center;justify-content:center;border-radius:14px;border:1px dashed var(--line2)}
+.p2d-task{padding:8px 18px;border-radius:12px;font-size:19px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.4);animation:upIn .5s var(--spring) both}
+.p2d-dims{display:flex;gap:8px;justify-content:center}
+.p2d-dims span{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+.p2d-dims span.on{color:#fda4af;border-color:rgba(253,164,175,.6);background:rgba(253,164,175,.1)}
+.p2d-lanes{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;min-height:0}
+.p2d-lane{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.025);display:flex;flex-direction:column;gap:4px;transition:all .4s}
+.p2d-lane b{font-size:18px}
+.p2d-lane>span{font-size:15px;color:var(--text3)}
+.p2d-lane.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.p2d-q{margin-top:8px;display:flex;flex-direction:column;gap:6px}
+.p2d-q i{font-style:normal;font-size:16px;padding:5px 10px;border-radius:9px;border:1px solid var(--line2);background:rgba(12,18,40,.8);animation:upIn .45s var(--spring) both}
+.p2d-flow{display:flex;flex-direction:column;gap:12px;min-width:0}
+.p2d-ask{display:flex;align-items:center;gap:12px;font-size:22px}
+.p2d-ask .ic{color:var(--tool);font-size:26px}
+.p2d-qs{display:flex;flex-direction:column;gap:8px}
+.p2d-qq{padding:9px 14px;border-radius:12px;font-size:17px;border:1px solid var(--line);background:rgba(12,18,40,.72);opacity:.3;transition:all .45s}
+.p2d-qq em{font-style:normal;display:inline-block;min-width:56px;font-weight:700;color:var(--acc)}
+.p2d-qq.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+.p2d-doc{padding:12px 16px;border-radius:16px;border:1px solid var(--line2);background:rgba(5,9,22,.7);display:flex;flex-direction:column;gap:6px}
+.p2d-dh{display:flex;align-items:center;gap:10px;font-family:var(--mono)}
+.p2d-dh .ic{color:var(--acc)}
+.p2d-dh b{font-size:18px}
+.p2d-stp{margin-left:auto;padding:4px 12px;border-radius:9px;font:700 16px var(--font);color:var(--ok);border:2px solid var(--ok)}
+.p2d-dl{display:grid;grid-template-columns:250px 1fr;gap:10px;font-size:16px;padding:3px 0}
+.p2d-dl i{font-style:normal;color:var(--text3)}
+.p2d-dl span{color:var(--text)}
+.p2d-note{font-size:17px;color:var(--text2);line-height:1.6}
+.p2d-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-clarify'] = {
+  TASKS: [
+    { t: '修正一个已知的 bug', l: 0, d: [] },
+    { t: '调整某个函数的参数', l: 0, d: [] },
+    { t: '优化系统性能', l: 1, d: [0, 1, 2] },
+    { t: '给结算流程加一种新的支付方式', l: 1, d: [1, 2] },
+  ],
+  DOC: ['src/cache.py：查询热点在这里', '读缓存（相对批量查询：改动小、可回退）', '无', '延迟下降；缓存失效需并发保护'],
+  async tri(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const box = s.querySelector('.p2d-in'), lanes = s.querySelectorAll('.p2d-lane');
+    for (let i = 0; ok(); i++) {
+      if (i % this.TASKS.length === 0) s.querySelectorAll('.p2d-q').forEach((q) => (q.innerHTML = ''));
+      const t = this.TASKS[i % this.TASKS.length];
+      box.innerHTML = `<span class="p2d-task">${t.t}</span>`;
+      s.querySelectorAll('.p2d-dims span').forEach((d) => d.classList.toggle('on', t.d.includes(+d.dataset.d)));
+      await U.wait(ctx, 1300); if (!ok()) return;
+      lanes.forEach((l) => l.classList.toggle('on', +l.dataset.l === t.l));
+      lanes[t.l].querySelector('.p2d-q').insertAdjacentHTML('beforeend', `<i>${t.t}</i>`);
+      box.innerHTML = '';
+      await U.wait(ctx, 1200);
+    }
+  },
+  async flow(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    while (ok()) {
+      s.querySelectorAll('.p2d-qq').forEach((q) => q.classList.remove('on'));
+      s.querySelectorAll('.p2d-dl span').forEach((x) => (x.textContent = ''));
+      s.querySelector('.p2d-stp').classList.remove('on');
+      for (const q of s.querySelectorAll('.p2d-qq')) { await U.wait(ctx, 1100); if (!ok()) return; q.classList.add('on'); }
+      for (const [i, d] of s.querySelectorAll('.p2d-dl span').entries()) {
+        await U.wait(ctx, 900); if (!ok()) return;
+        d.dataset.orig = this.DOC[i];
+        U.type(d, { ctx, speed: 30 });
+      }
+      await U.wait(ctx, 2200); if (!ok()) return;
+      s.querySelector('.p2d-stp').classList.add('on');
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; ctx.later(() => { this.tri(s); this.flow(s); }, 800); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.p2d-in').innerHTML = '';
+    s.querySelectorAll('.p2d-q').forEach((q) => (q.innerHTML = ''));
+    s.querySelectorAll('.on').forEach((e) => e.classList.remove('on'));
+    s.querySelectorAll('.p2d-dl span').forEach((x) => { x.textContent = ''; x.classList.remove('typing'); });
+  },
+};
+</script>
+
+<section class="slide" id="c05-testfix" data-part="2" data-trans="rise" data-dur="16000" data-title="测试-修复循环与完成标准" data-notes="<b>代码实现与测试。</b>获得设计批准后，Agent 遵循项目代码规范进行实现，复用现有抽象和工具，必要时进行适度重构以保持代码库健康。实现完成后立即进入测试驱动的质量保障环节——为新增或修改的功能编写测试用例，覆盖正常路径、边界条件和异常情况，然后执行测试套件。如果测试失败，Agent 不应简单地向用户报告失败，而应分析原因、定位问题、修改代码直到所有测试通过。这个“测试-修复”循环可能需要多次迭代，正是这种自我纠错能力把 Coding Agent 从代码生成器提升为可靠的工程助手。反过来说，Coding Agent 最常见的偷懒方式，就是跳过这一环节——写完代码不跑测试就报告“任务完成”。把“测试通过”而非“代码写完”定义为完成标准，正是 Loop 工程“由验证判定何时可以停”原则在编码场景的落地。<br>即使所有测试通过，工作也还没结束。接下来是代码审查：Agent 对自己生成的代码进行批判性审视——可读性如何、是否有足够注释；是否存在潜在的性能问题或安全漏洞；是否遵循项目的代码风格和最佳实践。自我审查可通过阅读代码、运行 lint 工具或调用专门的代码审查子 Agent（Sub-Agent）来实现；发现问题应回到修改阶段完善，而不是把有缺陷的代码交付给用户。<br><b>文档同步与交付。</b>如果修改涉及架构层面的变化——引入新模块、改变模块间依赖关系、修改核心抽象语义——Agent 需相应更新架构文档。过时的文档比没有文档更糟糕，因为它会误导未来的开发者。<br>两个终端同时回放（内容为示意），上方开关切换关注哪一边。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">完成标准是<em>测试通过</em>，不是代码写完</h2></div>
+    <div class="p2e-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="lazy">偷懒的 Agent</button><button data-v="good">合格的 Agent</button></div></header>
+  <div class="p2e-body">
+    <div class="p2e-col" data-c="lazy">
+      <div class="win fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>写完就报完成</span><span class="c5-tag demo">示意</span></div><div class="c5-term p2e-t"></div></div>
+      <div class="p2e-verdict bad"><svg class="ic"><use href="#i-x"/></svg><span>跳过测试环节 = 最常见的偷懒方式</span></div>
+    </div>
+    <div class="p2e-col" data-c="good">
+      <div class="win fx fx-right" style="--d:4"><div class="win-bar"><i></i><i></i><i></i><span>测试 → 修复 → 审查 → 文档 → 交付</span><span class="c5-tag demo">示意</span></div><div class="c5-term p2e-t"></div></div>
+      <div class="p2e-verdict ok"><svg class="ic"><use href="#i-check"/></svg><span>由验证判定何时可以停（Loop 工程）</span></div>
+    </div>
+  </div>
+  <div class="p2e-chain fx fx-up" style="--d:6">
+    <span data-g="0">实现<small>遵循规范 · 复用抽象 · 适度重构</small></span><i>→</i>
+    <span data-g="1">写测试<small>正常路径 · 边界条件 · 异常情况</small></span><i>→</i>
+    <span data-g="2">测试-修复循环<small>分析原因 · 定位 · 修改</small></span><i>→</i>
+    <span data-g="3">自我审查<small>阅读 · lint · 审查子 Agent</small></span><i>→</i>
+    <span data-g="4">文档同步<small>过时的文档比没有文档更糟</small></span>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的整体流程」·「代码实现与测试。」「文档同步与交付。」</div>
+</section>
+<style>
+#c05-testfix .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.p2e-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:500px}
+.p2e-col{display:flex;flex-direction:column;gap:12px;min-height:0;transition:opacity .5s,filter .5s}
+.p2e-col .win{flex:1;min-height:0;display:flex;flex-direction:column}
+.p2e-col .win-bar span:nth-child(4){flex:1}
+.p2e-t{flex:1;min-height:0;font-size:16px}
+#c05-testfix[data-f=lazy] .p2e-col[data-c=good],#c05-testfix[data-f=good] .p2e-col[data-c=lazy]{opacity:.38;filter:saturate(.4)}
+.p2e-verdict{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:14px;font-size:19px;opacity:0;transition:opacity .5s}
+.p2e-verdict.on{opacity:1}
+.p2e-verdict .ic{font-size:24px}
+.p2e-verdict.bad{color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+.p2e-verdict.ok{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.p2e-chain{margin-top:18px;display:flex;align-items:center;gap:10px}
+.p2e-chain i{font-style:normal;color:var(--text3)}
+.p2e-chain span{flex:1;display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;font-size:18px;font-weight:600;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:all .4s}
+.p2e-chain small{font-size:15px;font-weight:400;color:var(--text3)}
+.p2e-chain span.on{border-color:color-mix(in srgb,var(--acc) 65%,transparent);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.8))}
+</style>
+<script>
+HOOKS['c05-testfix'] = {
+  LAZY: [
+    { c: 'call', t: 'edit_file("src/order.py", old_str → new_str)' }, { c: 'res', t: '已修改 2 处' },
+    { c: 'say', t: '任务完成！折扣计算已经实现。', w: 1800 },
+    { c: 'dim', t: '…… 两天后 ……', w: 1200 },
+    { c: 'err', t: '用户：满减和优惠券叠加时金额算成了负数' },
+  ],
+  GOOD: [
+    { c: 'call', t: 'edit_file("src/order.py", old_str → new_str)', g: 0 }, { c: 'res', t: '已修改 2 处' },
+    { c: 'call', t: 'write_file("tests/test_discount.py")', g: 1 }, { c: 'res', t: '6 个用例：正常路径 · 边界条件 · 异常情况' },
+    { c: 'cmd', t: 'pytest tests/test_discount.py', g: 2 }, { c: 'err', t: 'FAILED test_stacked_coupon  1 failed, 5 passed' },
+    { c: 'ag', t: '叠加时没有设下限 → 修改代码' },
+    { c: 'call', t: 'edit_file("src/order.py")' }, { c: 'cmd', t: 'pytest tests/test_discount.py' }, { c: 'ok', t: '6 passed' },
+    { c: 'cmd', t: 'ruff check src/', g: 3 }, { c: 'ok', t: 'All checks passed!' },
+    { c: 'call', t: 'Task(code_reviewer, "审查 src/order.py")' }, { c: 'res', t: '审查：可读性良好；建议补一行注释说明下限' },
+    { c: 'call', t: 'edit_file("docs/ARCHITECTURE.md")', g: 4 }, { c: 'res', t: '已同步：折扣模块的依赖关系' },
+    { c: 'say', t: '完成：测试全部通过，已审查，文档已同步。' },
+  ],
+  init(s) {
+    const ts = s.querySelectorAll('.p2e-t');
+    this.TL = C5.term(ts[0], { max: 16 });
+    this.TG = C5.term(ts[1], { max: 16 });
+    this.set = U.seg(s.querySelector('.p2e-seg'), (v) => { this.auto = false; this.focus(s, v); });
+  },
+  focus(s, v) { s.dataset.f = v; this.set(v); },
+  async side(s, T, lines, vcls) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    while (ok()) {
+      T.clear();
+      s.querySelector('.p2e-verdict.' + vcls).classList.remove('on');
+      if (vcls === 'ok') s.querySelectorAll('.p2e-chain span').forEach((e) => e.classList.remove('on'));
+      const L = lines.map((x) => ({ ...x, w: x.w || (x.c === 'ag' ? 700 : 420), fn: x.g != null ? () => s.querySelectorAll('.p2e-chain span').forEach((e) => e.classList.toggle('on', +e.dataset.g <= x.g)) : null }));
+      if (!(await C5.play(T, L, ctx, ok, { speed: 20 }))) return;
+      s.querySelector('.p2e-verdict.' + vcls).classList.add('on');
+      await U.wait(ctx, vcls === 'bad' ? 9000 : 3800);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.tk = (this.tk || 0) + 1;
+    this.auto = true;
+    this.focus(s, 'lazy');
+    ctx.later(() => { this.side(s, this.TL, this.LAZY, 'bad'); this.side(s, this.TG, this.GOOD, 'ok'); }, 700);
+    ctx.every(() => { if (this.auto) this.focus(s, s.dataset.f === 'lazy' ? 'good' : 'lazy'); }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.TL.clear(); this.TG.clear();
+    s.querySelectorAll('.p2e-verdict,.p2e-chain span').forEach((e) => e.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-tailor" data-part="2" data-steps="1" data-trans="iris" data-dur="15000" data-title="推荐流程与模型的行为策略" data-notes="需要注意，上面介绍的是<b>推荐的工程化流程</b>。现实中的 Coding Agent（如 Claude Code、Codex）会按需裁剪这套流程：简单 bug 修复任务会跳过生成设计文档，只有当任务复杂、影响面大时才会完整走完各阶段。<br>按 → 看第二步。不同模型裁剪这套流程的方式并不相同。有些 Coding 模型会在第一次修改前广泛阅读目录、实现、调用方和测试；另一些则会读少数最可能相关的文件，马上提交一个补丁，再把编译与测试反馈当作调查的一部分。更换 Harness 后，这种“何时停止收集信息、开始行动”的阈值仍可能随模型保持不变；而在同一个 Harness 中切换模型时，阈值也可能随之改变。因此，它首先是<b>模型学到的行为策略</b>，而不只是 Coding 产品的界面风格。Harness 的提示词、工具和预算仍能放大或抑制它，但不必是它的来源。第七章将在固定 Harness 中衡量这一差异，第八章再从后训练角度解释它可能如何写入参数。<br>第二步的 2×2 网格是示意：竖线是“开始行动”的位置，它跟着模型那一列走，而不是跟着 Harness 那一行走。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">推荐流程会被裁剪，<em>怎么裁剪由模型决定</em></h2></div>
+    <div class="p2f-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="bug">简单 bug 修复</button><button data-v="big">复杂、影响面大的任务</button></div></header>
+  <div class="p2f-wrap">
+    <div class="p2f-a">
+      <div class="p2f-stages fx fx-up" style="--d:3"></div>
+      <p class="p2f-say fx fx-up" style="--d:4"></p>
+      <div class="p2f-prod fx fx-up" style="--d:5"><span class="chip">Claude Code</span><span class="chip">Codex</span><span>现实中的 Coding Agent 都会按需裁剪这套流程</span></div>
+    </div>
+    <div class="p2f-b">
+      <div class="p2f-grid">
+        <div></div><div class="p2f-colh">模型 X<small>先广泛阅读，再动手</small></div><div class="p2f-colh">模型 Y<small>读几个文件就提交补丁</small></div>
+      </div>
+      <div class="p2f-leg"><span><i class="r"></i>收集信息：读目录、实现、调用方、测试</span><span><i class="a"></i>行动：补丁 + 把编译与测试反馈当作调查</span><span class="c5-tag demo">示意</span></div>
+      <p class="p2f-cap">阈值跟着<b>模型</b>那一列走：它首先是<b>模型学到的行为策略</b>，Harness 的提示词、工具和预算只能放大或抑制它</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Coding Agent 的整体流程」</div>
+</section>
+<style>
+#c05-tailor .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.p2f-wrap{position:relative;flex:1;min-height:0}
+.p2f-a,.p2f-b{position:absolute;inset:0;transition:opacity .6s var(--ease),translate .6s var(--ease)}
+.p2f-b{opacity:0;pointer-events:none;translate:0 24px}
+#c05-tailor[data-k="1"] .p2f-a{opacity:0;pointer-events:none;translate:0 -24px}
+#c05-tailor[data-k="1"] .p2f-b{opacity:1;pointer-events:auto;translate:0 0}
+.p2f-stages{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-top:30px}
+.p2f-s{position:relative;height:230px;padding:22px 18px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.85));transition:all .55s var(--ease)}
+.p2f-s em{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font:800 22px var(--num);font-style:normal;color:#06101f;background:var(--acc)}
+.p2f-s b{font-size:23px}
+.p2f-s small{font-size:16px;color:var(--text2);line-height:1.5}
+.p2f-s.skip{opacity:.3;filter:grayscale(1);border-style:dashed;scale:.94}
+.p2f-s.skip::after{content:"跳过";position:absolute;top:14px;right:14px;font-size:15px;font-weight:700;color:var(--bad);border:1px solid var(--bad);padding:1px 8px;border-radius:7px}
+.p2f-say{margin-top:30px;text-align:center;font-size:24px;min-height:40px}
+.p2f-say b{color:var(--acc)}
+.p2f-prod{margin-top:22px;display:flex;justify-content:center;align-items:center;gap:12px;font-size:18px;color:var(--text3)}
+.p2f-grid{display:grid;grid-template-columns:200px 1fr 1fr;gap:14px 18px;align-items:stretch}
+.p2f-colh{text-align:center;font-size:22px;font-weight:700}
+.p2f-colh small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+.p2f-rowh{display:flex;flex-direction:column;justify-content:center;font-size:21px;font-weight:700}
+.p2f-rowh small{font-size:15px;font-weight:400;color:var(--text3)}
+.p2f-cell{position:relative;height:150px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.p2f-bar{position:relative;height:44px;margin-top:28px;border-radius:10px;overflow:hidden;display:flex;background:rgba(255,255,255,.05)}
+.p2f-bar i{display:block;height:100%;transition:width .9s var(--ease)}
+.p2f-bar i.r{background:linear-gradient(90deg,#60a5fa,#38bdf8)}
+.p2f-bar i.a{background:linear-gradient(90deg,#fbbf24,#fb923c)}
+.p2f-th{position:absolute;top:10px;bottom:10px;width:3px;margin-left:-1.5px;border-radius:3px;background:#fff;box-shadow:0 0 10px #fff;transition:left .9s var(--ease)}
+.p2f-th::after{content:"开始行动";position:absolute;top:-2px;left:8px;font-size:15px;white-space:nowrap;color:var(--text)}
+.p2f-cell small{position:absolute;left:18px;bottom:12px;font-size:15px;color:var(--text3)}
+.p2f-leg{display:flex;align-items:center;gap:22px;margin-top:16px;font-size:16px;color:var(--text2)}
+.p2f-leg i{display:inline-block;width:14px;height:14px;border-radius:4px;margin-right:8px;vertical-align:-2px}
+.p2f-leg i.r{background:#60a5fa}.p2f-leg i.a{background:#fbbf24}
+.p2f-cap{margin-top:16px;font-size:20px;line-height:1.6;color:var(--text2);padding:12px 18px;border-left:4px solid var(--acc);border-radius:0 12px 12px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),transparent)}
+.p2f-cap b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-tailor'] = {
+  ST: [['项目文档化', '已有指令文件就直接读'], ['需求澄清', '边界清晰时一句话确认'], ['设计文档', '方案对比 + 等待审批'], ['实现与测试', '测试-修复循环'], ['审查与交付', 'lint · 自审 · 文档']],
+  // 两种 Harness × 两种模型：收集信息所占比例（阈值）；Harness 只做小幅放大或抑制（示意）
+  TH: { X: 0.62, Y: 0.24 }, HN: [['Harness A', '提示词鼓励先读后改', 0.04], ['Harness B', '工具调用预算更紧', -0.04]],
+  init(s) {
+    s.querySelector('.p2f-stages').innerHTML = this.ST.map(([b, t], i) => `<div class="p2f-s" data-i="${i}"><em>${i + 1}</em><b>${b}</b><small>${t}</small></div>`).join('');
+    const g = s.querySelector('.p2f-grid');
+    this.HN.forEach(([h, d, bias]) => {
+      g.insertAdjacentHTML('beforeend', `<div class="p2f-rowh">${h}<small>${d}</small></div>` + ['X', 'Y'].map((m) => `<div class="p2f-cell" data-m="${m}" data-b="${bias}"><div class="p2f-bar"><i class="r"></i><i class="a"></i></div><span class="p2f-th"></span><small></small></div>`).join(''));
+    });
+    this.set = U.seg(s.querySelector('.p2f-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  mode(s, v) {
+    this.v = v;
+    this.set(v);
+    s.querySelectorAll('.p2f-s').forEach((e) => e.classList.toggle('skip', v === 'bug' && +e.dataset.i === 2));
+    s.querySelector('.p2f-say').innerHTML = v === 'bug' ? '简单 bug 修复：<b>跳过生成设计文档</b>，其余阶段照常' : '任务复杂、影响面大：<b>完整走完各阶段</b>';
+  },
+  bars(s, on) {
+    s.querySelectorAll('.p2f-cell').forEach((c) => {
+      const t = on ? Math.min(0.9, Math.max(0.1, this.TH[c.dataset.m] + +c.dataset.b)) : 0;
+      c.querySelector('i.r').style.width = t * 100 + '%';
+      c.querySelector('i.a').style.width = on ? (1 - t) * 100 + '%' : '0';
+      c.querySelector('.p2f-th').style.left = (18 + t * (c.clientWidth - 36)) + 'px';
+      c.querySelector('small').textContent = on ? `收集信息约占 ${Math.round(t * 100)}%` : '';
+    });
+  },
+  apply(s, k) {
+    s.dataset.k = k;
+    if (k >= 1) { this.bars(s, false); this.ctx && this.ctx.later(() => this.bars(s, true), 400); }
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'bug');
+    this.apply(s, k);
+    ctx.every(() => { if (this.auto && +s.dataset.k === 0) this.mode(s, this.v === 'bug' ? 'big' : 'bug'); }, 3800);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { s.dataset.k = 0; this.bars(s, false); },
+};
+</script>

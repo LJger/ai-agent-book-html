@@ -1,0 +1,510 @@
+<!-- ================= PART 06 机器人（续）：理想上限、控制分层、长程规划、实验 6-12 ================= -->
+<section class="slide" id="c06-exp11" data-part="6" data-trans="rise" data-dur="15000" data-title="实验 6-11 ★：模拟器中的理想控制上限" data-notes="真机遥操作得到的是最有说服力的任务上限，但它不适合批量改变物体数量和位置。为了得到可重复、可统计的对照，下一步把同一个“物体归位”问题搬进二维桌面模拟器，用理想控制器代表一个不会感知错误、不会选错动作的强操作者。<br><b>实验 6-11 ★</b>：在二维桌面模拟器中随机摆放红色杯子、黄色废纸及其目标区域，由理想控制器依次接近物体、抓取并移动到正确位置。它不需要识别图像，也不会选错动作，因此代表“感知和决策都正确时，这个任务至少可以做到什么”。实验关注任务成功率、完成步数和路径长度，并改变物体初始位置与任务规模，观察理想上限是否稳定。它与实验 6-10 使用相同的成功条件，但测量的是理想化模拟结果，<b>不代表 XLeRobot 真机已经运行</b>。二者共同建立后续自主控制的两条参考线：实验 6-10 是真实硬件上的人类闭环，实验 6-11 是模拟环境中的理想闭环。<br>配套仓库的真实数据（本地 GPU，Apple MPS；5 个随机种子 × 物体数 1–4 × 每格 512 回合，共 10240 回合；控制频率 20 Hz）：成功率全部 100%；平均步数 1 个物体 12.9、2 个 30.5、3 个 48.0、4 个 65.5；p95 步数（各种子中的最大值）20、49、74、97；平均路径长度 0.23、0.54、0.85、1.17 米；固定条件重放结果一致。左侧动画是理想控制器的示意，右侧数字来自验收记录。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-11 ★：模拟器中的<em>理想控制上限</em></h2></div>
+    <div class="x11-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="1">1 个物体</button><button data-v="2">2 个</button><button data-v="3">3 个</button><button data-v="4">4 个</button></div></header>
+  <div class="x11-body">
+    <div class="x11-sim panel fx fx-left" style="--d:2">
+      <div class="x11-bar"><svg class="ic"><use href="#i-cpu"/></svg><b>理想控制器</b><span>不识别图像 · 不会选错动作</span><span class="chip warn x11-sim-c">示意</span></div>
+      <canvas class="x11-cv" width="1320" height="880"></canvas>
+      <div class="x11-st"><span>回合 <b class="x11-ep">1</b></span><span>步数 <b class="x11-sp">0</b></span><span>路径 <b class="x11-pl">0.00</b> m</span></div>
+    </div>
+    <div class="x11-r fx fx-right" style="--d:3">
+      <div class="x11-kpi">
+        <div><span>成功率</span><b class="x11-k0">100%</b><small>5 个种子 × 512 回合</small></div>
+        <div><span>平均步数</span><b class="x11-k1">12.9</b><small>20 Hz 控制</small></div>
+        <div><span>p95 步数</span><b class="x11-k2">20</b><small>各种子最大值</small></div>
+        <div><span>平均路径</span><b class="x11-k3">0.23 m</b><small>末端移动距离</small></div>
+      </div>
+      <div class="x11-chart panel"><span class="lbl">任务规模变大，理想上限仍然稳定：步数与路径近似线性增长</span><div class="x11-bars"></div></div>
+      <div class="x11-ref">
+        <div class="x11-rl h"><svg class="ic"><use href="#i-user"/></svg><div><b>参考线一 · 实验 6-10</b><span>真实硬件上的<b>人类闭环</b></span></div></div>
+        <div class="x11-rl s"><svg class="ic"><use href="#i-cpu"/></svg><div><b>参考线二 · 实验 6-11</b><span>模拟环境中的<b>理想闭环</b>：不代表真机已经运行</span></div></div>
+      </div>
+      <small class="x11-data">数据：配套仓库 chapter6/xlerobot-teleoperation 本地 GPU 验收记录（Apple MPS，共 10240 回合，固定条件重放一致）</small>
+    </div>
+  </div>
+  <div class="src">第六章 ·「硬件与算法的分工」· 实验 6-11</div>
+</section>
+<style>
+#c06-exp11 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp11 .x11-seg button{font-size:19px;padding:9px 20px}
+#c06-exp11 .x11-body{display:grid;grid-template-columns:700px 1fr;gap:28px;height:650px}
+#c06-exp11 .x11-sim{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+#c06-exp11 .x11-bar{display:flex;align-items:center;gap:12px}
+#c06-exp11 .x11-bar .ic{font-size:26px;color:var(--acc)}
+#c06-exp11 .x11-bar b{font-size:21px}
+#c06-exp11 .x11-bar span{font-size:16px;color:var(--text3)}
+#c06-exp11 .x11-sim-c{margin-left:auto;font-size:15px;padding:2px 10px}
+#c06-exp11 .x11-cv{width:660px;height:440px;border-radius:16px;background:#0f1a2a;border:1px solid rgba(103,232,249,.4)}
+#c06-exp11 .x11-st{display:flex;gap:30px;justify-content:center;font-size:18px;color:var(--text2)}
+#c06-exp11 .x11-st b{font:700 22px var(--num);color:var(--acc)}
+#c06-exp11 .x11-r{display:flex;flex-direction:column;gap:16px}
+#c06-exp11 .x11-kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+#c06-exp11 .x11-kpi>div{padding:12px 14px;border-radius:14px;display:flex;flex-direction:column;gap:2px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-exp11 .x11-kpi span{font-size:16px;color:var(--text3)}
+#c06-exp11 .x11-kpi b{font:800 34px var(--num);color:var(--acc)}
+#c06-exp11 .x11-kpi small{font-size:15px;color:var(--text3)}
+#c06-exp11 .x11-chart{padding:14px 18px}
+#c06-exp11 .x11-bars{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+#c06-exp11 .x11-row{display:grid;grid-template-columns:76px 1fr 1fr;gap:14px;align-items:center;padding:4px 8px;border-radius:10px;transition:background .35s}
+#c06-exp11 .x11-row.on{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+#c06-exp11 .x11-row>span{font-size:17px;color:var(--text2)}
+#c06-exp11 .x11-b{position:relative;height:24px;border-radius:7px;background:rgba(255,255,255,.05)}
+#c06-exp11 .x11-b i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;width:var(--w);background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 60%,#fff))}
+#c06-exp11 .x11-b em{position:absolute;left:calc(var(--w) + 8px);top:50%;translate:0 -50%;font:700 15px var(--num);font-style:normal;color:var(--text);white-space:nowrap}
+#c06-exp11 .x11-hd{display:grid;grid-template-columns:76px 1fr 1fr;gap:14px;padding:0 8px;font-size:15px;color:var(--text3)}
+#c06-exp11 .x11-ref{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c06-exp11 .x11-rl{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;border:1.5px dashed var(--c)}
+#c06-exp11 .x11-rl.h{--c:#fb923c}#c06-exp11 .x11-rl.s{--c:#22d3ee}
+#c06-exp11 .x11-rl .ic{flex:none;font-size:30px;color:var(--c)}
+#c06-exp11 .x11-rl b{display:block;font-size:17px;color:var(--c)}
+#c06-exp11 .x11-rl span{font-size:16px;color:var(--text2)}
+#c06-exp11 .x11-rl span b{display:inline;font-size:inherit}
+#c06-exp11 .x11-data{font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-exp11'] = {
+  // 配套仓库验收记录：各物体数的平均步数、p95（各种子最大值）、平均路径
+  D: { 1: [12.9, 20, 0.23], 2: [30.5, 49, 0.54], 3: [48.0, 74, 0.85], 4: [65.5, 97, 1.17] },
+  COL: ['#ef4444', '#facc15', '#a78bfa', '#34d399'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.x11-seg'), (v) => { this.auto = false; this.pick(s, +v); });
+    s.querySelector('.x11-bars').innerHTML = '<div class="x11-hd"><span>物体数</span><span>平均步数</span><span>平均路径（米）</span></div>' + [1, 2, 3, 4].map((n) => {
+      const [st, , pl] = this.D[n];
+      return `<div class="x11-row" data-n="${n}"><span>${n} 个</span><div class="x11-b" style="--w:${(st / 65.5) * 72}%;--c:#22d3ee"><i></i><em>${st.toFixed(1)}</em></div><div class="x11-b" style="--w:${(pl / 1.17) * 72}%;--c:#fb923c"><i></i><em>${pl.toFixed(2)}</em></div></div>`;
+    }).join('');
+    this.g = s.querySelector('.x11-cv').getContext('2d');
+  },
+  pick(s, n) {
+    this.n = n;
+    this.set(String(n));
+    const [st, p95, pl] = this.D[n], q = (x) => s.querySelector(x);
+    q('.x11-k1').textContent = st.toFixed(1);
+    q('.x11-k2').textContent = p95;
+    q('.x11-k3').textContent = pl.toFixed(2) + ' m';
+    s.querySelectorAll('.x11-row').forEach((r) => r.classList.toggle('on', +r.dataset.n === n));
+    this.newEp();
+  },
+  // 随机摆放 n 个物体与各自的目标区，理想控制器按顺序搬运
+  newEp() {
+    const r = Math.random, o = [];
+    for (let i = 0; i < this.n; i++) o.push({ x: 120 + r() * 420, y: 150 + r() * 250, tx: 70 + i * 160, ty: 60, c: this.COL[i], done: 0 });
+    this.o = o;
+    this.ee = [330, 420];
+    this.i = 0; this.ph = 0; this.steps = 0; this.path = 0; this.trail = [];
+    this.ep = (this.ep || 0) + 1;
+  },
+  tick(dt) {
+    const o = this.o[this.i];
+    if (!o) { this.hold = (this.hold || 0) + dt; if (this.hold > 1400) { this.hold = 0; if (this.auto && this.ep % 2 === 0) this.pick(this.s, (this.n % 4) + 1); else this.newEp(); } return; }
+    const tg = this.ph === 0 ? [o.x, o.y] : [o.tx, o.ty], dx = tg[0] - this.ee[0], dy = tg[1] - this.ee[1], d = Math.hypot(dx, dy), v = 0.42 * dt;
+    if (d <= v) {
+      this.ee = tg;
+      if (this.ph === 0) this.ph = 1; else { o.done = 1; this.ph = 0; this.i++; }
+    } else { this.ee = [this.ee[0] + (dx / d) * v, this.ee[1] + (dy / d) * v]; this.path += v; }
+    if (this.ph === 1) { o.x = this.ee[0]; o.y = this.ee[1]; }
+    this.acc = (this.acc || 0) + dt;
+    if (this.acc > 50) { this.acc = 0; this.steps++; this.trail.push([...this.ee]); if (this.trail.length > 400) this.trail.shift(); }
+  },
+  draw(s) {
+    const g = this.g;
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, 660, 440);
+    g.strokeStyle = 'rgba(103,232,249,.08)'; g.lineWidth = 1;
+    for (let x = 0; x < 660; x += 33) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 440); g.stroke(); }
+    for (let y = 0; y < 440; y += 33) { g.beginPath(); g.moveTo(0, y); g.lineTo(660, y); g.stroke(); }
+    this.o.forEach((o) => {
+      g.strokeStyle = o.c; g.lineWidth = 2.5; g.setLineDash([6, 5]);
+      g.strokeRect(o.tx - 44, o.ty - 34, 88, 68); g.setLineDash([]);
+    });
+    if (this.trail.length > 1) {
+      g.strokeStyle = 'rgba(251,146,60,.75)'; g.lineWidth = 2.5; g.beginPath();
+      this.trail.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke();
+    }
+    this.o.forEach((o) => {
+      g.fillStyle = o.c; g.globalAlpha = o.done ? 0.55 : 1;
+      g.beginPath(); g.arc(o.x, o.y, 16, 0, 6.283); g.fill(); g.globalAlpha = 1;
+    });
+    g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(this.ee[0], this.ee[1], 22, 0, 6.283); g.stroke();
+    g.fillStyle = this.ph === 1 ? '#fb923c' : '#fff'; g.beginPath(); g.arc(this.ee[0], this.ee[1], 5, 0, 6.283); g.fill();
+    const q = (x) => s.querySelector(x);
+    q('.x11-ep').textContent = this.ep;
+    q('.x11-sp').textContent = this.steps;
+    q('.x11-pl').textContent = (this.path / 560).toFixed(2);
+  },
+  enter(s, ctx) {
+    this.s = s;
+    this.auto = true;
+    this.ep = 0;
+    this.pick(s, 1);
+    let last = 0;
+    ctx.raf((t) => { const dt = last ? Math.min(60, t - last) : 0; last = t; this.tick(dt); this.draw(s); });
+  },
+  reset() { this.ep = 0; },
+};
+</script>
+
+<section class="slide" id="c06-layers" data-part="6" data-trans="zoom" data-dur="15000" data-title="机器人控制的基本结构" data-notes="机器人系统通常会把不同时间尺度的工作分开：<br>• <b>任务目标</b>：人想完成什么——“把杯子和废纸归位”——分钟级；<br>• <b>长程规划</b>：先做什么、后做什么——先处理杯子，再处理废纸，最后检查——秒到分钟；<br>• <b>基本技能</b>：当前要完成哪个状态变化——pick(red_cup)、place(red_cup, tray)——约 1—3 秒；<br>• <b>VLA / 技能策略</b>：这个技能具体怎么动——XLeRobot 夹爪的一小段动作或连续轨迹——约 1—10 Hz 推理；<br>• <b>底层控制与安全层</b>：如何稳定、及时地执行——关节或末端控制量、限速与急停——约 50—1000 Hz。<br>这是一种常见的工程分工，不是唯一的模型架构。VLA 可以承担一部分高层判断，规划器也可以是规则程序、VLM 或优化器。无论采用哪种实现，都应该<b>把“任务顺序”和“眼前动作”分开</b>，否则高层模型的推理延迟会拖慢底层控制，底层的高频控制也会让高层模型处理大量无关细节。对 XLeRobot 来说，<b>模型不应直接输出任意关节角</b>；它只选择 pick、place、verify_state 或 stop 等有边界的技能，经过标定、限速并带超时的执行器再把技能变成真实机械臂动作。<br>表格最右一列的刻度线按各层的节拍滚动，只示意快慢的相对关系；行会自动轮流高亮，也可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">机器人控制的基本结构：<em>把不同时间尺度的工作分开</em></h2></header>
+  <div class="ly-tb fx fx-up" style="--d:2">
+    <div class="ly-hd"><span>层级</span><span>核心问题</span><span>输出</span><span>典型时间尺度</span><span>节拍 <i class="chip warn">示意</i></span></div>
+    <div class="ly-rows"></div>
+    <canvas class="ly-cv" width="640" height="860"></canvas>
+  </div>
+  <div class="ly-foot">
+    <div class="ly-c fx fx-up" style="--d:4"><span class="lbl">常见的工程分工，不是唯一架构</span><p>VLA 可以承担一部分高层判断；规划器也可以是规则程序、VLM 或优化器</p></div>
+    <div class="ly-c fx fx-up" style="--d:5"><span class="lbl">为什么要把“任务顺序”和“眼前动作”分开</span><p><b>高层推理延迟</b>会拖慢底层控制；<b>底层高频控制</b>会让高层模型处理大量无关细节</p></div>
+    <div class="ly-c ly-x fx fx-up" style="--d:6"><span class="lbl">XLeRobot：模型不直接输出任意关节角</span><div class="ly-chain"><span class="m">有边界的技能<br><code>pick · place · verify_state · stop</code></span><i></i><span>标定</span><i></i><span>限速</span><i></i><span>超时</span><i></i><span class="a">真实机械臂动作</span></div></div>
+  </div>
+  <div class="src">第六章 ·「机器人控制的基本结构」· 表（层级 / 核心问题 / 输出 / 典型时间尺度）</div>
+</section>
+<style>
+#c06-layers .ly-tb{position:relative;border-radius:18px;border:1px solid var(--line);background:rgba(10,16,36,.7);overflow:hidden}
+#c06-layers .ly-hd,#c06-layers .ly-r{display:grid;grid-template-columns:240px 300px 1fr 200px 340px;gap:0 18px;align-items:center;padding:0 22px}
+#c06-layers .ly-hd{height:52px;font-size:17px;font-weight:700;color:var(--text3);background:rgba(255,255,255,.04);border-bottom:1px solid var(--line)}
+#c06-layers .ly-hd .chip{font-style:normal;font-size:15px;padding:1px 8px;margin-left:6px}
+#c06-layers .ly-r{height:86px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .35s}
+#c06-layers .ly-r:last-child{border-bottom:none}
+#c06-layers .ly-r.on{background:color-mix(in srgb,var(--c) 13%,transparent)}
+#c06-layers .ly-l{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:700;color:var(--c)}
+#c06-layers .ly-l em{font:800 15px var(--num);font-style:normal;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#06101f;background:var(--c)}
+#c06-layers .ly-r>span{font-size:18px;line-height:1.45;color:var(--text2)}
+#c06-layers .ly-r.on>span{color:var(--text)}
+#c06-layers .ly-r code{font:16px var(--mono);color:var(--ctx)}
+#c06-layers .ly-ts{font:700 19px var(--num)!important;color:var(--c)!important}
+#c06-layers .ly-cv{position:absolute;right:22px;top:52px;width:320px;height:430px;pointer-events:none}
+#c06-layers .ly-foot{display:grid;grid-template-columns:1fr 1fr 1.35fr;gap:16px;margin-top:18px}
+#c06-layers .ly-c{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+#c06-layers .ly-c p{margin-top:6px;font-size:18px;line-height:1.55;color:var(--text2)}
+#c06-layers .ly-c b{color:var(--acc)}
+#c06-layers .ly-chain{display:flex;align-items:center;gap:8px;margin-top:10px}
+#c06-layers .ly-chain span{padding:6px 12px;border-radius:10px;font-size:16px;text-align:center;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-layers .ly-chain span.m{border-color:color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 12%,transparent)}
+#c06-layers .ly-chain span.m code{font:15px var(--mono);color:#ddd6fe}
+#c06-layers .ly-chain span.a{border-color:color-mix(in srgb,var(--acc) 55%,transparent);color:var(--acc)}
+#c06-layers .ly-chain i{flex:none;width:18px;height:2px;background:var(--acc);position:relative}
+#c06-layers .ly-chain i::after{content:"";position:absolute;right:-2px;top:-4px;border:5px solid transparent;border-left-color:var(--acc);border-right:none}
+</style>
+<script>
+HOOKS['c06-layers'] = {
+  R: [
+    ['任务目标', '人想完成什么', '“把杯子和废纸归位”', '分钟级', '#f472b6', 6000],
+    ['长程规划', '先做什么、后做什么', '先处理杯子，再处理废纸，最后检查', '秒到分钟', '#a78bfa', 2600],
+    ['基本技能', '当前要完成哪个状态变化', '<code>pick(red_cup)</code>、<code>place(red_cup, tray)</code>', '约 1—3 秒', '#fb923c', 1200],
+    ['VLA / 技能策略', '这个技能具体怎么动', 'XLeRobot 夹爪的一小段动作或连续轨迹', '约 1—10 Hz 推理', '#22d3ee', 420],
+    ['底层控制与安全层', '如何稳定、及时地执行', '关节或末端控制量、限速与急停', '约 50—1000 Hz', '#34d399', 70],
+  ],
+  init(s) {
+    s.querySelector('.ly-rows').innerHTML = this.R.map(([l, q, o, t, c], i) => `<div class="ly-r" data-i="${i}" style="--c:${c}"><div class="ly-l"><em>${i + 1}</em>${l}</div><span>${q}</span><span>${o}</span><span class="ly-ts">${t}</span><span></span></div>`).join('');
+    this.rows = [...s.querySelectorAll('.ly-r')];
+    s.querySelector('.ly-rows').addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (r) { this.auto = false; this.pick(+r.dataset.i); } });
+    this.g = s.querySelector('.ly-cv').getContext('2d');
+  },
+  pick(i) { this.cur = i; this.rows.forEach((r, j) => r.classList.toggle('on', j === i)); },
+  enter(s, ctx) {
+    this.auto = true;
+    this.pick(0);
+    ctx.every(() => { if (this.auto) this.pick((this.cur + 1) % this.R.length); }, 3000);
+    const g = this.g;
+    ctx.raf((t) => {
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 320, 430);
+      // 每层一条刻度带：刻度间距代表节拍，向左滚动；越快越密
+      this.R.forEach(([, , , , c, per], i) => {
+        const y = 43 + i * 86, gap = Math.max(5, Math.min(300, per / 20)), off = ((t / per) % 1) * gap;
+        g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(0, y); g.lineTo(320, y); g.stroke();
+        g.strokeStyle = c; g.lineWidth = i === this.cur ? 3 : 2; g.globalAlpha = i === this.cur ? 1 : 0.55;
+        for (let x = 320 - off; x > -1; x -= gap) { g.beginPath(); g.moveTo(x, y - 16); g.lineTo(x, y + 16); g.stroke(); }
+        g.globalAlpha = 1;
+      });
+    });
+  },
+  reset() { this.rows.forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c06-plan" data-part="6" data-trans="flip" data-dur="16000" data-title="长程规划与任务分解" data-notes="用户说“把桌面整理干净”时，系统不能把这句话直接交给动作模型。规划器要先列出场景中的物体和目标，再决定先后顺序，并为每一步写清楚<b>开始条件、完成条件和风险限制</b>。例如：处理红色杯子 → 清理黄色纸张 → 检查桌面。“处理红色杯子”还要继续拆成两个动作和一次检查：pick(red_cup) → place(red_cup, tray) → verify_state()。<br>每完成一个技能，就得到一个可以检查的节点。<b>如果抓取失败，只重试当前这一步；如果物体被人挪动了，或者用户改变了目标，只需要重新规划受影响的后续步骤，不必把旧计划全部重做。</b>给智能体的工具也应该足够简单：一次调用只做一件事，动作范围固定，有超时限制，执行后立即重新观察。<br>演示会轮流播放三种情形：顺利执行、抓杯子时失败一次、处理纸张前纸被人挪动。也可以点右上角按钮选择。右侧“当前步骤”卡片里的条件写法是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">长程规划与任务分解：<em>每一步都是可检查的节点</em></h2></div>
+    <div class="pl-btns fx fx-up" style="--d:2"><button class="btn" data-m="0"><svg class="ic"><use href="#i-play"/></svg>顺利执行</button><button class="btn" data-m="1"><svg class="ic"><use href="#i-x"/></svg>注入抓取失败</button><button class="btn" data-m="2"><svg class="ic"><use href="#i-hand"/></svg>有人挪动了纸张</button></div></header>
+  <div class="pl-body">
+    <div class="pl-tree panel fx fx-left" style="--d:2">
+      <div class="pl-root"><svg class="ic"><use href="#i-user"/></svg>用户：“把桌面整理干净”<span>不能直接交给动作模型</span></div>
+      <div class="pl-sub" data-g="0"><div class="pl-gh"><em>1</em>处理红色杯子</div><div class="pl-ns"></div></div>
+      <div class="pl-sub" data-g="1"><div class="pl-gh"><em>2</em>清理黄色纸张</div><div class="pl-ns"></div></div>
+      <div class="pl-sub" data-g="2"><div class="pl-gh"><em>3</em>检查桌面</div><div class="pl-ns"></div></div>
+    </div>
+    <div class="pl-mid fx fx-scale" style="--d:3">
+      <div class="pl-scene"></div>
+      <div class="pl-msg"></div>
+    </div>
+    <div class="pl-r fx fx-right" style="--d:4">
+      <div class="pl-cur panel"><span class="lbl">当前步骤 <i class="chip warn">示意</i></span><b class="pl-ct">—</b>
+        <div class="pl-kv"><span>开始条件</span><p class="pl-c0">—</p></div><div class="pl-kv"><span>完成条件</span><p class="pl-c1">—</p></div><div class="pl-kv"><span>风险限制</span><p class="pl-c2">—</p></div></div>
+      <div class="pl-tools panel"><span class="lbl">给智能体的工具应该足够简单</span>
+        <div class="pl-t"><svg class="ic"><use href="#i-target"/></svg>一次调用只做一件事</div><div class="pl-t"><svg class="ic"><use href="#i-grid"/></svg>动作范围固定</div><div class="pl-t"><svg class="ic"><use href="#i-timer"/></svg>有超时限制</div><div class="pl-t"><svg class="ic"><use href="#i-eye"/></svg>执行后立即重新观察</div></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「长程规划与任务分解」</div>
+</section>
+<style>
+#c06-plan .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-plan .pl-btns{display:flex;gap:10px}
+#c06-plan .pl-btns .btn{padding:8px 14px;font-size:17px}
+#c06-plan .pl-btns .btn.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 16%,transparent)}
+#c06-plan .pl-body{display:grid;grid-template-columns:460px 620px 1fr;gap:22px;height:650px}
+#c06-plan .pl-tree{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+#c06-plan .pl-root{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;font-size:19px;font-weight:700}
+#c06-plan .pl-root .ic{font-size:22px;color:var(--acc)}
+#c06-plan .pl-root span{width:100%;font-size:15px;font-weight:400;color:var(--text3)}
+#c06-plan .pl-sub{padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.02);transition:border-color .35s,box-shadow .35s}
+#c06-plan .pl-sub.re{border-color:var(--warn);box-shadow:0 0 22px color-mix(in srgb,var(--warn) 35%,transparent)}
+#c06-plan .pl-gh{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700}
+#c06-plan .pl-gh em{font:800 15px var(--num);font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#06101f;background:var(--acc)}
+#c06-plan .pl-ns{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-left:12px;border-left:2px dashed var(--line2)}
+#c06-plan .pl-n{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:10px;font:16px var(--mono);border:1px solid var(--line);background:rgba(10,16,36,.9);transition:all .35s}
+#c06-plan .pl-n small{margin-left:auto;font:15px var(--font);color:var(--text3)}
+#c06-plan .pl-n.run{border-color:var(--acc);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 40%,transparent)}
+#c06-plan .pl-n.run small{color:var(--acc)}
+#c06-plan .pl-n.ok{border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+#c06-plan .pl-n.ok small{color:var(--ok)}
+#c06-plan .pl-n.bad{border-color:var(--bad);animation:shake .5s}
+#c06-plan .pl-n.bad small{color:var(--bad)}
+#c06-plan .pl-n.re small{color:var(--warn)}
+#c06-plan .pl-mid{position:relative;display:flex;flex-direction:column;gap:12px}
+#c06-plan .pl-scene{height:442px;border-radius:18px;overflow:hidden}
+#c06-plan .pl-msg{padding:12px 16px;border-radius:14px;font-size:18px;line-height:1.5;min-height:80px;color:var(--text);border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-plan .pl-msg b{color:var(--acc)}
+#c06-plan .pl-msg.bad b{color:var(--bad)}
+#c06-plan .pl-msg.warn b{color:var(--warn)}
+#c06-plan .pl-r{display:flex;flex-direction:column;gap:16px}
+#c06-plan .pl-cur{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+#c06-plan .pl-cur .chip{font-style:normal;font-size:15px;padding:1px 8px;margin-left:6px}
+#c06-plan .pl-ct{font:700 19px var(--mono);color:var(--acc)}
+#c06-plan .pl-kv span{font-size:15px;color:var(--text3)}
+#c06-plan .pl-kv p{font-size:17px;line-height:1.45;color:var(--text)}
+#c06-plan .pl-tools{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+#c06-plan .pl-t{display:flex;align-items:center;gap:10px;font-size:18px}
+#c06-plan .pl-t .ic{font-size:22px;color:var(--ok)}
+</style>
+<script>
+HOOKS['c06-plan'] = {
+  N: [
+    [0, 'pick(red_cup)', '杯子在工作区内且可见', '夹爪内检测到杯子', '限速；超时即停止'],
+    [0, 'place(red_cup, tray)', '夹爪持有杯子', '杯子位于托盘内', '只在托盘范围内松开'],
+    [0, 'verify_state()', '放置动作已返回', '新观察确认杯子在托盘', '无法确认就不继续'],
+    [1, 'pick(yellow_paper)', '纸张在工作区内且可见', '夹爪内检测到纸张', '避开托盘里的杯子'],
+    [1, 'place(yellow_paper, bin)', '夹爪持有纸张', '纸张位于垃圾盒内', '只在垃圾盒上方松开'],
+    [1, 'verify_state()', '放置动作已返回', '新观察确认纸张在垃圾盒', '无法确认就不继续'],
+    [2, 'verify_state()', '所有子任务完成', '桌面状态符合目标，机械臂回到安全姿态', '状态无法确认则 stop'],
+  ],
+  init(s) {
+    const subs = [...s.querySelectorAll('.pl-sub .pl-ns')];
+    this.N.forEach(([g, t], i) => subs[g].insertAdjacentHTML('beforeend', `<div class="pl-n" data-i="${i}">${t}<small>待做</small></div>`));
+    this.ns = [...s.querySelectorAll('.pl-n')];
+    this.subs = [...s.querySelectorAll('.pl-sub')];
+    this.desk = HOOKS['c06-robot'].mkDesk(s.querySelector('.pl-scene'), { w: 620, h: 442, p: 'c06pl' });
+    this.msg = s.querySelector('.pl-msg');
+    s.querySelectorAll('.pl-btns .btn').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.play(s, +b.dataset.m); }));
+  },
+  st(i, cls, txt) { const n = this.ns[i]; n.className = 'pl-n ' + cls; n.querySelector('small').textContent = txt; },
+  say(h, cls = '') { this.msg.className = 'pl-msg ' + cls; this.msg.innerHTML = h; },
+  cur(s, i) {
+    const [, t, a, b, c] = this.N[i], q = (x) => s.querySelector(x);
+    q('.pl-ct').textContent = t; q('.pl-c0').textContent = a; q('.pl-c1').textContent = b; q('.pl-c2').textContent = c;
+  },
+  async play(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk, P = D.P;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, mv = (to, ms) => D.tween(ctx, to, ms), w = (ms) => U.wait(ctx, ms);
+    this.m = m;
+    s.querySelectorAll('.pl-btns .btn').forEach((b) => b.classList.toggle('on', +b.dataset.m === m));
+    D.halt(); D.reset();
+    this.ns.forEach((n, i) => this.st(i, '', '待做'));
+    this.subs.forEach((x) => x.classList.remove('re'));
+    this.say('规划器先列出物体和目标，决定先后顺序：<b>处理红色杯子 → 清理黄色纸张 → 检查桌面</b>');
+    await w(1400); if (!ok()) return;
+    // 1. pick(red_cup)
+    this.st(0, 'run', '执行中'); this.cur(s, 0);
+    await mv({ ee: [D.S.cup[0] + 6, D.S.cup[1] + 70] }, 800); if (!ok()) return;
+    await mv({ ee: [...D.S.cup] }, 500); if (!ok()) return;
+    if (m === 1) {
+      await mv({ grip: 1 }, 300); if (!ok()) return;
+      this.st(0, 'bad', '失败'); this.say('<b>抓取失败</b>：杯子没有夹住——只重试当前这一步，不重做整个计划', 'bad');
+      await mv({ grip: 0, ee: [D.S.cup[0], D.S.cup[1] + 50] }, 400); if (!ok()) return;
+      D.scan(); await w(900); if (!ok()) return;
+      this.st(0, 'run', '重试当前步');
+      await mv({ ee: [...D.S.cup] }, 450); if (!ok()) return;
+    }
+    await mv({ grip: 1 }, 300); if (!ok()) return;
+    D.S.hold = 'cup'; this.st(0, 'ok', '完成');
+    // 2. place
+    this.st(1, 'run', '执行中'); this.cur(s, 1);
+    if (m !== 1) this.say('每完成一个技能，就得到一个<b>可以检查的节点</b>');
+    await mv({ ee: [...P.tray] }, 1200); if (!ok()) return;
+    await mv({ grip: 0 }, 300); if (!ok()) return;
+    D.S.hold = null; this.st(1, 'ok', '完成');
+    // 3. verify
+    this.st(2, 'run', '观察中'); this.cur(s, 2);
+    D.scan(); await w(900); if (!ok()) return;
+    this.st(2, 'ok', '已确认');
+    // 纸张被挪动：只重新规划受影响的后续步骤
+    if (m === 2) {
+      this.say('<b>有人挪动了纸张</b>：杯子的三步保持完成，只重新规划受影响的后续步骤', 'warn');
+      D.ovl('<g opacity=".85"><path d="M640 420 C 600 380, 560 360, 520 330" fill="none" stroke="#fde68a" stroke-width="3" stroke-dasharray="6 6"/><text x="600" y="460" text-anchor="middle" fill="#fde68a" font-size="20" font-weight="700">人手挪动</text></g>');
+      await mv({ paper: [D.S.paper[0] + 90, D.S.paper[1] + 70] }, 700); if (!ok()) return;
+      D.ovl('');
+      this.subs[1].classList.add('re'); this.subs[2].classList.add('re');
+      [3, 4, 5, 6].forEach((i) => this.st(i, 're', '已重新规划'));
+      D.scan(); await w(1300); if (!ok()) return;
+      this.subs.forEach((x) => x.classList.remove('re'));
+    }
+    // 4–6 纸张
+    this.st(3, 'run', '执行中'); this.cur(s, 3);
+    if (m !== 2) this.say('杯子完成并确认后，再处理<b>黄色纸张</b>');
+    await mv({ ee: [D.S.paper[0] - 4, D.S.paper[1] + 60] }, 800); if (!ok()) return;
+    await mv({ ee: [...D.S.paper] }, 450); if (!ok()) return;
+    await mv({ grip: 1 }, 300); if (!ok()) return;
+    D.S.hold = 'paper'; this.st(3, 'ok', '完成');
+    this.st(4, 'run', '执行中'); this.cur(s, 4);
+    await mv({ ee: [...P.bin] }, 1200); if (!ok()) return;
+    await mv({ grip: 0 }, 300); if (!ok()) return;
+    D.S.hold = null; D.S.papS = 0.82; D.draw(); this.st(4, 'ok', '完成');
+    this.st(5, 'run', '观察中'); this.cur(s, 5);
+    D.scan(); await w(900); if (!ok()) return;
+    this.st(5, 'ok', '已确认');
+    // 7. 检查桌面
+    this.st(6, 'run', '观察中'); this.cur(s, 6);
+    await mv({ ee: [...P.safe] }, 900); if (!ok()) return;
+    D.scan(); await w(1000); if (!ok()) return;
+    this.st(6, 'ok', '已确认');
+    this.say('<b>整理完成</b>：最终状态由新观察确认');
+    await w(2400); if (!ok()) return;
+    this.play(s, this.auto ? (m + 1) % 3 : m);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.play(s, 0); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.desk.halt(); this.desk.reset(); },
+};
+</script>
+
+<section class="slide" id="c06-exp12" data-part="6" data-trans="zoom" data-dur="18000" data-title="实验 6-12 ★★：Gemini Robotics-ER 1.5 驱动 XLeRobot" data-notes="<b>实验 6-12 ★★：使用 Gemini Robotics-ER 1.5 驱动 XLeRobot 自主整理桌面。</b>保持实验 6-10 的真实 XLeRobot、桌面布置、任务指令和成功条件不变，把人类操作者替换为 Agent。可以使用 Gemini Robotics-ER 1.5 这类具身推理模型负责观察和规划，通过 RoboCrew 风格的智能体循环<b>只开放五个工具</b>：observe_scene、pick、place、verify_state 和 stop（脚注：XLeRobot 上游示例展示模型与工具调用的编排方式；本节保持同一编排原则，但把动作工具限定为经过标定的桌面抓取、放置、检查和停止原语）。<br>模型先观察桌面，决定处理顺序，再调用经过标定的 XLeRobot 抓取和放置动作。每完成一个技能都必须重新观察并检查后置条件；抓取失败时只能重试当前技能，用户喊停、物体离开工作区或状态无法确认时必须调用 stop。<b>模型不能直接输出任意关节角，也不能仅凭自己先前说过“已经完成”就跳过真实检查。</b><br>验收标准与实验 6-10 完全相同：杯子位于托盘内、废纸位于垃圾盒内、机械臂回到安全姿态且没有碰撞或越界。区别在于，自主实验的任务语义必须来自模型观察，真实动作必须来自工具调用，最终状态必须由新观察确认；<b>人只能负责启动、急停和安全监护，不能在中途代替 Agent 完成动作</b>。这样，实验 6-10 与 6-12 才能直接比较“同一硬件、同一任务，人类闭环与模型闭环之间还差什么”。<br>真机实验能暴露标定误差、相机遮挡和夹爪失败，却很难安全、可控地重复大量故障。后面的模拟实验会保留这五个工具和完全相同的任务状态，只把真实执行器换成可注入失败的桌面环境。<br>左侧调用日志与场景是示意回放；右下角“用户喊停”按钮可以随时触发 stop。配套仓库现状：本地验收不调用 Gemini API、不打开串口；真机扩展需要绑定 RoboCrew 工具注册与 XLeRobot 手臂控制器，并增加工作空间、急停、观察员与动作回执门禁。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-12 ★★：Gemini Robotics-ER 1.5 驱动 XLeRobot <em>自主整理桌面</em></h2></header>
+  <div class="x12-body">
+    <div class="x12-l fx fx-left" style="--d:2">
+      <div class="x12-scene"></div>
+      <div class="x12-hum"><svg class="ic"><use href="#i-user"/></svg><p>人只负责<b>启动、急停和安全监护</b>，不能中途代替 Agent 完成动作</p><button class="btn x12-stop"><svg class="ic"><use href="#i-c06-rl-estop"/></svg>用户喊停</button></div>
+    </div>
+    <div class="x12-log win fx fx-up" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>Agent 循环 · 工具调用日志</span><span class="chip warn x12-sim">示意</span></div><div class="x12-lines"></div></div>
+    <div class="x12-r fx fx-right" style="--d:4">
+      <div class="x12-tools panel"><span class="lbl">只开放五个工具</span><div class="x12-tl"></div></div>
+      <div class="x12-gate panel"><span class="lbl">安全闸门</span>
+        <div class="x12-g" data-g="0"><svg class="ic"><use href="#i-ban"/></svg><p>不能直接输出<b>任意关节角</b></p></div>
+        <div class="x12-g" data-g="1"><svg class="ic"><use href="#i-eye"/></svg><p>不能仅凭先前说过“已经完成”就<b>跳过真实检查</b></p></div>
+        <div class="x12-g" data-g="2"><svg class="ic"><use href="#i-alert"/></svg><p>用户喊停 · 物体离开工作区 · 状态无法确认 → <b>必须 stop</b></p></div>
+      </div>
+      <div class="x12-st"><b>配套仓库现状</b><p>本地验收不调用 Gemini API、不打开串口；真机扩展需绑定 RoboCrew 工具注册与 XLeRobot 手臂控制器，并增加工作空间、急停、观察员与动作回执门禁</p></div>
+    </div>
+  </div>
+  <p class="tagline x12-tag fx fx-up" style="--d:6">验收标准与实验 6-10 完全相同——同一硬件、同一任务，直接比较<b>人类闭环与模型闭环之间还差什么</b></p>
+  <div class="src">第六章 ·「长程规划与任务分解」· 实验 6-12</div>
+</section>
+<style>
+#c06-exp12 .x12-body{display:grid;grid-template-columns:560px 1fr 470px;gap:22px;height:610px}
+#c06-exp12 .x12-l{display:flex;flex-direction:column;gap:12px}
+#c06-exp12 .x12-scene{height:400px;border-radius:18px;overflow:hidden}
+#c06-exp12 .x12-hum{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+#c06-exp12 .x12-hum>.ic{flex:none;font-size:26px;color:var(--acc)}
+#c06-exp12 .x12-hum p{font-size:17px;line-height:1.5;color:var(--text2)}
+#c06-exp12 .x12-hum b{color:var(--text)}
+#c06-exp12 .x12-stop{flex:none;padding:8px 14px;font-size:17px;color:#fecdd3;border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.12)}
+#c06-exp12 .x12-stop .ic{color:var(--bad)}
+#c06-exp12 .x12-log{display:flex;flex-direction:column;min-height:0}
+#c06-exp12 .x12-sim{margin-left:auto;font-size:15px;padding:1px 8px}
+#c06-exp12 .x12-lines{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:6px;overflow:hidden;font:15.5px/1.5 var(--mono)}
+#c06-exp12 .x12-ln{display:flex;gap:10px;animation:upIn .35s var(--ease) both}
+#c06-exp12 .x12-ln em{flex:none;width:48px;font-style:normal;font-weight:700}
+#c06-exp12 .x12-ln.th{color:#ddd6fe}#c06-exp12 .x12-ln.th em{color:var(--llm)}
+#c06-exp12 .x12-ln.tc{color:#fde68a}#c06-exp12 .x12-ln.tc em{color:var(--tool)}
+#c06-exp12 .x12-ln.ob{color:#a5f3fc}#c06-exp12 .x12-ln.ob em{color:var(--ctx)}
+#c06-exp12 .x12-ln.no{color:#fecdd3;background:rgba(251,113,133,.1);border-radius:6px;padding:2px 6px}#c06-exp12 .x12-ln.no em{color:var(--bad)}
+#c06-exp12 .x12-ln.ok{color:#a7f3d0}#c06-exp12 .x12-ln.ok em{color:var(--ok)}
+#c06-exp12 .x12-r{display:flex;flex-direction:column;gap:12px}
+#c06-exp12 .x12-tools{padding:12px 16px}
+#c06-exp12 .x12-tl{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#c06-exp12 .x12-tl code{padding:4px 10px;border-radius:8px;font:16px var(--mono);color:var(--tool);border:1px solid color-mix(in srgb,var(--tool) 40%,transparent);background:color-mix(in srgb,var(--tool) 8%,transparent);transition:box-shadow .3s,background .3s}
+#c06-exp12 .x12-tl code.on{background:color-mix(in srgb,var(--tool) 26%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--tool) 50%,transparent)}
+#c06-exp12 .x12-tl code.st{color:var(--bad);border-color:rgba(251,113,133,.5);background:rgba(251,113,133,.08)}
+#c06-exp12 .x12-gate{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+#c06-exp12 .x12-g{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:12px;border:1px solid var(--line);transition:all .35s}
+#c06-exp12 .x12-g .ic{flex:none;font-size:22px;color:var(--bad)}
+#c06-exp12 .x12-g p{font-size:16px;line-height:1.45;color:var(--text2)}
+#c06-exp12 .x12-g b{color:var(--text)}
+#c06-exp12 .x12-g.on{border-color:var(--bad);background:rgba(251,113,133,.1);box-shadow:0 0 20px rgba(251,113,133,.3)}
+#c06-exp12 .x12-st{padding:12px 16px;border-radius:14px;border:1.5px dashed color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 6%,transparent)}
+#c06-exp12 .x12-st b{font-size:17px;color:var(--warn)}
+#c06-exp12 .x12-st p{margin-top:4px;font-size:15px;line-height:1.5;color:var(--text2)}
+#c06-exp12 .x12-tag{margin-top:16px;font-size:21px}
+</style>
+<script>
+HOOKS['c06-exp12'] = {
+  TOOLS: ['observe_scene', 'pick', 'place', 'verify_state', 'stop'],
+  init(s) {
+    s.querySelector('.x12-tl').innerHTML = this.TOOLS.map((t) => `<code data-t="${t}"${t === 'stop' ? ' class="st"' : ''}>${t}</code>`).join('');
+    this.desk = HOOKS['c06-robot'].mkDesk(s.querySelector('.x12-scene'), { w: 560, h: 400, p: 'c06x12' });
+    this.lines = s.querySelector('.x12-lines');
+    this.gs = [...s.querySelectorAll('.x12-g')];
+    s.querySelector('.x12-stop').addEventListener('click', () => this.stop(s));
+  },
+  log(c, e, t) {
+    this.lines.insertAdjacentHTML('beforeend', `<div class="x12-ln ${c}"><em>${e}</em><span>${t}</span></div>`);
+    while (this.lines.children.length > 17) this.lines.firstElementChild.remove();
+    const m = t.match(/^(observe_scene|pick|place|verify_state|stop)\(/);
+    if (m) { const el = this.s.querySelector(`.x12-tl [data-t="${m[1]}"]`); el.classList.add('on'); this.ctx && this.ctx.later(() => el.classList.remove('on'), 700); }
+  },
+  gate(i) { const g = this.gs[i]; g.classList.add('on'); this.ctx && this.ctx.later(() => g.classList.remove('on'), 1600); },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, D = this.desk;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    D.halt(); D.reset(); this.lines.innerHTML = '';
+    this.log('tc', '调用', 'observe_scene()'); D.scan();
+    await w(900); if (!ok()) return;
+    this.log('ob', '观察', '红色杯子、黄色废纸、托盘、垃圾盒');
+    this.log('th', '思考', '先处理杯子，再处理废纸，最后检查');
+    await w(900); if (!ok()) return;
+    const ev = {
+      start: () => this.log('tc', '调用', 'pick(red_cup)'),
+      'pick-cup': () => { this.log('ok', '返回', '已夹住杯子'); this.log('no', '拒绝', 'set_joint_angles([…]) 不在五个工具之内'); this.gate(0); this.log('tc', '调用', 'place(red_cup, tray)'); },
+      'place-cup': () => this.log('ok', '返回', '已放下'),
+      'check-cup': () => { this.log('tc', '调用', 'verify_state(red_cup in tray)'); this.log('ob', '观察', '新观察：杯子在托盘内'); this.log('tc', '调用', 'pick(yellow_paper)'); },
+      miss: () => this.log('no', '返回', '抓取失败：未夹住纸张'),
+      reobserve: () => this.log('tc', '调用', 'observe_scene() · 只重试当前技能'),
+      retry: () => this.log('tc', '调用', 'pick(yellow_paper)'),
+      'pick-paper': () => { this.log('ok', '返回', '已夹住纸张'); this.log('tc', '调用', 'place(yellow_paper, bin)'); },
+      'place-paper': () => this.log('ok', '返回', '已放下'),
+      'check-paper': () => { this.log('th', '思考', '“已经完成”，可以结束'); this.log('no', '拒绝', '未经新观察不能宣布完成'); this.gate(1); },
+      verify: () => this.log('tc', '调用', 'verify_state(all)'),
+      done: () => this.log('ok', '确认', '杯子在托盘 · 废纸在垃圾盒 · 安全姿态 · 无碰撞'),
+    };
+    const r = await D.run(ctx, ok, { fail: true, checkEach: true, on: (e) => ev[e] && ev[e]() });
+    if (!r || !ok()) return;
+    await w(2600); if (!ok()) return;
+    this.run(s);
+  },
+  stop(s) {
+    if (!this.ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    this.desk.halt();
+    this.log('no', '用户', '“停！”');
+    this.log('tc', '调用', 'stop()');
+    this.log('ok', '返回', '机械臂已停止，等待人工确认');
+    this.gate(2);
+    this.desk.ovl('<rect x="5" y="5" width="690" height="490" rx="24" fill="rgba(251,113,133,.12)" stroke="#fb7185" stroke-width="6"/><text x="350" y="260" text-anchor="middle" fill="#fecdd3" font-size="34" font-weight="800">STOP</text>');
+    ctx.later(() => { if (ok()) this.run(s); }, 3600);
+  },
+  enter(s, ctx) { this.s = s; this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.desk.halt(); this.desk.reset(); this.lines.innerHTML = ''; this.gs.forEach((g) => g.classList.remove('on')); },
+};
+</script>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>深入理解 AI Agent · 动画版</title>
+  <link rel="stylesheet" href="css/player.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">深入理解 AI Agent <span>动画版</span></div>
+      <div class="crumb"><span id="crumb-chapter"></span><span class="sep">/</span><span id="crumb-scene"></span></div>
+    </header>
+
+    <main class="stage-wrap">
+      <svg id="stage" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" role="img" aria-label="动画画面"></svg>
+
+      <div class="cover" id="cover">
+        <div class="cover-inner">
+          <div class="cover-kicker">《深入理解 AI Agent：设计原理与工程实践》</div>
+          <h1>动画版</h1>
+          <p class="cover-sub">按原书深度逐章呈现 · 默认连续播放，可随时暂停、逐步浏览</p>
+          <button class="start" id="btn-start" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>开始播放
+          </button>
+          <p class="cover-keys">空格　播放 / 暂停　　← →　上一步 / 下一步　　点击或拖动进度条　跳转</p>
+          <p class="cover-note">非官方二次创作。内容依据李博杰《深入理解 AI Agent：设计原理与工程实践》（github.com/bojieli/ai-agent-book，Apache License 2.0）</p>
+        </div>
+      </div>
+    </main>
+
+    <section class="narration">
+      <div class="narration-inner">
+        <div class="narration-meta"><span class="step" id="step-count"></span><span id="source"></span></div>
+        <p id="narration-text"></p>
+      </div>
+    </section>
+
+    <footer class="controls">
+      <button class="btn" id="btn-prev" type="button" title="上一步（←）" aria-label="上一步">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h2v14H6zM9.5 12L19 5v14z"/></svg>
+      </button>
+      <button class="btn primary" id="btn-play" type="button" title="播放 / 暂停（空格）" aria-label="播放或暂停">
+        <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        <svg class="i-replay" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5V2L7 6l5 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z"/></svg>
+      </button>
+      <button class="btn" id="btn-next" type="button" title="下一步（→）" aria-label="下一步">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>
+      </button>
+      <span class="time" id="time">00:00 / 00:00</span>
+      <div class="timeline" id="timeline">
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <div class="markers" id="markers"></div>
+        <div class="knob" id="knob"></div>
+        <div class="tip" id="tip"></div>
+      </div>
+      <select class="speed" id="speed" title="播放速度" aria-label="播放速度">
+        <option value="0.5">0.5×</option>
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+        <option value="2">2×</option>
+      </select>
+    </footer>
+  </div>
+
+  <script src="js/vendor/gsap.min.js"></script>
+  <script src="js/core/kit.js"></script>
+  <script src="js/core/player.js"></script>
+  <!-- 场景按播放顺序引入 -->
+  <script src="js/scenes/ch1-0-opening.js"></script>
+  <script src="js/scenes/ch1-1-formula.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

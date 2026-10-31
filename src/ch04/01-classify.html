@@ -1,0 +1,333 @@
+<!-- ================= PART 01 工具的分类 ================= -->
+<section class="slide chapter" id="c04-d1" data-part="1" data-title="PART 01 · 工具的分类" data-notes="第一章介绍了 Agent 的五类工具：<b>感知、执行、协作、事件触发、用户沟通</b>。为了帮助理解这五类工具的设计差异，可以从两个特征来审视它们：<b>调用方向</b>（这次交互由谁发起）和<b>作用对象</b>（这次交互作用于什么）。这两列并不构成一个交叉分类框架——每类工具在“作用对象”上各有专属的取值——它们的作用是帮助读者快速把握每类工具的定位，便于后文逐类讨论其设计重点。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">工具的分类</h1>
+  <div class="ch-s fx fx-up" style="--d:3">五类工具，用两个特征快速定位</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">调用方向：这次交互由谁发起；<br>作用对象：这次交互作用于什么。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c04-t41" data-part="1" data-trans="flip" data-title="表4-1 五类工具的调用方向与作用对象" data-dur="14000" data-notes="表4-1 汇总了五类工具的<b>调用方向</b>与<b>作用对象</b>。表格会逐行自动高亮，右侧示意图同步演示这一类工具的交互方向；也可以点击任一行。<br><b>感知工具</b>是 Agent 主动获取信息、感知世界的方式，例如网络搜索（web_search）、内部知识库检索（knowledge_base_search）、阅读网页（fetch_url）、搜索文件名（find_file）、搜索文件内容（grep_file）、读文件（read_file）。它的设计关键在于<b>控制输出信息量，防止上下文爆炸</b>。<br><b>执行工具</b>是 Agent 改变外部世界的方式，例如命令行（shell_exec）、代码解释器（code_interpreter）、写文件、编辑文件、发送邮件。与感知工具不同，执行工具的错误代价可能极高，<b>安全约束是其设计的核心</b>。<br><b>协作工具</b>是 Agent 与其他 Agent 及人类协作的方式：创建子 Agent、给子 Agent 发消息、取消子 Agent、发现系统中可用的 Agent。最简单的原因是<b>并行执行不相关的多个任务</b>，例如并行调研 OpenAI 的多个联合创始人；更复杂的原因是使用不同的模型、工具、提示词和上下文执行不同的任务，实现更好的效果（第 10 章）。<br><b>用户沟通工具</b>是 Agent 主动向用户传递信息的方式：回复用户、发送结构化卡片、发送通知提醒。当沟通从单一会话内的一问一答扩展到多渠道的异步消息时，<b>“说话”本身也需要成为显式的工具调用</b>。<br><b>事件触发工具</b>是外部世界驱动 Agent 行动的方式：设置定时器、监控后台命令行任务、连接外部事件源。下一页单独展开它的两个时刻。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">五类工具的<em>调用方向</em>与<em>作用对象</em></h2></header>
+  <div class="t41-body">
+    <div class="t41-left fx fx-left" style="--d:2">
+      <div class="t41-tb panel">
+        <div class="t41-r t41-h"><span>工具类型</span><span>调用方向</span><span>作用对象</span></div>
+        <div class="t41-rows"></div>
+      </div>
+      <p class="t41-cav"><svg class="ic"><use href="#i-alert"/></svg><span>两列<b>不构成交叉分类框架</b>：每类工具在“作用对象”上各有专属取值，只用来快速把握每类工具的定位</span></p>
+    </div>
+    <div class="t41-card panel fx fx-right" style="--d:3">
+      <div class="t41-dia">
+        <svg class="t41-svg" viewBox="0 0 660 170" width="660" height="170">
+          <path class="t41-p a" d="M152 85 H 253"/><path class="t41-p b" d="M407 85 H 508"/>
+          <circle class="t41-k k1" r="9"/><circle class="t41-k k2" r="9"/>
+        </svg>
+        <div class="t41-n t41-ag"><svg class="ic"><use href="#i-robot"/></svg><b>Agent</b><span class="t41-zz">休眠中…</span></div>
+        <div class="t41-n t41-tl"><svg class="ic"><use href="#i-wrench"/></svg><b class="t41-tn">工具</b></div>
+        <div class="t41-n t41-tg"><svg class="ic"><use href="#i-globe"/></svg><b class="t41-gn">对象</b><small class="t41-gs"></small></div>
+      </div>
+      <p class="t41-ph"></p>
+      <span class="lbl">例子</span>
+      <div class="t41-ex"></div>
+      <p class="t41-key"></p>
+      <div class="runbar t41-bar"><i></i></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「工具的分类」· 表4-1</div>
+</section>
+<style>
+#c04-t41 .t41-body{display:flex;gap:30px;flex:1;min-height:0}
+#c04-t41 .t41-left{width:900px;flex:none;display:flex;flex-direction:column;gap:16px}
+#c04-t41 .t41-tb{padding:6px 0;overflow:hidden}
+#c04-t41 .t41-r{--c:var(--line2);display:grid;grid-template-columns:300px 290px 1fr;gap:16px;align-items:center;padding:0 26px;height:94px;border-left:4px solid transparent;cursor:pointer;transition:all .4s var(--ease)}
+#c04-t41 .t41-r+.t41-r{border-top:1px solid var(--line)}
+#c04-t41 .t41-h{height:52px;cursor:default;font-size:16px;letter-spacing:.14em;color:var(--text3)}
+#c04-t41 .t41-r b{display:flex;align-items:center;gap:12px;font-size:25px;color:var(--c)}
+#c04-t41 .t41-r b .ic{font-size:28px}
+#c04-t41 .t41-r>span{font-size:22px;color:var(--text2)}
+#c04-t41 .t41-h>span{font-size:16px;color:var(--text3)}
+#c04-t41 .t41-r .t41-ev{color:var(--tp-evt);font-weight:600}
+#c04-t41 .t41-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+#c04-t41 .t41-r.on>span{color:var(--text)}
+#c04-t41 .t41-cav{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-radius:14px;font-size:18px;line-height:1.6;color:var(--text2);background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.3)}
+#c04-t41 .t41-cav .ic{flex:none;font-size:22px;color:var(--warn);margin-top:3px}
+#c04-t41 .t41-cav b{color:var(--warn)}
+#c04-t41 .t41-card{flex:1;padding:24px 28px 20px;display:flex;flex-direction:column;gap:12px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+#c04-t41 .t41-card::before{content:"";position:absolute;left:0;top:26px;bottom:26px;width:4px;border-radius:4px;background:var(--c);box-shadow:0 0 16px var(--c)}
+#c04-t41 .t41-dia{position:relative;width:660px;height:170px;margin:0 auto}
+#c04-t41 .t41-svg{position:absolute;inset:0;overflow:visible;z-index:1;pointer-events:none}
+#c04-t41 .t41-p{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2.5;stroke-dasharray:6 8}
+#c04-t41 .t41-p.on{stroke:var(--c);stroke-width:3.5;animation:flow 1s linear infinite;filter:drop-shadow(0 0 5px var(--c))}
+#c04-t41 .t41-p.rev.on{animation-direction:reverse}
+#c04-t41 .t41-k{opacity:0;fill:var(--c);filter:drop-shadow(0 0 8px var(--c))}
+#c04-t41 .t41-n{position:absolute;top:20px;width:150px;height:130px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:all .45s var(--ease);z-index:2}
+#c04-t41 .t41-n>.ic{font-size:36px}
+#c04-t41 .t41-n b{font-size:19px;line-height:1.3}
+#c04-t41 .t41-n small{font-size:15px;color:var(--text3);line-height:1.35;padding:0 6px}
+#c04-t41 .t41-ag{left:0;border-color:color-mix(in srgb,var(--llm) 55%,transparent)}
+#c04-t41 .t41-ag>.ic{color:var(--llm)}
+#c04-t41 .t41-tl{left:255px;border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.92))}
+#c04-t41 .t41-tl>.ic{color:var(--c)}
+#c04-t41 .t41-tl b{color:var(--c)}
+#c04-t41 .t41-tg{left:510px;border-color:color-mix(in srgb,var(--env) 45%,transparent)}
+#c04-t41 .t41-tg>.ic{color:var(--env)}
+#c04-t41 .t41-n.hit{box-shadow:0 0 30px color-mix(in srgb,var(--c) 45%,transparent);translate:0 -4px}
+#c04-t41 .t41-zz{position:absolute;bottom:-28px;font-size:15px;color:var(--text3);opacity:0;transition:opacity .4s}
+#c04-t41 .t41-ag.sleep{filter:grayscale(.8) brightness(.6)}
+#c04-t41 .t41-ag.sleep .t41-zz{opacity:1}
+#c04-t41 .t41-ph{min-height:30px;text-align:center;font-size:19px;color:var(--c);font-weight:600}
+#c04-t41 .t41-ex{display:flex;flex-wrap:wrap;gap:9px}
+#c04-t41 .t41-ex span{padding:6px 12px;border-radius:10px;font:17px var(--mono);color:var(--text);background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);animation:upIn .45s var(--spring) both;animation-delay:calc(var(--j)*60ms)}
+#c04-t41 .t41-key{font-size:20px;line-height:1.65;padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+#c04-t41 .t41-key b{color:var(--c)}
+#c04-t41 .t41-bar{margin-top:auto}
+</style>
+<script>
+HOOKS['c04-t41'] = {
+  R: [
+    { k: 'per', dir: 'Agent 主动调用', obj: '获取信息', g: '外部信息', gs: '网页 · 知识库 · 文件', gic: 'globe', flow: 'pull',
+      ex: ['web_search', 'knowledge_base_search', 'fetch_url', 'find_file', 'grep_file', 'read_file'],
+      key: '<b>设计关键</b>：控制输出信息量，防止上下文爆炸' },
+    { k: 'exe', dir: 'Agent 主动调用', obj: '改变世界', g: '外部世界', gs: '文件 · 系统 · 邮箱', gic: 'cpu', flow: 'push',
+      ex: ['shell_exec', 'code_interpreter', 'write_file', 'edit_file', 'send_email'],
+      key: '<b>设计关键</b>：错误代价可能极高，安全约束是设计的核心' },
+    { k: 'col', dir: 'Agent 主动调用', obj: '驱动其他 Agent 或人类', g: '其他 Agent / 人类', gs: '子 Agent · 审批人', gic: 'robot', flow: 'both',
+      ex: ['spawn_subagent', 'send_message_to_subagent', 'cancel_subagent', 'list_agents'],
+      key: '<b>为什么协作</b>：并行执行不相关的多个任务（如并行调研 OpenAI 的多个联合创始人）；用不同的模型、工具、提示词和上下文完成不同任务（第 10 章）' },
+    { k: 'usr', dir: 'Agent 主动调用', obj: '向用户传递信息', g: '用户', gs: '多个渠道 · 异步触达', gic: 'user', flow: 'push',
+      ex: ['reply_to_user', 'send_card_to_user', 'send_user_notification'],
+      key: '<b>设计关键</b>：沟通扩展到多渠道的异步消息时，“说话”本身也要成为显式的工具调用' },
+    { k: 'evt', dir: 'Agent 注册、外部触发', obj: '驱动 Agent 开始执行', g: '外部事件源', gs: '定时器 · 后台任务 · 外部渠道', gic: 'bell', flow: 'event',
+      ex: ['set_timer', 'monitor_shell', 'connect_channel'],
+      key: '<b>两个时刻</b>：注册时 Agent 主动声明关心什么事件；触发时外部事件异步回调，唤醒 Agent 开始处理' },
+  ],
+  init(s) {
+    s.querySelector('.t41-rows').innerHTML = this.R.map((r, i) => {
+      const t = C4.T[r.k];
+      return `<div class="t41-r" data-i="${i}" style="--c:${t.c}"><b><svg class="ic"><use href="#i-${t.ic}"/></svg>${t.n}</b><span class="${r.k === 'evt' ? 't41-ev' : ''}">${r.dir}</span><span>${r.obj}</span></div>`;
+    }).join('');
+    s.querySelector('.t41-rows').addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (r) { this.auto = false; this.show(s, +r.dataset.i); } });
+  },
+  async show(s, i) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx, r = this.R[i], t = C4.T[r.k];
+    this.i = i;
+    s.querySelectorAll('.t41-r[data-i]').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    const card = s.querySelector('.t41-card');
+    card.style.setProperty('--c', t.c);
+    s.querySelector('.t41-tn').textContent = t.n;
+    s.querySelector('.t41-tl use').setAttribute('href', `#i-${t.ic}`);
+    s.querySelector('.t41-gn').textContent = r.g;
+    s.querySelector('.t41-gs').textContent = r.gs;
+    s.querySelector('.t41-tg use').setAttribute('href', `#i-${r.gic}`);
+    s.querySelector('.t41-ex').innerHTML = r.ex.map((x, j) => `<span style="--j:${j}">${x}</span>`).join('');
+    s.querySelector('.t41-key').innerHTML = r.key;
+    const bar = s.querySelector('.t41-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) bar.classList.add('run');
+    const ph = s.querySelector('.t41-ph'), ag = s.querySelector('.t41-ag'), tl = s.querySelector('.t41-tl'), tg = s.querySelector('.t41-tg');
+    const pa = s.querySelector('.t41-p.a'), pb = s.querySelector('.t41-p.b'), k1 = s.querySelector('.t41-k.k1'), k2 = s.querySelector('.t41-k.k2');
+    [pa, pb].forEach((p) => p.classList.remove('on', 'rev'));
+    [ag, tl, tg].forEach((n) => n.classList.remove('hit', 'sleep'));
+    ph.textContent = '';
+    if (!ctx) return;
+    const hit = (n) => { n.classList.add('hit'); ctx.later(() => n.classList.remove('hit'), 650); };
+    const go = async (p, k, rev) => { p.classList.add('on'); p.classList.toggle('rev', !!rev); await U.fly(k, p, 750, { ctx, reverse: !!rev }); return ok(); };
+    if (r.flow === 'event') {
+      ph.textContent = '① 注册：Agent 主动调用，声明关心什么事件';
+      if (!(await go(pa, k1))) return;
+      hit(tl);
+      pa.classList.remove('on');
+      ag.classList.add('sleep');
+      await U.wait(ctx, 1300);
+      if (!ok()) return;
+      ph.textContent = '② 触发：外部事件异步回调，唤醒 Agent';
+      hit(tg);
+      if (!(await go(pb, k2, true))) return;
+      hit(tl);
+      if (!(await go(pa, k1, true))) return;
+      ag.classList.remove('sleep');
+      hit(ag);
+      return;
+    }
+    ph.textContent = r.flow === 'pull' ? 'Agent 主动调用 → 取回信息' : r.flow === 'both' ? 'Agent 主动调用 → 委托出去，再取回结果' : 'Agent 主动调用 → 作用在对象上';
+    if (!(await go(pa, k1))) return;
+    hit(tl);
+    if (!(await go(pb, k2))) return;
+    hit(tg);
+    if (r.flow === 'push') return;
+    await U.wait(ctx, 350);
+    if (!ok()) return;
+    pb.classList.remove('on');
+    pa.classList.remove('on');
+    if (!(await go(pb, k2, true))) return;
+    if (!(await go(pa, k1, true))) return;
+    hit(ag);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.R.length); }, 5200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.on,.hit,.sleep,.rev').forEach((e) => e.classList.remove('on', 'hit', 'sleep', 'rev'));
+    s.querySelector('.t41-bar').classList.remove('run');
+  },
+};
+</script>
+
+<section class="slide" id="c04-event" data-part="1" data-steps="1" data-trans="rise" data-title="事件触发：注册与触发两个时刻" data-dur="14000" data-notes="<b>事件触发工具</b>是外部世界驱动 Agent 行动的方式，例如设置定时器（set_timer）、监控后台命令行任务（monitor_shell）、连接外部事件源（connect_channel）。这类工具涉及两个时刻：<b>注册</b>时由 Agent 主动调用工具，声明自己关心什么事件；<b>触发</b>时由外部事件异步回调，唤醒 Agent 开始处理——这正是表4-1 中“Agent 注册、外部触发”的含义。<br>如果没有事件触发工具，Agent 只能在用户发起对话时被动响应，无法在指定时间自主行动，也无法对新邮件、系统告警等外部事件做出反应。右上角的开关可以对比两种情况（时间线为示意）。<br>按 → 看本章的取舍：前三类工具由 Agent 主动调用，其设计在本章逐类展开。事件触发工具由外部事件驱动；用户沟通工具则要在用户不一定在线的前提下跨多个渠道异步触达——<b>两者的设计都离不开事件驱动的异步运行时</b>，因此与实时交互一并放在第六章讨论。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">事件触发：<em>注册</em>与<em>触发</em>两个时刻</h2></div>
+    <button class="tgl ev4-tg on fx fx-up" style="--d:2;--tc:var(--tp-evt)"><i></i>有事件触发工具</button></header>
+  <div class="ev4-stage fx fx-scale" style="--d:2">
+    <div class="ev4-lane" style="top:0"><span class="ev4-ll"><svg class="ic"><use href="#i-robot"/></svg>Agent</span></div>
+    <div class="ev4-lane tl" style="top:124px"><span class="ev4-ll"><svg class="ic"><use href="#i-bell"/></svg>事件触发工具</span><span class="ev4-none">没有事件触发工具：外部事件找不到入口</span></div>
+    <div class="ev4-lane wd" style="top:248px"><span class="ev4-ll"><svg class="ic"><use href="#i-globe"/></svg>外部世界</span></div>
+    <div class="ev4-dyn"></div>
+    <div class="ev4-now"><i></i></div>
+    <svg class="ev4-svg" viewBox="0 0 1660 372" width="1660" height="372"><g class="ev4-ps"></g><circle class="ev4-k" r="10"/></svg>
+    <span class="ev4-sx c4x-sx">时间线为示意</span>
+  </div>
+  <div class="ev4-split" data-step="1">
+    <div class="ev4-c fx fx-up" style="--d:1"><span class="lbl">前三类 · Agent 主动调用</span><b>感知 · 执行 · 协作</b><p>设计在本章逐类展开</p><div class="ev4-dots"><i style="--c:var(--tp-per)"></i><i style="--c:var(--tp-exe)"></i><i style="--c:var(--tp-col)"></i></div></div>
+    <div class="ev4-c ch6 fx fx-up" style="--d:2"><span class="lbl">另外两类 · 第六章</span><b>事件触发 · 用户沟通</b><p>一个由外部事件驱动；一个要在用户不一定在线时跨多个渠道异步触达——<em>都离不开事件驱动的异步运行时</em>，与实时交互一并讨论</p><div class="ev4-dots"><i style="--c:var(--tp-evt)"></i><i style="--c:var(--tp-usr)"></i></div></div>
+  </div>
+  <div class="src">第四章 ·「工具的分类」· 表4-1</div>
+</section>
+<style>
+#c04-event .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-event .ev4-stage{position:relative;width:1660px;height:372px}
+#c04-event .ev4-lane{position:absolute;left:0;width:1660px;height:112px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.55)}
+#c04-event .ev4-lane.tl{border-color:color-mix(in srgb,var(--tp-evt) 35%,transparent);background:color-mix(in srgb,var(--tp-evt) 5%,rgba(12,18,40,.55));transition:opacity .5s,filter .5s}
+#c04-event .ev4-lane.wd{border-color:color-mix(in srgb,var(--env) 30%,transparent);background:color-mix(in srgb,var(--env) 4%,rgba(12,18,40,.55))}
+#c04-event .ev4-ll{position:absolute;left:18px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:10px;font-size:20px;font-weight:700;color:var(--text2);width:170px}
+#c04-event .ev4-ll .ic{font-size:24px;color:var(--acc)}
+#c04-event .ev4-lane.tl .ev4-ll .ic{color:var(--tp-evt)}
+#c04-event .ev4-lane.wd .ev4-ll .ic{color:var(--env)}
+#c04-event .ev4-none{position:absolute;left:230px;top:50%;transform:translateY(-50%);font-size:19px;color:var(--bad);opacity:0;transition:opacity .4s}
+#c04-event[data-m=off] .ev4-lane.tl{filter:grayscale(1)}
+#c04-event[data-m=off] .ev4-none{opacity:1}
+#c04-event .ev4-dyn{position:absolute;inset:0;z-index:2;pointer-events:none}
+#c04-event .ev4-b{position:absolute;height:64px;margin-top:-32px;padding:0 14px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:17px;line-height:1.3;text-align:center;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 16%,rgba(10,16,36,.95));animation:upIn .45s var(--spring) both}
+#c04-event .ev4-b.mono{font-family:var(--mono);font-size:16px}
+#c04-event .ev4-b.sleep{justify-content:flex-start;color:var(--text3);border-style:dashed;border-color:var(--line2);background:rgba(255,255,255,.02)}
+#c04-event .ev4-b.flash{box-shadow:0 0 26px color-mix(in srgb,var(--c) 60%,transparent)}
+#c04-event .ev4-b.bad{--c:var(--bad);color:#fecdd3}
+#c04-event .ev4-now{position:absolute;top:-8px;bottom:-8px;left:200px;width:2px;background:linear-gradient(var(--acc),transparent);z-index:3;transition:left 1.6s linear}
+#c04-event .ev4-now i{position:absolute;left:-6px;top:-4px;width:14px;height:14px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+#c04-event .ev4-svg{position:absolute;inset:0;overflow:visible;z-index:4;pointer-events:none}
+#c04-event .ev4-p{fill:none;stroke:transparent;stroke-width:2}
+#c04-event .ev4-k{opacity:0;fill:#fff;filter:drop-shadow(0 0 10px #f472b6)}
+#c04-event .ev4-sx{position:absolute;right:0;bottom:-34px}
+#c04-event .ev4-split{display:grid;grid-template-columns:1fr 1.4fr;gap:24px;margin-top:46px}
+#c04-event .ev4-c{position:relative;padding:18px 24px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.75)}
+#c04-event .ev4-c b{display:block;margin-top:6px;font-size:26px}
+#c04-event .ev4-c p{margin-top:6px;font-size:19px;line-height:1.6;color:var(--text2)}
+#c04-event .ev4-c p em{font-style:normal;color:var(--tp-evt);font-weight:600}
+#c04-event .ev4-c.ch6{border-color:color-mix(in srgb,var(--tp-evt) 45%,transparent);background:color-mix(in srgb,var(--tp-evt) 7%,rgba(12,18,40,.8))}
+#c04-event .ev4-dots{position:absolute;right:22px;top:20px;display:flex;gap:8px}
+#c04-event .ev4-dots i{width:14px;height:14px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+</style>
+<script>
+HOOKS['c04-event'] = {
+  // 车道中心 y：Agent 56，工具 180，外部世界 304
+  REG: [['set_timer', '明早 9:00 生成日报', 300], ['monitor_shell', '后台构建任务', 495], ['connect_channel', '邮箱 · 告警频道', 690]],
+  EV: [
+    { x: 840, w: '到点：9:00', r: 0, a: '被唤醒：生成日报' },
+    { x: 1100, w: '后台构建结束', r: 1, a: '被唤醒：检查构建结果' },
+    { x: 1360, w: '新邮件 / 系统告警', r: 2, a: '被唤醒：处理告警' },
+  ],
+  init(s) {
+    const xs = [300, ...this.EV.map((e) => e.x), 1560];
+    s.querySelector('.ev4-ps').innerHTML = xs.map((x, i) => `<path class="ev4-p" data-i="${i}" d="${i === 0 ? `M${x} 56 V 180` : `M${x} 304 V 56`}"/>`).join('');
+    this.tg = s.querySelector('.ev4-tg');
+    this.tg.addEventListener('click', () => this.setMode(s, this.mode === 'on' ? 'off' : 'on'));
+  },
+  setMode(s, m) {
+    this.mode = m;
+    s.dataset.m = m;
+    this.tg.classList.toggle('on', m === 'on');
+    this.tg.lastChild.textContent = m === 'on' ? '有事件触发工具' : '没有事件触发工具';
+    this.run(s);
+  },
+  block(s, x, w, y, txt, c, cls = '') {
+    const d = document.createElement('div');
+    d.className = 'ev4-b ' + cls;
+    d.style.cssText = `left:${x}px;width:${w}px;top:${y}px;--c:${c}`;
+    d.innerHTML = txt;
+    s.querySelector('.ev4-dyn').appendChild(d);
+    return d;
+  },
+  now(s, x) { s.querySelector('.ev4-now').style.left = x + 'px'; },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const on = this.mode === 'on', P = [...s.querySelectorAll('.ev4-p')], k = s.querySelector('.ev4-k'), dyn = s.querySelector('.ev4-dyn');
+    const PINK = '#f472b6', ENV = '#34d399', LLM = '#a78bfa';
+    while (ok()) {
+      dyn.innerHTML = '';
+      const nw = s.querySelector('.ev4-now');
+      nw.style.transition = 'none';
+      this.now(s, 200);
+      void nw.offsetWidth;
+      nw.style.transition = '';
+      await U.wait(ctx, 500);
+      if (!ok()) return;
+      const reg = [];
+      if (on) {
+        this.block(s, 210, 170, 56, '注册：声明关心的事件', LLM);
+        k.style.fill = PINK;
+        await U.fly(k, P[0], 700, { ctx });
+        if (!ok()) return;
+        for (const [n, d, x] of this.REG) {
+          reg.push(this.block(s, x - 90, 180, 180, `${n}<br>${d}`, PINK, 'mono'));
+          await U.wait(ctx, 260);
+          if (!ok()) return;
+        }
+      }
+      this.block(s, on ? 400 : 210, on ? 1250 : 1440, 56, '<svg class="ic"><use href="#i-moon"/></svg>' + (on ? '休眠：不必守在对话里，也不需要用户在场' : '空闲：只能等用户开口'), 'var(--line2)', 'sleep');
+      for (const e of this.EV) {
+        this.now(s, e.x);
+        await U.wait(ctx, 1700);
+        if (!ok()) return;
+        const wd = this.block(s, e.x - 100, 200, 304, e.w, ENV);
+        if (!on) {
+          await U.wait(ctx, 300);
+          if (!ok()) return;
+          wd.classList.add('bad');
+          wd.innerHTML = e.w + ' · 无人响应';
+          continue;
+        }
+        reg[e.r].classList.add('flash');
+        k.style.fill = PINK;
+        await U.fly(k, P[this.EV.indexOf(e) + 1], 800, { ctx });
+        if (!ok()) return;
+        reg[e.r].classList.remove('flash');
+        this.block(s, e.x - 105, 210, 56, e.a, PINK);
+      }
+      this.now(s, 1560);
+      await U.wait(ctx, 1500);
+      if (!ok()) return;
+      this.block(s, 1470, 180, 304, '用户发起对话', ENV);
+      k.style.fill = '#fbbf24';
+      await U.fly(k, P[4], 700, { ctx });
+      if (!ok()) return;
+      this.block(s, 1470, 180, 56, on ? '回应用户' : '被动响应', '#fbbf24');
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.setMode(s, this.mode || 'on'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.mode = 'on';
+    s.dataset.m = 'on';
+    this.tg.classList.add('on');
+    this.tg.lastChild.textContent = '有事件触发工具';
+    s.querySelector('.ev4-dyn').innerHTML = '';
+  },
+};
+</script>

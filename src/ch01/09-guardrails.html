@@ -1,0 +1,338 @@
+<!-- ================= PART 09 护栏与安全性 ================= -->
+<section class="slide chapter" id="c1-d9" data-part="9" data-title="PART 09 · 护栏与安全性" data-notes="编排模式解决的是上下文与工具的组织问题。但光能做事还不够，还要确保做得对、做得安全。为此，需要设置<b>护栏</b>（Guardrails），将约束、验证与纠正落实到实践中。护栏构成了保障 Agent 行为安全可控的分层防线，可用于管理数据隐私风险（例如防止系统提示泄露）或声誉风险（例如确保模型行为与品牌形象一致）。实践中可以先针对已识别的风险设置护栏，再在发现新漏洞时逐步添加。<b>单个护栏不太可能提供足够的保护，多个专门的护栏组合使用，才能构建出更有韧性的 Agent 系统。</b>">
+  <div class="ch-k fx fx-up">PART 09</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">护栏与安全性</h1>
+  <div class="ch-s fx fx-up" style="--d:3">把约束、验证与纠正落实到实践中</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">单个护栏不太可能提供足够的保护，多个专门的护栏组合使用，才能构建出更有韧性的 Agent 系统。</blockquote>
+  <div class="ch-loop" data-node="8" data-num="09"></div>
+</section>
+
+<section class="slide" id="c1-g3" data-part="9" data-title="三层护栏：按被绕过的难度排列" data-dur="16000" data-notes="按防护位置可以分为三层：<b>上下文层、执行层、数据层</b>。这三层<b>不是按请求处理的先后顺序排的，而是按被绕过的难度排的</b>——越靠下的层越不依赖模型自己的判断，因此越难被一次成功的攻击穿透。本书后面所有的安全讨论都挂在这棵树上。<br><b>上下文层</b>护栏管的是模型能看到什么，在内容进入上下文之前拦截：相关性分类器标记偏离主题的查询；安全分类器检测越狱（用户自己试图绕过模型的安全限制）和提示注入（攻击者通过网页、文档等外部数据间接操纵模型）；内容审核标记有害或不当的输入；基于规则的保护采用黑名单、输入长度限制、正则过滤等确定性措施，防范 SQL 注入等已知威胁；来源标注与“指令 / 数据”分离也属于这一层（第二章）。但这一层有一个结构性上限：<b>处在同一个上下文里的 Agent，很难判断自己是否已经被注入</b>，所以只能降低攻击成功率，给不出保证。<br><b>执行层</b>护栏管的是模型能做什么，在动作真正生效之前验证。核心是<b>工具风险评级</b>：根据操作是否可逆、权限等级、财务影响为每个工具标注低 / 中 / 高风险，高风险操作需额外审查或人工确认。关键在于这类复核必须由<b>上下文之外</b>的机制完成——独立的审查进程、最小权限凭证、沙盒隔离、人在回路——否则它会和被注入的 Agent 一起沦陷。返回给用户的回复本身也是一次动作，因此输出检查（PII 过滤器、输出验证）同样属于这一层。<br><b>数据层</b>护栏管的是世界最终能被改成什么样：数据库的行级安全策略、约束与校验器、受控视图与存储过程，以及由受信任运行时绑定、无法被伪造的访问上下文。它的价值在于<b>不依赖上面两层是否正确</b>——即使提示注入得手、生成的代码完全漏写了权限判断，越权操作仍会在数据层被拒绝（第五章）。<br>左侧粒子模拟是示意：可以关掉任意一层，看突破的攻击怎样增加。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三层护栏：按<em>被绕过的难度</em>排列</h2></header>
+  <div class="g3-body">
+    <div class="g3-left fx fx-scale" style="--d:2">
+      <canvas class="g3-cv" width="1640" height="1200"></canvas>
+      <div class="g3-ls"></div>
+      <div class="g3-world"><svg class="ic"><use href="#i-db"/></svg>世界状态 · 突破 <b class="g3-br">0</b></div>
+      <span class="g3-sx cap">示意</span>
+    </div>
+    <div class="g3-card panel fx fx-right" style="--d:3">
+      <div class="g3-h"><span class="g3-no"></span><div><b class="g3-n"></b><span class="g3-q"></span></div></div>
+      <ul class="g3-pts"></ul>
+      <p class="g3-lim"></p>
+      <div class="runbar g3-bar"><i></i></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「护栏与安全性」·「护栏类型」</div>
+</section>
+<style>
+.g3-body{display:flex;gap:34px;flex:1;min-height:0}
+.g3-left{position:relative;width:820px;height:640px;flex:none;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:rgba(5,9,22,.6)}
+.g3-cv{position:absolute;inset:0;width:820px;height:600px;pointer-events:none;z-index:2}
+.g3-ls{position:absolute;inset:0}
+.g3-l{--c:var(--acc);position:absolute;left:20px;right:20px;height:96px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.85));transition:all .35s}
+.g3-l b{font-size:22px;color:var(--c)}
+.g3-l small{display:block;font-size:15px;color:var(--text2);margin-top:2px}
+.g3-l .tgl{pointer-events:auto}
+.g3-l em{font:800 26px var(--num);font-style:normal;color:var(--c)}
+.g3-l.off{opacity:.35;filter:saturate(.2);border-style:dashed}
+.g3-l.on{box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent);border-color:var(--c)}
+.g3-world{position:absolute;left:0;right:0;bottom:0;height:72px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:20px;color:var(--text2);border-top:1px solid var(--line);background:rgba(251,113,133,.06)}
+.g3-world b{font:800 30px var(--num);color:var(--bad)}
+.g3-sx{position:absolute;right:14px;top:8px;z-index:3}
+.g3-card{flex:1;padding:26px 30px 20px;display:flex;flex-direction:column;gap:14px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.g3-h{display:flex;gap:16px;align-items:center}
+.g3-no{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;font:800 26px var(--num);color:#06101f;background:var(--c)}
+.g3-n{display:block;font-size:30px;color:var(--c)}
+.g3-q{display:block;font-size:18px;color:var(--text2);margin-top:2px}
+.g3-pts{display:flex;flex-direction:column;gap:10px}
+.g3-pts li{position:relative;padding-left:22px;font-size:18px;line-height:1.6}
+.g3-pts li::before{content:"";position:absolute;left:3px;top:.62em;width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.g3-lim{font-size:17px;line-height:1.6;padding:12px 14px;border-radius:12px;color:var(--warn);background:rgba(251,146,60,.08);border:1px solid rgba(251,146,60,.3)}
+.g3-bar{margin-top:auto}
+.g3-card.sw .g3-h,.g3-card.sw .g3-pts li,.g3-card.sw .g3-lim{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c1-g3'] = {
+  L: [
+    { n: '上下文层', q: '管的是：模型能看到什么', c: '#22d3ee', y: 40, pr: 0.45, sub: '内容进入上下文之前拦截',
+      pts: ['相关性分类器：标记偏离主题的查询', '安全分类器：越狱（用户自己绕过限制）与提示注入（通过外部数据间接操纵）', '内容审核：标记有害或不当的输入', '基于规则的保护：黑名单、长度限制、正则过滤', '来源标注与“指令 / 数据”分离（第二章）'],
+      lim: '结构性上限：处在同一个上下文里的 Agent，很难判断自己是否已经被注入——只能降低攻击成功率，给不出保证。' },
+    { n: '执行层', q: '管的是：模型能做什么', c: '#fbbf24', y: 190, pr: 0.6, sub: '动作真正生效之前验证',
+      pts: ['工具风险评级：按是否可逆、权限等级、财务影响标为低 / 中 / 高', '高风险操作需额外审查或人工确认', '复核必须由上下文之外的机制完成：独立审查进程、最小权限凭证、沙盒隔离、人在回路', '输出检查：PII 过滤器、输出验证——回复本身也是一次动作'],
+      lim: '否则复核会和被注入的 Agent 一起沦陷。' },
+    { n: '数据层', q: '管的是：世界最终能被改成什么样', c: '#34d399', y: 340, pr: 0.9, sub: '稳定、经过人类审查的机制强制执行',
+      pts: ['数据库的行级安全策略', '约束与校验器、受控视图与存储过程', '由受信任运行时绑定、无法被伪造的访问上下文'],
+      lim: '不依赖上面两层是否正确：即使注入得手、代码漏写了权限判断，越权操作仍会在这里被拒绝（第五章）。' },
+  ],
+  init(s) {
+    s.querySelector('.g3-ls').innerHTML = this.L.map((l, i) => `<div class="g3-l" data-i="${i}" style="top:${l.y + 60}px;--c:${l.c}"><div><b>${i + 1} · ${l.n}</b><small>${l.sub}</small></div><span>拦截 <em class="g3-k">0</em></span><button class="tgl on" style="--tc:${l.c}"><i></i>启用</button></div>`).join('');
+    this.g = s.querySelector('.g3-cv').getContext('2d');
+    s.querySelectorAll('.g3-l').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        const i = +el.dataset.i;
+        if (e.target.closest('.tgl')) { this.on[i] = !this.on[i]; el.classList.toggle('off', !this.on[i]); e.target.closest('.tgl').classList.toggle('on', this.on[i]); return; }
+        this.auto = false; this.show(s, i);
+      });
+    });
+  },
+  show(s, i) {
+    const l = this.L[i], c = s.querySelector('.g3-card');
+    this.i = i;
+    s.querySelectorAll('.g3-l').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    c.style.setProperty('--c', l.c);
+    c.querySelector('.g3-no').textContent = i + 1;
+    c.querySelector('.g3-n').textContent = l.n;
+    c.querySelector('.g3-q').textContent = l.q;
+    c.querySelector('.g3-pts').innerHTML = l.pts.map((p) => `<li>${p}</li>`).join('');
+    c.querySelector('.g3-lim').textContent = l.lim;
+    U.restart(c, 'sw');
+    const b = c.querySelector('.g3-bar');
+    b.classList.remove('run'); void b.offsetWidth;
+    if (this.auto) b.classList.add('run');
+  },
+  enter(s, ctx) {
+    this.on = [true, true, true];
+    s.querySelectorAll('.g3-l').forEach((el) => { el.classList.remove('off'); el.querySelector('.tgl').classList.add('on'); });
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 5000);
+    const g = this.g, P = [], kEl = [...s.querySelectorAll('.g3-k')], br = s.querySelector('.g3-br'), cnt = [0, 0, 0];
+    let broke = 0, last = 0, sp = 0;
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.raf((t) => {
+      const dt = last ? Math.min(40, t - last) / 16.7 : 1;
+      last = t;
+      if ((sp -= dt) <= 0) { sp = 7 + Math.random() * 6; P.push({ x: 60 + Math.random() * 700, y: -8, vy: 1.6 + Math.random() * 1.2, li: 0, st: 0, t: 0 }); }
+      g.clearRect(0, 0, 820, 600);
+      for (let i = P.length - 1; i >= 0; i--) {
+        const p = P[i];
+        if (!p.st) {
+          p.y += p.vy * dt;
+          while (p.li < 3 && p.y >= this.L[p.li].y + 108) {
+            if (this.on[p.li] && Math.random() < this.L[p.li].pr) { p.st = 1; p.c = this.L[p.li].c; cnt[p.li]++; kEl[p.li].textContent = cnt[p.li]; break; }
+            p.li++;
+          }
+          if (p.y > 560) { broke++; br.textContent = broke; P.splice(i, 1); continue; }
+          g.fillStyle = '#fb7185'; g.shadowColor = '#fb7185'; g.shadowBlur = 10;
+          g.beginPath(); g.arc(p.x, p.y, 5, 0, 6.283); g.fill(); g.shadowBlur = 0;
+        } else {
+          p.t += dt;
+          const a = 1 - p.t / 36;
+          if (a <= 0) { P.splice(i, 1); continue; }
+          g.globalAlpha = a; g.strokeStyle = p.c; g.lineWidth = 2;
+          g.beginPath(); g.arc(p.x, p.y, 6 + p.t * 0.6, 0, 6.283); g.stroke(); g.globalAlpha = 1;
+        }
+      }
+    });
+  },
+  reset(s) { s.querySelectorAll('.g3-k').forEach((k) => (k.textContent = 0)); s.querySelector('.g3-br').textContent = 0; this.g.clearRect(0, 0, 820, 600); },
+};
+</script>
+
+<section class="slide" id="c1-cls" data-part="9" data-trans="rise" data-title="两级筛查与误拒绝" data-notes="上下文层护栏的一个代表性工业实践是 Anthropic 的 <b>Constitutional Classifiers</b>，核心机制有三点：一是<b>规则驱动</b>——用自然语言写成的规则（明确规定哪些内容允许、哪些禁止）生成合成训练数据，训练输入输出分类器；二是<b>上下文联合判断</b>——新一代系统把用户提问和模型回答放在一起检查，因为有些回答单独看毫无问题（如“如何使用食品调味料”），只有对照提问才能发现“食品调味料”其实是化学试剂的暗语；三是<b>两级筛查</b>——先用一个极轻量的探针（直接读取模型内部激活，几乎零成本）检查所有对话，发现可疑之处再交给更强的分类器复审，而不是直接拒绝。这样一来，第一级即使误报较多也不影响用户体验，成本也大大降低。<br>护栏也存在另一类失败：<b>误拒绝</b>。为了降低危险请求被放行的概率，模型可能同时拒绝一部分合法但形式敏感的任务，例如经过授权的安全测试、模型蒸馏研究。因此，<b>护栏评估不能只测试“应当拒绝的请求是否被拦截”，还要测试“明确允许的请求是否能正常完成”</b>。右下角滑块是示意：护栏收得越紧，两个指标此消彼长。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Constitutional Classifiers：<em>两级筛查</em>，以及误拒绝</h2></header>
+  <div class="cl-body">
+    <div class="cl-pipe panel fx fx-left" style="--d:2">
+      <span class="lbl">两级筛查：先粗筛全部，再精审可疑</span>
+      <div class="cl-stage">
+        <div class="cl-in"></div>
+        <div class="cl-s1"><svg class="ic"><use href="#i-zap"/></svg><b>第一级：轻量探针</b><small>直接读取模型内部激活，几乎零成本；检查所有对话</small></div>
+        <div class="cl-s2"><svg class="ic"><use href="#i-search"/></svg><b>第二级：更强的分类器复审</b><small>只看第一级标记的可疑对话；不是直接拒绝</small></div>
+        <div class="cl-out"><span class="cl-pass">放行 <b>0</b></span><span class="cl-blk">拦截 <b>0</b></span></div>
+      </div>
+      <p class="cap">第一级误报多一些也不影响用户体验，成本也大大降低（示意）</p>
+    </div>
+    <div class="cl-right">
+      <div class="cl-joint panel fx fx-right" style="--d:3">
+        <div class="cl-jh"><span class="lbl">上下文联合判断</span><div class="cl-seg seg"><i class="knob"></i><button data-v="a">只看回答</button><button data-v="qa">提问 + 回答</button></div></div>
+        <div class="cl-q"><b>提问</b>（前文约定：用“调味料”代指某种化学试剂）……那“调味料”该怎么用？<em>示意</em></div>
+        <div class="cl-a"><b>回答</b>如何使用食品调味料：……</div>
+        <div class="cl-v"><span class="badge cl-vb"></span><span class="cl-vt"></span></div>
+      </div>
+      <div class="cl-fr panel fx fx-right" style="--d:4">
+        <span class="lbl">误拒绝：两个方向都要测</span>
+        <div class="cl-m"><span>应当拒绝的请求被拦截</span><div class="meter" style="--c:var(--ok)"><i class="cl-m1"></i></div><em class="cl-v1"></em></div>
+        <div class="cl-m"><span>明确允许的请求能正常完成</span><div class="meter" style="--c:var(--acc)"><i class="cl-m2"></i></div><em class="cl-v2"></em></div>
+        <div class="cl-m"><span>护栏松紧</span><input class="rng cl-r" type="range" min="0" max="100" value="45"><em>示意</em></div>
+        <p class="cap">容易被误拒的合法任务：经过授权的安全测试、模型蒸馏研究</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「护栏类型」· Constitutional Classifiers ·「护栏与安全性」误拒绝</div>
+</section>
+<style>
+.cl-body{display:flex;gap:28px;flex:1;min-height:0}
+.cl-pipe{width:760px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:12px}
+.cl-stage{position:relative;flex:1}
+.cl-in{position:absolute;left:0;top:0;width:200px;height:100%;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.cl-c{padding:8px 12px;border-radius:10px;font-size:15px;border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .5s var(--ease)}
+.cl-c.sus{border-color:var(--warn);color:#fed7aa}
+.cl-s1,.cl-s2{position:absolute;left:250px;width:440px;padding:16px 18px;border-radius:16px;display:grid;grid-template-columns:40px 1fr;column-gap:12px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:rgba(12,18,40,.9);transition:box-shadow .3s}
+.cl-s1{top:20px}.cl-s2{top:180px;border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+.cl-s1 .ic,.cl-s2 .ic{grid-row:1/3;font-size:30px;color:var(--acc);align-self:center}
+.cl-s2 .ic{color:var(--warn)}
+.cl-s1 b,.cl-s2 b{font-size:19px}
+.cl-s1 small,.cl-s2 small{font-size:15px;color:var(--text2)}
+.cl-s1.on{box-shadow:0 0 26px color-mix(in srgb,var(--acc) 45%,transparent)}
+.cl-s2.on{box-shadow:0 0 26px color-mix(in srgb,var(--warn) 45%,transparent)}
+.cl-out{position:absolute;left:250px;top:350px;display:flex;gap:16px}
+.cl-out span{padding:10px 18px;border-radius:12px;font-size:18px;border:1px solid var(--line2)}
+.cl-pass{color:var(--ok)}.cl-blk{color:var(--bad)}
+.cl-out b{font:800 22px var(--num);margin-left:6px}
+.cl-right{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+.cl-joint,.cl-fr{padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.cl-jh{display:flex;align-items:center;justify-content:space-between}
+.cl-jh .seg button{font-size:16px;padding:7px 16px}
+.cl-q,.cl-a{position:relative;padding:12px 16px;border-radius:12px;font-size:17px;line-height:1.6;border:1px solid var(--line)}
+.cl-q b,.cl-a b{margin-right:10px;color:var(--text3);font-size:15px}
+.cl-q em{position:absolute;right:10px;top:8px;font-style:normal;font-size:14px;color:var(--text3)}
+.cl-q{transition:opacity .4s,filter .4s}
+#c1-cls[data-j=a] .cl-q{opacity:.2;filter:blur(2px)}
+.cl-v{display:flex;align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.cl-m{display:grid;grid-template-columns:230px 1fr 60px;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.cl-m em{font:700 17px var(--num);font-style:normal;color:var(--text);text-align:right}
+</style>
+<script>
+HOOKS['c1-cls'] = {
+  init(s) {
+    this.setJ = U.seg(s.querySelector('.cl-seg'), (v) => { this.autoJ = false; this.joint(s, v); });
+    const r = s.querySelector('.cl-r');
+    r.addEventListener('input', () => { this.autoR = false; this.fr(s, +r.value); });
+    r.addEventListener('change', () => r.blur());
+  },
+  joint(s, v) {
+    s.dataset.j = v;
+    this.setJ(v);
+    const b = s.querySelector('.cl-vb'), t = s.querySelector('.cl-vt');
+    if (v === 'a') { b.textContent = '放行'; b.style.setProperty('--c', 'var(--ok)'); t.textContent = '单独看回答，毫无问题'; }
+    else { b.textContent = '可疑 → 复审'; b.style.setProperty('--c', 'var(--warn)'); t.textContent = '对照提问才发现“调味料”是暗语'; }
+  },
+  fr(s, x) {
+    const u = x / 100, hit = Math.round(55 + 43 * u), ok = Math.round(99 - 45 * u * u);
+    s.querySelector('.cl-r').value = x;
+    s.querySelector('.cl-r').style.setProperty('--p', x + '%');
+    s.querySelector('.cl-m1').style.setProperty('--v', hit + '%');
+    s.querySelector('.cl-m2').style.setProperty('--v', ok + '%');
+    s.querySelector('.cl-v1').textContent = hit + '%';
+    s.querySelector('.cl-v2').textContent = ok + '%';
+  },
+  enter(s, ctx) {
+    this.autoJ = this.autoR = true;
+    this.joint(s, 'a');
+    this.fr(s, 45);
+    ctx.every(() => { if (this.autoJ) this.joint(s, s.dataset.j === 'a' ? 'qa' : 'a'); }, 3200);
+    let x = 45, dir = 1;
+    ctx.every(() => { if (!this.autoR) return; x += dir * 5; if (x >= 95 || x <= 5) dir = -dir; this.fr(s, x); }, 260);
+    // 对话流：全部经过第一级，少数被标记的进入第二级
+    const inn = s.querySelector('.cl-in'), s1 = s.querySelector('.cl-s1'), s2 = s.querySelector('.cl-s2'), pass = s.querySelector('.cl-pass b'), blk = s.querySelector('.cl-blk b');
+    let np = 0, nb = 0, n = 0;
+    ctx.every(() => {
+      n++;
+      const sus = Math.random() < 0.25, bad = sus && Math.random() < 0.45;
+      inn.insertAdjacentHTML('afterbegin', `<span class="cl-c${sus ? ' sus' : ''}">对话 #${n}${sus ? ' · 可疑' : ''}</span>`);
+      while (inn.children.length > 10) inn.lastElementChild.remove();
+      U.restart(s1, 'on');
+      ctx.later(() => {
+        s1.classList.remove('on');
+        if (!sus) { pass.textContent = ++np; return; }
+        U.restart(s2, 'on');
+        ctx.later(() => { s2.classList.remove('on'); if (bad) blk.textContent = ++nb; else pass.textContent = ++np; }, 700);
+      }, 500);
+    }, 1100);
+  },
+  reset(s) { s.querySelector('.cl-in').innerHTML = ''; s.querySelector('.cl-pass b').textContent = 0; s.querySelector('.cl-blk b').textContent = 0; },
+};
+</script>
+
+<section class="slide" id="c1-hitl" data-part="9" data-title="人工干预" data-notes="<b>人工干预</b>（Human in the loop，又称人在回路）是一个关键的保护措施，它让 Agent 能够在不损害用户体验的情况下提升实际性能。这在部署早期尤为重要，有助于识别失败模式、发现边缘情况并建立健壮的评估周期。实施人工干预机制，可以让 Agent 在无法完成任务时<b>平稳地移交控制权</b>：在客户服务中，这意味着将问题升级到人工客服；对于 Coding Agent，这意味着将控制权交还给开发者。<br>通常有两种主要情况会触发人工干预：<b>超过失败阈值</b>——为 Agent 的重试次数或操作次数设置上限，超过限制就升级到人工干预；<b>高风险操作</b>——涉及敏感、不可逆或高风险的操作时应触发人工监督，至少在团队对 Agent 可靠性建立起足够信心之前是如此，典型例子包括授权大额退款或付款等。左右两个演示都可以手动操作：点击“再失败一次”，或拖动退款金额。阈值数值是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">人工干预：<em>平稳地移交控制权</em></h2>
+  <p class="lead fx fx-up" style="--d:2">部署早期尤为重要：识别失败模式、发现边缘情况、建立健壮的评估周期</p></header>
+  <div class="hl-body">
+    <div class="hl-c panel fx fx-left" style="--d:3">
+      <b class="hl-t"><svg class="ic"><use href="#i-repeat"/></svg>触发一：超过失败阈值</b>
+      <p class="hl-d">为重试次数或操作次数设置上限，超过就升级到人工</p>
+      <div class="hl-tr"><span class="hl-ag"><svg class="ic"><use href="#i-robot"/></svg>Agent</span><div class="hl-dots"></div><span class="hl-hu"><svg class="ic"><use href="#i-user"/></svg>人工</span></div>
+      <div class="hl-st hl-s1"></div>
+      <div class="hl-btns"><button class="btn hl-f"><svg class="ic"><use href="#i-x"/></svg>再失败一次</button><button class="btn hl-r"><svg class="ic"><use href="#i-refresh"/></svg>重置</button></div>
+    </div>
+    <div class="hl-c panel fx fx-right" style="--d:4">
+      <b class="hl-t"><svg class="ic"><use href="#i-coin"/></svg>触发二：高风险操作</b>
+      <p class="hl-d">敏感、不可逆或高风险的操作（如授权大额退款或付款）由人来确认</p>
+      <div class="hl-amt"><span>退款金额</span><input class="rng hl-rng" type="range" min="0" max="5000" step="50" value="300"><em class="hl-v">¥300</em></div>
+      <div class="hl-th"><span>需要人工确认的阈值：¥1,000（示意）</span></div>
+      <div class="hl-st hl-s2"></div>
+    </div>
+  </div>
+  <div class="hl-who fx fx-up" style="--d:6"><span><svg class="ic"><use href="#i-headphones"/></svg>客户服务：升级到人工客服</span><span><svg class="ic"><use href="#i-code"/></svg>Coding Agent：把控制权交还给开发者</span></div>
+  <div class="src">第一章 ·「人工干预」</div>
+</section>
+<style>
+.hl-body{display:grid;grid-template-columns:1fr 1fr;gap:28px;flex:1;min-height:0;margin-bottom:20px}
+.hl-c{padding:24px 28px;display:flex;flex-direction:column;gap:16px}
+.hl-t{display:flex;align-items:center;gap:12px;font-size:25px;color:var(--acc)}
+.hl-d{font-size:19px;color:var(--text2)}
+.hl-tr{display:flex;align-items:center;gap:14px;padding:18px;border-radius:16px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.hl-ag,.hl-hu{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:16px;padding:10px 14px;border-radius:14px;border:2px solid var(--line2);transition:all .4s}
+.hl-ag .ic,.hl-hu .ic{font-size:32px}
+.hl-ag{color:var(--llm)}.hl-hu{color:var(--tool)}
+.hl-c.esc .hl-hu{border-color:var(--tool);box-shadow:0 0 26px color-mix(in srgb,var(--tool) 50%,transparent)}
+.hl-c.esc .hl-ag{opacity:.4}
+.hl-dots{flex:1;display:flex;gap:10px;justify-content:center}
+.hl-dots i{width:34px;height:34px;border-radius:50%;border:2px solid var(--line2);transition:all .3s}
+.hl-dots i.on{background:var(--bad);border-color:var(--bad);box-shadow:0 0 12px var(--bad)}
+.hl-st{min-height:60px;padding:14px 18px;border-radius:14px;font-size:19px;line-height:1.5;border:1px solid var(--line);transition:all .4s}
+.hl-st.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.hl-st.wait{color:var(--tool);border-color:color-mix(in srgb,var(--tool) 50%,transparent);background:color-mix(in srgb,var(--tool) 10%,transparent)}
+.hl-btns{display:flex;gap:10px;margin-top:auto}
+.hl-amt{display:grid;grid-template-columns:90px 1fr 90px;align-items:center;gap:14px;font-size:18px;color:var(--text2)}
+.hl-amt em{font:800 24px var(--num);font-style:normal;color:var(--text);text-align:right}
+.hl-th{font-size:16px;color:var(--text3)}
+.hl-who{display:flex;gap:20px;justify-content:center}
+.hl-who span{display:flex;align-items:center;gap:10px;padding:12px 22px;border-radius:999px;font-size:19px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.hl-who .ic{color:var(--acc)}
+</style>
+<script>
+HOOKS['c1-hitl'] = {
+  MAX: 3,
+  init(s) {
+    s.querySelector('.hl-dots').innerHTML = '<i></i><i></i><i></i>';
+    s.querySelector('.hl-f').addEventListener('click', () => { this.autoF = false; this.fail(s); });
+    s.querySelector('.hl-r').addEventListener('click', () => { this.autoF = false; this.n = 0; this.paintF(s); });
+    const r = s.querySelector('.hl-rng');
+    r.addEventListener('input', () => { this.autoA = false; this.amt(s, +r.value); });
+    r.addEventListener('change', () => r.blur());
+  },
+  paintF(s) {
+    const c = s.querySelectorAll('.hl-c')[0], st = s.querySelector('.hl-s1');
+    s.querySelectorAll('.hl-dots i').forEach((d, i) => d.classList.toggle('on', i < this.n));
+    const esc = this.n >= this.MAX;
+    c.classList.toggle('esc', esc);
+    st.className = 'hl-st hl-s1 ' + (esc ? 'wait' : 'ok');
+    st.textContent = esc ? `连续失败 ${this.n} 次，已达上限：升级到人工，Agent 停止重试` : this.n ? `已失败 ${this.n} 次，Agent 继续尝试（上限 ${this.MAX} 次）` : 'Agent 正常执行中';
+  },
+  fail(s) { if (this.n < this.MAX) this.n++; this.paintF(s); },
+  amt(s, v) {
+    const r = s.querySelector('.hl-rng'), st = s.querySelector('.hl-s2'), c = s.querySelectorAll('.hl-c')[1];
+    r.value = v;
+    r.style.setProperty('--p', (v / 5000) * 100 + '%');
+    s.querySelector('.hl-v').textContent = '¥' + v.toLocaleString('en-US');
+    const high = v > 1000;
+    c.classList.toggle('esc', high);
+    st.className = 'hl-st hl-s2 ' + (high ? 'wait' : 'ok');
+    st.textContent = high ? '高风险：暂停执行，等待人工确认后再退款' : '低风险：在权限范围内，Agent 直接执行';
+  },
+  enter(s, ctx) {
+    this.autoF = this.autoA = true;
+    this.n = 0;
+    this.paintF(s);
+    this.amt(s, 300);
+    let k = 0;
+    ctx.every(() => { if (!this.autoF) return; k++; if (k % 5 === 0) { this.n = 0; this.paintF(s); } else this.fail(s); }, 1300);
+    const seq = [300, 800, 1800, 3200, 600];
+    let j = 0;
+    ctx.every(() => { if (this.autoA) this.amt(s, seq[j++ % seq.length]); }, 1800);
+  },
+  reset(s) { this.n = 0; },
+};
+</script>

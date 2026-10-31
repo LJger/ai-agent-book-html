@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>后记 回到 Agent = LLM + 上下文 + 工具 · 深入理解 AI Agent 动画版</title>
+<style>
+/* 深入理解 AI Agent · 动画版 —— 演示引擎样式（各章共用） */
+@property --acc{syntax:'<color>';inherits:true;initial-value:#22d3ee}
+@property --acc2{syntax:'<color>';inherits:true;initial-value:#a78bfa}
+:root{
+  --bg:#050816;--text:#e9edf8;--text2:#a5afc9;--text3:#6c7695;
+  --line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.17);
+  /* 语义色：与核心公式一一对应，全书统一 */
+  --llm:#a78bfa;--ctx:#22d3ee;--tool:#fbbf24;--env:#34d399;--har:#60a5fa;
+  --ok:#34d399;--bad:#fb7185;--warn:#fb923c;--pink:#f472b6;--teal:#2dd4bf;--blue:#60a5fa;--violet:#a78bfa;
+  --ease:cubic-bezier(.2,.8,.2,1);--spring:cubic-bezier(.34,1.56,.64,1);--eio:cubic-bezier(.7,0,.3,1);
+  --font:"PingFang SC","Microsoft YaHei","Noto Sans SC","Source Han Sans SC","Hiragino Sans GB",system-ui,sans-serif;
+  --num:"Segoe UI","Inter","SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono","Cascadia Code",Consolas,"SFMono-Regular",Menlo,monospace;
+  --kai:KaiTi,STKaiti,"Kaiti SC",serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font)}
+body{--acc:#22d3ee;--acc2:#a78bfa;transition:--acc 1.2s var(--ease),--acc2 1.2s var(--ease);-webkit-font-smoothing:antialiased;user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+ul,ol{list-style:none}
+a{color:inherit;text-decoration:none}
+
+/* ---------- 背景层 ---------- */
+#bg,#fx{position:fixed;inset:0;width:100vw;height:100vh;display:block}
+#bg{z-index:0}#fx{z-index:45;pointer-events:none}
+.aurora{position:fixed;inset:-25%;z-index:0;pointer-events:none;filter:blur(100px);opacity:.4}
+.aurora i{position:absolute;border-radius:50%;display:block}
+.aurora .a1{width:55vmax;height:55vmax;left:8%;top:12%;background:radial-gradient(circle,var(--acc),transparent 62%);animation:au1 36s ease-in-out infinite alternate}
+.aurora .a2{width:50vmax;height:50vmax;right:6%;bottom:6%;background:radial-gradient(circle,var(--acc2),transparent 62%);animation:au2 42s ease-in-out infinite alternate}
+.aurora .a3{width:40vmax;height:40vmax;left:40%;top:45%;background:radial-gradient(circle,#1e3a8a,transparent 65%);animation:au3 50s ease-in-out infinite alternate}
+@keyframes au1{to{transform:translate(18vw,10vh) scale(1.15)}}
+@keyframes au2{to{transform:translate(-16vw,-12vh) scale(.9)}}
+@keyframes au3{to{transform:translate(-20vw,8vh) scale(1.2)}}
+.gridlines{position:fixed;inset:0;z-index:1;pointer-events:none;background-image:linear-gradient(rgba(148,163,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(148,163,255,.05) 1px,transparent 1px);background-size:72px 72px;-webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 30%,transparent 80%);mask-image:radial-gradient(ellipse 70% 60% at 50% 45%,#000 30%,transparent 80%)}
+.vignette{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(1,3,10,.8) 100%)}
+#viewport{position:fixed;inset:0;z-index:2}
+#deck{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:50% 50%}
+
+/* ---------- 过渡特效：章节切换时的光束扫过 ---------- */
+#sweep{position:fixed;top:-20vh;bottom:-20vh;left:0;width:34vw;z-index:44;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--acc) 22%,transparent) 35%,rgba(255,255,255,.28) 50%,color-mix(in srgb,var(--acc2) 22%,transparent) 65%,transparent);
+  filter:blur(8px);mix-blend-mode:screen}
+
+/* ---------- 幻灯片与入场动画 ---------- */
+.slide{position:absolute;inset:0;padding:92px 130px 110px;display:flex;flex-direction:column;visibility:hidden;opacity:0;pointer-events:none}
+.slide.active{visibility:visible;opacity:1;pointer-events:auto;z-index:2}
+.slide.leaving{pointer-events:none;z-index:1}
+.slide:not(.active) *{animation-play-state:paused!important}
+.no-trans,.no-trans *{transition:none!important;animation:none!important}
+/* 入场动画：.fx + 方向类（fx-up/left/right/scale/pop/blur/flip/zoom），--d 控制先后顺序。
+   注意：.fx 占用了元素的 transition 和 transform。需要自己写过渡或位移的元素，
+   要么在外面再包一层负责入场，要么改用 translate / scale 这两个独立属性。 */
+.fx{opacity:0;transition:opacity .9s var(--ease),transform .9s var(--ease),filter .9s var(--ease);transition-delay:calc(var(--d,0)*90ms + 120ms)}
+.fx-up{transform:translateY(40px)}.fx-down{transform:translateY(-40px)}
+.fx-left{transform:translateX(-56px)}.fx-right{transform:translateX(56px)}
+.fx-scale{transform:scale(.86)}
+.fx-pop{transform:scale(.5);transition-timing-function:var(--ease),var(--spring),var(--ease)}
+.fx-blur{filter:blur(16px);transform:scale(1.06)}
+.fx-flip{transform:perspective(1200px) rotateX(-70deg);transform-origin:50% 0}
+.fx-zoom{transform:scale(1.5);filter:blur(10px)}
+.active .fx:not([data-step]):not([data-step] .fx),.active [data-step].on.fx,.active [data-step].on .fx{opacity:1;transform:none;filter:none}
+
+/* ---------- 文字 ---------- */
+.sh{position:relative;z-index:3;margin-bottom:30px}
+.kicker{display:flex;align-items:center;gap:14px;font:600 20px/1 var(--font);letter-spacing:.3em;color:var(--acc)}
+.kicker::before{content:"";width:40px;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--acc),transparent)}
+.title{font-size:56px;font-weight:700;line-height:1.25;margin-top:18px;letter-spacing:.01em}
+.title em,.grad{font-style:normal;background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{font-size:27px;line-height:1.65;color:var(--text2);margin-top:14px}
+.muted{color:var(--text2)}.dim{color:var(--text3)}
+.c-llm{color:var(--llm)}.c-ctx{color:var(--ctx)}.c-tool{color:var(--tool)}.c-env{color:var(--env)}.c-har{color:var(--har)}
+.c-ok{color:var(--ok)}.c-bad{color:var(--bad)}.c-warn{color:var(--warn)}.c-acc{color:var(--acc)}
+.mono{font-family:var(--mono)}.num{font-family:var(--num)}
+.sel{user-select:text}
+.src{position:absolute;left:130px;bottom:58px;z-index:3;font-size:16px;color:var(--text3);letter-spacing:.04em}
+.src::before{content:"原书 · ";color:var(--acc)}
+
+/* ---------- 通用容器 ---------- */
+.glass{position:relative;background:linear-gradient(160deg,rgba(255,255,255,.075),rgba(255,255,255,.02) 60%);border:1px solid var(--line);border-radius:22px;box-shadow:0 24px 60px -24px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.panel{position:relative;background:rgba(12,18,40,.72);border:1px solid var(--line);border-radius:20px;box-shadow:0 20px 50px -24px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:7px 16px;border-radius:999px;font-size:19px;line-height:1.3;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text2);white-space:nowrap}
+.chip.llm,.chip.ctx,.chip.tool,.chip.env,.chip.har,.chip.ok,.chip.bad,.chip.warn,.chip.acc{color:var(--cc);border-color:color-mix(in srgb,var(--cc) 42%,transparent);background:color-mix(in srgb,var(--cc) 11%,transparent)}
+.chip.llm{--cc:var(--llm)}.chip.ctx{--cc:var(--ctx)}.chip.tool{--cc:var(--tool)}.chip.env{--cc:var(--env)}.chip.har{--cc:var(--har)}
+.chip.ok{--cc:var(--ok)}.chip.bad{--cc:var(--bad)}.chip.warn{--cc:var(--warn)}.chip.acc{--cc:var(--acc)}
+.ic{width:1em;height:1em;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.14em}
+kbd{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:32px;padding:0 9px;border-radius:8px;border:1px solid var(--line2);border-bottom-width:3px;background:rgba(255,255,255,.06);font:600 16px/1 var(--num);color:var(--text)}
+.foot{position:absolute;left:130px;right:130px;bottom:62px;font-size:19px;color:var(--text3);display:flex;gap:10px;align-items:center}
+.quote{font-size:30px;line-height:1.75;color:var(--text);padding:6px 0 6px 30px;border-left:4px solid var(--acc)}
+.tagline{font-size:26px;line-height:1.6;color:var(--text);padding:18px 28px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 16%,transparent),transparent);border-left:4px solid var(--acc)}
+.tagline b{color:var(--acc)}
+
+/* ---------- 窗口 / 代码 ---------- */
+.win{background:rgba(5,9,22,.85);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 30px 80px -30px rgba(0,0,0,.85)}
+.win-bar{height:42px;display:flex;align-items:center;gap:9px;padding:0 18px;background:rgba(255,255,255,.04);border-bottom:1px solid var(--line);font:15px var(--mono);color:var(--text3)}
+.win-bar i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.win-bar i:nth-child(2){background:#febc2e}.win-bar i:nth-child(3){background:#28c840}
+.win-bar span{margin-left:10px}
+.code{font:20px/1.75 var(--mono);color:#cbd5f5;padding:20px 26px;white-space:pre}
+.t-k{color:#c084fc}.t-s{color:#86efac}.t-c{color:#5f6b8a}.t-n{color:#fbbf24}.t-p{color:#7dd3fc}.t-h{color:#f0abfc;font-weight:700}.t-r{color:#fb7185}.t-g{color:#34d399}
+.typing::after{content:"▍";color:var(--acc);animation:blink 1s steps(1) infinite;margin-left:2px}
+.code .ln{display:block;border-radius:6px;transition:background .35s,box-shadow .35s}
+.code .ln.hl{background:color-mix(in srgb,var(--acc) 16%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+
+/* ---------- 动画关键帧 ---------- */
+@keyframes blink{50%{opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{to{opacity:1}}
+@keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.2);opacity:0}}
+@keyframes flow{to{stroke-dashoffset:-36}}
+@keyframes floaty{50%{transform:translateY(-10px)}}
+@keyframes grow{to{transform:scaleX(1)}}
+@keyframes pop{to{transform:scale(1)}}
+@keyframes swIn{from{opacity:0;transform:translateX(24px)}}
+@keyframes upIn{from{opacity:0;transform:translateY(18px)}}
+@keyframes arcDraw{to{stroke-dashoffset:0}}
+@keyframes nodeIn{to{opacity:1;transform:none}}
+@keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes glowPulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--c,var(--acc)) 18%,transparent),0 0 40px color-mix(in srgb,var(--c,var(--acc)) 45%,transparent)}}
+
+/* ---------- 控件 ---------- */
+.seg{position:relative;display:inline-flex;padding:5px;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
+.seg button{position:relative;z-index:1;padding:10px 26px;border-radius:999px;font-size:20px;color:var(--text2);transition:color .3s}
+.seg button.on{color:#06101f;font-weight:600}
+.seg .knob{position:absolute;top:5px;bottom:5px;left:5px;width:0;border-radius:999px;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent);transition:all .55s var(--spring)}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+.tabs button{padding:10px 20px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:20px;color:var(--text2);transition:all .3s}
+.tabs button:hover{color:var(--text);border-color:var(--line2)}
+.tabs button.on{color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2));border-color:transparent;font-weight:600}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.05);font-size:18px;color:var(--text2);transition:all .25s}
+.btn:hover{color:var(--text);background:rgba(255,255,255,.1)}
+.btn.pri{color:#06101f;font-weight:600;border-color:transparent;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 18px color-mix(in srgb,var(--acc) 40%,transparent)}
+.btn.pri:hover{filter:brightness(1.1)}
+.btn:disabled{opacity:.4;pointer-events:none}
+a.btn.soon{opacity:.55;filter:saturate(.4)}
+/* 开关：<button class="tgl" data-on><i></i>文字</button> */
+.tgl{display:inline-flex;align-items:center;gap:12px;padding:8px 16px 8px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:19px;color:var(--text2);transition:all .3s}
+.tgl i{position:relative;width:46px;height:26px;border-radius:999px;background:rgba(255,255,255,.12);transition:background .3s;flex:none}
+.tgl i::after{content:"";position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#cbd5e1;transition:transform .35s var(--spring),background .3s}
+.tgl.on{color:var(--text);border-color:color-mix(in srgb,var(--tc,var(--acc)) 45%,transparent);background:color-mix(in srgb,var(--tc,var(--acc)) 9%,transparent)}
+.tgl.on i{background:color-mix(in srgb,var(--tc,var(--acc)) 70%,transparent)}
+.tgl.on i::after{transform:translateX(20px);background:#fff}
+/* 滑块 */
+.rng{-webkit-appearance:none;appearance:none;width:100%;height:8px;border-radius:8px;background:linear-gradient(90deg,var(--acc) var(--p,0%),rgba(255,255,255,.12) var(--p,0%));outline:none;cursor:pointer}
+.rng::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 0 14px var(--acc)}
+.rng::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid var(--acc);box-shadow:0 0 14px var(--acc)}
+/* 勾选项 */
+.chk{display:flex;gap:18px;align-items:flex-start;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:background .35s,border-color .35s}
+.chk:hover{border-color:var(--line2)}
+.chk .box{flex:none;width:32px;height:32px;border-radius:10px;border:2px solid var(--line2);display:grid;place-items:center;transition:all .4s var(--spring)}
+.chk .box svg{width:20px;height:20px;stroke:#04121a;stroke-width:3.2;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:30;stroke-dashoffset:30;transition:stroke-dashoffset .4s ease .1s}
+.chk.done{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.chk.done .box{background:var(--acc);border-color:var(--acc);transform:scale(1.08);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 60%,transparent)}
+.chk.done .box svg{stroke-dashoffset:0}
+/* 翻转卡片 */
+.flip{perspective:1400px;cursor:pointer}
+.flip-in{position:relative;width:100%;height:100%;transition:transform .9s var(--ease);transform-style:preserve-3d}
+.flip.flipped .flip-in{transform:rotateY(180deg)}
+.flip-f,.flip-b{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:20px;padding:24px 28px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--line)}
+.flip-f{background:rgba(12,18,40,.82)}
+.flip-b{transform:rotateY(180deg);background:rgba(6,26,36,.88);border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+/* 进度细条（轮播计时） */
+.runbar{height:3px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
+.runbar i{display:block;height:100%;width:100%;background:var(--c,var(--acc));transform-origin:left;transform:scaleX(0)}
+.runbar.run i{animation:grow var(--dur,4.2s) linear forwards}
+.sw{animation:swIn .55s var(--ease) both}
+
+/* ---------- 概念演示通用件 ---------- */
+/* 图节点：<div class="nd" style="--c:var(--llm)"><svg class="ic">…</svg><div><b>标题</b><small>说明</small></div></div> */
+.nd{position:relative;display:flex;align-items:center;gap:16px;padding:16px 22px;border-radius:18px;background:rgba(12,18,40,.88);border:1px solid var(--line2);transition:all .5s var(--ease)}
+.nd>.ic{flex:none;font-size:34px;color:var(--c,var(--text3));transition:color .5s}
+.nd b{display:block;font-size:23px}.nd small{display:block;font-size:16px;color:var(--text3);margin-top:3px}
+.nd.on{border-color:var(--c,var(--acc));background:color-mix(in srgb,var(--c,var(--acc)) 13%,rgba(12,18,40,.92));box-shadow:0 0 34px color-mix(in srgb,var(--c,var(--acc)) 35%,transparent);transform:translateY(-3px)}
+.nd.dim{opacity:.38}
+/* 流动连线（SVG path） */
+.fl{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2.5;stroke-dasharray:6 8;transition:stroke .5s,opacity .5s}
+.fl.on{stroke:var(--c,var(--acc));stroke-width:3;animation:flow 1s linear infinite;filter:drop-shadow(0 0 6px var(--c,var(--acc)))}
+.fl.bad{stroke:var(--bad)}
+.pk{fill:#fff;filter:drop-shadow(0 0 8px var(--c,#fff))}
+/* 消息列表（上下文窗口）：<div class="ml"><div class="mr" data-r="system">…</div></div> */
+.ml{display:flex;flex-direction:column;gap:8px}
+.mr{--c:var(--text3);position:relative;display:flex;align-items:flex-start;gap:12px;padding:10px 16px 10px 18px;border-radius:12px;background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 30%,transparent);font-size:18px;line-height:1.5;transition:all .5s var(--ease)}
+.mr::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:4px;background:var(--c)}
+.mr .rl{flex:none;min-width:86px;font:600 15px/1.9 var(--mono);color:var(--c)}
+.mr .tx{flex:1;min-width:0;color:var(--text)}
+.mr[data-r=system]{--c:#94a3b8}.mr[data-r=tools]{--c:var(--har)}.mr[data-r=user]{--c:var(--tool)}
+.mr[data-r=assistant]{--c:var(--llm)}.mr[data-r=tool]{--c:var(--env)}.mr[data-r=status]{--c:var(--pink)}
+.mr.new{animation:upIn .6s var(--spring) both}
+.mr.ghost{opacity:.25;filter:grayscale(1)}
+.mr.bad{border-color:var(--bad);box-shadow:0 0 18px color-mix(in srgb,var(--bad) 35%,transparent)}
+/* 计量条 */
+.meter{height:14px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.meter i{display:block;height:100%;width:var(--v,0%);border-radius:999px;background:linear-gradient(90deg,var(--c,var(--acc)),color-mix(in srgb,var(--c,var(--acc)) 60%,#fff));transition:width .9s var(--ease)}
+/* 圆形徽标 */
+.orb{position:relative;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;font-size:52px;color:var(--c,var(--acc));background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:1px solid var(--line2);transition:all .5s var(--ease)}
+.orb.on{border-color:var(--c);box-shadow:0 0 0 7px color-mix(in srgb,var(--c) 14%,transparent),0 0 60px color-mix(in srgb,var(--c) 50%,transparent);transform:scale(1.06)}
+/* 编号列表（当前 / 已完成） */
+.sl{display:flex;flex-direction:column;gap:12px}
+.sl li{display:flex;gap:18px;align-items:flex-start;padding:14px 18px;border-radius:16px;border:1px solid transparent;opacity:.5;transition:all .5s var(--ease)}
+.sl li>span{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font:700 19px var(--num);border:2px solid var(--line2);color:var(--text2);transition:all .5s}
+.sl b{font-size:24px}.sl p{font-size:18px;color:var(--text2);margin-top:4px;line-height:1.5}
+.sl li.done{opacity:.82}
+.sl li.done>span{background:color-mix(in srgb,var(--acc) 25%,transparent);border-color:var(--acc);color:var(--acc)}
+.sl li.cur{opacity:1;background:color-mix(in srgb,var(--acc) 10%,transparent);border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.sl li.cur>span{background:var(--acc);border-color:var(--acc);color:#06101f;box-shadow:0 0 18px var(--acc)}
+
+/* 徽标、说明文字、印章 */
+.badge{--c:var(--acc);display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:10px;font-size:18px;font-weight:700;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);white-space:nowrap}
+.cap{font-size:17px;color:var(--text3);line-height:1.6}
+.lbl{font-size:15px;letter-spacing:.14em;color:var(--text3)}
+.stamp{opacity:0;transform:scale(2.2) rotate(-14deg)}
+.stamp.on{animation:stampIn .5s var(--spring) forwards}
+@keyframes stampIn{to{opacity:1;transform:rotate(-8deg)}}
+.blink-on{animation:blink 1s steps(1) infinite}
+
+/* 章末导航 */
+.end-nav{display:flex;gap:14px;flex-wrap:wrap;align-items:center}
+.end-nav .btn{padding:14px 24px;font-size:20px}
+
+/* 思考题折叠列表：<div class="qa"><div class="qa-it"><button class="qa-q"><em>1</em><span class="qa-st">★★</span>题干</button><div class="qa-a"><div>答案</div></div></div></div>
+   用 U.qa(host) 绑定点击；.qa-it.open 时展开 */
+.qa{display:flex;flex-direction:column;gap:10px}
+.qa-it{border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .35s,background .35s}
+.qa-it.open{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.qa-q{display:flex;align-items:flex-start;gap:14px;width:100%;text-align:left;padding:14px 18px;font-size:19px;line-height:1.55;color:var(--text)}
+.qa-q em{flex:none;width:32px;height:32px;border-radius:10px;display:grid;place-items:center;font:700 16px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.qa-it.open .qa-q em{color:#06101f;background:var(--acc)}
+.qa-st{flex:none;font-size:15px;line-height:2;color:var(--tool);letter-spacing:-.05em}
+.qa-a{display:grid;grid-template-rows:0fr;transition:grid-template-rows .5s var(--ease)}
+.qa-a>div{overflow:hidden;padding:0 20px 0 64px;font-size:17px;line-height:1.75;color:var(--text2)}
+.qa-it.open .qa-a{grid-template-rows:1fr}
+.qa-it.open .qa-a>div{padding-bottom:16px}
+
+/* ---------- 环形图（章节页 / 循环示意） ---------- */
+.loop-svg{width:100%;height:100%;overflow:visible}
+.loop-svg .ring{fill:none;stroke:rgba(255,255,255,.09);stroke-width:1.2;transform-box:fill-box;transform-origin:center}
+.loop-svg .ring.r1{stroke-dasharray:3 9;animation:spin 70s linear infinite}
+.loop-svg .ring.r2{stroke-dasharray:1 7;animation:spin 50s linear infinite reverse}
+.loop-svg .arc{fill:none;stroke:var(--c);stroke-width:2.6;stroke-linecap:round;opacity:.55;stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}
+.active .loop-svg .arc{animation:arcDraw .9s var(--ease) forwards;animation-delay:calc(var(--i)*130ms + 300ms)}
+.loop-svg .arc-flow{fill:none;stroke:var(--c);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:3 14;opacity:0;animation:flow 1.4s linear infinite}
+.active .loop-svg .arc-flow{opacity:.9;transition:opacity 1s 1.6s}
+.loop-svg .comet{fill:#fff;opacity:0;transition:opacity 1s 1.4s}
+.active .loop-svg .comet{opacity:1}
+.loop-svg .node-in{opacity:0;transform:scale(.3);transform-box:fill-box;transform-origin:center}
+.active .loop-svg .node-in{animation:nodeIn .8s var(--spring) forwards;animation-delay:calc(var(--i)*130ms + 200ms)}
+.loop-svg .halo{fill:var(--c);opacity:0;transform-box:fill-box;transform-origin:center}
+.loop-svg .core{fill:rgba(8,12,30,.92);stroke:var(--c);stroke-width:2.6;transition:fill .4s}
+.loop-svg .num{fill:var(--c);font-family:var(--num);font-weight:700;text-anchor:middle;dominant-baseline:central;transition:fill .4s}
+.loop-svg .lab{fill:var(--text);font-weight:600;dominant-baseline:middle;opacity:0;transition:fill .3s}
+.active .loop-svg .lab{animation:fadeIn .8s ease forwards;animation-delay:calc(var(--i)*130ms + 500ms)}
+.loop-svg .node.on .core{fill:var(--c)}
+.loop-svg .node.on .num{fill:#0b1020}
+.loop-svg .node.on .halo{animation:pulse 2.2s ease-out infinite}
+.loop-svg .node.dim{opacity:.38}
+.loop-svg .lab.dim{fill:var(--text3)}
+.loop-svg .lab.on{fill:var(--c)}
+.loop-svg .big{font-family:var(--num);font-weight:800;text-anchor:middle;dominant-baseline:central;fill:transparent;stroke:var(--acc);stroke-width:2.4;stroke-dasharray:1500;stroke-dashoffset:1500}
+.active .loop-svg .big{animation:drawText 2.2s var(--ease) .3s forwards,fillText 1s ease 1.9s forwards}
+@keyframes drawText{to{stroke-dashoffset:0}}
+@keyframes fillText{to{fill:rgba(255,255,255,.07)}}
+
+/* ---------- 章节分隔页 ---------- */
+.slide.chapter{justify-content:center;padding-left:170px}
+.chapter .ch-k{font:700 22px var(--num);letter-spacing:.42em;color:var(--acc)}
+.chapter .ch-t{font-size:104px;font-weight:800;line-height:1.15;margin-top:22px;letter-spacing:.02em;max-width:1000px}
+.chapter .ch-s{font-size:38px;color:var(--text2);margin-top:18px;max-width:980px;line-height:1.45}
+.chapter .quote{margin-top:54px;max-width:900px;font-size:31px}
+.chapter .ch-loop{position:absolute;right:110px;top:50%;width:660px;height:660px;margin-top:-330px}
+
+/* ---------- 逐字标题 ---------- */
+.split{display:block;white-space:nowrap;perspective:900px}
+.ch{display:inline-block;opacity:0;transform:translateY(50%) rotateX(-75deg);filter:blur(10px)}
+.active .ch{animation:chIn 1s var(--ease) forwards;animation-delay:calc(var(--i)*55ms + 250ms)}
+@keyframes chIn{to{opacity:1;transform:none;filter:none}}
+
+/* ---------- 轨道图（封面） ---------- */
+.orbit-svg{width:100%;height:100%;overflow:visible}
+.orbit-svg .ob-outer{fill:none;stroke:color-mix(in srgb,var(--env) 40%,transparent);stroke-width:1.5;stroke-dasharray:2 10;transform-box:fill-box;transform-origin:center;animation:spin 90s linear infinite}
+.orbit-svg .ob-outer-t{fill:color-mix(in srgb,var(--env) 75%,#fff);font:600 17px var(--num);letter-spacing:.5em}
+.orbit-svg .ob-path{fill:none;stroke:color-mix(in srgb,var(--c) 38%,transparent);stroke-width:1.6;stroke-dasharray:4 8}
+.orbit-svg .ob-glow{fill:var(--c);opacity:.5}
+.orbit-svg .ob-dot{fill:#0a1024;stroke:var(--c);stroke-width:3}
+.orbit-svg .ob-lab{fill:var(--c);font-size:24px;font-weight:700;text-anchor:middle;dominant-baseline:hanging;paint-order:stroke;stroke:#050816;stroke-width:6px}
+.orbit-svg .ob-halo{opacity:.55}
+.orbit-svg .ob-core{fill:#0a1024;stroke:var(--acc);stroke-width:3}
+.orbit-svg .ob-wave{fill:none;stroke:var(--acc);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:pulse 3s ease-out infinite}
+.orbit-svg .ob-wave.w2{animation-delay:1.5s}
+.orbit-svg .ob-core-t{fill:var(--text);font:800 34px var(--num);text-anchor:middle;dominant-baseline:central;letter-spacing:.02em}
+
+/* ---------- HUD 与浮层 ---------- */
+#progress{position:fixed;left:0;top:0;height:3px;width:0;z-index:30;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 14px var(--acc);transition:width .7s var(--ease)}
+#hud{position:fixed;left:0;right:0;bottom:0;height:60px;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:0 26px;font-size:14px;color:var(--text3);transition:opacity .5s;background:linear-gradient(0deg,rgba(3,6,16,.65),transparent)}
+body.idle #hud{opacity:0}
+body.idle{cursor:none}
+.hud-l{display:flex;gap:10px;align-items:center;min-width:300px;letter-spacing:.08em}
+.hud-l a{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:9px;color:var(--text2);transition:background .2s,color .2s}
+.hud-l a:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.hud-l a .ic{font-size:17px}
+.hud-l b{color:var(--acc);font:700 14px var(--num)}
+#rail{display:flex;gap:6px;align-items:center}
+#rail button{position:relative;height:6px;width:32px;border-radius:6px;background:rgba(255,255,255,.13);transition:all .45s var(--ease)}
+#rail button.done{background:rgba(255,255,255,.32)}
+#rail button.cur{width:62px;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 10px var(--acc)}
+#rail button span{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:13px;color:var(--text2);opacity:0;transition:opacity .2s;pointer-events:none}
+#rail button:hover span{opacity:1}
+.hud-r{display:flex;gap:4px;align-items:center;min-width:300px;justify-content:flex-end}
+#count{font:600 14px var(--num);margin-right:10px;letter-spacing:.06em}
+.hud-r button{position:relative;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;color:var(--text2);transition:background .2s,color .2s}
+.hud-r button:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.hud-r .ic{font-size:18px}
+/* 自动播放按钮：外圈显示倒计时 */
+#autobtn .i-pause{display:none}
+body.autoplay #autobtn{color:var(--acc)}
+body.autoplay #autobtn .i-play{display:none}
+body.autoplay #autobtn .i-pause{display:block}
+#autobtn svg.ring{position:absolute;inset:0;width:34px;height:34px;transform:rotate(-90deg);opacity:0}
+#autobtn svg.ring circle{fill:none;stroke:var(--acc);stroke-width:2;stroke-dasharray:94.25;stroke-dashoffset:94.25}
+body.autoplay #autobtn svg.ring{opacity:1}
+#autobtn.tick svg.ring circle{animation:autoRing var(--ms,8s) linear forwards}
+@keyframes autoRing{to{stroke-dashoffset:0}}
+.overlay{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;background:rgba(3,6,16,.74);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);opacity:0;visibility:hidden;transition:opacity .35s,visibility .35s}
+.overlay.show{opacity:1;visibility:visible}
+.ov-box{width:min(1460px,94vw);max-height:88vh;overflow:auto;padding:34px 40px;border-radius:24px;background:rgba(12,18,40,.88);border:1px solid var(--line);transform:translateY(16px) scale(.98);transition:transform .45s var(--ease)}
+.overlay.show .ov-box{transform:none}
+.ov-box h3{font-size:24px;margin-bottom:22px;display:flex;justify-content:space-between;align-items:center}
+.ov-box h3 small{font-size:14px;color:var(--text3);font-weight:400}
+#ov-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.ov-ch{border-radius:16px;padding:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ov-h{font-size:15px;color:var(--c);margin-bottom:10px;display:flex;gap:8px;align-items:center;font-weight:600}
+.ov-h b{font-family:var(--num)}
+.ov-ch button{display:flex;gap:8px;width:100%;text-align:left;padding:7px 9px;border-radius:9px;font-size:14px;color:var(--text2);line-height:1.4;transition:background .2s,color .2s}
+.ov-ch button span{font:600 12px/1.6 var(--num);color:var(--text3);min-width:20px}
+.ov-ch button:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.ov-ch button.cur{background:color-mix(in srgb,var(--c) 18%,transparent);color:var(--text)}
+.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 40px;font-size:16px;color:var(--text2)}
+.help-grid div{display:flex;align-items:center;gap:10px}
+.help-grid kbd{height:28px;min-width:30px;font-size:14px}
+#notes{position:fixed;left:50%;bottom:70px;transform:translate(-50%,20px);width:min(1180px,92vw);max-height:42vh;overflow:auto;z-index:35;padding:20px 26px;border-radius:18px;background:rgba(8,12,28,.94);border:1px solid var(--line2);font-size:18px;line-height:1.9;color:var(--text2);opacity:0;visibility:hidden;transition:all .35s var(--ease);user-select:text}
+#notes.show{opacity:1;visibility:visible;transform:translate(-50%,0)}
+#notes .nh{font-size:13px;letter-spacing:.2em;color:var(--acc);margin-bottom:8px}
+#notes b{color:var(--text)}
+#toast{position:fixed;left:50%;top:26px;transform:translate(-50%,-20px);z-index:50;padding:10px 22px;border-radius:999px;background:rgba(16,185,129,.18);border:1px solid rgba(52,211,153,.5);color:#a7f3d0;font-size:15px;opacity:0;transition:all .35s var(--ease);pointer-events:none}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+/* 离开本页时的转场遮罩（跳到总目录或下一章） */
+#leaveMask{position:fixed;inset:0;z-index:60;pointer-events:none;background:radial-gradient(circle at var(--mx,50%) var(--my,50%),color-mix(in srgb,var(--acc) 35%,#050816) 0%,#050816 60%);clip-path:circle(0% at var(--mx,50%) var(--my,50%));transition:clip-path .75s var(--eio)}
+#leaveMask.go{clip-path:circle(150% at var(--mx,50%) var(--my,50%))}
+
+</style>
+<script>
+/* 演示引擎 · 核心（页面头部加载）：HOOKS 注册表、通用工具 U、背景粒子
+ *
+ * 每页的钩子：HOOKS['页面id'] = { init(s), enter(s, ctx, k, dir), step(s, ctx, k, dir), leave(s), reset(s) }
+ *   init  —— 页面加载时调用一次，用来生成 DOM
+ *   enter —— 进入页面时调用；k 是当前步，dir 是翻页方向（1 前进 / -1 后退）
+ *   step  —— 在页内按 → / ← 切换步骤时调用
+ *   leave / reset —— 离开页面时调用；reset 在离场动画结束后把页面恢复到初始状态
+ * ctx 提供 later / every / raf，离开页面时自动清理，不会泄漏计时器。
+ */
+window.HOOKS = {};
+window.U = {
+  scale: 1,
+  _id: 0,
+  reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+  ease: (t) => 1 - Math.pow(1 - t, 3),
+  rand(seed) {
+    let s = seed >>> 0 || 1;
+    return () => {
+      s = (s + 0x6d2b79f5) >>> 0;
+      let t = s;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  },
+  ic: (n, c = '') => `<svg class="ic ${c}"><use href="#i-${n}"/></svg>`,
+  // 鼠标在 1920×1080 画布内的坐标
+  local(el, e) {
+    const r = el.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / U.scale, y: (e.clientY - r.top) / U.scale };
+  },
+  later(ctx, fn, ms) { return ctx ? ctx.later(fn, ms) : setTimeout(fn, ms); },
+  // 等待 ms 毫秒；离开页面后 ctx 失效，返回的 Promise 不再结算，后续动画自然中止
+  wait(ctx, ms) { return new Promise((r) => (ctx ? ctx.later(r, ms) : setTimeout(r, ms))); },
+  // 让 SVG 圆点沿同一个 <svg> 里的 path 走一遍（坐标天然一致）；返回 Promise，可以 await 串成动画序列。
+  // o.alive 是可选的中止条件函数（例如检查令牌），返回 false 时立刻停下并隐藏圆点
+  fly(dot, path, ms, o = {}) {
+    const len = path.getTotalLength(), t0 = performance.now() + (o.delay || 0);
+    const ease = o.linear ? (t) => t : (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+    return new Promise((res) => {
+      const tick = (now) => {
+        if ((o.ctx && !o.ctx.alive) || (o.alive && !o.alive())) { dot.style.opacity = 0; res(false); return; }
+        const t = Math.min(1, Math.max(0, (now - t0) / ms)), e = ease(t);
+        const p = path.getPointAtLength((o.reverse ? 1 - e : e) * len);
+        dot.setAttribute('cx', p.x.toFixed(1));
+        dot.setAttribute('cy', p.y.toFixed(1));
+        dot.style.opacity = t <= 0 ? 0 : t < 0.08 ? t / 0.08 : t > 0.92 && !o.keep ? (1 - t) / 0.08 : 1;
+        if (t < 1) requestAnimationFrame(tick);
+        else { dot.style.opacity = o.keep ? 1 : 0; res(true); }
+      };
+      requestAnimationFrame(tick);
+    });
+  },
+  // 重新触发某个 CSS 动画类
+  restart(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); },
+  // 把标题拆成单字，配合 .split .ch 做逐字入场；data-grad="#色1,#色2" 给出渐变色，data-off 是起始延迟序号
+  splitChars(el) {
+    const t = el.textContent.trim(), off = +el.dataset.off || 0, gr = el.dataset.grad;
+    const A = gr ? gr.split(',').map((h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }) : null;
+    el.innerHTML = [...t].map((c, j) => {
+      let col = '';
+      if (A) {
+        const u = t.length > 1 ? j / (t.length - 1) : 0, seg = u * (A.length - 1), a = Math.min(A.length - 2, Math.floor(seg)), fr = seg - a;
+        col = ';color:rgb(' + A[a].map((v, q) => Math.round(v + (A[a + 1][q] - v) * fr)) + ')';
+      }
+      return `<span class="ch" style="--i:${j + off}${col}">${c === ' ' ? '&nbsp;' : c}</span>`;
+    }).join('');
+  },
+  // 数字格式：dec 小数位，sep 千分位，prefix/suffix 前后缀
+  fmt(v, o = {}) {
+    const dec = +o.dec || 0;
+    const s = o.sep ? v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }) : v.toFixed(dec);
+    return (o.prefix || '') + s + (o.suffix || '');
+  },
+  count(el, to, o = {}) {
+    const dur = o.dur || 1600, ctx = o.ctx, from = +o.from || 0;
+    el.textContent = U.fmt(from, o);
+    U.later(ctx, () => {
+      const t0 = performance.now();
+      const tick = () => {
+        if (ctx && !ctx.alive) return;
+        const t = Math.min(1, (performance.now() - t0) / dur);
+        el.textContent = U.fmt(from + (to - from) * U.ease(t), o);
+        if (t < 1) requestAnimationFrame(tick);
+      };
+      tick();
+    }, o.delay || 0);
+  },
+  type(el, o = {}) {
+    const txt = el.dataset.orig ?? el.textContent;
+    el.dataset.orig = txt;
+    el.textContent = '';
+    el.classList.add('typing');
+    const sp = o.speed || 40, ctx = o.ctx;
+    let i = 0;
+    const tick = () => {
+      if (ctx && !ctx.alive) return;
+      i++;
+      el.textContent = txt.slice(0, i);
+      if (i < txt.length) U.later(ctx, tick, sp);
+      else U.later(ctx, () => { el.classList.remove('typing'); o.done && o.done(); }, 700);
+    };
+    U.later(ctx, tick, o.delay || 0);
+  },
+  scramble(el, o = {}) {
+    const txt = el.dataset.orig ?? el.textContent;
+    el.dataset.orig = txt;
+    const cs = '▓▒░<>/{}[]=+*#%&ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
+    const dur = o.dur || 1200, ctx = o.ctx;
+    const rnd = () => [...txt].map((c) => (c === ' ' || c === '\n' ? c : cs[(Math.random() * cs.length) | 0])).join('');
+    el.textContent = rnd();
+    U.later(ctx, () => {
+      const t0 = performance.now();
+      const tick = () => {
+        if (ctx && !ctx.alive) return;
+        const t = Math.min(1, (performance.now() - t0) / dur), n = Math.floor(txt.length * t);
+        let s = txt.slice(0, n);
+        for (let i = n; i < txt.length; i++) {
+          const c = txt[i];
+          s += c === ' ' || c === '\n' ? c : cs[(Math.random() * cs.length) | 0];
+        }
+        el.textContent = s;
+        if (t < 1) requestAnimationFrame(tick);
+        else el.textContent = txt;
+      };
+      tick();
+    }, o.delay || 0);
+  },
+  // 思考题折叠列表：点击题干展开 / 收起（single 为 true 时同时只展开一题）；返回 open(i) 供分步或自动演示调用
+  qa(host, o = {}) {
+    const items = [...host.querySelectorAll('.qa-it')];
+    const open = (i) => items.forEach((it, j) => it.classList.toggle('open', o.single === false ? it.classList.contains('open') || j === i : j === i));
+    items.forEach((it, i) => it.querySelector('.qa-q').addEventListener('click', () => {
+      if (it.classList.contains('open')) it.classList.remove('open');
+      else open(i);
+    }));
+    return open;
+  },
+  toast(m) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = m;
+    t.classList.add('show');
+    clearTimeout(t._t);
+    t._t = setTimeout(() => t.classList.remove('show'), 1800);
+  },
+  copy(text) {
+    const ok = () => U.toast('已复制到剪贴板');
+    const fb = () => {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); ok(); } catch (e) { U.toast('复制失败，请手动选择文本'); }
+      ta.remove();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fb);
+    else fb();
+  },
+  confetti(x, y, n = 150) {
+    const cv = document.getElementById('fx'), g = cv.getContext('2d'), d = Math.min(2, devicePixelRatio || 1);
+    cv.width = innerWidth * d;
+    cv.height = innerHeight * d;
+    g.setTransform(d, 0, 0, d, 0, 0);
+    const cols = ['#22d3ee', '#a78bfa', '#fbbf24', '#34d399', '#fb7185', '#60a5fa'];
+    const ps = Array.from({ length: n }, () => ({
+      x, y, vx: (Math.random() - 0.5) * 18, vy: -Math.random() * 17 - 5, r: Math.random() * 7 + 4,
+      a: Math.random() * 6.3, va: (Math.random() - 0.5) * 0.4, c: cols[(Math.random() * 6) | 0], l: 1,
+    }));
+    const tick = () => {
+      g.clearRect(0, 0, innerWidth, innerHeight);
+      let k = 0;
+      for (const p of ps) {
+        p.vy += 0.42; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.a += p.va; p.l -= 0.007;
+        if (p.l > 0 && p.y < innerHeight + 40) {
+          k++;
+          g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.globalAlpha = p.l; g.fillStyle = p.c;
+          g.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); g.restore();
+        }
+      }
+      if (k) requestAnimationFrame(tick);
+      else g.clearRect(0, 0, innerWidth, innerHeight);
+    };
+    tick();
+  },
+  // 分段开关：<div class="seg"><i class="knob"></i><button data-v="a">…</button>…</div>
+  seg(host, onPick) {
+    const knob = host.querySelector('.knob'), bs = [...host.querySelectorAll('button')];
+    const set = (v) => {
+      bs.forEach((b) => b.classList.toggle('on', b.dataset.v === v));
+      const b = bs.find((x) => x.dataset.v === v);
+      if (b && knob) { knob.style.left = b.offsetLeft + 'px'; knob.style.width = b.offsetWidth + 'px'; }
+    };
+    bs.forEach((b) => b.addEventListener('click', () => { set(b.dataset.v); onPick && onPick(b.dataset.v, true); }));
+    return set;
+  },
+
+  // 环形图：nodes = [{label, color}]；active 高亮第几个；center(c, S) 返回中心 SVG
+  ring(host, o = {}) {
+    const id = 'rg' + ++U._id, S = o.size || 640, c = S / 2, R = o.r || S * 0.34, nr = o.nodeR || S * 0.056;
+    const st = o.nodes || [], N = st.length;
+    const A = (i) => ((-90 + (i * 360) / N) * Math.PI) / 180;
+    const P = (i, r = R) => [c + r * Math.cos(A(i)), c + r * Math.sin(A(i))];
+    const gap = (nr + 9) / R, f = (n) => n.toFixed(1);
+    let h = `<svg class="loop-svg" viewBox="0 0 ${S} ${S}"><defs><filter id="${id}g" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="${f(S / 120)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+    h += `<circle class="ring r1" cx="${c}" cy="${c}" r="${f(R + nr + S * 0.05)}"/><circle class="ring r2" cx="${c}" cy="${c}" r="${f(R - nr - S * 0.045)}"/>`;
+    for (let i = 0; i < N; i++) {
+      const a1 = A(i) + gap, a2 = A(i + 1) - gap;
+      const d = `M${f(c + R * Math.cos(a1))} ${f(c + R * Math.sin(a1))}A${R} ${R} 0 0 1 ${f(c + R * Math.cos(a2))} ${f(c + R * Math.sin(a2))}`;
+      h += `<path class="arc" d="${d}" style="--c:${st[i].color};--len:${f(R * (a2 - a1))};--i:${i}"/><path class="arc-flow" d="${d}" style="--c:${st[i].color}"/>`;
+    }
+    if (o.comet !== false) {
+      const cp = `M${c} ${c - R}A${R} ${R} 0 1 1 ${c - 0.01} ${c - R}`;
+      [[1, 0], [0.75, -0.08], [0.5, -0.16], [0.3, -0.24]].forEach(([k, b]) => {
+        h += `<circle class="comet" r="${f((S / 160) * k + 1.2)}" fill-opacity="${k}" filter="url(#${id}g)"><animateMotion dur="${o.cometDur || 9}s" begin="${b}s" repeatCount="indefinite" path="${cp}"/></circle>`;
+      });
+    }
+    if (o.center) h += o.center(c, S);
+    for (let i = 0; i < N; i++) {
+      const [x, y] = P(i), on = o.active === i, dm = o.active != null && o.active >= 0 && !on;
+      const num = st[i].num ?? String(i + 1).padStart(2, '0');
+      h += `<g class="node${on ? ' on' : ''}${dm ? ' dim' : ''}" data-i="${i}" style="--c:${st[i].color};--i:${i}" transform="translate(${f(x)} ${f(y)})"><g class="node-in"><circle class="halo" r="${nr}"/><circle class="core" r="${nr}"/><text class="num" style="font-size:${f(nr * 0.62)}px">${num}</text></g></g>`;
+      if (o.labels !== false) {
+        const [lx, ly] = P(i, R + nr + (o.labelGap || S * 0.055)), co = Math.cos(A(i));
+        const an = co > 0.25 ? 'start' : co < -0.25 ? 'end' : 'middle';
+        h += `<text class="lab${on ? ' on' : ''}${dm ? ' dim' : ''}" data-i="${i}" x="${f(lx)}" y="${f(ly)}" text-anchor="${an}" style="--c:${st[i].color};--i:${i};font-size:${f(o.labelSize || S * 0.036)}px">${st[i].label}</text>`;
+      }
+    }
+    host.innerHTML = h + '</svg>';
+    return host.querySelector('svg');
+  },
+
+  // 轨道图（封面）：中心核心 + 若干条倾斜椭圆轨道上的卫星，卫星标签始终保持水平
+  orbit(host, o = {}) {
+    const id = 'ob' + ++U._id, S = o.size || 700, c = S / 2, f = (n) => n.toFixed(1);
+    let h = `<svg class="orbit-svg" viewBox="0 0 ${S} ${S}"><defs>
+      <radialGradient id="${id}c"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="${o.coreColor || '#a5f3fc'}"/><stop offset="1" stop-color="${o.coreColor || '#22d3ee'}" stop-opacity="0"/></radialGradient>
+      <filter id="${id}g" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="${f(S / 110)}" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>`;
+    if (o.outer) {
+      h += `<circle class="ob-outer" cx="${c}" cy="${c}" r="${f(S * 0.47)}"/>`;
+      h += `<path id="${id}t" d="M${f(c - S * 0.47)} ${c}A${f(S * 0.47)} ${f(S * 0.47)} 0 0 1 ${f(c + S * 0.47)} ${c}" fill="none"/>`;
+      h += `<text class="ob-outer-t"><textPath href="#${id}t" startOffset="50%" text-anchor="middle">${o.outer}</textPath></text>`;
+    }
+    (o.sats || []).forEach((s, i) => {
+      const rx = s.rx * S, ry = s.ry * S, t = ((s.tilt || 0) * Math.PI) / 180;
+      const x1 = c - rx * Math.cos(t), y1 = c - rx * Math.sin(t), x2 = c + rx * Math.cos(t), y2 = c + rx * Math.sin(t);
+      const d = `M${f(x1)} ${f(y1)}A${f(rx)} ${f(ry)} ${s.tilt || 0} 1 1 ${f(x2)} ${f(y2)}A${f(rx)} ${f(ry)} ${s.tilt || 0} 1 1 ${f(x1)} ${f(y1)}`;
+      h += `<path id="${id}p${i}" class="ob-path" d="${d}" style="--c:${s.color}"/>`;
+      h += `<g class="ob-sat" style="--c:${s.color}"><circle class="ob-glow" r="${f(S * 0.05)}" filter="url(#${id}g)"/><circle class="ob-dot" r="${f(S * 0.034)}"/><text class="ob-lab" y="${f(S * 0.075)}">${s.label}</text>`;
+      h += `<animateMotion dur="${s.dur || 12}s" begin="${-(s.phase || 0) * (s.dur || 12)}s" repeatCount="indefinite"><mpath href="#${id}p${i}"/></animateMotion></g>`;
+    });
+    h += `<circle class="ob-halo" cx="${c}" cy="${c}" r="${f(S * 0.16)}" fill="url(#${id}c)"/>`;
+    h += `<circle class="ob-core" cx="${c}" cy="${c}" r="${f(S * 0.09)}"/>`;
+    h += `<circle class="ob-wave" cx="${c}" cy="${c}" r="${f(S * 0.09)}"/><circle class="ob-wave w2" cx="${c}" cy="${c}" r="${f(S * 0.09)}"/>`;
+    h += `<text class="ob-core-t" x="${c}" y="${c}">${o.core || 'Agent'}</text>`;
+    host.innerHTML = h + '</svg>';
+    return host.querySelector('svg');
+  },
+
+  // 背景粒子网络：color(a, b) 渐变到新的强调色，warp(v) 触发一次曲速效果
+  background(cv) {
+    const g = cv.getContext('2d');
+    let W, Hh, pts = [], warp = 0, mx = 0, my = 0, cx = 0, cy = 0;
+    const col = [34, 211, 238], col2 = [167, 139, 250];
+    let tg = [34, 211, 238], tg2 = [167, 139, 250];
+    const hex = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+    const mk = () => ({ x: Math.random() * W, y: Math.random() * Hh, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, z: Math.random() * 0.8 + 0.2, r: Math.random() * 1.6 + 0.5 });
+    function rs() {
+      const d = Math.min(2, devicePixelRatio || 1);
+      W = innerWidth; Hh = innerHeight;
+      cv.width = W * d; cv.height = Hh * d;
+      g.setTransform(d, 0, 0, d, 0, 0);
+      pts = Array.from({ length: Math.round(Math.min(130, (W * Hh) / 15000)) }, mk);
+    }
+    function frame() {
+      requestAnimationFrame(frame);
+      if (document.hidden) return;
+      g.clearRect(0, 0, W, Hh);
+      for (let i = 0; i < 3; i++) { col[i] += (tg[i] - col[i]) * 0.04; col2[i] += (tg2[i] - col2[i]) * 0.04; }
+      warp *= 0.955; cx += (mx - cx) * 0.05; cy += (my - cy) * 0.05;
+      const ox = W / 2, oy = Hh / 2, c1 = `rgba(${col.map(Math.round)},`, c2 = `rgba(${col2.map(Math.round)},`;
+      for (const p of pts) {
+        p.px = p.x; p.py = p.y; p.x += p.vx * p.z; p.y += p.vy * p.z;
+        if (warp > 0.02) { const dx = p.x - ox, dy = p.y - oy, d = Math.hypot(dx, dy) || 1, s = warp * 24 * p.z; p.x += (dx / d) * s; p.y += (dy / d) * s; }
+        if (p.x < -30 || p.x > W + 30 || p.y < -30 || p.y > Hh + 30) {
+          if (warp > 0.1) { p.x = ox + (Math.random() - 0.5) * W * 0.35; p.y = oy + (Math.random() - 0.5) * Hh * 0.35; }
+          else { p.x = ((p.x + W + 60) % (W + 60)) - 30; p.y = ((p.y + Hh + 60) % (Hh + 60)) - 30; }
+          p.px = p.x; p.py = p.y;
+        }
+      }
+      if (warp < 0.45) {
+        const L2 = 140 * 140;
+        g.lineWidth = 1;
+        for (let i = 0; i < pts.length; i++) {
+          const a = pts[i];
+          for (let j = i + 1; j < pts.length; j++) {
+            const b = pts[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+            if (d2 < L2) {
+              g.strokeStyle = c1 + ((1 - d2 / L2) * 0.17 * (1 - warp * 2)).toFixed(3) + ')';
+              g.beginPath(); g.moveTo(a.x + cx * a.z, a.y + cy * a.z); g.lineTo(b.x + cx * b.z, b.y + cy * b.z); g.stroke();
+            }
+          }
+        }
+      }
+      for (const p of pts) {
+        const x = p.x + cx * p.z, y = p.y + cy * p.z;
+        if (warp > 0.05) {
+          g.strokeStyle = c2 + (0.25 + 0.55 * p.z).toFixed(2) + ')';
+          g.lineWidth = p.r * p.z * 1.5;
+          g.beginPath(); g.moveTo(p.px + cx * p.z, p.py + cy * p.z); g.lineTo(x, y); g.stroke();
+        }
+        g.fillStyle = c1 + (0.35 + 0.5 * p.z).toFixed(2) + ')';
+        g.beginPath(); g.arc(x, y, p.r * p.z + 0.3, 0, 6.283); g.fill();
+      }
+    }
+    addEventListener('resize', rs);
+    addEventListener('mousemove', (e) => { mx = (e.clientX / innerWidth - 0.5) * -34; my = (e.clientY / innerHeight - 0.5) * -34; });
+    rs();
+    requestAnimationFrame(frame);
+    return {
+      color(a, b) { tg = hex(a); tg2 = hex(b); },
+      warp(v) { if (!U.reduced) warp = Math.max(warp, v); },
+    };
+  },
+};
+
+</script>
+<script>
+window.DECK_CFG = {"id":"ch11","no":"后记","title":"回到 Agent = LLM + 上下文 + 工具","ready":true,"autoMs":10000,"parts":[{"n":"开篇","k":"OPENING","short":"开篇","acc":"#a5b4fc","acc2":"#7dd3fc"},{"n":"回到公式","k":"PART 01","short":"公式","acc":"#c4b5fd","acc2":"#67e8f9"},{"n":"两朵乌云","k":"PART 02","short":"乌云","acc":"#cbd5e1","acc2":"#7dd3fc"},{"n":"模型与 Agent 的共同演进","k":"PART 03","short":"演进","acc":"#5eead4","acc2":"#a5b4fc"},{"n":"收束","k":"CLOSING","short":"收束","acc":"#7dd3fc","acc2":"#c4b5fd"}],"prev":{"id":"ch10","no":"第十章","title":"多 Agent 协作","href":"ch10.html","ready":true},"next":null};
+</script>
+</head>
+<body>
+<canvas id="bg"></canvas>
+<div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+<div class="gridlines"></div><div class="vignette"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7 9l5-5 5 5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+<symbol id="i-shieldx" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.2-8 9-4.6-.8-8-4.5-8-9V6z"/><path d="M9.5 9.5l5 5M14.5 9.5l-5 5"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18 9.5l-4.2 1.9L12 16l-1.8-4.6L6 9.5l4.2-1.9z"/><path d="M19 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+<symbol id="i-ucheck" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M16 11l2 2 4-4"/></symbol>
+<symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 20h18M6 20V11M11 20V5M16 20v-7M20 20V9"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="7" r="2"/><path d="M6 7v10M18 9c0 5-6 4-11.5 8.5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.5v.01"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+<symbol id="i-unlock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.6-1.8"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4h6a3 3 0 0 1 2 1v15a2.5 2.5 0 0 0-2-1H4zM20 4h-6a3 3 0 0 0-2 1v15a2.5 2.5 0 0 1 2-1h6z"/></symbol>
+<symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></symbol>
+<symbol id="i-db" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17" cy="9" r="2.5"/><path d="M17 14c2.8 0 4.5 2 4.5 5"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></symbol>
+<symbol id="i-map" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><circle cx="4" cy="5" r="1.8"/><circle cx="20" cy="5" r="1.8"/><circle cx="4" cy="19" r="1.8"/><circle cx="20" cy="19" r="1.8"/><path d="M10 10.5L5.5 6.3M14 10.5l4.5-4.2M10 13.5l-4.5 4.2M14 13.5l4.5 4.2"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 6.1A9.5 9.5 0 0 1 12 6c6.5 0 10 6 10 6a17 17 0 0 1-3.1 3.9M6.6 6.6A17 17 0 0 0 2 12s3.5 6 10 6a9.6 9.6 0 0 0 4.2-.9"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></symbol>
+<symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M15 8l2 2"/></symbol>
+<symbol id="i-pkg" viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></symbol>
+<symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-robot" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 14h.01M15 14h.01M2 13v3M22 13v3"/><circle cx="12" cy="3" r="1"/></symbol>
+<symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></symbol>
+<symbol id="i-bug" viewBox="0 0 24 24"><rect x="7" y="8" width="10" height="12" rx="5"/><path d="M12 8v12M7 12H3M21 12h-4M7 16H4M20 16h-3M9 8L7.5 5M15 8l1.5-3"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6l-5 10a1 1 0 0 0 .9 1.5h12.2a1 1 0 0 0 .9-1.5L14 9V3M7.5 15h9"/></symbol>
+<symbol id="i-funnel" viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></symbol>
+<symbol id="i-server" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+<symbol id="i-left" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+<symbol id="i-right" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></symbol>
+<symbol id="i-note" viewBox="0 0 24 24"><path d="M5 3h10l4 4v14H5z"/><path d="M9 9h6M9 13h6M9 17h4"/></symbol>
+<symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+<symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+<symbol id="i-rocket" viewBox="0 0 24 24"><path d="M12 15l-3-3c1-4.5 4.5-8 10-9-1 5.5-4.5 9-7 12z"/><path d="M9 12l-4 .5-2 3 4 1M12 15l-.5 4 3 2 1-4"/><circle cx="15" cy="9" r="1.5"/></symbol>
+<symbol id="i-merge" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="17" r="2"/><path d="M6 7v10M6 7c0 6 5 10 10 10"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></symbol>
+<symbol id="i-code" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 5h3v14H7zM14 5h3v14h-3z"/></symbol>
+<symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4 18a8 8 0 1 1 16 0"/><path d="M12 18l4-6"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+<symbol id="i-brain" viewBox="0 0 24 24"><path d="M9.5 4A2.5 2.5 0 0 0 7 6.5v.3A3 3 0 0 0 4.5 10a3 3 0 0 0 .8 2A3.2 3.2 0 0 0 6 17a2.8 2.8 0 0 0 3.5 3 2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 9.5 4z"/><path d="M14.5 4A2.5 2.5 0 0 1 17 6.5v.3a3 3 0 0 1 2.5 3.2 3 3 0 0 1-.8 2A3.2 3.2 0 0 1 18 17a2.8 2.8 0 0 1-3.5 3 2.5 2.5 0 0 1-2.5-2.5"/><path d="M7 11h2M15 11h2M8 15h1.5M14.5 15H16"/></symbol>
+<symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3z"/></symbol>
+<symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+<symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+<symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 15l-8-4V5.5a1.5 1.5 0 0 0-3 0V11l-8 4v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-4.5l8 2.5z"/></symbol>
+<symbol id="i-card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></symbol>
+<symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></symbol>
+<symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18z"/></symbol>
+<symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M10 4a2 2 0 1 1 4 0v2h4v4h-2a2 2 0 1 0 0 4h2v4h-4v-2a2 2 0 1 0-4 0v2H6v-4h2a2 2 0 1 0 0-4H6V6h4z"/></symbol>
+<symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 10 0V2M7 22v-4a5 5 0 0 1 10 0v4"/></symbol>
+<symbol id="i-scale" viewBox="0 0 24 24"><path d="M12 3v18M6 21h12M4 7h16"/><path d="M7 7l-3 7a3 3 0 0 0 6 0zM17 7l-3 7a3 3 0 0 0 6 0z"/></symbol>
+<symbol id="i-coin" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.5 9.2A2.6 2 0 0 0 12 7.8c-1.4 0-2.5.8-2.5 2s1.1 1.7 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2a2.6 2 0 0 1-2.5-1.4M12 6.2v1.6M12 16.2v1.6"/></symbol>
+<symbol id="i-cursor" viewBox="0 0 24 24"><path d="M5 3l14 7-6 2-2 6z"/></symbol>
+<symbol id="i-browser" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M7 6.5h.01M10 6.5h.01"/></symbol>
+<symbol id="i-mobile" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2l2-6 3 12 3-9 2 5 2-2h4"/></symbol>
+<symbol id="i-nodes" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M8.5 6h7M7.2 8.2l3.6 7.6M16.8 8.2l-3.6 7.6"/></symbol>
+<symbol id="i-send" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/></symbol>
+<symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2"/><circle cx="18" cy="5" r="2"/><path d="M8 19h8a3 3 0 0 0 0-6H8a3 3 0 0 1 0-6h8"/></symbol>
+<symbol id="i-inbox" viewBox="0 0 24 24"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1 3h6l1-3h5"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V3h6v1M9 11h6M9 15h4"/></symbol>
+<symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M15 4V2M15 10V8M11 6h2M17 6h2M3 21l12-12"/></symbol>
+<symbol id="i-box" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M9 21V9"/></symbol>
+<symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 4h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/></symbol>
+<symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 8.5h.01M15.5 8.5h.01M12 12h.01M8.5 15.5h.01M15.5 15.5h.01"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="12" cy="19" r="2"/><path d="M6 7v2a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V7M12 12v5"/></symbol>
+<symbol id="i-cart" viewBox="0 0 24 24"><path d="M3 4h2l2.5 11h10L20 7H6.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></symbol>
+<symbol id="i-speaker" viewBox="0 0 24 24"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></symbol>
+<symbol id="i-headphones" viewBox="0 0 24 24"><path d="M4 15v-3a8 8 0 0 1 16 0v3"/><rect x="3" y="14" width="4" height="7" rx="1.5"/><rect x="17" y="14" width="4" height="7" rx="1.5"/></symbol>
+<symbol id="i-ear" viewBox="0 0 24 24"><path d="M7 10a5 5 0 0 1 10 0c0 3-3 4-3 7a3 3 0 0 1-6 0"/><path d="M10 10a2 2 0 0 1 4 0"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+<symbol id="i-video" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></symbol>
+<symbol id="i-arm" viewBox="0 0 24 24"><path d="M4 21h8M8 21v-4l3-6 6-3"/><circle cx="11" cy="11" r="1.6"/><circle cx="17" cy="8" r="1.6"/><path d="M18.5 6.5l2-2M18.5 9.5l2.5.5"/></symbol>
+<symbol id="i-gpu" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="2"/><circle cx="8" cy="12.5" r="2.5"/><circle cx="16" cy="12.5" r="2.5"/><path d="M5 18v3M9 18v3M13 18v3"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 21h8M9.5 17h5"/></symbol>
+<symbol id="i-medal" viewBox="0 0 24 24"><path d="M8 3l2 6M16 3l-2 6"/><circle cx="12" cy="15" r="5"/><path d="M12 13v4"/></symbol>
+<symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="9" width="18" height="4" rx="1"/><path d="M5 13v8h14v-8M12 9v12M12 9c-2-4-6-4-6-1.5S9 9 12 9zM12 9c2-4 6-4 6-1.5S15 9 12 9z"/></symbol>
+<symbol id="i-trend" viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M4 16l5-5 4 3 7-7"/><path d="M15 7h5v5"/></symbol>
+<symbol id="i-pie" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/></symbol>
+<symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6M12 2v3"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></symbol>
+<symbol id="i-docs" viewBox="0 0 24 24"><path d="M8 3h8l4 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M16 3v4h4M4 7v12a3 3 0 0 0 3 3h8"/></symbol>
+<symbol id="i-scissors" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/></symbol>
+<symbol id="i-compress" viewBox="0 0 24 24"><path d="M4 9h5V4M20 9h-5V4M4 15h5v5M20 15h-5v5"/></symbol>
+<symbol id="i-thumb" viewBox="0 0 24 24"><path d="M7 11v9H4v-9z"/><path d="M7 11l4-7a2 2 0 0 1 2 2v4h5.5a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.3 20H7"/></symbol>
+<symbol id="i-tree" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="4" rx="1"/><rect x="3" y="17" width="6" height="4" rx="1"/><rect x="15" y="17" width="6" height="4" rx="1"/><path d="M12 7v5M6 17v-5h12v5"/></symbol>
+<symbol id="i-hier" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="12" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M12 7.5v9M12 12H5v4.5M12 12h7v4.5"/></symbol>
+<symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V11M14 10.5V6a1.5 1.5 0 0 1 3 0v8a7 7 0 0 1-7 7 6 6 0 0 1-5-2.7L3 14a1.5 1.5 0 0 1 2.5-1.7L8 15"/></symbol>
+<symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></symbol>
+<symbol id="i-gavel" viewBox="0 0 24 24"><path d="M14 4l6 6M11.5 6.5l6 6M13 5l-4.5 4.5 6 6L19 11M10.5 12.5L3 20"/></symbol>
+<symbol id="i-sprout" viewBox="0 0 24 24"><path d="M12 21v-9"/><path d="M12 12C12 7 8 5 4 5c0 4 3 7 8 7zM12 14c0-4 3-7 8-7 0 4-3 7-8 7z"/></symbol>
+<symbol id="i-dna" viewBox="0 0 24 24"><path d="M7 3c0 6 10 6 10 12s-10 3-10 6M17 3c0 3-10 3-10 9s10 6 10 9"/><path d="M8 6h8M9 9.5h6M9 14.5h6M8 18h8"/></symbol>
+<symbol id="i-infinity" viewBox="0 0 24 24"><path d="M12 12c-2-3-4-4.5-6-4.5a4.5 4.5 0 0 0 0 9c2 0 4-1.5 6-4.5zm0 0c2 3 4 4.5 6 4.5a4.5 4.5 0 0 0 0-9c-2 0-4 1.5-6 4.5z"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+<symbol id="i-receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-2.5-1.5L14 21l-2-1.5L10 21l-2.5-1.5L5 21z"/><path d="M9 8h6M9 12h6M9 16h3"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5"/><path d="M4 17v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/></symbol>
+<symbol id="i-commit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/></symbol>
+<symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></symbol>
+<symbol id="i-game" viewBox="0 0 24 24"><path d="M6 8h12a4 4 0 0 1 4 4v1a4 4 0 0 1-7 2.6L14 14h-4l-1 1.6A4 4 0 0 1 2 13v-1a4 4 0 0 1 4-4z"/><path d="M7 11v3M5.5 12.5h3M16 11.5h.01M18 13.5h.01"/></symbol>
+<symbol id="i-lang" viewBox="0 0 24 24"><path d="M4 5h9M8.5 3v2M6 5c1 4 3.5 7 6.5 8.5M11 5c-1 4-3.5 7-7 8.5"/><path d="M13 21l4-9 4 9M14.5 18h5"/></symbol>
+<symbol id="i-percent" viewBox="0 0 24 24"><path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/></symbol>
+<symbol id="i-sigma" viewBox="0 0 24 24"><path d="M18 5H6l6 7-6 7h12"/></symbol>
+<symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/><path d="M5.5 9h2M16.5 9h2M5.5 13h2M16.5 13h2"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M4 8h14l-3-3M20 16H6l3 3"/></symbol>
+<symbol id="i-unlink" viewBox="0 0 24 24"><path d="M9 15l-2 2a3.5 3.5 0 0 1-5-5l2-2M15 9l2-2a3.5 3.5 0 0 1 5 5l-2 2M8 4v3M4 8h3M16 20v-3M20 16h-3"/></symbol>
+<symbol id="i-grad" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2.5 9 2.5 12 0v-5M22 9v6"/></symbol>
+<symbol id="i-dumbbell" viewBox="0 0 24 24"><path d="M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12"/></symbol>
+<symbol id="i-vector" viewBox="0 0 24 24"><path d="M4 20L20 4M4 20l5-14M4 20l14-5"/><circle cx="20" cy="4" r="1.5"/><circle cx="9" cy="6" r="1.5"/><circle cx="18" cy="15" r="1.5"/></symbol>
+<symbol id="i-memory" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 8h3v3H8zM13 8h3v3h-3zM8 13h3v3H8zM13 13h3v3h-3zM4 9H2M4 15H2M22 9h-2M22 15h-2"/></symbol>
+<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4z"/></symbol>
+<symbol id="i-quote" viewBox="0 0 24 24"><path d="M4 11h5v7H4zM4 11c0-4 2-6 5-6M15 11h5v7h-5zM15 11c0-4 2-6 5-6"/></symbol>
+<symbol id="i-cloud2" viewBox="0 0 24 24"><path d="M7 18a5 5 0 1 1 1-9.9A6 6 0 0 1 19.5 10 4 4 0 0 1 18 18z"/><path d="M9 14l2 2 4-4"/></symbol>
+<symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z"/></symbol>
+<symbol id="i-stack" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="5" rx="1"/><rect x="4" y="10" width="16" height="5" rx="1"/><rect x="4" y="17" width="16" height="4" rx="1"/></symbol>
+<symbol id="i-network" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M6.5 6.5l3.7 3.7M17.5 6.5l-3.7 3.7M6.5 17.5l3.7-3.7M17.5 17.5l-3.7-3.7M7 5h10M7 19h10"/></symbol>
+</svg>
+
+<div id="viewport"><div id="deck">
+<!-- ===== 00-opening.html ===== -->
+<!-- ================= 开篇 ================= -->
+<script>
+// 本章共用的小工具：跳到某个部分的第一页
+window.C11 = {
+  jump(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+};
+</script>
+
+<section class="slide" id="c11-cover" data-part="0" data-title="封面" data-notes="这是全书的<b>后记：回到 Agent = LLM + 上下文 + 工具</b>。本书开篇提出了一个公式：Agent = LLM + 上下文 + 工具；全书十章，都在这三个词里展开。后记做三件事：回到这个公式，看十章如何围绕它展开、又如何在第九章汇合；指出今天 Agent 天空上的两朵乌云——流式实时的交互，以及从成功与失败中持续积累经验；最后讨论模型与 Agent 的共同演进：一个自我强化的飞轮，以及“模型会不会最终吃掉 Harness”。<br>右侧外圈的十颗珠子是全书十章，光点不断从各章飞回公式里的三个组件和中心的 Agent（对应关系取自引言的图0-1）。">
+  <div class="c1cv-art fx fx-scale" style="--d:4"></div>
+  <div class="c1cv-text">
+    <div class="c1cv-tag fx fx-up"><i></i>深入理解 AI Agent · 后记</div>
+    <h1 class="c1cv-title"><span class="split">后记</span><span class="split c1cv-t2" data-off="2" data-grad="#a5b4fc,#7dd3fc,#5eead4">回到 Agent = LLM + 上下文 + 工具</span></h1>
+    <p class="c1cv-sub fx fx-up" style="--d:16">全书十章，都在这三个词里展开；<br>两朵乌云；模型与 Agent 的共同演进</p>
+    <div class="c1cv-meta fx fx-up" style="--d:18"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c1cv-hint fx fx-up" style="--d:20"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c11-cover{justify-content:center;padding-left:150px}
+.c1cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c1cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c1cv-title{margin-top:30px;font-size:150px;line-height:1.08;font-weight:800;letter-spacing:.04em}
+.c1cv-title .c1cv-t2{font-size:54px;letter-spacing:.01em;margin-top:22px}
+.c1cv-sub{margin-top:32px;font-size:30px;color:var(--text2);line-height:1.6}
+.c1cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c1cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c1cv-art{position:absolute;right:120px;top:50%;width:720px;height:720px;margin-top:-372px}
+.c1cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c1cv-hint span{margin:0 4px}
+.c1cv-svg{width:100%;height:100%;overflow:visible}
+.c1cv-r0{fill:none;stroke:rgba(255,255,255,.1);stroke-width:1.4;stroke-dasharray:2 10;transform-box:fill-box;transform-origin:center;animation:spin 140s linear infinite}
+.c1cv-r1{fill:none;stroke:rgba(255,255,255,.08);stroke-width:1.2}
+.c1cv-ln{stroke:rgba(255,255,255,.18);stroke-width:2;stroke-dasharray:4 7}
+.c1cv-bd circle{fill:#0a1024;stroke:var(--c);stroke-width:2.4}
+.c1cv-bd text{fill:var(--c);font:700 17px var(--num);text-anchor:middle;dominant-baseline:central}
+.c1cv-nd circle.k{fill:rgba(8,12,30,.94);stroke:var(--c);stroke-width:3;transition:fill .3s}
+.c1cv-nd circle.h{fill:var(--c);opacity:0;transform-box:fill-box;transform-origin:center}
+.c1cv-nd.hit circle.h{animation:pulse 1s ease-out}
+.c1cv-nd text{fill:var(--c);font-size:19px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.c1cv-core circle{fill:#0a1024;stroke:var(--acc);stroke-width:3}
+.c1cv-core text{fill:var(--text);font:800 30px var(--num);text-anchor:middle;dominant-baseline:central}
+.c1cv-core.hit circle{animation:c11coreHit 1s ease-out}
+@keyframes c11coreHit{0%{filter:drop-shadow(0 0 26px #a5b4fc)}100%{filter:drop-shadow(0 0 0 transparent)}}
+.c1cv-sp{opacity:0;filter:drop-shadow(0 0 8px currentColor)}
+.c1cv-lg{fill:var(--text3);font-size:15px;text-anchor:middle;letter-spacing:.1em}
+</style>
+<script>
+HOOKS['c11-cover'] = {
+  // 各章光点飞回的位置：取自引言图0-1 的对应关系（-1 表示中心的 Agent）
+  MAP: [-1, 1, 1, 2, 2, -1, 0, 0, -1, -1],
+  NODES: [['LLM', '#a78bfa', -90], ['上下文', '#22d3ee', 150], ['工具', '#fbbf24', 30]],
+  init(s) {
+    const c = 360, f = (n) => n.toFixed(1), P = (a, r) => [c + r * Math.cos((a * Math.PI) / 180), c + r * Math.sin((a * Math.PI) / 180)];
+    let h = `<svg class="c1cv-svg" viewBox="0 0 720 720" width="720" height="720"><circle class="c1cv-r0" cx="${c}" cy="${c}" r="338"/><circle class="c1cv-r1" cx="${c}" cy="${c}" r="290"/>`;
+    this.NODES.forEach(([, , a]) => { const [x, y] = P(a, 150); h += `<line class="c1cv-ln" x1="${c}" y1="${c}" x2="${f(x)}" y2="${f(y)}"/>`; });
+    for (let i = 0; i < 10; i++) h += `<g class="c1cv-bd" style="--c:${i < 6 ? '#22d3ee' : '#a78bfa'}"><circle r="22"/><text>${String(i + 1).padStart(2, '0')}</text></g>`;
+    h += `<g class="c1cv-core"><circle cx="${c}" cy="${c}" r="72"/><text x="${c}" y="${c}">Agent</text></g>`;
+    this.NODES.forEach(([t, col, a]) => { const [x, y] = P(a, 150); h += `<g class="c1cv-nd" style="--c:${col}" transform="translate(${f(x)} ${f(y)})"><circle class="h" r="44"/><circle class="k" r="44"/><text>${t}</text></g>`; });
+    for (let i = 0; i < 5; i++) h += `<circle class="c1cv-sp" r="7"/>`;
+    h += `<text class="c1cv-lg" x="${c}" y="752">外圈：全书十章　内圈：公式的三个组件</text>`;
+    s.querySelector('.c1cv-art').innerHTML = h + '</svg>';
+    this.bds = [...s.querySelectorAll('.c1cv-bd')];
+    this.nds = [...s.querySelectorAll('.c1cv-nd')];
+    this.core = s.querySelector('.c1cv-core');
+    this.sps = [...s.querySelectorAll('.c1cv-sp')].map((el) => ({ el, on: false }));
+    this.P = P;
+  },
+  enter(s, ctx) {
+    let t0 = null, next = 0, ci = 0;
+    ctx.raf((t) => {
+      if (t0 === null) t0 = t;
+      const e = (t - t0) / 1000, rot = e * 5;
+      const pos = this.bds.map((b, i) => { const [x, y] = this.P(-90 + i * 36 + rot, 290); b.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`); return [x, y]; });
+      // 每隔一会儿，从下一章发出一个光点，飞回它对应的组件
+      if (t > next) {
+        next = t + 650;
+        const sp = this.sps.find((p) => !p.on);
+        if (sp) {
+          const i = ci++ % 10, m = this.MAP[i], to = m < 0 ? [360, 360] : this.P(this.NODES[m][2], 150), col = m < 0 ? '#c7d2fe' : this.NODES[m][1];
+          Object.assign(sp, { on: true, t0: t, from: pos[i], to, m, col });
+          sp.el.style.fill = col; sp.el.style.color = col;
+        }
+      }
+      this.sps.forEach((p) => {
+        if (!p.on) return;
+        const u = Math.min(1, (t - p.t0) / 1100), k = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+        p.el.setAttribute('cx', (p.from[0] + (p.to[0] - p.from[0]) * k).toFixed(1));
+        p.el.setAttribute('cy', (p.from[1] + (p.to[1] - p.from[1]) * k).toFixed(1));
+        p.el.style.opacity = u < 0.1 ? u * 10 : u > 0.9 ? (1 - u) * 10 : 1;
+        if (u >= 1) {
+          p.on = false;
+          p.el.style.opacity = 0;
+          const tgt = p.m < 0 ? this.core : this.nds[p.m];
+          U.restart(tgt, 'hit');
+        }
+      });
+    });
+  },
+  reset() { this.sps.forEach((p) => { p.on = false; p.el.style.opacity = 0; }); },
+};
+</script>
+
+<section class="slide" id="c11-map" data-part="0" data-title="后记导览" data-notes="后记分三段，最后是收束：<br>① <b>回到公式</b>：全书十章都在 Agent = LLM + 上下文 + 工具这三个词里展开——第一章建立公式的三层理解和编排光谱，随后沿“构建—评估与进化—协作”逐步展开；这三个层次不是相互独立的书架，第九章是全书从“怎样构建 Agent”转向“怎样让 Agent 长期变好”的汇合点。<br>② <b>两朵乌云</b>：Agent 如何流式地、实时地与环境交互；Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。<br>③ <b>模型与 Agent 的共同演进</b>：两朵乌云都不是靠某一次模型升级就能凭空吹散的；模型和 Agent 从来不是上下游，而是一起往前走的——一个自我强化的飞轮、一层层被吃却吃不完的 Harness、以及飞轮带来的护城河。<br>④ <b>收束</b>：“看到什么、能做什么、如何验证做得对不对”这三个问题不会过时；接下来，去造点什么吧。<br>四站会自动轮流高亮，点击任一站直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">后记<em>导览</em></h2>
+  <p class="lead fx fx-up" style="--d:2">从公式出发，看清天空上的两朵乌云，再看模型与 Agent 如何一起往前走</p></header>
+  <div class="mp1-stage fx fx-scale" style="--d:3">
+    <svg class="mp1-svg" viewBox="0 0 1660 600" width="1660" height="600">
+      <defs>
+        <radialGradient id="mp1-sun"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#c4b5fd"/><stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/></radialGradient>
+        <linearGradient id="mp1-hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc" stop-opacity=".18"/><stop offset="1" stop-color="#7dd3fc" stop-opacity="0"/></linearGradient>
+        <linearGradient id="mp1-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
+      </defs>
+      <rect x="0" y="360" width="1660" height="80" fill="url(#mp1-hz)"/>
+      <path id="mp1-p" class="mp1-route" d="M210 230 C 400 120, 520 330, 690 230 S 980 140, 1110 230 S 1360 320, 1470 220"/>
+      <circle class="mp1-comet" r="7"><animateMotion dur="9s" repeatCount="indefinite"><mpath href="#mp1-p"/></animateMotion></circle>
+      <g class="mp1-st" data-s="0"><circle cx="210" cy="230" r="120" fill="url(#mp1-sun)" class="mp1-glow"/><circle cx="210" cy="230" r="52" class="mp1-sun"/>
+        <g class="mp1-orb"><circle cx="210" cy="140" r="11" fill="#a78bfa"/><circle cx="288" cy="275" r="11" fill="#fbbf24"/><circle cx="132" cy="275" r="11" fill="#22d3ee"/></g>
+        <text x="210" y="230" class="mp1-t">公式</text></g>
+      <g class="mp1-st" data-s="1"><g class="mp1-cloud c1"><circle cx="610" cy="210" r="42"/><circle cx="650" cy="186" r="50"/><circle cx="700" cy="206" r="40"/><rect x="580" y="206" width="150" height="40" rx="20"/></g>
+        <g class="mp1-cloud c2"><circle cx="740" cy="282" r="34"/><circle cx="772" cy="262" r="42"/><circle cx="812" cy="280" r="32"/><rect x="716" y="278" width="122" height="32" rx="16"/></g></g>
+      <g class="mp1-st" data-s="2"><g class="mp1-fw"><circle cx="1110" cy="230" r="64" class="mp1-ring"/>
+        <path d="M1110 166 A64 64 0 0 1 1174 230" class="mp1-arc"/><path d="M1174 230 A64 64 0 0 1 1110 294" class="mp1-arc"/><path d="M1110 294 A64 64 0 0 1 1046 230" class="mp1-arc"/><path d="M1046 230 A64 64 0 0 1 1110 166" class="mp1-arc"/></g>
+        <text x="1110" y="232" class="mp1-t s">飞轮</text></g>
+      <g class="mp1-st" data-s="3"><circle cx="1470" cy="220" r="62" class="mp1-go"/><use href="#i-rocket" x="1436" y="186" width="68" height="68" class="mp1-rk"/></g>
+    </svg>
+    <div class="mp1-cards"></div>
+  </div>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 全篇导览</div>
+</section>
+<style>
+.mp1-stage{position:relative;width:1660px;height:600px}
+.mp1-svg{position:absolute;inset:0;overflow:visible}
+.mp1-route{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2.5;stroke-dasharray:6 10;animation:flow 1.6s linear infinite}
+.mp1-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff)}
+.mp1-glow{opacity:.5}
+.mp1-sun{fill:#0a1024;stroke:#c4b5fd;stroke-width:3}
+.mp1-orb{transform-box:view-box;transform-origin:210px 230px;animation:spin 14s linear infinite}
+.mp1-t{fill:var(--text);font-size:24px;font-weight:800;text-anchor:middle;dominant-baseline:central}
+.mp1-t.s{font-size:22px}
+.mp1-cloud{fill:url(#mp1-cl);opacity:.85}
+.mp1-cloud.c1{animation:c11drift 7s ease-in-out infinite alternate}
+.mp1-cloud.c2{animation:c11drift 9s ease-in-out infinite alternate-reverse;opacity:.7}
+@keyframes c11drift{to{transform:translateX(18px)}}
+.mp1-ring{fill:none;stroke:rgba(94,234,212,.25);stroke-width:14}
+.mp1-arc{fill:none;stroke:#5eead4;stroke-width:5;stroke-linecap:round;stroke-dasharray:70 40}
+.mp1-fw{transform-box:view-box;transform-origin:1110px 230px;animation:spin 6s linear infinite}
+.mp1-go{fill:rgba(125,211,252,.1);stroke:#7dd3fc;stroke-width:2.5;stroke-dasharray:4 6}
+.mp1-rk{color:#7dd3fc;stroke:#7dd3fc;fill:none;stroke-width:1.6;animation:floaty 3s ease-in-out infinite}
+.mp1-st{transition:opacity .5s,filter .5s}
+.mp1-st.dim{opacity:.45}
+.mp1-st.on{filter:drop-shadow(0 0 14px rgba(255,255,255,.35))}
+.mp1-cards{position:absolute;left:0;right:0;top:390px}
+.mp1-c{--c:var(--acc);position:absolute;width:310px;margin-left:-155px;padding:18px 20px;border-radius:18px;text-align:center;cursor:pointer;border:1px solid var(--line);background:rgba(10,16,36,.82);transition:border-color .45s,box-shadow .45s,translate .45s var(--ease)}
+.mp1-c em{display:block;font:700 15px var(--num);font-style:normal;letter-spacing:.3em;color:var(--c)}
+.mp1-c b{display:block;font-size:25px;margin-top:6px}
+.mp1-c p{font-size:17px;line-height:1.5;color:var(--text2);margin-top:6px}
+.mp1-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 0 40px -6px color-mix(in srgb,var(--c) 60%,transparent);translate:0 -8px}
+</style>
+<script>
+HOOKS['c11-map'] = {
+  S: [
+    { x: 210, p: 1, c: '#c4b5fd', k: 'PART 01', b: '回到公式', d: '十章都在三个词里展开；第九章是汇合点' },
+    { x: 700, p: 2, c: '#cbd5e1', k: 'PART 02', b: '两朵乌云', d: '流式实时地交互；从成功与失败中积累经验' },
+    { x: 1110, p: 3, c: '#5eead4', k: 'PART 03', b: '模型与 Agent 的共同演进', d: '飞轮 · 一层层吃掉 Harness · 护城河' },
+    { x: 1470, p: 4, c: '#7dd3fc', k: 'CLOSING', b: '去造点什么吧', d: '三个问题不会过时' },
+  ],
+  init(s) {
+    s.querySelector('.mp1-cards').innerHTML = this.S.map((t, i) => `<div class="mp1-c" data-i="${i}" style="left:${t.x}px;--c:${t.c}"><em>${t.k}</em><b>${t.b}</b><p>${t.d}</p></div>`).join('');
+    s.querySelectorAll('.mp1-c').forEach((c) => {
+      c.addEventListener('click', () => C11.jump(this.S[+c.dataset.i].p));
+      c.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +c.dataset.i); });
+    });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.mp1-c').forEach((c, j) => c.classList.toggle('on', j === i));
+    s.querySelectorAll('.mp1-st').forEach((g, j) => { g.classList.toggle('on', j === i); g.classList.toggle('dim', j !== i); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.later(() => this.auto && this.show(s, 0), 1200);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 2800);
+  },
+  reset(s) { s.querySelectorAll('.mp1-c,.mp1-st').forEach((c) => c.classList.remove('on', 'dim')); },
+};
+</script>
+
+<!-- ===== 01-formula.html ===== -->
+<!-- ================= PART 01 回到公式 ================= -->
+<section class="slide chapter" id="c11-d1" data-part="1" data-title="PART 01 · 回到公式" data-notes="本书开篇提出了一个公式：<b>Agent = LLM + 上下文 + 工具</b>。全书十章，都在这三个词里展开。<br>这一部分先看十章如何围绕这个公式展开：第一章建立公式的三层理解与编排光谱，随后沿“构建—评估与进化—协作”逐步展开；再看为什么这三个层次不是相互独立的书架，以及第九章为何成为全书的汇合点。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">回到公式</h1>
+  <div class="ch-s fx fx-up" style="--d:3">全书十章，都在这三个词里展开</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">本书开篇提出了一个公式：Agent = LLM + 上下文 + 工具。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c11-recap" data-part="1" data-steps="3" data-dur="11000" data-title="十章都在三个词里展开" data-notes="本书开篇提出了一个公式：<b>Agent = LLM + 上下文 + 工具</b>。全书十章，都在这三个词里展开。<br><b>第一章</b>建立公式的三层理解——实现层、直觉层、学术层，并给出从工作流到自主 Agent 的编排光谱。随后的章节沿“构建—评估与进化—协作”逐步展开：<br>• <b>构建 Agent（第二至六章）。</b>上下文工程决定 Agent 在一次任务中看到什么，记忆与知识库把信息扩展到多次会话；工具定义它能做什么，代码生成则提供创造新工具与新系统的元能力；交互一章再把观察与动作空间从文本回合制推向语音、GUI 与物理世界。<br>• <b>评估与进化（第七至九章）。</b>评估把表现变成可信信号，后训练把高维能力写入模型参数，持续进化再把生产经验转化为知识、指令、程序或参数的受控更新。<br>• <b>协作（第十章）。</b>多 Agent 协作进一步改变上下文、工具与责任的组织方式。<br>按 → 逐层展开；每张章节卡下方的标签表示它主要展开公式里的哪个部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">全书十章，都在<em>三个词</em>里展开</h2></header>
+  <div class="rc-f fx fx-up" style="--d:2"><span>Agent</span><i>=</i><span class="rc-w" data-w="llm" style="--c:var(--llm)">LLM</span><i>+</i><span class="rc-w" data-w="ctx" style="--c:var(--ctx)">上下文</span><i>+</i><span class="rc-w" data-w="tool" style="--c:var(--tool)">工具</span></div>
+  <div class="rc-rows">
+    <div class="rc-row fx fx-up" style="--d:3">
+      <div class="rc-lb"><b>第一章</b><span>公式的三层理解 · 编排光谱</span></div>
+      <div class="rc-one">
+        <div class="rc-lay"><span><em>实现层</em>LLM + 上下文 + 工具</span><span><em>直觉层</em>大脑 + 眼睛 + 手脚</span><span><em>学术层</em>策略 · 观察空间 · 动作空间</span></div>
+        <div class="rc-spec"><span>工作流</span><div class="rc-bar"><i></i></div><span>自主 Agent</span></div>
+      </div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="1">
+      <div class="rc-lb"><b>构建 Agent（第二至六章）</b><span>看到什么 · 能做什么</span></div>
+      <div class="rc-cs n5"></div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="2">
+      <div class="rc-lb"><b>评估与进化（第七至九章）</b><span>可信信号 · 写入参数 · 受控更新</span></div>
+      <div class="rc-cs n3"></div>
+    </div>
+    <div class="rc-row fx fx-up" data-step="3">
+      <div class="rc-lb"><b>协作（第十章）</b><span>组织方式的改变</span></div>
+      <div class="rc-cs n1"></div>
+    </div>
+  </div>
+  <p class="rc-note fx fx-up" style="--d:5">第一章之后，随后的章节沿 <b>构建 → 评估与进化 → 协作</b> 逐步展开</p>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 开篇第 1–4 段</div>
+</section>
+<style>
+.rc-f{display:flex;align-items:center;justify-content:center;gap:16px;font:800 46px var(--num);margin-top:-8px}
+.rc-f>i{font-style:normal;color:var(--text3);font-weight:400}
+.rc-w{padding:2px 20px;border-radius:14px;color:var(--c);font-family:var(--font);border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent);transition:box-shadow .5s,background .5s,transform .5s var(--spring)}
+.rc-w.lit{background:color-mix(in srgb,var(--c) 20%,transparent);box-shadow:0 0 34px color-mix(in srgb,var(--c) 50%,transparent);transform:translateY(-4px)}
+.rc-rows{display:flex;flex-direction:column;gap:12px;margin-top:22px}
+.rc-row{display:grid;grid-template-columns:300px 1fr;gap:20px;align-items:stretch}
+.rc-lb{display:flex;flex-direction:column;justify-content:center;gap:6px;padding:12px 18px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent)}
+.rc-lb b{font-size:22px;line-height:1.35}
+.rc-lb span{font-size:16px;color:var(--text2)}
+.rc-one{display:grid;grid-template-columns:1fr 520px;gap:18px;align-items:center;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.rc-lay{display:flex;gap:10px}
+.rc-lay span{flex:1;padding:8px 12px;border-radius:12px;font-size:17px;line-height:1.4;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line2)}
+.rc-lay em{display:block;font-style:normal;font-size:15px;color:var(--acc);margin-bottom:2px}
+.rc-spec{display:flex;align-items:center;gap:12px;font-size:17px;color:var(--text2);white-space:nowrap}
+.rc-bar{position:relative;flex:1;height:10px;border-radius:10px;background:linear-gradient(90deg,#93c5fd,#c4b5fd,#5eead4)}
+.rc-bar i{position:absolute;top:50%;left:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:#fff;box-shadow:0 0 14px #fff;animation:c11spec 5s ease-in-out infinite alternate}
+@keyframes c11spec{to{left:100%}}
+.rc-cs{display:grid;gap:12px}
+.rc-cs.n5{grid-template-columns:repeat(5,1fr)}
+.rc-cs.n3{grid-template-columns:repeat(3,1fr)}
+.rc-cs.n1{grid-template-columns:1fr}
+.rc-c{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);display:flex;flex-direction:column;gap:6px}
+.rc-ch{display:flex;align-items:baseline;gap:8px}
+.rc-ch em{font:800 18px var(--num);font-style:normal;color:var(--acc)}
+.rc-ch b{font-size:19px}
+.rc-c p{font-size:16px;line-height:1.45;color:var(--text2);flex:1}
+.rc-tg{display:flex;gap:6px;flex-wrap:wrap}
+.rc-tg i{font-style:normal;font-size:15px;padding:1px 9px;border-radius:999px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.rc-cs.n1 .rc-c{flex-direction:row;align-items:center;gap:20px}
+.rc-cs.n1 .rc-c p{flex:none;font-size:18px}
+.rc-note{margin-top:16px;text-align:center;font-size:20px;color:var(--text2)}
+.rc-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c11-recap'] = {
+  TG: { llm: ['模型参数', 'var(--llm)'], ctx: ['上下文', 'var(--ctx)'], tool: ['工具', 'var(--tool)'], sig: ['可信信号', '#e2e8f0'], resp: ['责任', 'var(--pink)'] },
+  C: [
+    [['02', '上下文工程', '决定 Agent 在一次任务中看到什么', ['ctx']], ['03', '记忆与知识库', '把信息扩展到多次会话', ['ctx']], ['04', '工具', '定义它能做什么', ['tool']], ['05', '代码生成', '提供创造新工具与新系统的元能力', ['tool']], ['06', '交互', '把观察与动作空间从文本回合制推向语音、GUI 与物理世界', ['ctx', 'tool']]],
+    [['07', '评估', '把表现变成可信信号', ['sig']], ['08', '后训练', '把高维能力写入模型参数', ['llm']], ['09', '持续进化', '把生产经验转化为知识、指令、程序或参数的受控更新', ['ctx', 'tool', 'llm']]],
+    [['10', '多 Agent 协作', '进一步改变上下文、工具与责任的组织方式', ['ctx', 'tool', 'resp']]],
+  ],
+  LIT: [['llm', 'ctx', 'tool'], ['ctx', 'tool'], ['llm'], ['ctx', 'tool']],
+  init(s) {
+    const box = [...s.querySelectorAll('.rc-cs')];
+    this.C.forEach((row, r) => {
+      box[r].innerHTML = row.map(([n, t, p, tg]) => `<div class="rc-c"><div class="rc-ch"><em>${n}</em><b>${t}</b></div><p>${p}</p><div class="rc-tg">${tg.map((k) => `<i style="--c:${this.TG[k][1]}">${this.TG[k][0]}</i>`).join('')}</div></div>`).join('');
+    });
+  },
+  apply(s, k) { s.querySelectorAll('.rc-w').forEach((w) => w.classList.toggle('lit', this.LIT[k].includes(w.dataset.w))); },
+  enter(s, ctx, k) { ctx.later(() => this.apply(s, k), 600); },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { s.querySelectorAll('.rc-w').forEach((w) => w.classList.remove('lit')); },
+};
+</script>
+
+<section class="slide" id="c11-hub" data-part="1" data-trans="zoom" data-dur="14000" data-title="第九章：全书的汇合点" data-notes="这三个层次并不是相互独立的书架。<b>第九章尤其依赖前文的全部基础</b>：没有轨迹和知识系统，经验无处保存；没有代码能力，Agent 无法修改工具与 Harness；没有评估，系统更无法判断一次修改究竟是进步还是退化。它由此成为全书从“怎样构建 Agent”转向“怎样让 Agent 长期变好”的汇合点。<br>中间是一次“持续进化”的示意流水线：一段生产中的经验，要先被保存，再被用来修改工具与 Harness，最后经过评估判断，才能变成下一版本的能力。三个开关对应三项基础——不操作时会依次关掉其中一项，看经验在哪一步卡住；也可以自己点开关。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不是独立的书架：<em>第九章是汇合点</em></h2></header>
+  <div class="hb-shelf fx fx-up" style="--d:2">
+    <div class="hb-sh"><b>构建</b><span>第二至六章</span><div class="hb-bk"><i>2</i><i>3</i><i>4</i><i>5</i><i>6</i></div></div>
+    <div class="hb-sh"><b>评估与进化</b><span>第七至九章</span><div class="hb-bk"><i>7</i><i>8</i><i class="h">9</i></div></div>
+    <div class="hb-sh"><b>协作</b><span>第十章</span><div class="hb-bk"><i>10</i></div></div>
+    <p class="hb-q">三个层次并不是相互独立的书架——<b>第九章尤其依赖前文的全部基础</b></p>
+  </div>
+  <div class="hb-pipe fx fx-scale" style="--d:3">
+    <svg class="hb-svg" viewBox="0 0 1660 330" width="1660" height="330">
+      <path class="hb-line" d="M220 150 H1430"/>
+      <path class="hb-run" d="M220 150 H1430"/>
+      <circle class="pk hb-k" r="13" style="fill:#5eead4;--c:#5eead4"/>
+    </svg>
+    <div class="hb-end a"><svg class="ic"><use href="#i-history"/></svg><b>生产中的经验</b><small>踩过的坑 · 试出来的窍门</small></div>
+    <div class="hb-g" data-g="0" style="left:330px"><span class="hb-gn">① 保存</span><b>轨迹和知识系统</b><button class="tgl on" data-i="0"><i></i>具备</button><p class="hb-x">经验无处保存</p></div>
+    <div class="hb-g" data-g="1" style="left:690px"><span class="hb-gn">② 修改</span><b>代码能力</b><small>修改工具与 Harness</small><button class="tgl on" data-i="1"><i></i>具备</button><p class="hb-x">Agent 无法修改工具与 Harness</p></div>
+    <div class="hb-g" data-g="2" style="left:1050px"><span class="hb-gn">③ 判断</span><b>评估</b><small>是进步还是退化</small><button class="tgl on" data-i="2"><i></i>具备</button><p class="hb-x">无法判断一次修改究竟是进步还是退化</p></div>
+    <div class="hb-end b"><svg class="ic"><use href="#i-trend"/></svg><b>下一版本</b><small>Agent 长期变好</small></div>
+    <span class="hb-tag">第九章 · Agent 的持续进化</span>
+    <span class="hb-sx cap">示意</span>
+  </div>
+  <p class="tagline hb-t fx fx-up" style="--d:5">第九章由此成为全书从“<b>怎样构建 Agent</b>”转向“<b>怎样让 Agent 长期变好</b>”的汇合点</p>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 开篇第 5 段</div>
+</section>
+<style>
+.hb-shelf{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;align-items:stretch}
+.hb-sh{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.hb-sh b{font-size:22px}
+.hb-sh span{font-size:16px;color:var(--text3)}
+.hb-bk{margin-left:auto;display:flex;gap:5px;align-items:flex-end}
+.hb-bk i{width:30px;height:46px;border-radius:5px 5px 3px 3px;display:grid;place-items:end center;padding-bottom:4px;font:700 15px var(--num);font-style:normal;color:#06101f;background:linear-gradient(#a5b4fc,#7dd3fc)}
+.hb-bk i:nth-child(2n){height:40px;background:linear-gradient(#c4b5fd,#93c5fd)}
+.hb-bk i.h{background:linear-gradient(#5eead4,#34d399);box-shadow:0 0 16px #5eead4}
+.hb-q{grid-column:1/-1;text-align:center;font-size:20px;color:var(--text2)}
+.hb-q b{color:var(--acc)}
+.hb-pipe{position:relative;height:330px;margin-top:16px;border-radius:22px;border:1px solid var(--line);background:rgba(8,12,30,.5)}
+.hb-svg{position:absolute;inset:0;overflow:visible}
+.hb-line{fill:none;stroke:rgba(255,255,255,.12);stroke-width:14;stroke-linecap:round}
+.hb-run{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:6 10;opacity:.5;animation:flow 1s linear infinite}
+.hb-k{opacity:0}
+.hb-end{position:absolute;top:84px;width:200px;height:132px;padding:14px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;border:1.5px solid var(--line2);background:rgba(10,16,36,.94);transition:box-shadow .4s,border-color .4s}
+.hb-end.a{left:24px}.hb-end.b{right:24px}
+.hb-end .ic{font-size:34px;color:var(--acc)}
+.hb-end b{font-size:21px}
+.hb-end small{font-size:15px;color:var(--text3)}
+.hb-end.win{border-color:var(--ok);box-shadow:0 0 40px color-mix(in srgb,var(--ok) 45%,transparent)}
+.hb-end.b .ic{color:var(--ok)}
+.hb-g{position:absolute;top:56px;width:260px;height:188px;padding:14px 16px;border-radius:18px;display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;border:1.5px solid var(--line2);background:rgba(10,16,36,.94);transition:border-color .35s,box-shadow .35s}
+.hb-gn{font-size:16px;color:var(--text3);letter-spacing:.1em}
+.hb-g b{font-size:21px}
+.hb-g small{font-size:15px;color:var(--text2)}
+.hb-g .tgl{margin-top:auto;font-size:16px;padding:5px 12px 5px 8px}
+.hb-g.pass{border-color:var(--ok);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 35%,transparent)}
+.hb-g.fail{border-color:var(--bad);box-shadow:0 0 30px color-mix(in srgb,var(--bad) 45%,transparent);animation:shake .5s}
+.hb-g.off{border-style:dashed;opacity:.85}
+.hb-x{position:absolute;left:-10px;right:-10px;top:200px;padding:8px 10px;border-radius:12px;font-size:17px;line-height:1.4;color:var(--bad);background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.45);opacity:0;transform:translateY(-6px);transition:all .35s var(--ease)}
+.hb-g.fail .hb-x{opacity:1;transform:none}
+.hb-tag{position:absolute;left:50%;top:14px;transform:translateX(-50%);padding:5px 16px;border-radius:999px;font-size:17px;font-weight:700;color:#06101f;background:linear-gradient(90deg,#5eead4,#a5b4fc)}
+.hb-sx{position:absolute;right:16px;top:12px}
+.hb-t{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c11-hub'] = {
+  X: [220, 460, 820, 1180, 1430],
+  SC: [[1, 1, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0]],
+  init(s) {
+    this.gs = [...s.querySelectorAll('.hb-g')];
+    this.k = s.querySelector('.hb-k');
+    this.win = s.querySelector('.hb-end.b');
+    this.on = [1, 1, 1];
+    // 每一段用一条独立路径，便于数据包停在某个关口
+    const svg = s.querySelector('.hb-svg');
+    this.seg = [];
+    for (let i = 0; i < 4; i++) {
+      const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      p.setAttribute('d', `M${this.X[i]} 150 H${this.X[i + 1]}`);
+      p.setAttribute('fill', 'none');
+      svg.appendChild(p);
+      this.seg.push(p);
+    }
+    s.querySelectorAll('.hb-g .tgl').forEach((b) => b.addEventListener('click', () => {
+      const i = +b.dataset.i;
+      this.auto = false;
+      this.on[i] = this.on[i] ? 0 : 1;
+      this.paint(s);
+      this.run(s);
+    }));
+  },
+  paint() {
+    this.gs.forEach((g, i) => {
+      const t = g.querySelector('.tgl');
+      t.classList.toggle('on', !!this.on[i]);
+      t.lastChild.textContent = this.on[i] ? '具备' : '缺失';
+      g.classList.toggle('off', !this.on[i]);
+    });
+  },
+  // 一次持续进化：经验依次经过保存、修改、判断三个关口
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    this.gs.forEach((g) => g.classList.remove('pass', 'fail'));
+    this.win.classList.remove('win');
+    await U.wait(ctx, 400);
+    for (let i = 0; i < 4; i++) {
+      if (!ok()) return;
+      await U.fly(this.k, this.seg[i], 820, { ctx, keep: true, linear: i > 0 && i < 3 });
+      if (!ok()) return;
+      if (i === 3) { this.k.style.opacity = 0; this.win.classList.add('win'); return; }
+      const g = this.gs[i];
+      if (!this.on[i]) { g.classList.add('fail'); this.k.style.fill = '#fb7185'; await U.wait(ctx, 300); if (ok()) { this.k.style.opacity = 0; this.k.style.fill = '#5eead4'; } return; }
+      g.classList.add('pass');
+      await U.wait(ctx, 250);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.n = 0;
+    this.on = [1, 1, 1];
+    this.paint(s);
+    this.run(s);
+    ctx.every(() => {
+      if (this.auto) { this.n = (this.n + 1) % this.SC.length; this.on = [...this.SC[this.n]]; this.paint(s); }
+      this.run(s);
+    }, 4800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.on = [1, 1, 1]; this.paint(s); this.gs.forEach((g) => g.classList.remove('pass', 'fail')); this.win.classList.remove('win'); this.k.style.opacity = 0; },
+};
+</script>
+
+<!-- ===== 02-clouds.html ===== -->
+<!-- ================= PART 02 两朵乌云 ================= -->
+<section class="slide chapter" id="c11-d2" data-part="2" data-title="PART 02 · 两朵乌云" data-notes="1900 年，开尔文说物理学晴朗的天空上还飘着两朵乌云——后来，一朵变成了相对论，另一朵变成了量子力学。今天 Agent 的天空同样称不上晴朗，作者也看到两朵乌云：<br>第一朵，是 Agent 如何流式地、实时地与环境交互；<br>第二朵，是 Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">两朵乌云</h1>
+  <div class="ch-s fx fx-up" style="--d:3">流式地、实时地与环境交互；<br>从成功与失败中持续积累经验</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">1900 年，开尔文说物理学晴朗的天空上还飘着两朵乌云——后来，一朵变成了相对论，另一朵变成了量子力学。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c11-cloud1" data-part="2" data-dur="13000" data-title="第一朵乌云：流式、实时地交互" data-notes="<b>第一朵乌云，是 Agent 如何流式地、实时地与环境交互。</b>今天绝大多数 Agent 仍是按轮次（turn-by-turn）的“请求—应答”模式：你说完一句，它想一整段，再一次性吐出结果。但真实世界不会停下来等它想完——话会被打断，画面在持续变化，邮件在不断到达。一个真正“活着”的 Agent，应该能边听边想、边说边想，能在你话说到一半时就开始规划，也能在没人吩咐时主动发现“这封邮件该处理了”。<br>图中三条泳道共用一根时间轴（示意）：最上面是真实世界里发生的事；中间是按轮次的 Agent——等你说完、想一整段、一次性吐出结果，中途发生的打断、画面变化和新邮件都被错过；最下面是“活着”的 Agent——边听边想、边说边想，接住打断，主动发现该处理的邮件。右上角可以暂停，或拖动滑块逐帧查看。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第一朵乌云：<em>流式地、实时地</em>与环境交互</h2></div>
+    <div class="cl1-ctl fx fx-up" style="--d:2"><button class="btn cl1-play"><svg class="ic"><use href="#i-pause"/></svg><span>暂停</span></button><input class="rng cl1-rng" type="range" min="0" max="1000" value="0"><span class="cap">示意</span></div></header>
+  <p class="lead cl1-lead fx fx-up" style="--d:2">今天绝大多数 Agent 仍是按轮次（turn-by-turn）的“请求—应答”：你说完一句，它想一整段，再一次性吐出结果</p>
+  <div class="cl1-stage fx fx-scale" style="--d:3">
+    <div class="cl1-lane" style="top:14px"><div class="cl1-lb w"><svg class="ic"><use href="#i-globe"/></svg><b>真实世界</b><small>不会停下来等它想完</small></div></div>
+    <div class="cl1-lane" style="top:160px"><div class="cl1-lb a"><svg class="ic"><use href="#i-chat"/></svg><b>按轮次的 Agent</b><small>turn-by-turn</small></div></div>
+    <div class="cl1-lane" style="top:306px"><div class="cl1-lb b"><svg class="ic"><use href="#i-wave"/></svg><b>“活着”的 Agent</b><small>边听边想 · 边说边想</small></div></div>
+    <div class="cl1-items"></div>
+    <i class="cl1-head"></i>
+    <div class="cl1-axis"><span>时间 →</span></div>
+  </div>
+  <p class="tagline cl1-tag fx fx-up" style="--d:5">真实世界不会停下来等它想完：一个真正“活着”的 Agent，应该能<b>边听边想、边说边想</b>，也能在没人吩咐时主动发现该做的事</p>
+  <div class="src">后记 ·「两朵乌云」第一朵</div>
+</section>
+<style>
+#c11-cloud1 .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:6px}
+.cl1-ctl{display:flex;align-items:center;gap:14px;width:540px}
+.cl1-ctl .btn{padding:8px 14px}
+.cl1-lead{margin:0 0 18px;font-size:23px}
+.cl1-stage{position:relative;height:470px;border-radius:22px;border:1px solid var(--line);background:rgba(8,12,30,.55)}
+.cl1-lane{position:absolute;left:0;right:0;height:132px}
+.cl1-lane+.cl1-lane{border-top:1px dashed var(--line)}
+.cl1-lb{position:absolute;left:22px;top:20px;width:210px;display:grid;grid-template-columns:36px 1fr;gap:2px 10px;align-items:center}
+.cl1-lb .ic{grid-row:1/3;font-size:30px}
+.cl1-lb b{font-size:21px}
+.cl1-lb small{font-size:15px;color:var(--text3)}
+.cl1-lb.w .ic{color:var(--tool)}.cl1-lb.a .ic{color:#94a3b8}.cl1-lb.b .ic{color:var(--acc2)}
+.cl1-bk{position:absolute;height:46px;border-radius:12px;overflow:hidden;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:rgba(255,255,255,.02)}
+.cl1-bk i{position:absolute;left:0;top:0;bottom:0;width:0;background:color-mix(in srgb,var(--c) 30%,transparent)}
+.cl1-bk span{position:absolute;inset:0;display:grid;place-items:center;font-size:17px;white-space:nowrap;color:var(--text);z-index:1}
+.cl1-bk.wait{border-style:dashed}
+.cl1-bk.wait i{background:repeating-linear-gradient(90deg,rgba(148,163,184,.16) 0 8px,transparent 8px 16px)}
+.cl1-bk.scr i{background:repeating-linear-gradient(110deg,color-mix(in srgb,var(--c) 30%,transparent) 0 14px,transparent 14px 28px);animation:c11scr 1.2s linear infinite}
+@keyframes c11scr{to{background-position:28px 0}}
+.cl1-mk{position:absolute;width:0;opacity:0;transition:opacity .3s}
+.cl1-mk.on{opacity:1}
+.cl1-mk::before{content:"";position:absolute;left:-1px;top:-6px;width:2px;height:58px;background:var(--c)}
+.cl1-mk em{position:absolute;top:60px;left:0;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:9px;font-style:normal;font-size:16px;white-space:nowrap;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:rgba(8,12,30,.95)}
+.cl1-mk em .ic{font-size:17px}
+.cl1-mk.on em{animation:pop .45s var(--spring) both;transform:translateX(-50%) scale(1)}
+.cl1-head{position:absolute;top:8px;bottom:36px;left:260px;width:2px;background:linear-gradient(transparent,#fff 12%,#fff 88%,transparent);box-shadow:0 0 12px #fff;opacity:.75}
+.cl1-axis{position:absolute;left:260px;right:30px;bottom:10px;height:20px;border-top:1px solid rgba(255,255,255,.2);font-size:15px;color:var(--text3);text-align:right}
+.cl1-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c11-cloud1'] = {
+  T: 9.4,
+  X0: 260, PX: 145,
+  LANES: [14, 160, 306],
+  D: [
+    { l: 0, t0: 0.2, t1: 3.0, txt: '你在说话……', c: '#fbbf24' },
+    { l: 0, at: 3.7, txt: '话被打断', ic: 'zap', c: '#fbbf24' },
+    { l: 0, t0: 4.4, t1: 9.0, txt: '画面在持续变化', c: '#fbbf24', cls: 'scr' },
+    { l: 0, at: 6.3, txt: '新邮件到达', ic: 'mail', c: '#fbbf24' },
+    { l: 1, t0: 0.2, t1: 3.0, txt: '等你说完', c: '#94a3b8', cls: 'wait' },
+    { l: 1, t0: 3.0, t1: 6.9, txt: '想一整段', c: '#94a3b8' },
+    { l: 1, t0: 6.9, t1: 8.3, txt: '一次性吐出结果', c: '#a78bfa' },
+    { l: 1, at: 3.7, txt: '没听到打断', ic: 'x', c: '#fb7185' },
+    { l: 1, at: 5.2, txt: '画面已经变了', ic: 'x', c: '#fb7185' },
+    { l: 1, at: 6.3, txt: '没注意到新邮件', ic: 'x', c: '#fb7185' },
+    { l: 2, t0: 0.4, t1: 3.0, txt: '边听边想', c: '#7dd3fc' },
+    { l: 2, at: 1.5, txt: '话说到一半就开始规划', ic: 'route', c: '#34d399' },
+    { l: 2, t0: 3.0, t1: 9.0, txt: '边说边想', c: '#5eead4' },
+    { l: 2, at: 3.7, txt: '接住打断，随即调整', ic: 'check', c: '#34d399' },
+    { l: 2, at: 6.3, txt: '主动发现：这封邮件该处理了', ic: 'check', c: '#34d399' },
+  ],
+  x(t) { return this.X0 + t * this.PX; },
+  init(s) {
+    s.querySelector('.cl1-items').innerHTML = this.D.map((d, i) => {
+      const top = this.LANES[d.l] + 34;
+      if (d.at != null) return `<div class="cl1-mk" data-k="${i}" style="left:${this.x(d.at)}px;top:${top}px;--c:${d.c}"><em><svg class="ic"><use href="#i-${d.ic}"/></svg>${d.txt}</em></div>`;
+      return `<div class="cl1-bk ${d.cls || ''}" data-k="${i}" style="left:${this.x(d.t0)}px;top:${top}px;width:${(d.t1 - d.t0) * this.PX}px;--c:${d.c}"><i></i><span>${d.txt}</span></div>`;
+    }).join('');
+    this.els = [...s.querySelectorAll('.cl1-items [data-k]')];
+    this.head = s.querySelector('.cl1-head');
+    this.rng = s.querySelector('.cl1-rng');
+    this.btn = s.querySelector('.cl1-play');
+    this.btn.addEventListener('click', () => this.setPlay(!this.playing));
+    this.rng.addEventListener('input', () => { this.setPlay(false); this.t = (this.rng.value / 1000) * this.T; this.draw(); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+  },
+  setPlay(v) {
+    this.playing = v;
+    this.btn.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play');
+    this.btn.querySelector('span').textContent = v ? '暂停' : '继续';
+  },
+  draw() {
+    const t = this.t;
+    this.head.style.left = this.x(Math.min(t, this.T - 0.2)) + 'px';
+    this.els.forEach((el) => {
+      const d = this.D[+el.dataset.k];
+      if (d.at != null) el.classList.toggle('on', t >= d.at);
+      else el.firstElementChild.style.width = Math.max(0, Math.min(1, (t - d.t0) / (d.t1 - d.t0))) * 100 + '%';
+    });
+    const p = (t / this.T) * 100;
+    this.rng.value = Math.round(p * 10);
+    this.rng.style.setProperty('--p', p + '%');
+  },
+  enter(s, ctx) {
+    this.t = 0;
+    this.setPlay(true);
+    this.draw();
+    let last = 0, hold = 0;
+    ctx.raf((now) => {
+      const dt = last ? Math.min(60, now - last) : 0;
+      last = now;
+      if (!this.playing) return;
+      if (this.t >= this.T) { hold += dt; if (hold > 2200) { hold = 0; this.t = 0; } this.draw(); return; }
+      this.t = Math.min(this.T, this.t + dt / 1000);
+      this.draw();
+    });
+  },
+  reset() { this.t = 0; this.draw(); },
+};
+</script>
+
+<section class="slide" id="c11-paths" data-part="2" data-steps="2" data-trans="rise" data-dur="11000" data-title="走向实时的两条路" data-notes="走向这种实时性有两条路，往往并行推进：<br>一是<b>架构上做快慢分离</b>——实时与智能几乎是两条正交的轴，单一模型难以兼顾，于是让前台快模型维持对话节奏、后台慢模型负责深度思考；<br>二是<b>把推理本身做快</b>——当 decode 速度足够高，按轮次的等待就短到近乎消失，turn-by-turn 与“实时”的界限也随之模糊。这条路正被芯片与推理引擎快速推进：小米 MiMo 已让一个 1T 参数模型在单个 8 卡节点上把生成速度推过 1000 token/s（脚注：小米 MiMo-V2.5-Pro-UltraSpeed 通过 FP4 量化、DFlash 并行推测解码与 TileRT 推理系统的模型—系统协同设计，在单个通用 8-GPU 节点上首次把 1T 参数模型的生成速度推过 1000 token/s；见小米 MiMo 官方技术博客，2026），而把整个模型直接固化进芯片的专用方案（如 Taalas HC1）更是把 80 亿参数模型推到约 17000 token/s、响应低于 100 毫秒（脚注：Taalas HC1 将 Llama 3.1 8B 整个模型固化进 6nm 芯片；代价是芯片只能运行被固化的那个模型，模型更新需重新流片；见 Forbes，2026）。当模型每秒能吐出上千个字，“想完再说”和“边想边说”的体验差距就被抹平了。<br>左侧示意图：单一模型只能在“实时”与“智能”的取舍曲线上移动，快慢分离把两者组合到右上角。右侧滑块示意 decode 速度与等待时间的关系（示意回复长度 600 token，等待 = 长度 ÷ 速度；按一字约一 token 粗略示意），两个标记是原书给出的真实数字。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">走向实时的<em>两条路</em></h2></header>
+  <div class="ph-body">
+    <div class="ph-card panel fx fx-left" style="--d:2">
+      <div class="ph-h"><span class="ph-no">路一</span><b>架构上做快慢分离</b></div>
+      <svg class="ph-svg" viewBox="0 0 760 330" width="760" height="330">
+        <defs><marker id="ph-ma" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#6c7695"/></marker></defs>
+        <path class="ph-ax" d="M60 300 H730" marker-end="url(#ph-ma)"/><path class="ph-ax" d="M60 300 V24" marker-end="url(#ph-ma)"/>
+        <text class="ph-al" x="726" y="324" text-anchor="end">实时 →</text><text class="ph-al" x="72" y="26">智能 ↑</text>
+        <path id="ph-fr" class="ph-fr" d="M110 64 C 300 80, 560 160, 650 262"/>
+        <text class="ph-fl" x="420" y="150">单一模型的取舍：难以兼顾</text>
+        <circle class="ph-one" r="12"/>
+        <line class="ph-dl" x1="650" y1="262" x2="650" y2="64"/><line class="ph-dl" x1="110" y1="64" x2="650" y2="64"/>
+        <g class="ph-pt s"><circle cx="110" cy="64" r="13"/><text x="128" y="100">后台慢模型 · 负责深度思考</text></g>
+        <g class="ph-pt f"><circle cx="650" cy="262" r="13"/><text x="636" y="240" text-anchor="end">前台快模型 · 维持对话节奏</text></g>
+        <g class="ph-pt c"><circle cx="650" cy="64" r="16"/><text x="636" y="40" text-anchor="end">快慢分离：两者兼得</text></g>
+      </svg>
+      <div class="ph-lanes">
+        <div class="ph-ln"><span>前台快模型</span><div class="ph-tr f"></div></div>
+        <div class="ph-ln"><span>后台慢模型</span><div class="ph-tr s"><i class="ph-blk"><em>深度思考</em></i></div></div>
+      </div>
+      <p class="ph-cap">实时与智能几乎是两条<b>正交的轴</b>，单一模型难以兼顾</p>
+    </div>
+    <div class="ph-card panel fx fx-right" data-step="1">
+      <div class="ph-h"><span class="ph-no">路二</span><b>把推理本身做快</b><span class="cap">示意</span></div>
+      <div class="ph-sl"><span class="lbl">decode 速度</span><div class="ph-rw"><input class="rng ph-rng" type="range" min="0" max="1000" value="0"><i class="ph-tk" style="left:60.6%"><b>1000</b></i><i class="ph-tk" style="left:97.9%"><b>17000</b></i></div><span class="ph-v"><b>10</b> token/s</span></div>
+      <div class="ph-wait"><span>按轮次的等待</span><div class="ph-wb"><i></i></div><span class="ph-wt">60 秒</span></div>
+      <div class="ph-out" data-clip-ok></div>
+      <div class="ph-facts">
+        <div class="ph-f"><b><em>1000 token/s</em>小米 MiMo</b><p>1T 参数模型 · 单个 8 卡节点；MiMo-V2.5-Pro-UltraSpeed 用 FP4 量化、DFlash 并行推测解码与 TileRT 推理系统做模型—系统协同设计</p><small>小米 MiMo 官方技术博客，2026</small></div>
+        <div class="ph-f"><b><em>≈17000 token/s</em>Taalas HC1</b><p>把 Llama 3.1 8B（80 亿参数）整个固化进 6nm 芯片，响应低于 100 毫秒；代价：只能运行被固化的那个模型，更新需重新流片</p><small>Forbes，2026</small></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline ph-tag fx fx-up" data-step="2">两条路往往并行推进：当模型每秒能吐出上千个字，“想完再说”和“边想边说”的<b>体验差距就被抹平了</b></p>
+  <div class="src">后记 ·「两朵乌云」第一朵 · 脚注 mimo、taalas</div>
+</section>
+<style>
+.ph-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:640px}
+.ph-card{padding:20px 26px;display:flex;flex-direction:column;gap:12px}
+.ph-h{display:flex;align-items:center;gap:14px}
+.ph-h b{font-size:27px}
+.ph-h .cap{margin-left:auto}
+.ph-no{padding:4px 14px;border-radius:10px;font-size:18px;font-weight:700;color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.ph-svg{display:block;overflow:visible}
+.ph-ax{fill:none;stroke:rgba(255,255,255,.25);stroke-width:2}
+.ph-al{fill:var(--text3);font-size:16px}
+.ph-fr{fill:none;stroke:rgba(255,255,255,.3);stroke-width:3;stroke-dasharray:8 6}
+.ph-fl{fill:var(--text3);font-size:16px}
+.ph-one{fill:#cbd5e1;filter:drop-shadow(0 0 10px #cbd5e1)}
+.ph-dl{stroke:var(--acc);stroke-width:2;stroke-dasharray:5 6;opacity:.6}
+.ph-pt circle{stroke-width:3;fill:#0a1024}
+.ph-pt text{font-size:17px;font-weight:700}
+.ph-pt.s circle{stroke:#a78bfa}.ph-pt.s text{fill:#c4b5fd}
+.ph-pt.f circle{stroke:#7dd3fc}.ph-pt.f text{fill:#7dd3fc}
+.ph-pt.c circle{stroke:var(--ok);fill:color-mix(in srgb,var(--ok) 30%,#0a1024);filter:drop-shadow(0 0 12px #34d399)}
+.ph-pt.c text{fill:var(--ok)}
+.ph-pt.c{animation:c11ptc 2.4s ease-in-out infinite}
+@keyframes c11ptc{50%{opacity:.55}}
+.ph-lanes{display:flex;flex-direction:column;gap:8px}
+.ph-ln{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px;font-size:16px;color:var(--text2)}
+.ph-tr{position:relative;height:30px;border-radius:8px;background:rgba(255,255,255,.04);overflow:hidden}
+.ph-tr.f{background:repeating-linear-gradient(90deg,rgba(125,211,252,.55) 0 18px,transparent 18px 40px);background-size:40px 100%;animation:c11fast 1s linear infinite}
+@keyframes c11fast{to{background-position:40px 0}}
+.ph-blk{position:absolute;left:6%;top:4px;bottom:4px;width:62%;border-radius:6px;background:rgba(167,139,250,.35);border:1px solid rgba(167,139,250,.6);display:grid;place-items:center}
+.ph-blk em{font-style:normal;font-size:15px;color:var(--text)}
+.ph-cap{margin-top:auto;font-size:20px;color:var(--text2)}
+.ph-cap b{color:var(--acc)}
+.ph-sl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;margin-top:8px}
+.ph-rw{position:relative;padding:20px 0 26px}
+.ph-tk{position:absolute;top:28px;width:0;height:18px}
+.ph-tk::before{content:"";position:absolute;left:-1px;top:0;width:2px;height:16px;background:var(--warn)}
+.ph-tk b{position:absolute;top:18px;left:0;transform:translateX(-50%);font:700 15px var(--num);color:var(--warn);white-space:nowrap}
+.ph-v{font-size:17px;color:var(--text2);min-width:150px;text-align:right}
+.ph-v b{font:800 30px var(--num);color:var(--acc)}
+.ph-wait{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:14px;font-size:17px;color:var(--text2)}
+.ph-wb{height:16px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+.ph-wb i{display:block;height:100%;width:100%;border-radius:999px;background:linear-gradient(90deg,var(--bad),var(--warn))}
+.ph-wt{font:700 20px var(--num);color:var(--warn);min-width:96px;text-align:right}
+.ph-out{height:112px;padding:10px 14px;border-radius:12px;font-size:17px;line-height:1.6;color:var(--text);background:rgba(0,0,0,.28);border:1px solid var(--line);overflow:hidden}
+.ph-out::after{content:"▍";color:var(--acc);animation:blink 1s steps(1) infinite}
+.ph-facts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto}
+.ph-f{padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--warn) 40%,transparent);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+.ph-f b{display:block;font-size:18px}
+.ph-f b em{display:block;font:800 22px var(--num);font-style:normal;color:var(--warn)}
+.ph-f p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:6px}
+.ph-f small{display:block;font-size:15px;color:var(--text3);margin-top:6px}
+.ph-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c11-paths'] = {
+  TXT: '当模型每秒能吐出上千个字，“想完再说”和“边想边说”的体验差距就被抹平了。',
+  LEN: 600,
+  sp(v) { return 10 * Math.pow(2000, v / 1000); },
+  init(s) {
+    this.rng = s.querySelector('.ph-rng');
+    this.rng.addEventListener('input', () => { this.auto = false; this.v = +this.rng.value; this.restartOut(); this.draw(s); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    this.fr = s.querySelector('#ph-fr');
+    this.one = s.querySelector('.ph-one');
+  },
+  restartOut() { this.chars = 0; },
+  draw(s) {
+    const sp = this.sp(this.v), w = this.LEN / sp;
+    s.querySelector('.ph-v b').textContent = sp >= 1000 ? Math.round(sp).toLocaleString('en-US') : Math.round(sp);
+    s.querySelector('.ph-wt').textContent = w >= 1 ? w.toFixed(1) + ' 秒' : Math.round(w * 1000) + ' 毫秒';
+    s.querySelector('.ph-wb i').style.width = Math.min(100, (w / 60) * 100) + '%';
+    this.rng.value = Math.round(this.v);
+    this.rng.style.setProperty('--p', this.v / 10 + '%');
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    this.auto = true;
+    this.v = 0;
+    this.chars = 0;
+    this.draw(s);
+    const out = s.querySelector('.ph-out'), full = this.TXT.repeat(3), L = this.fr.getTotalLength();
+    let last = 0, hold = 0, u = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      // 左：单一模型的点只能在取舍曲线上来回移动
+      u += dt / 4200;
+      const q = (Math.sin(u * Math.PI) + 1) / 2, p = this.fr.getPointAtLength(q * L);
+      this.one.setAttribute('cx', p.x.toFixed(1)); this.one.setAttribute('cy', p.y.toFixed(1));
+      if (this.k < 1) return;
+      // 右：滑块自动从慢到快；输出框按当前速度逐字吐出（1 字约 1 token，示意）
+      if (this.auto) {
+        if (this.v < 1000) { this.v = Math.min(1000, this.v + dt / 7.5); this.draw(s); }
+        else { hold += dt; if (hold > 2600) { hold = 0; this.v = 0; this.chars = 0; this.draw(s); } }
+      }
+      this.chars = Math.min(full.length, this.chars + (this.sp(this.v) * dt) / 1000);
+      out.textContent = full.slice(0, Math.floor(this.chars));
+      if (this.chars >= full.length && !this.auto) this.chars = full.length;
+      if (this.chars >= full.length && this.auto && this.v < 1000) this.chars = 0;
+    });
+  },
+  step(s, ctx, k) { this.k = k; if (k >= 1 && this.auto) { this.v = 0; this.chars = 0; this.draw(s); } },
+  reset(s) { this.v = 0; this.chars = 0; s.querySelector('.ph-out').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c11-cloud2" data-part="2" data-steps="2" data-dur="13000" data-title="第二朵乌云：持续积累经验" data-notes="<b>第二朵乌云，是 Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。</b>今天的模型更像一个记性极好、却学不会新东西的天才：训练时把人类知识背得滚瓜烂熟，上岗后却几乎不再成长——每次任务结束，那些踩过的坑、试出来的窍门，大多随着上下文一起被丢掉。这究竟是不是一个真问题，取决于两种针锋相对的假设。<br>一种是<b>“小世界假设”</b>：一个足够大的模型——比如几万亿参数——本就装得下物理世界里几乎所有重要的通用知识，学一次就够。持这种看法的人（不乏 OpenAI、Anthropic 的研究者）会指出，AI 今天唯独在编程上最强，并不是因为代码对模型有什么特殊，而是因为编程是人类最开放的领域：海量开源代码摆在那里，可供学习；而绝大多数行业压根没有公开的信息与数据。于是前沿实验室真正在做的，是一家家去与各行各业合作，把各自的专业能力“蒸馏”进同一个大模型。按这种观点，瓶颈既不在模型的容量、也不在它学不学得会，而在数据够不够：把数据喂进去、训练一次，问题就解决了。<br>但<b>“大世界假设”</b>指向了单靠“训练一次”补不上的一层：属于某个具体用户、某家具体公司的知识。特定公司的代码规范、做 PPT 的口味、某个客户特有的脾气不在任何训练语料里，而且时时在变；要贴合这个由无数具体情境拼成的“大世界”，模型只能在上岗之后持续学习，没法指望出厂时一次配齐。这正是第三章的记忆与第九章的持续进化在摸索的方向：把经验写成知识文档、指令或程序，还是经过筛选后用于更新模型参数？更进一步，“RSI”（递归自我进化）和“AI for Science”都在推动 Agent 走到没有现成答案的前沿；在那里，它只能从一次次实验的成败中自主学习，而不是事事回头问人。所以，<b>模型最强的能力，终将不是记住，而是学习与适应</b>。<br>按 → 依次看小世界假设、大世界假设和结论；左侧“健忘的天才”、行业方块与情境方块都是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">第二朵乌云：从成败中<em>持续积累经验</em></h2></div>
+    <div class="cw-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">“小世界假设”</button><button data-v="1">“大世界假设”</button></div></header>
+  <div class="cw-body">
+    <div class="cw-l panel fx fx-left" style="--d:2">
+      <b class="cw-lt">记性极好、却学不会新东西的天才</b>
+      <div class="cw-ep">
+        <div class="cw-eh"><span class="cw-task">任务 1</span><span class="cw-st">进行中</span></div>
+        <div class="cw-ctx"><span class="lbl">上下文</span><div class="cw-chips"></div><span class="cw-gone">任务结束：随着上下文一起被丢掉</span></div>
+      </div>
+      <p class="cw-lp">训练时把人类知识背得滚瓜烂熟，上岗后却几乎不再成长</p>
+      <p class="cw-q">这究竟是不是一个真问题？<br>取决于两种<b>针锋相对的假设</b> →</p>
+    </div>
+    <div class="cw-r panel fx fx-right" style="--d:3">
+      <div class="cw-v sm">
+        <canvas class="cw-cv" width="2000" height="760"></canvas>
+        <div class="cw-doms"></div>
+        <div class="cw-model"><b>足够大的模型</b><span>比如几万亿参数</span><small>装得下物理世界里几乎所有重要的通用知识</small></div>
+        <p class="cw-cap">编程最强，是因为编程是人类<b>最开放的领域</b>；前沿实验室一家家与各行各业合作，把专业能力“蒸馏”进同一个大模型——瓶颈在<b>数据够不够</b>：喂进去、训练一次就好</p>
+        <span class="cw-who">持这种看法的人不乏 OpenAI、Anthropic 的研究者</span>
+      </div>
+      <div class="cw-v bg">
+        <div class="cw-mos"></div>
+        <div class="cw-mt"><span>由无数具体情境拼成的“大世界”：不在任何训练语料里，而且<b>时时在变</b></span></div>
+        <div class="cw-how">
+          <div class="cw-x"><svg class="ic"><use href="#i-x"/></svg>出厂时一次配齐</div>
+          <div class="cw-ok"><svg class="ic"><use href="#i-refresh"/></svg><b>上岗之后持续学习</b><small>把经验写成知识文档、指令或程序（第三章的记忆、第九章的持续进化）</small><small>还是经过筛选后用于更新模型参数？</small></div>
+          <div class="cw-fr"><svg class="ic"><use href="#i-flask"/></svg><b>RSI（递归自我进化）· AI for Science</b><small>走到没有现成答案的前沿：只能从一次次实验的成败中自主学习，而不是事事回头问人</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline cw-tag fx fx-up" data-step="2">所以，模型最强的能力，终将不是记住，而是<b>学习与适应</b></p>
+  <div class="src">后记 ·「两朵乌云」第二朵</div>
+</section>
+<style>
+#c11-cloud2 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.cw-seg button{font-size:20px;padding:10px 24px}
+.cw-body{display:flex;gap:24px;height:610px}
+.cw-l{width:560px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.cw-lt{font-size:25px;color:var(--acc)}
+.cw-ep{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(8,12,30,.6)}
+.cw-eh{display:flex;justify-content:space-between;align-items:center}
+.cw-task{font:700 20px var(--num)}
+.cw-st{font-size:16px;padding:3px 12px;border-radius:999px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent)}
+.cw-st.end{color:var(--text3);border-color:var(--line2)}
+.cw-ctx{position:relative;height:196px;margin-top:12px;padding:12px;border-radius:12px;border:1px dashed var(--line2)}
+.cw-chips{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.cw-chips span{display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:10px;font-size:17px;animation:upIn .45s var(--ease) both;transition:opacity .9s,translate 1.1s var(--ease),filter .9s}
+.cw-chips span.bad{color:#fecdd3;background:rgba(251,113,133,.12);border:1px solid rgba(251,113,133,.4)}
+.cw-chips span.good{color:#a7f3d0;background:rgba(52,211,153,.12);border:1px solid rgba(52,211,153,.4)}
+.cw-chips span.gone{opacity:0;translate:0 -40px;filter:blur(6px)}
+.cw-chips span.again{color:#fff;background:rgba(251,113,133,.3);border:1px solid var(--bad);animation:shake .5s}
+.cw-gone{position:absolute;left:12px;right:12px;bottom:12px;text-align:center;font-size:17px;color:var(--text3);opacity:0;transition:opacity .4s}
+.cw-ctx.end .cw-gone{opacity:1}
+.cw-lp{font-size:20px;line-height:1.6;color:var(--text)}
+.cw-q{margin-top:auto;font-size:20px;line-height:1.6;color:var(--text2)}
+.cw-q b{color:var(--acc)}
+.cw-r{position:relative;flex:1;overflow:hidden}
+.cw-v{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .6s,visibility .6s}
+#c11-cloud2[data-k="0"] .cw-v.sm,#c11-cloud2[data-k="1"] .cw-v.bg,#c11-cloud2[data-k="2"] .cw-v.bg{opacity:1;visibility:visible}
+.cw-cv{position:absolute;left:0;top:0;width:1000px;height:380px}
+.cw-ind{position:absolute;left:28px;width:250px;height:58px;padding:0 14px;border-radius:14px;display:flex;align-items:center;gap:10px;font-size:18px;border:1px solid var(--line2);background:rgba(10,16,36,.92);transition:all .45s var(--ease)}
+.cw-ind .ic{font-size:22px;color:var(--text3)}
+.cw-ind small{margin-left:auto;font-size:15px;color:var(--text3)}
+.cw-ind.open{border-color:color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 30%,transparent)}
+.cw-ind.open .ic{color:var(--acc)}
+.cw-ind.code{border-color:color-mix(in srgb,var(--ok) 55%,transparent)}
+.cw-ind.code .ic{color:var(--ok)}
+.cw-model{position:absolute;left:650px;top:40px;width:300px;height:300px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;padding:30px;background:radial-gradient(circle at 35% 30%,rgba(196,181,253,.35),rgba(10,16,36,.9) 70%);border:2px solid #c4b5fd;box-shadow:0 0 60px rgba(196,181,253,.3)}
+.cw-model b{font-size:25px}
+.cw-model span{font:700 18px var(--num);color:#c4b5fd}
+.cw-model small{font-size:15px;line-height:1.45;color:var(--text2)}
+.cw-cap{position:absolute;left:28px;right:28px;top:398px;font-size:19px;line-height:1.6;color:var(--text2)}
+.cw-cap b{color:var(--acc)}
+.cw-who{position:absolute;left:28px;bottom:22px;font-size:16px;color:var(--text3)}
+.cw-mos{position:absolute;left:28px;top:26px;width:520px;display:grid;grid-template-columns:repeat(10,1fr);grid-auto-flow:dense;gap:6px}
+.cw-mos i{height:40px;border-radius:7px;background:hsla(var(--h),60%,60%,.28);border:1px solid hsla(var(--h),60%,70%,.4);transition:background .8s,border-color .8s}
+.cw-mos i.lab{grid-column:span 5;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:17px;color:var(--text);background:hsla(var(--h),60%,55%,.35)}
+.cw-mt{position:absolute;left:28px;top:420px;width:520px;font-size:18px;line-height:1.6;color:var(--text2)}
+.cw-mt b{color:var(--acc)}
+.cw-how{position:absolute;left:580px;right:24px;top:26px;bottom:24px;display:flex;flex-direction:column;gap:14px}
+.cw-how>div{padding:14px 16px;border-radius:14px;display:grid;grid-template-columns:34px 1fr;gap:4px 10px;align-items:start}
+.cw-how .ic{font-size:26px;grid-row:1/4}
+.cw-how b{font-size:20px}
+.cw-how small{font-size:16px;line-height:1.5;color:var(--text2)}
+.cw-x{color:var(--bad);font-size:20px;font-weight:700;border:1px dashed rgba(251,113,133,.5);background:rgba(251,113,133,.06);align-items:center!important}
+.cw-x .ic{grid-row:auto!important}
+.cw-ok{border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.cw-ok .ic{color:var(--ok)}
+.cw-fr{border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent);background:color-mix(in srgb,var(--acc2) 8%,transparent)}
+.cw-fr .ic{color:var(--acc2)}
+.cw-tag{margin-top:18px;font-size:24px}
+</style>
+<script>
+HOOKS['c11-cloud2'] = {
+  IND: [['code', '编程', '海量开源代码'], ['lock', '行业 A', '无公开数据'], ['lock', '行业 B', '无公开数据'], ['lock', '行业 C', '无公开数据'], ['lock', '行业 D', '无公开数据']],
+  init(s) {
+    this.set = U.seg(s.querySelector('.cw-seg'), (v) => DECK.go(DECK.cur, +v));
+    s.querySelector('.cw-doms').innerHTML = this.IND.map(([ic, t, d], i) => `<div class="cw-ind${i ? '' : ' code'}" style="top:${28 + i * 70}px"><svg class="ic"><use href="#i-${ic}"/></svg><b>${t}</b><small>${d}</small></div>`).join('');
+    this.inds = [...s.querySelectorAll('.cw-ind')];
+    // 大世界：许多小方块代表具体情境，其中三块带标签
+    const rnd = U.rand(13), lab = { 0: '特定公司的代码规范', 2: '做 PPT 的口味', 5: '某个客户特有的脾气' };
+    let h = '';
+    for (let i = 0; i < 64; i++) {
+      if (lab[i] !== undefined) h += `<i class="lab" style="--h:${(rnd() * 360) | 0}">${lab[i]}</i>`;
+      else h += `<i style="--h:${(rnd() * 360) | 0}"></i>`;
+    }
+    s.querySelector('.cw-mos').innerHTML = h;
+    this.tiles = [...s.querySelectorAll('.cw-mos i')];
+    this.g = s.querySelector('.cw-cv').getContext('2d');
+  },
+  // 健忘的天才：踩坑、找到窍门 → 任务结束全部丢掉 → 下个任务又踩同一个坑
+  forget(s, ctx) {
+    const chips = s.querySelector('.cw-chips'), task = s.querySelector('.cw-task'), st = s.querySelector('.cw-st'), cx = s.querySelector('.cw-ctx');
+    let n = 1;
+    const cycle = async () => {
+      while (ctx.alive) {
+        chips.innerHTML = ''; cx.classList.remove('end'); st.classList.remove('end'); st.textContent = '进行中';
+        task.textContent = `任务 ${n}`;
+        await U.wait(ctx, 700);
+        if (n > 1) { chips.insertAdjacentHTML('beforeend', '<span class="again">又踩了同一个坑</span>'); await U.wait(ctx, 1200); }
+        chips.insertAdjacentHTML('beforeend', '<span class="bad">踩过的坑：……</span>'); await U.wait(ctx, 900);
+        chips.insertAdjacentHTML('beforeend', '<span class="good">试出来的窍门：……</span>'); await U.wait(ctx, 1300);
+        if (!ctx.alive) return;
+        st.textContent = '任务结束'; st.classList.add('end'); cx.classList.add('end');
+        chips.querySelectorAll('span').forEach((x) => x.classList.add('gone'));
+        await U.wait(ctx, 2000);
+        n = n >= 3 ? 1 : n + 1;
+      }
+    };
+    cycle();
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    s.dataset.k = k;
+    this.set(String(Math.min(1, k)));
+    this.forget(s, ctx);
+    // 小世界：编程（开放）的数据一直流进模型；各行各业的锁被逐个打开，数据被“蒸馏”进去
+    const g = this.g, parts = [];
+    let open = 0, acc = 0, last = 0;
+    this.inds.forEach((x, i) => x.classList.toggle('open', i === 0));
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      if (this.k === 0) {
+        acc += dt;
+        if (acc > 2200) { acc = 0; open = open >= 4 ? 0 : open + 1; this.inds.forEach((x, i) => { x.classList.toggle('open', i <= open); x.querySelector('use').setAttribute('href', i === 0 ? '#i-code' : i <= open ? '#i-unlock' : '#i-lock'); }); }
+        for (let i = 0; i <= open; i++) if (Math.random() < 0.22) parts.push({ x: 280, y: 57 + i * 70, i, u: 0, v: 0.006 + Math.random() * 0.006, c: i ? '#7dd3fc' : '#34d399' });
+      }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 1000, 380);
+      for (let j = parts.length - 1; j >= 0; j--) {
+        const p = parts[j];
+        p.u += p.v * (dt / 16);
+        if (p.u >= 1) { parts.splice(j, 1); continue; }
+        const x = 280 + (800 - 280) * p.u, y = p.y + (190 - p.y) * (p.u * p.u);
+        g.globalAlpha = Math.min(1, (1 - p.u) * 3);
+        g.fillStyle = p.c;
+        g.beginPath(); g.arc(x, y, 3.2, 0, 6.283); g.fill();
+      }
+      g.globalAlpha = 1;
+      // 大世界：情境方块时时在变
+      if (this.k >= 1 && Math.random() < 0.3) { const tl = this.tiles[(Math.random() * this.tiles.length) | 0]; tl.style.setProperty('--h', (Math.random() * 360) | 0); }
+    });
+  },
+  step(s, ctx, k) { this.k = k; s.dataset.k = k; this.set(String(Math.min(1, k))); },
+  reset(s) { s.dataset.k = 0; s.querySelector('.cw-chips').innerHTML = ''; },
+};
+</script>
+
+<!-- ===== 03-coevolve.html ===== -->
+<!-- ================= PART 03 模型与 Agent 的共同演进 ================= -->
+<section class="slide chapter" id="c11-d3" data-part="3" data-title="PART 03 · 模型与 Agent 的共同演进" data-notes="这两朵乌云，都不是靠某一次模型升级就能凭空吹散的。要理解它们最终会怎样被跨越，得先看清一件事：<b>模型和 Agent，从来不是上下游，而是一起往前走的。</b><br>这一部分依次看：harness 里的兜底逻辑与模型之间自我强化的飞轮；第一章悬下的问题——模型会不会最终吃掉 Harness；同时握住两端的人为什么转得最快、飞轮为什么是护城河；以及这对站在飞轮不同端的人分别意味着什么。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">模型与 Agent 的<br>共同演进</h1>
+  <div class="ch-s fx fx-up" style="--d:3">两朵乌云都不是靠某一次模型升级就能凭空吹散的</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型和 Agent，从来不是上下游，而是一起往前走的。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c11-flywheel" data-part="3" data-trans="zoom" data-dur="14000" data-title="自我强化的飞轮" data-notes="回头看那些 harness 里层层叠叠的兜底逻辑——<b>多级上下文压缩、失败数千次才熔断的重试、悲观地默认“不安全”的权限判断</b>——每一段看似丑陋的“屎山”，记录的都是模型此刻还做不稳的地方。当下一代模型把这些约束内化，对应的代码就可以删掉；而模型之所以能内化，又正是因为 Agent 早已在真实业务里替它把这些坑趟了一遍，沉淀成了下一轮训练的信号。<br>用户提出真实的难题，应用层用 harness 把模型暂时做不好的事补上，这些补救再反过来变成模型下一次迭代的训练信号。<b>这是一个自我强化的飞轮。</b><br>左侧光点每转一圈经过四站；每当经过“下一代模型内化约束”，右侧就删掉一段兜底代码，飞轮也越转越快。右侧代码与删除顺序都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一个<em>自我强化</em>的飞轮</h2></header>
+  <div class="fw-body">
+    <div class="fw-stage fx fx-scale" style="--d:2">
+      <svg class="fw-svg" viewBox="0 0 700 600" width="700" height="600">
+        <circle class="fw-ring" cx="350" cy="300" r="200"/>
+        <circle class="fw-run" cx="350" cy="300" r="200"/>
+        <circle class="fw-dot" r="14"/>
+      </svg>
+      <div class="fw-core"><b>飞轮</b><span class="fw-lap">第 1 圈</span><small>越转越快</small></div>
+      <div class="fw-st" style="left:350px;top:100px;--c:#fbbf24"><em>①</em><b>用户提出真实的难题</b></div>
+      <div class="fw-st" style="left:550px;top:300px;--c:#60a5fa"><em>②</em><b>应用层用 harness 补上</b><small>模型暂时做不好的事</small></div>
+      <div class="fw-st" style="left:350px;top:500px;--c:#5eead4"><em>③</em><b>补救变成训练信号</b><small>Agent 在真实业务里替模型趟坑</small></div>
+      <div class="fw-st" style="left:150px;top:300px;--c:#c4b5fd"><em>④</em><b>下一代模型内化约束</b><small>对应的代码可以删掉</small></div>
+    </div>
+    <div class="fw-r">
+      <div class="win fw-win fx fx-right" style="--d:3">
+        <div class="win-bar"><i></i><i></i><i></i><span>harness 里层层叠叠的兜底逻辑</span><span class="cap fw-sx">示意</span></div>
+        <div class="fw-code">
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 多级上下文压缩</span></div><div class="ln"><span class="t-k">if</span> tokens &gt; L1: ctx = summarize(ctx)</div><div class="ln"><span class="t-k">if</span> tokens &gt; L2: ctx = drop_oldest(ctx)</div><em class="fw-del">已内化 · 删除</em></div>
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 失败数千次才熔断的重试</span></div><div class="ln"><span class="t-k">for</span> i <span class="t-k">in</span> range(MAX_RETRY):</div><div class="ln">&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">if</span> step(): <span class="t-k">break</span></div><em class="fw-del">已内化 · 删除</em></div>
+          <div class="fw-blk"><div class="ln"><span class="t-c"># 悲观地默认“不安全”的权限判断</span></div><div class="ln"><span class="t-k">def</span> allowed(cmd):</div><div class="ln">&nbsp;&nbsp;&nbsp;&nbsp;<span class="t-k">return</span> cmd <span class="t-k">in</span> WHITELIST</div><em class="fw-del">已内化 · 删除</em></div>
+        </div>
+      </div>
+      <p class="fw-cap fx fx-up" style="--d:4">每一段看似丑陋的<b>“屎山”</b>，记录的都是<b>模型此刻还做不稳的地方</b></p>
+      <div class="fw-why fx fx-up" style="--d:5"><svg class="ic"><use href="#i-refresh"/></svg><p>模型之所以能内化，正是因为 Agent 早已在真实业务里<b>替它把这些坑趟了一遍</b>，沉淀成了下一轮训练的信号</p></div>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 1 段</div>
+</section>
+<style>
+.fw-body{display:grid;grid-template-columns:700px 1fr;gap:40px;align-items:start}
+.fw-stage{position:relative;width:700px;height:600px}
+.fw-svg{position:absolute;inset:0;overflow:visible}
+.fw-ring{fill:none;stroke:rgba(255,255,255,.1);stroke-width:18}
+.fw-run{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:10 14;opacity:.6}
+.fw-dot{fill:#fff;filter:drop-shadow(0 0 12px var(--acc)) drop-shadow(0 0 4px #fff)}
+.fw-core{position:absolute;left:250px;top:200px;width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:radial-gradient(circle,rgba(94,234,212,.18),rgba(8,12,30,.6) 70%);border:1px solid var(--line2)}
+.fw-core b{font-size:30px}
+.fw-lap{font:700 20px var(--num);color:var(--acc)}
+.fw-core small{font-size:15px;color:var(--text3)}
+.fw-st{position:absolute;width:236px;translate:-50% -50%;padding:10px 14px;border-radius:16px;text-align:center;display:flex;flex-direction:column;gap:2px;border:1.5px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(10,16,36,.95);transition:box-shadow .35s,border-color .35s,scale .35s var(--spring)}
+.fw-st em{font-style:normal;font:700 17px var(--num);color:var(--c)}
+.fw-st b{font-size:19px;line-height:1.3}
+.fw-st small{font-size:15px;color:var(--text3)}
+.fw-st.hit{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 50%,transparent);scale:1.06}
+.fw-r{display:flex;flex-direction:column;gap:20px}
+.fw-win .win-bar span{font-size:16px}
+.fw-sx{margin-left:auto}
+.fw-code{padding:14px 18px;display:flex;flex-direction:column;gap:10px;font:17px/1.65 var(--mono)}
+.fw-blk{position:relative;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.02);max-height:130px;overflow:hidden;transition:max-height .6s var(--ease) .5s,padding .6s var(--ease) .5s,opacity .6s .5s,background .3s,border-color .3s}
+.fw-blk .ln{white-space:pre}
+.fw-del{position:absolute;right:12px;top:10px;font-style:normal;font:700 15px var(--font);color:var(--bad);opacity:0;transition:opacity .3s}
+.fw-blk.del{background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.5);max-height:0;padding:0 12px;opacity:0}
+.fw-blk.del .ln{text-decoration:line-through;text-decoration-color:var(--bad)}
+.fw-blk.del .fw-del{opacity:1}
+.fw-cap{font-size:23px;line-height:1.6;color:var(--text2)}
+.fw-cap b{color:var(--acc)}
+.fw-why{display:flex;gap:14px;align-items:flex-start;padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent);background:color-mix(in srgb,var(--acc2) 8%,transparent)}
+.fw-why .ic{flex:none;font-size:30px;color:var(--acc2);animation:spin 6s linear infinite}
+.fw-why p{font-size:20px;line-height:1.6}
+.fw-why b{color:var(--acc2)}
+</style>
+<script>
+HOOKS['c11-flywheel'] = {
+  init(s) {
+    this.dot = s.querySelector('.fw-dot');
+    this.run = s.querySelector('.fw-run');
+    this.sts = [...s.querySelectorAll('.fw-st')];
+    this.blks = [...s.querySelectorAll('.fw-blk')];
+    this.lapEl = s.querySelector('.fw-lap');
+  },
+  draw(u) {
+    const a = u * Math.PI * 2 - Math.PI / 2;
+    this.dot.setAttribute('cx', (350 + 200 * Math.cos(a)).toFixed(1));
+    this.dot.setAttribute('cy', (300 + 200 * Math.sin(a)).toFixed(1));
+  },
+  enter(s, ctx) {
+    // u：本圈进度（从顶部顺时针），每经过一站点亮它；经过第④站删掉一段兜底代码
+    let u = 0, lap = 0, last = 0, off = 0, prev = -1;
+    const restart = () => { lap = 0; this.blks.forEach((b) => b.classList.remove('del')); };
+    restart();
+    this.lapEl.textContent = '第 1 圈';
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      const sp = (1 + lap * 0.45) / 4200;
+      u += dt * sp;
+      if (u >= 1) {
+        u -= 1;
+        lap += 1;
+        if (lap > 3) restart();
+        this.lapEl.textContent = `第 ${lap + 1} 圈`;
+      }
+      off -= dt * sp * 1256;
+      this.run.style.strokeDashoffset = off.toFixed(1);
+      this.draw(u);
+      const st = Math.floor(u * 4 + 0.08) % 4;
+      if (st !== prev) {
+        prev = st;
+        const el = this.sts[st];
+        el.classList.add('hit');
+        ctx.later(() => el.classList.remove('hit'), 700);
+        if (st === 3 && this.blks[lap]) this.blks[lap].classList.add('del');
+      }
+    });
+  },
+  reset() { this.blks.forEach((b) => b.classList.remove('del')); this.sts.forEach((x) => x.classList.remove('hit')); },
+};
+</script>
+
+<section class="slide" id="c11-eat" data-part="3" data-steps="2" data-trans="rise" data-dur="13000" data-title="模型会不会吃掉 Harness？" data-notes="这个飞轮，也回答了第一章悬下的那个问题：<b>模型会不会最终吃掉 Harness？</b>本书的观点是：<b>会，但不是一次性吃掉，而是一层一层地吃，并且没有吃完的那一天。</b><br>模型每稳定内化一种能力，对应的 Harness 层就可以删掉——第六章的交互模型就是这样一个例子：打断、插话这些曾经要靠外挂 harness 才能拼出的行为，如今被直接做进了模型内部。<br>但这个“吃”永远不会完结。一是训练以月计，模型等得起，业务等不起；二是模型无法内化真实业务中所有的约束与偏好，总有一层最新的边界需要外部逻辑兜底；三是每一代模型都会打开新的能力前沿，而前沿处恰恰是模型最做不稳的地方。所以 <b>Harness 不会消失，它只是随着模型，不断向新的前沿迁移。</b><br>这也正是《苦涩的教训》在 Agent 时代的读法：通用方法终将胜出，但“终将”二字里的每一段路，都是 Harness 铺出来的。<br>左侧能力塔是示意：底部模型一代代向上内化 Harness 层，顶部的能力前沿又不断长出新的一层，Harness 的层数始终吃不完。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型会不会最终<em>吃掉 Harness</em>？</h2></header>
+  <div class="et-body">
+    <div class="et-stage panel fx fx-left" style="--d:2">
+      <div class="et-fr"><span>能力前沿 · 模型最做不稳的地方</span></div>
+      <div class="et-layers"></div>
+      <div class="et-base"><b>模型</b><span class="et-gen">第 1 代</span><small>每一代稳定内化一种能力</small></div>
+      <div class="et-meta"><span>Harness 层数</span><b class="et-n">5</b><small>被吃掉一层，前沿又长出一层</small></div>
+      <span class="cap et-sx">示意</span>
+    </div>
+    <div class="et-r">
+      <div class="et-ans fx fx-up" style="--d:3"><span class="lbl">本书的观点</span><p><b>会，但不是一次性吃掉，而是一层一层地吃，并且没有吃完的那一天。</b></p></div>
+      <div class="et-c6 fx fx-up" style="--d:4"><svg class="ic"><use href="#i-mic"/></svg><div><b>例子：第六章的交互模型</b><p>打断、插话这些曾经要靠外挂 harness 才能拼出的行为，如今被直接做进了模型内部</p></div></div>
+      <div class="et-why" data-step="1">
+        <span class="lbl">为什么永远吃不完</span>
+        <div class="et-y fx fx-up" style="--d:1"><em>一</em><svg class="ic"><use href="#i-calendar"/></svg><p>训练以月计：<b>模型等得起，业务等不起</b></p></div>
+        <div class="et-y fx fx-up" style="--d:2"><em>二</em><svg class="ic"><use href="#i-scale"/></svg><p>模型无法内化真实业务中<b>所有的约束与偏好</b>，总有一层最新的边界需要外部逻辑兜底</p></div>
+        <div class="et-y fx fx-up" style="--d:3"><em>三</em><svg class="ic"><use href="#i-flag"/></svg><p>每一代模型都会打开<b>新的能力前沿</b>，而前沿处恰恰是模型最做不稳的地方</p></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline et-tag fx fx-up" data-step="2">Harness 不会消失，只是随着模型不断<b>向新的前沿迁移</b>。《苦涩的教训》在 Agent 时代的读法：通用方法终将胜出，但“终将”二字里的每一段路，<b>都是 Harness 铺出来的</b></p>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 2 段</div>
+</section>
+<style>
+.et-body{display:grid;grid-template-columns:720px 1fr;gap:32px;height:610px}
+.et-stage{position:relative;overflow:hidden}
+.et-fr{position:absolute;left:24px;right:24px;top:20px;padding-bottom:8px;border-bottom:2px dashed var(--warn);font-size:17px;color:var(--warn)}
+.et-fr span{animation:blink 2.4s ease-in-out infinite}
+.et-layers{position:absolute;left:40px;width:440px;top:0;bottom:0}
+.et-l{position:absolute;left:0;right:0;height:58px;padding:0 18px;border-radius:12px;display:flex;align-items:center;gap:12px;font-size:19px;border:1.5px solid rgba(96,165,250,.5);background:rgba(96,165,250,.12);transition:bottom .6s var(--ease),opacity .5s,background .5s,border-color .5s,filter .5s}
+.et-l .ic{font-size:22px;color:var(--har)}
+.et-l small{margin-left:auto;font-size:15px;color:var(--text3)}
+.et-l.fr{border-color:var(--warn);background:rgba(251,191,36,.12);box-shadow:0 0 22px rgba(251,191,36,.25)}
+.et-l.fr .ic{color:var(--warn)}
+.et-l.m{border-color:#c4b5fd;background:rgba(167,139,250,.32)}
+.et-l.m .ic{color:#c4b5fd}
+.et-l.new{animation:c11drop .6s var(--spring) both}
+@keyframes c11drop{from{opacity:0;translate:0 -40px}}
+.et-l.gone{opacity:0;filter:blur(6px)}
+.et-base{position:absolute;left:40px;width:440px;bottom:24px;height:104px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:linear-gradient(180deg,rgba(167,139,250,.45),rgba(124,58,237,.25));border:2px solid #c4b5fd;box-shadow:0 0 40px rgba(167,139,250,.3)}
+.et-base b{font-size:24px}
+.et-gen{font:700 19px var(--num);color:#e9d5ff}
+.et-base small{font-size:15px;color:var(--text2)}
+.et-base.pulse{animation:c11base .8s ease-out}
+@keyframes c11base{30%{box-shadow:0 0 70px rgba(196,181,253,.8)}}
+.et-meta{position:absolute;right:26px;bottom:24px;width:160px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}
+.et-meta span{font-size:16px;color:var(--text3)}
+.et-meta b{font:800 64px var(--num);color:var(--har);line-height:1}
+.et-meta small{font-size:15px;color:var(--text2);line-height:1.45}
+.et-sx{position:absolute;right:26px;top:58px}
+.et-r{display:flex;flex-direction:column;gap:16px}
+.et-ans{padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.et-ans p{margin-top:6px;font-size:25px;line-height:1.55}
+.et-ans b{color:var(--acc)}
+.et-c6{display:flex;gap:16px;align-items:flex-start;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.et-c6 .ic{flex:none;font-size:30px;color:#c4b5fd}
+.et-c6 b{font-size:19px}
+.et-c6 p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:4px}
+.et-why{display:flex;flex-direction:column;gap:10px}
+.et-y{display:grid;grid-template-columns:34px 30px 1fr;gap:12px;align-items:center;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.7)}
+.et-y em{font-style:normal;font-size:22px;font-weight:800;color:var(--warn)}
+.et-y .ic{font-size:26px;color:var(--warn)}
+.et-y p{font-size:18px;line-height:1.5}
+.et-y b{color:var(--warn)}
+.et-tag{margin-top:18px;font-size:21px;line-height:1.6}
+</style>
+<script>
+HOOKS['c11-eat'] = {
+  INIT: [['wave', '打断、插话（外挂 harness 拼出）'], ['compress', '多级上下文压缩'], ['repeat', '失败数千次才熔断的重试'], ['lock', '悲观的权限判断'], ['flag', '最新的业务边界']],
+  NEW: [['flag', '新能力前沿的兜底'], ['flag', '新的业务约束与偏好'], ['flag', '新前沿上做不稳的事']],
+  H: 58, GAP: 8, B0: 138,
+  init(s) {
+    this.box = s.querySelector('.et-layers');
+    this.base = s.querySelector('.et-base');
+    this.genEl = s.querySelector('.et-gen');
+    this.nEl = s.querySelector('.et-n');
+  },
+  mk(ic, t, cls) {
+    const el = document.createElement('div');
+    el.className = 'et-l ' + cls;
+    el.innerHTML = `<svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span><small></small>`;
+    this.box.appendChild(el);
+    return el;
+  },
+  layout() {
+    this.L.forEach((l, i) => {
+      l.el.style.bottom = this.B0 + i * (this.H + this.GAP) + 'px';
+      l.el.classList.toggle('fr', i === this.L.length - 1 && !l.m);
+    });
+    this.nEl.textContent = this.L.filter((l) => !l.m).length;
+  },
+  start() {
+    this.box.innerHTML = '';
+    this.gen = 1; this.nn = 0; this.ph = 0;
+    this.genEl.textContent = '第 1 代';
+    this.L = this.INIT.map(([ic, t]) => ({ el: this.mk(ic, t, ''), m: false }));
+    this.layout();
+  },
+  // 交替两拍：①最底层被模型内化，前沿长出新一层；②已内化的层并入模型，新一代诞生
+  tick(ctx) {
+    if (this.ph === 0) {
+      const b = this.L[0];
+      b.m = true; b.el.classList.add('m'); b.el.querySelector('small').textContent = '已内化';
+      const [ic, t] = this.NEW[this.nn++ % this.NEW.length];
+      this.L.push({ el: this.mk(ic, t, 'new'), m: false });
+    } else {
+      const b = this.L.shift();
+      b.el.classList.add('gone');
+      ctx.later(() => b.el.remove(), 600);
+      this.gen += 1;
+      this.genEl.textContent = `第 ${this.gen} 代`;
+      U.restart(this.base, 'pulse');
+      if (this.gen > 6) { ctx.later(() => this.start(), 900); this.ph = 0; return; }
+    }
+    this.ph = 1 - this.ph;
+    this.layout();
+  },
+  enter(s, ctx) {
+    this.start();
+    ctx.every(() => this.tick(ctx), 1800);
+  },
+  reset() { this.box.innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c11-ends" data-part="3" data-steps="2" data-dur="12000" data-title="握住两端的人与护城河" data-notes="而飞轮转得最快的地方，是<b>同时握住两端的人</b>。Anthropic 用 Claude Code 做的，正是让自家模型和自家 harness 互相喂养、共同进化：模型知道 harness 会怎样调用它，harness 也清楚模型的边界在哪，两端的每一次改动都能立刻反馈给对方。<br>曾有人做过一个实验，不换模型、只改 harness，任务准确率就从 <b>52.8%</b> 跳到 <b>66.5%</b>。这既说明 harness 今天的杠杆有多大，也提醒你：它之所以有这么大杠杆，恰恰是因为模型还没走到那一步。<br>也正因如此，<b>这条飞轮本身，就是这个时代最深的一条护城河</b>：真实业务、反馈数据与模型迭代咬合得越紧，别人越难从外部追上。<br>左侧三个齿轮是示意：真实业务、反馈数据与模型迭代互相咬合转动。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">飞轮转得最快的地方：<em>同时握住两端的人</em></h2></header>
+  <div class="ge-body">
+    <div class="ge-stage fx fx-scale" style="--d:2">
+      <svg class="ge-svg" viewBox="0 0 680 560" width="680" height="560"></svg>
+      <span class="cap ge-sx">示意</span>
+    </div>
+    <div class="ge-r">
+      <div class="ge-cc panel fx fx-right" style="--d:3">
+        <div class="ge-h"><svg class="ic"><use href="#i-term"/></svg><b>Anthropic · Claude Code</b><span>自家模型 ⇄ 自家 harness，互相喂养、共同进化</span></div>
+        <div class="ge-ex">
+          <div class="ge-e m"><svg class="ic"><use href="#i-brain"/></svg><b>模型</b><small>知道 harness 会怎样调用它</small></div>
+          <div class="ge-ar"><i></i><i></i><span>每一次改动都能<br>立刻反馈给对方</span></div>
+          <div class="ge-e h"><svg class="ic"><use href="#i-wrench"/></svg><b>harness</b><small>清楚模型的边界在哪</small></div>
+        </div>
+      </div>
+      <div class="ge-exp panel" data-step="1">
+        <div class="ge-xh"><span class="lbl">曾有人做过一个实验</span><b>不换模型、只改 harness</b></div>
+        <div class="ge-bars">
+          <div class="ge-b"><span>改动前</span><div class="ge-bt"><i style="--w:52.8%"></i></div><b data-count="52.8" data-dec="1" data-suffix="%">0</b></div>
+          <div class="ge-b n"><span>只改 harness</span><div class="ge-bt"><i style="--w:66.5%"></i></div><b data-count="66.5" data-dec="1" data-suffix="%" data-delay="700">0</b></div>
+        </div>
+        <div class="ge-two"><p><svg class="ic"><use href="#i-zap"/></svg>说明 harness 今天的<b>杠杆有多大</b></p><p><svg class="ic"><use href="#i-alert"/></svg>也提醒你：之所以有这么大杠杆，<b>恰恰是因为模型还没走到那一步</b></p></div>
+      </div>
+    </div>
+  </div>
+  <p class="tagline ge-tag fx fx-up" data-step="2">这条飞轮本身，就是这个时代<b>最深的一条护城河</b>：真实业务、反馈数据与模型迭代咬合得越紧，别人越难从外部追上</p>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 3 段</div>
+</section>
+<style>
+.ge-body{display:grid;grid-template-columns:680px 1fr;gap:36px;height:600px}
+.ge-stage{position:relative}
+.ge-svg{position:absolute;inset:0;overflow:visible}
+.ge-g path{stroke-width:2.5;transform-box:view-box}
+.ge-g .sp{animation:spin linear infinite}
+.ge-lb{text-anchor:middle;dominant-baseline:central}
+.ge-lb.t{font-size:24px;font-weight:800;fill:var(--text)}
+.ge-lb.s{font-size:15px;fill:var(--text2)}
+.ge-sx{position:absolute;left:10px;bottom:6px}
+.ge-r{display:flex;flex-direction:column;gap:20px}
+.ge-cc{padding:18px 24px}
+.ge-h{display:grid;grid-template-columns:36px 1fr;gap:2px 12px;align-items:center}
+.ge-h .ic{grid-row:1/3;font-size:32px;color:var(--acc)}
+.ge-h b{font-size:23px}
+.ge-h span{font-size:17px;color:var(--text2)}
+.ge-ex{display:grid;grid-template-columns:1fr 230px 1fr;align-items:center;gap:12px;margin-top:16px}
+.ge-e{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.ge-e.m{--c:var(--llm)}.ge-e.h{--c:var(--har)}
+.ge-e .ic{font-size:32px;color:var(--c)}
+.ge-e b{font-size:20px}
+.ge-e small{font-size:16px;color:var(--text2)}
+.ge-ar{position:relative;height:96px;display:flex;align-items:flex-end;justify-content:center}
+.ge-ar span{font-size:15px;line-height:1.4;color:var(--text3);text-align:center}
+.ge-ar i{position:absolute;left:8px;right:8px;height:2px;background:linear-gradient(90deg,transparent,var(--acc),transparent);background-size:50% 100%;background-repeat:no-repeat}
+.ge-ar i:nth-child(1){top:14px;animation:c11arR 1.4s linear infinite}
+.ge-ar i:nth-child(2){top:30px;animation:c11arL 1.4s linear infinite}
+@keyframes c11arR{from{background-position:-100% 0}to{background-position:200% 0}}
+@keyframes c11arL{from{background-position:200% 0}to{background-position:-100% 0}}
+.ge-exp{padding:18px 24px;display:flex;flex-direction:column;gap:14px}
+.ge-xh{display:flex;align-items:baseline;gap:16px}
+.ge-xh b{font-size:23px}
+.ge-bars{display:flex;flex-direction:column;gap:12px}
+.ge-b{display:grid;grid-template-columns:130px 1fr 110px;gap:14px;align-items:center;font-size:18px;color:var(--text2)}
+.ge-b>b{font:800 30px var(--num);color:var(--text);text-align:right}
+.ge-b.n>b{color:var(--ok)}
+.ge-bt{height:26px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+.ge-bt i{display:block;height:100%;width:0;border-radius:8px;background:linear-gradient(90deg,#64748b,#94a3b8);transition:width 1.6s var(--ease) .35s}
+.ge-b.n .ge-bt i{background:linear-gradient(90deg,var(--acc),var(--ok));transition-delay:1.05s}
+.ge-exp.on .ge-bt i{width:var(--w)}
+.ge-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.ge-two p{display:flex;gap:10px;align-items:flex-start;font-size:17px;line-height:1.5;padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ge-two .ic{flex:none;font-size:22px;color:var(--warn);margin-top:2px}
+.ge-two b{color:var(--warn)}
+.ge-tag{margin-top:18px;font-size:23px}
+</style>
+<script>
+HOOKS['c11-ends'] = {
+  // 三个互相咬合的齿轮：节圆半径与齿数成比例，转一圈的时间与齿数成比例
+  G: [
+    { x: 230, y: 330, r: 150, n: 20, c: '#5eead4', t: '真实业务', s: '用户提出真实的难题', ic: 'users', rev: false },
+    { x: 425, y: 166, r: 105, n: 14, c: '#7dd3fc', t: '反馈数据', s: '补救沉淀成信号', ic: 'chart', rev: true },
+    { x: 497, y: 363, r: 105, n: 14, c: '#c4b5fd', t: '模型迭代', s: '下一代内化约束', ic: 'brain', rev: false },
+  ],
+  gear(cx, cy, r, n) {
+    const ro = r + 9, ri = r - 9, pts = [], f = (v) => v.toFixed(1);
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2, w = Math.PI / n;
+      [[a - w * 0.5, ri], [a - w * 0.28, ro], [a + w * 0.28, ro], [a + w * 0.5, ri]].forEach(([b, rr]) => pts.push(`${f(cx + rr * Math.cos(b))} ${f(cy + rr * Math.sin(b))}`));
+    }
+    return `M${pts.join('L')}Z M${f(cx + r * 0.35)} ${cy}A${f(r * 0.35)} ${f(r * 0.35)} 0 1 0 ${f(cx - r * 0.35)} ${cy}A${f(r * 0.35)} ${f(r * 0.35)} 0 1 0 ${f(cx + r * 0.35)} ${cy}`;
+  },
+  init(s) {
+    let h = '';
+    this.G.forEach((g, i) => {
+      h += `<g class="ge-g"><path class="sp" d="${this.gear(g.x, g.y, g.r, g.n)}" fill-rule="evenodd" style="fill:color-mix(in srgb,${g.c} 16%,#0a1024);stroke:${g.c};transform-origin:${g.x}px ${g.y}px;animation-duration:${g.n * 1.1}s;animation-direction:${g.rev ? 'reverse' : 'normal'};${i === 1 ? `rotate:${180 / g.n}deg` : ''}"/></g>`;
+    });
+    this.G.forEach((g) => {
+      h += `<text class="ge-lb t" x="${g.x}" y="${g.y - 12}" style="fill:${g.c}">${g.t}</text><text class="ge-lb s" x="${g.x}" y="${g.y + 18}">${g.s}</text>`;
+    });
+    s.querySelector('.ge-svg').innerHTML = h;
+  },
+};
+</script>
+
+<section class="slide" id="c11-side" data-part="3" data-trans="flip" data-dur="14000" data-title="你站在飞轮的哪一端" data-notes="这对你意味着什么，取决于你站在飞轮的哪一端。<br>如果你在<b>造模型</b>，护城河就是把这条飞轮转起来——让真实场景的反馈尽快回流到训练里。<br>如果你在<b>模型之上造应用</b>，harness 是你短期最锋利的技术杠杆，但要清醒：模型每内化一层约束，就会顺手抹平一批只靠 harness 建立的优势。应用层真正长久的护城河，往往在技术之外——独占的数据、稳固的渠道、用户的信任、网络效应，以及必须由人与 Agent 协作的物理世界场景等。<b>把 harness 用来争取时间，把这段时间用来构筑技术之外的壁垒，才是稳妥的打法。</b><br>页面会在两端之间自动切换，也可以点击右上角选择。造应用一侧的“水位”动画是示意：模型能力的水位上升，淹没只靠 harness 建立的优势。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">你站在飞轮的<em>哪一端</em>？</h2></div>
+    <div class="sd-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">我在造模型</button><button data-v="1">我在模型之上造应用</button></div></header>
+  <div class="sd-body fx fx-up" style="--d:3">
+    <div class="sd-v m">
+      <div class="sd-moat"><svg class="ic"><use href="#i-shield"/></svg><div><span class="lbl">护城河</span><b>把这条飞轮转起来</b><p>让真实场景的反馈<b>尽快回流到训练里</b></p></div></div>
+      <div class="sd-loop">
+        <svg class="sd-svg" viewBox="0 0 1560 300" width="1560" height="300">
+          <path class="sd-p" d="M200 110 H1360"/>
+          <path class="sd-p back" d="M1360 190 C 1360 290, 200 290, 200 190"/>
+        </svg>
+        <div class="sd-n" style="left:200px;--c:#5eead4"><svg class="ic"><use href="#i-globe"/></svg><b>真实场景</b></div>
+        <div class="sd-n" style="left:587px;--c:#7dd3fc"><svg class="ic"><use href="#i-inbox"/></svg><b>反馈</b></div>
+        <div class="sd-n" style="left:973px;--c:#a5b4fc"><svg class="ic"><use href="#i-gpu"/></svg><b>训练</b></div>
+        <div class="sd-n" style="left:1360px;--c:#c4b5fd"><svg class="ic"><use href="#i-brain"/></svg><b>新模型</b></div>
+        <span class="sd-bk">回到真实场景，开始下一圈</span>
+      </div>
+    </div>
+    <div class="sd-v a">
+      <div class="sd-l panel">
+        <div class="sd-lh"><span class="lbl">短期</span><b>harness：最锋利的技术杠杆</b></div>
+        <div class="sd-tank">
+          <div class="sd-adv"></div>
+          <div class="sd-water"><span>模型能力的水位</span></div>
+        </div>
+        <p class="sd-warn"><svg class="ic"><use href="#i-alert"/></svg>要清醒：模型每内化一层约束，就会<b>顺手抹平一批只靠 harness 建立的优势</b></p>
+        <span class="cap sd-sx">示意</span>
+      </div>
+      <div class="sd-rr">
+        <div class="sd-lh"><span class="lbl">长久</span><b>真正的护城河，往往在技术之外</b></div>
+        <div class="sd-chips"></div>
+        <div class="sd-play"><svg class="ic"><use href="#i-hourglass"/></svg><p>稳妥的打法：<b>把 harness 用来争取时间</b>，把这段时间用来<b>构筑技术之外的壁垒</b></p></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 4 段</div>
+</section>
+<style>
+#c11-side .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.sd-seg button{font-size:20px;padding:10px 24px}
+.sd-body{position:relative;height:660px}
+.sd-v{position:absolute;inset:0;opacity:0;visibility:hidden;translate:0 20px;transition:opacity .6s,visibility .6s,translate .6s var(--ease)}
+#c11-side[data-v="0"] .sd-v.m,#c11-side[data-v="1"] .sd-v.a{opacity:1;visibility:visible;translate:0 0}
+.sd-moat{display:flex;gap:22px;align-items:center;margin:20px auto 0;width:980px;padding:24px 34px;border-radius:22px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.sd-moat>.ic{flex:none;font-size:64px;color:var(--acc)}
+.sd-moat b{display:block;font-size:34px;margin-top:4px}
+.sd-moat p{font-size:22px;color:var(--text2);margin-top:6px}
+.sd-moat p b{display:inline;font-size:inherit;color:var(--acc)}
+.sd-loop{position:relative;width:1560px;height:300px;margin:40px auto 0}
+.sd-svg{position:absolute;inset:0;overflow:visible}
+.sd-p{fill:none;stroke:var(--acc);stroke-width:3;stroke-dasharray:8 10;animation:flow .6s linear infinite;filter:drop-shadow(0 0 6px var(--acc))}
+.sd-p.back{stroke:var(--acc2);filter:drop-shadow(0 0 6px var(--acc2))}
+.sd-n{position:absolute;top:110px;translate:-50% -50%;width:220px;padding:16px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:12px;border:1.5px solid var(--c);background:rgba(10,16,36,.95);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.sd-n .ic{font-size:32px;color:var(--c)}
+.sd-n b{font-size:23px}
+.sd-bk{position:absolute;left:50%;top:252px;translate:-50% 0;font-size:18px;color:var(--text3)}
+.sd-v.a{display:grid;grid-template-columns:1fr 1fr;gap:28px}
+.sd-l{position:relative;padding:20px 26px;display:flex;flex-direction:column;gap:14px}
+.sd-lh{display:flex;align-items:baseline;gap:14px}
+.sd-lh b{font-size:24px}
+.sd-tank{position:relative;height:360px;border-radius:16px;border:1px solid var(--line2);background:rgba(8,12,30,.6);overflow:hidden}
+.sd-adv{position:absolute;inset:16px 16px 16px 16px;display:flex;flex-direction:column-reverse;gap:10px}
+.sd-adv i{height:58px;border-radius:12px;display:flex;align-items:center;padding:0 16px;gap:10px;font-style:normal;font-size:18px;border:1.5px solid rgba(96,165,250,.55);background:rgba(96,165,250,.14);transition:opacity .5s,filter .5s,border-color .5s}
+.sd-adv i.sunk{opacity:.25;filter:blur(1.5px);border-color:transparent}
+.sd-adv i .ic{color:var(--har);font-size:22px}
+.sd-water{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(180deg,rgba(196,181,253,.55),rgba(124,58,237,.35));border-top:2px solid #c4b5fd;box-shadow:0 -6px 30px rgba(196,181,253,.4)}
+.sd-water span{position:absolute;right:14px;top:6px;font-size:16px;font-weight:700;color:#f5f3ff}
+.sd-warn{display:flex;gap:10px;align-items:flex-start;font-size:19px;line-height:1.55}
+.sd-warn .ic{flex:none;font-size:24px;color:var(--warn);margin-top:3px}
+.sd-warn b{color:var(--warn)}
+.sd-sx{position:absolute;right:24px;top:24px}
+.sd-rr{display:flex;flex-direction:column;gap:16px;padding:20px 6px}
+.sd-chips{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.sd-c{display:flex;align-items:center;gap:12px;padding:16px 18px;border-radius:16px;font-size:20px;border:1.5px solid color-mix(in srgb,var(--ok) 35%,transparent);background:color-mix(in srgb,var(--ok) 7%,transparent);transition:border-color .4s,box-shadow .4s,background .4s}
+.sd-c .ic{flex:none;font-size:28px;color:var(--ok)}
+.sd-c.wide{grid-column:1/-1}
+.sd-c.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 16%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 35%,transparent)}
+.sd-play{margin-top:auto;display:flex;gap:16px;align-items:center;padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 14%,transparent),rgba(12,18,40,.6))}
+.sd-play .ic{flex:none;font-size:40px;color:var(--acc);animation:c11hg 3s ease-in-out infinite}
+@keyframes c11hg{40%,60%{transform:rotate(180deg)}100%{transform:rotate(180deg)}}
+.sd-play p{font-size:21px;line-height:1.6}
+.sd-play b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c11-side'] = {
+  MOAT: [['db', '独占的数据'], ['route', '稳固的渠道'], ['shield', '用户的信任'], ['network', '网络效应'], ['arm', '必须由人与 Agent 协作的物理世界场景等', 'wide']],
+  ADV: ['只靠 harness 的优势 A', '只靠 harness 的优势 B', '只靠 harness 的优势 C', '只靠 harness 的优势 D', '只靠 harness 的优势 E'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.sd-seg'), (v) => { this.auto = false; this.show(s, +v); });
+    s.querySelector('.sd-chips').innerHTML = this.MOAT.map(([ic, t, c]) => `<div class="sd-c ${c || ''}"><svg class="ic"><use href="#i-${ic}"/></svg><span>${t}</span></div>`).join('');
+    s.querySelector('.sd-adv').innerHTML = this.ADV.map((t) => `<i><svg class="ic"><use href="#i-wrench"/></svg>${t}</i>`).join('');
+    this.advs = [...s.querySelectorAll('.sd-adv i')];
+    this.chips = [...s.querySelectorAll('.sd-c')];
+    this.water = s.querySelector('.sd-water');
+  },
+  show(s, v) { this.v = v; s.dataset.v = v; this.set(String(v)); this.t = 0; },
+  enter(s, ctx) {
+    this.auto = true;
+    this.show(s, 0);
+    let last = 0, sw = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      if (this.auto) { sw += dt; if (sw > 7000) { sw = 0; this.show(s, 1 - this.v); } }
+      if (this.v !== 1) return;
+      // 水位：模型能力上涨，逐层淹没只靠 harness 建立的优势；护城河卡片轮流点亮
+      this.t += dt;
+      const h = Math.min(328, (this.t / 6000) * 328);
+      this.water.style.height = h + 'px';
+      this.advs.forEach((a, i) => a.classList.toggle('sunk', h > 16 + i * 68 + 40));
+      const c = Math.floor(this.t / 1200) % this.chips.length;
+      this.chips.forEach((x, i) => x.classList.toggle('on', i === c));
+      if (this.t > 7500 && !this.auto) this.t = 0;
+    });
+  },
+  reset(s) { s.dataset.v = 0; this.water.style.height = 0; this.advs.forEach((a) => a.classList.remove('sunk')); this.chips.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<!-- ===== 04-closing.html ===== -->
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c11-sum" data-part="4" data-steps="1" data-trans="zoom" data-dur="14000" data-title="三个问题不会过时" data-notes="所以，不必焦虑手里的框架会不会过时。模型每几个月迭代一次，具体的 API、产品和榜单都会翻篇，但<b>“看到什么、能做什么、如何验证做得对不对”这三个问题不会过时</b>——它们描述的不是某个模型的用法，而是一个智能系统与世界交互的基本方式。掌握了它们，无论下一代模型带来什么新能力，你都知道该把它放进公式的哪个位置，也能一眼看出，它离吹散那两朵乌云还有多远。<br>左侧不断翻篇的卡片代表具体的 API、产品和榜单（示意）；右侧三根柱子是三个不会过时的问题。按 → 后，新能力会落进对应的问题里，下方的两朵乌云显示它们离被吹散还有多远——这些新能力的例子和对应关系都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不必焦虑框架会不会过时：<em>三个问题不会过时</em></h2></header>
+  <div class="sm-body">
+    <div class="sm-flow panel fx fx-left" style="--d:2">
+      <div class="sm-fh"><span class="lbl">每几个月翻篇</span><b>具体的 API、产品和榜单</b><span class="cap">示意</span></div>
+      <div class="sm-cards" data-clip-ok></div>
+    </div>
+    <div class="sm-qs fx fx-up" style="--d:3">
+      <div class="sm-q" style="--c:var(--ctx)"><div class="sm-qh"><svg class="ic"><use href="#i-eye"/></svg><b>看到什么</b></div><div class="sm-slot"></div></div>
+      <div class="sm-q" style="--c:var(--tool)"><div class="sm-qh"><svg class="ic"><use href="#i-wrench"/></svg><b>能做什么</b></div><div class="sm-slot"></div></div>
+      <div class="sm-q" style="--c:var(--ok)"><div class="sm-qh"><svg class="ic"><use href="#i-check"/></svg><b>如何验证做得对不对</b></div><div class="sm-slot"></div></div>
+      <p class="sm-qp">它们描述的不是某个模型的用法，而是<b>一个智能系统与世界交互的基本方式</b></p>
+    </div>
+  </div>
+  <div class="sm-bot" data-step="1">
+    <div class="sm-new fx fx-up"><span class="lbl">下一代模型带来新能力</span><b class="sm-nm">—</b><svg class="ic"><use href="#i-arrow"/></svg><span class="sm-to">放进公式的哪个位置</span></div>
+    <div class="sm-clouds fx fx-up" style="--d:2">
+      <div class="sm-cl"><svg class="ic"><use href="#i-cloud"/></svg><span>实时交互</span><div class="meter"><i></i></div></div>
+      <div class="sm-cl"><svg class="ic"><use href="#i-cloud"/></svg><span>持续积累经验</span><div class="meter"><i></i></div></div>
+      <small>离吹散两朵乌云还有多远</small>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 5 段</div>
+</section>
+<style>
+.sm-body{display:grid;grid-template-columns:560px 1fr;gap:30px;height:510px}
+.sm-flow{position:relative;padding:20px 24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.sm-fh{display:flex;align-items:baseline;gap:12px}
+.sm-fh b{font-size:21px}
+.sm-fh .cap{margin-left:auto}
+.sm-cards{position:relative;flex:1;overflow:hidden;-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 80%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 80%,transparent)}
+.sm-cd{position:absolute;left:0;right:0;height:64px;padding:0 18px;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:19px;border:1px solid var(--line2);background:rgba(12,18,40,.85);transition:top 1s var(--ease),opacity 1s,filter 1s}
+.sm-cd .ic{font-size:24px;color:var(--text3)}
+.sm-cd small{margin-left:auto;font-size:15px;color:var(--text3)}
+.sm-cd.old{opacity:.25;filter:grayscale(1)}
+.sm-cd.old span{text-decoration:line-through}
+.sm-qs{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr auto;gap:18px}
+.sm-q{position:relative;display:flex;flex-direction:column;border-radius:20px;border:1.5px solid color-mix(in srgb,var(--c) 50%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 16%,transparent),rgba(12,18,40,.6));box-shadow:0 0 30px color-mix(in srgb,var(--c) 15%,transparent);animation:glowPulse 4s ease-in-out infinite}
+.sm-qh{display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 14px 14px;text-align:center}
+.sm-qh .ic{font-size:48px;color:var(--c)}
+.sm-qh b{font-size:27px;line-height:1.3}
+.sm-slot{flex:1;margin:0 16px 16px;border-radius:14px;border:1.5px dashed color-mix(in srgb,var(--c) 40%,transparent);display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:10px;overflow:hidden}
+.sm-slot i{font-style:normal;font-size:17px;padding:8px 12px;border-radius:10px;text-align:center;color:var(--text);background:color-mix(in srgb,var(--c) 22%,transparent);border:1px solid color-mix(in srgb,var(--c) 60%,transparent);animation:c11land .7s var(--spring) both}
+@keyframes c11land{from{opacity:0;translate:0 -80px;scale:.8}}
+.sm-qp{grid-column:1/-1;text-align:center;font-size:21px;color:var(--text2)}
+.sm-qp b{color:var(--acc)}
+.sm-bot{display:grid;grid-template-columns:1fr 640px;gap:30px;margin-top:22px;align-items:center}
+.sm-new{display:flex;align-items:center;gap:16px;padding:16px 22px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.75)}
+.sm-new b{font-size:22px;color:var(--acc)}
+.sm-new .ic{font-size:24px;color:var(--text3)}
+.sm-to{font-size:20px;color:var(--text)}
+.sm-clouds{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;align-items:center}
+.sm-cl{display:grid;grid-template-columns:30px auto 1fr;gap:10px;align-items:center;font-size:18px;color:var(--text2)}
+.sm-cl .ic{font-size:26px;color:#cbd5e1}
+.sm-cl .meter i{transition:width 1s var(--ease)}
+.sm-clouds small{grid-column:1/-1;font-size:15px;color:var(--text3);text-align:right}
+</style>
+<script>
+HOOKS['c11-sum'] = {
+  OLD: [['code', 'API v1'], ['pkg', '框架 X'], ['trophy', '榜单 · 某季度'], ['code', 'API v2'], ['robot', '产品 Y'], ['pkg', '框架 Z'], ['trophy', '榜单 · 下一季度'], ['code', 'API v3']],
+  // 新能力 → 落进哪个问题（0 看到什么 / 1 能做什么 / 2 如何验证），以及对两朵乌云的推进（示意）
+  NEW: [['更长、更便宜的上下文', 0, [0, 1]], ['更快的 decode', 0, [2, 0]], ['原生的语音与 GUI 操作', 1, [2, 0]], ['自己写工具的能力', 1, [0, 1]], ['更可信的自动评估', 2, [0, 2]], ['从生产经验中更新', 2, [0, 2]]],
+  init(s) {
+    this.box = s.querySelector('.sm-cards');
+    this.slots = [...s.querySelectorAll('.sm-slot')];
+    this.nm = s.querySelector('.sm-nm');
+    this.to = s.querySelector('.sm-to');
+    this.mt = [...s.querySelectorAll('.sm-cl .meter')];
+  },
+  // 左侧卡片从下往上翻篇，最上面的过时、淡出
+  roll() {
+    const it = this.OLD[this.n++ % this.OLD.length], el = document.createElement('div');
+    el.className = 'sm-cd';
+    el.innerHTML = `<svg class="ic"><use href="#i-${it[0]}"/></svg><span>${it[1]}</span><small>翻篇中</small>`;
+    el.style.top = '400px';
+    this.box.appendChild(el);
+    this.cards.push(el);
+    void el.offsetWidth;
+    this.cards.forEach((c, i, a) => {
+      const pos = a.length - 1 - i;
+      c.style.top = 340 - pos * 76 + 'px';
+      c.classList.toggle('old', pos >= 3);
+      c.querySelector('small').textContent = pos >= 3 ? '已过时' : pos === 0 ? '刚发布' : '当前';
+    });
+    if (this.cards.length > 6) this.cards.shift().remove();
+  },
+  land() {
+    const [t, q, d] = this.NEW[this.m++ % this.NEW.length];
+    const sl = this.slots[q];
+    if (sl.children.length >= 3) sl.firstElementChild.remove();
+    sl.insertAdjacentHTML('beforeend', `<i>${t}</i>`);
+    this.nm.textContent = t;
+    this.to.textContent = ['看到什么', '能做什么', '如何验证做得对不对'][q];
+    this.lv = this.lv.map((v, i) => Math.min(92, v + d[i] * 6));
+    this.mt.forEach((m, i) => m.style.setProperty('--v', this.lv[i] + '%'));
+    if (this.m % this.NEW.length === 0) this.lv = [18, 12];
+  },
+  clear() {
+    this.box.innerHTML = '';
+    this.slots.forEach((x) => (x.innerHTML = ''));
+    this.cards = []; this.n = 0; this.m = 0; this.lv = [18, 12];
+    this.mt.forEach((m, i) => m.style.setProperty('--v', this.lv[i] + '%'));
+    this.nm.textContent = '—';
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    this.clear();
+    for (let i = 0; i < 4; i++) this.roll();
+    ctx.every(() => this.roll(), 1700);
+    if (k >= 1) this.land();
+    ctx.every(() => { if (this.k >= 1) this.land(); }, 2300);
+  },
+  step(s, ctx, k) { this.k = k; if (k >= 1) this.land(); },
+  reset() { this.clear(); },
+};
+</script>
+
+<section class="slide" id="c11-end" data-part="4" data-trans="iris" data-title="去造点什么吧" data-notes="Agent 技术仍在飞速演进，一本书追不上所有变化。但如果这本书让你带走的不是某个 API 的具体用法，而是<b>一套能在技术浪潮里保持清醒的判断力</b>，那它就完成了使命。<br>本书全部正文、配图与配套实验代码都是开源的，欢迎你去仓库里把实验亲手跑一遍、提 issue 和 PR。<br>而 Agent 最迷人的地方，正在于它能通过写代码创造新的能力，甚至改进自己；读到这里，你已经握住了“创造”的原则。<b>接下来，去造点什么吧。</b><br>全书到这里结束。可以返回总目录，或回到上一章。">
+  <div class="fe-orbit fx fx-scale" style="--d:3"></div>
+  <div class="fe-text">
+    <div class="fe-tag fx fx-up"><i></i>后记 · 全书完</div>
+    <h1 class="fe-title"><span class="split" data-off="1" data-grad="#7dd3fc,#c4b5fd,#5eead4">去造点什么吧</span></h1>
+    <div class="fe-lines">
+      <p class="fx fx-up" style="--d:8">一本书追不上所有变化；希望你带走的不是某个 API 的具体用法，而是<b>一套能在技术浪潮里保持清醒的判断力</b></p>
+      <p class="fx fx-up" style="--d:10"><svg class="ic"><use href="#i-branch"/></svg>全部正文、配图与配套实验代码都是开源的：去仓库里<b>把实验亲手跑一遍、提 issue 和 PR</b><span class="fe-repo">github.com/bojieli/ai-agent-book</span></p>
+      <p class="fx fx-up" style="--d:12"><svg class="ic"><use href="#i-wand"/></svg>Agent 能通过写代码创造新的能力，甚至改进自己；读到这里，你已经<b>握住了“创造”的原则</b></p>
+    </div>
+    <div class="end-nav fx fx-up" style="--d:14">
+      <a class="btn pri" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+<style>
+#c11-end{justify-content:center;padding-left:150px}
+.fe-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.fe-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.fe-title{margin-top:26px;font-size:120px;line-height:1.12;font-weight:800}
+.fe-lines{margin-top:30px;display:flex;flex-direction:column;gap:16px;max-width:920px}
+.fe-lines p{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:23px;line-height:1.6;color:var(--text2)}
+.fe-lines b{color:var(--text)}
+.fe-lines .ic{font-size:26px;color:var(--acc)}
+.fe-repo{font:600 18px var(--mono);color:var(--acc2);padding:2px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent)}
+.fe-text .end-nav{margin-top:36px}
+.fe-orbit{position:absolute;right:110px;top:50%;width:640px;height:640px;margin-top:-330px}
+</style>
+<script>
+HOOKS['c11-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.fe-orbit'), {
+      size: 640, core: 'Agent', outer: 'LLM + 上下文 + 工具 · 看到什么 · 能做什么 · 如何验证',
+      sats: [
+        { label: 'LLM', color: '#a78bfa', rx: 0.36, ry: 0.15, tilt: -24, dur: 12, phase: 0 },
+        { label: '上下文', color: '#22d3ee', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.35 },
+        { label: '工具', color: '#fbbf24', rx: 0.3, ry: 0.2, tilt: 88, dur: 10, phase: 0.7 },
+      ],
+    });
+  },
+  enter(s, ctx) {
+    ctx.later(() => U.confetti(innerWidth * 0.7, innerHeight * 0.45), 1400);
+  },
+};
+</script>
+
+</div></div>
+<div id="sweep"></div>
+<div id="progress"></div>
+<div id="hud">
+  <div class="hud-l"><a href="index.html" data-leave title="返回总目录"><svg class="ic"><use href="#i-home"/></svg>总目录</a><span id="hud-p"></span></div>
+  <div id="rail"></div>
+  <div class="hud-r">
+    <span id="count"></span>
+    <button data-act="prev" title="上一步（←）"><svg class="ic"><use href="#i-left"/></svg></button>
+    <button data-act="next" title="下一步（→ / 空格）"><svg class="ic"><use href="#i-right"/></svg></button>
+    <button id="autobtn" data-act="auto" title="自动播放（P）"><svg class="ic i-play"><use href="#i-play"/></svg><svg class="ic i-pause"><use href="#i-pause"/></svg><svg class="ring" viewBox="0 0 34 34"><circle cx="17" cy="17" r="15"/></svg></button>
+    <button data-act="overview" title="目录（O）"><svg class="ic"><use href="#i-grid"/></svg></button>
+    <button data-act="notes" title="讲解（N）"><svg class="ic"><use href="#i-note"/></svg></button>
+    <button data-act="help" title="快捷键（H）"><svg class="ic"><use href="#i-help"/></svg></button>
+    <button data-act="full" title="全屏（F）"><svg class="ic"><use href="#i-expand"/></svg></button>
+  </div>
+</div>
+<div class="overlay" id="overview"><div class="ov-box"><h3>后记 回到 Agent = LLM + 上下文 + 工具 · 深入理解 AI Agent 动画版 · 目录 <small>点击跳转 · Esc 关闭</small></h3><div id="ov-grid"></div></div></div>
+<div class="overlay" id="help"><div class="ov-box" style="width:min(780px,92vw)"><h3>快捷键 <small>Esc 关闭</small></h3>
+  <div class="help-grid">
+    <div><kbd>→</kbd><kbd>空格</kbd> 下一步</div><div><kbd>←</kbd> 上一步</div>
+    <div><kbd>P</kbd> 自动播放 / 暂停</div><div><kbd>N</kbd> 显示讲解（原书要点）</div>
+    <div><kbd>O</kbd> 本章目录</div><div><kbd>F</kbd> 全屏</div>
+    <div><kbd>0</kbd>~<kbd>9</kbd> 跳到对应部分</div><div><kbd>Home</kbd><kbd>End</kbd> 首页 / 末页</div>
+    <div>滚轮 / 左右滑动 翻页</div><div>页面里的卡片、按钮、开关都可以点</div>
+  </div></div></div>
+<div id="notes"><div class="nh">讲解 · <span id="notes-t"></span></div><div id="notes-b"></div></div>
+<div id="toast"></div>
+<canvas id="fx"></canvas>
+<div id="leaveMask"></div>
+<script>
+/* 演示引擎 · 运行时（页面末尾加载）
+ * 翻页与分步、页面生命周期、过渡特效、HUD、目录、讲稿、自动播放、快捷键。
+ * 每章的配置来自 window.DECK_CFG（见各章 chapter.json）。
+ * 页面属性：data-part 所属部分，data-steps 步数，data-trans 过渡方式，data-title 标题，data-notes 讲解，data-dur 自动播放时每步停留毫秒数。
+ */
+(() => {
+  'use strict';
+  const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const CFG = window.DECK_CFG || {};
+  const PARTS = CFG.parts && CFG.parts.length ? CFG.parts : [{ n: '', k: '', acc: '#22d3ee', acc2: '#a78bfa' }];
+  const deck = $('#deck'), slides = $$('.slide', deck), H = window.HOOKS;
+  const reduced = U.reduced;
+  const AUTO_MS = CFG.autoMs || 9000;
+  const BG = U.background($('#bg'));
+  const sweep = $('#sweep');
+
+  /* ---------- 过渡特效：每种都有入场和离场两段，dir 为翻页方向 ---------- */
+  const P3 = 'perspective(2400px)';
+  const TR = {
+    slide: (d) => ({
+      in: [{ opacity: 0, transform: `translateX(${d * 140}px) scale(1.02)`, filter: 'blur(12px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }],
+      out: [{ opacity: 1, transform: 'none', filter: 'blur(0px)' }, { opacity: 0, transform: `translateX(${-d * 110}px) scale(.97)`, filter: 'blur(12px)' }],
+      dIn: 820, dOut: 540,
+    }),
+    zoom: (d) => ({
+      in: [{ opacity: 0, transform: `scale(${d > 0 ? 0.8 : 1.18})`, filter: 'blur(16px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }],
+      out: [{ opacity: 1, transform: 'none', filter: 'blur(0px)' }, { opacity: 0, transform: `scale(${d > 0 ? 1.18 : 0.8})`, filter: 'blur(16px)' }],
+      dIn: 900, dOut: 560,
+    }),
+    flip: (d) => ({
+      in: [{ opacity: 0, transform: `${P3} rotateY(${-d * 58}deg) translateZ(-260px)`, filter: 'blur(6px)' }, { opacity: 1, transform: `${P3} rotateY(0deg) translateZ(0px)`, filter: 'blur(0px)' }],
+      out: [{ opacity: 1, transform: `${P3} rotateY(0deg) translateZ(0px)`, filter: 'blur(0px)' }, { opacity: 0, transform: `${P3} rotateY(${d * 58}deg) translateZ(-260px)`, filter: 'blur(6px)' }],
+      dIn: 1000, dOut: 620,
+    }),
+    rise: (d) => ({
+      in: [{ opacity: 0, transform: `translateY(${d * 130}px) scale(.98)`, filter: 'blur(10px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }],
+      out: [{ opacity: 1, transform: 'none', filter: 'blur(0px)' }, { opacity: 0, transform: `translateY(${-d * 90}px) scale(.98)`, filter: 'blur(10px)' }],
+      dIn: 860, dOut: 520,
+    }),
+    iris: () => ({
+      in: [{ clipPath: 'circle(0% at 50% 50%)', filter: 'brightness(1.8)' }, { clipPath: 'circle(76% at 50% 50%)', filter: 'brightness(1)' }],
+      out: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'scale(.94)' }],
+      dIn: 1050, dOut: 760, ease: 'cubic-bezier(.65,0,.35,1)',
+    }),
+    warp: () => ({
+      in: [{ opacity: 0, transform: 'scale(.84)', filter: 'blur(18px)' }, { opacity: 1, transform: 'none', filter: 'blur(0px)' }],
+      out: [{ opacity: 1, transform: 'none', filter: 'blur(0px)' }, { opacity: 0, transform: 'scale(1.14)', filter: 'blur(12px)' }],
+      dIn: 1100, dOut: 540, delay: 160,
+    }),
+  };
+  const transOf = (s) => (TR[s.dataset.trans] ? s.dataset.trans : s.classList.contains('chapter') ? 'warp' : 'slide');
+
+  /* ---------- 初始化 ---------- */
+  const numOpts = (el) => ({ dec: +el.dataset.dec || 0, sep: el.dataset.sep !== undefined, prefix: el.dataset.prefix || '', suffix: el.dataset.suffix || '' });
+  const ringNodes = PARTS.slice(1).map((p) => ({ label: p.short || p.n, color: p.acc }));
+
+  slides.forEach((s, i) => {
+    s.dataset.i = i;
+    s._p = Math.min(PARTS.length - 1, +s.dataset.part || 0);
+    const st = $$('[data-step]', s).map((e) => +e.dataset.step);
+    s._steps = Math.max(st.length ? Math.max(...st) : 0, +s.dataset.steps || 0);
+    const k = $('.kicker:empty', s);
+    if (k) { const p = PARTS[s._p]; k.textContent = (p.k ? p.k + ' · ' : '') + p.n; }
+    $$('[data-count]', s).forEach((e) => (e.textContent = U.fmt(0, numOpts(e))));
+    $$('[data-type]', s).forEach((e) => { e.dataset.orig = e.textContent; e.textContent = ''; });
+    $$('[data-scramble]', s).forEach((e) => (e.dataset.orig = e.textContent));
+    $$('.split', s).forEach(U.splitChars);
+    $$('.ch-loop', s).forEach((h) => U.ring(h, {
+      size: 660, nodes: ringNodes, active: +h.dataset.node, cometDur: 10,
+      center: (c) => `<text class="big" x="${c}" y="${c}" style="font-size:150px">${h.dataset.num || ''}</text>`,
+    }));
+  });
+  slides.forEach((s) => { try { H[s.id]?.init?.(s); } catch (e) { console.error(s.id, e); } });
+  // 未显示的页面先暂停 SVG 动画，进入时再恢复，避免几十页同时在后台跑动画
+  slides.forEach((s) => $$('svg', s).forEach((v) => v.pauseAnimations && v.pauseAnimations()));
+
+  /* ---------- 生命周期 ---------- */
+  function makeCtx(slide) {
+    const T = new Set(), I = new Set(), F = new Set(), C = [];
+    let alive = true;
+    return {
+      slide,
+      get alive() { return alive; },
+      later(fn, ms) { const id = setTimeout(() => { T.delete(id); if (alive) fn(); }, ms); T.add(id); return id; },
+      every(fn, ms) { const id = setInterval(() => { if (alive) fn(); }, ms); I.add(id); return id; },
+      raf(fn) {
+        const h = {};
+        const loop = (t) => { if (!alive) return; if (fn(t) === false) return; h.id = requestAnimationFrame(loop); };
+        h.id = requestAnimationFrame(loop);
+        F.add(h);
+        return h;
+      },
+      stop(id) { clearTimeout(id); clearInterval(id); },
+      onCleanup(fn) { C.push(fn); },
+      dispose() {
+        alive = false;
+        T.forEach(clearTimeout); I.forEach(clearInterval); F.forEach((h) => cancelAnimationFrame(h.id));
+        C.forEach((fn) => { try { fn(); } catch (e) { /* 清理失败不影响翻页 */ } });
+      },
+    };
+  }
+
+  let cur = -1, step = 0, ctx = null, lastP = -1;
+  const applySteps = (s, k) => $$('[data-step]', s).forEach((e) => e.classList.toggle('on', +e.dataset.step <= k));
+  function shown(el, s) {
+    for (let n = el; n && n !== s; n = n.parentElement) {
+      if (n.dataset && n.dataset.step !== undefined && !n.classList.contains('on')) return false;
+    }
+    return true;
+  }
+  function runAuto(s, c) {
+    $$('[data-count]', s).forEach((el) => {
+      if (el._done || !shown(el, s)) return;
+      el._done = 1;
+      U.count(el, +el.dataset.count, { ...numOpts(el), dur: +el.dataset.dur || 1600, delay: +(el.dataset.delay || 350), ctx: c });
+    });
+    $$('[data-type]', s).forEach((el) => {
+      if (el._done || !shown(el, s)) return;
+      el._done = 1;
+      U.type(el, { ctx: c, speed: +el.dataset.speed || 38, delay: +(el.dataset.delay || 400) });
+    });
+    $$('[data-scramble]', s).forEach((el) => {
+      if (el._done || !shown(el, s)) return;
+      el._done = 1;
+      U.scramble(el, { ctx: c, dur: +el.dataset.dur || 1200, delay: +(el.dataset.delay || 250) });
+    });
+  }
+  function resetAuto(s) {
+    $$('[data-count]', s).forEach((el) => { el._done = 0; el.textContent = U.fmt(0, numOpts(el)); });
+    $$('[data-type]', s).forEach((el) => { el._done = 0; el.textContent = ''; el.classList.remove('typing'); });
+    $$('[data-scramble]', s).forEach((el) => { el._done = 0; el.textContent = el.dataset.orig; });
+  }
+  function doSweep() {
+    if (reduced || !sweep) return;
+    sweep.animate([
+      { transform: 'translateX(-40vw) skewX(-16deg)', opacity: 0 },
+      { opacity: 1, offset: 0.35 },
+      { transform: 'translateX(120vw) skewX(-16deg)', opacity: 0 },
+    ], { duration: 1250, easing: 'cubic-bezier(.7,0,.3,1)' });
+  }
+  function setPart(p, force) {
+    const c = PARTS[p];
+    document.body.style.setProperty('--acc', c.acc);
+    document.body.style.setProperty('--acc2', c.acc2);
+    BG.color(c.acc, c.acc2);
+    if (lastP >= 0 && (p !== lastP || force)) { BG.warp(p !== lastP ? 1 : 0.7); if (p !== lastP) doSweep(); }
+    lastP = p;
+  }
+  function enter(s, k, dir, first) {
+    s.getAnimations().forEach((a) => a.cancel());
+    s.classList.remove('leaving', 'no-trans');
+    applySteps(s, k);
+    s.classList.add('active');
+    const kind = transOf(s);
+    if (!first && !reduced) {
+      const t = TR[kind](dir);
+      s.animate(t.in, { duration: t.dIn, easing: t.ease || 'cubic-bezier(.2,.8,.2,1)', delay: t.delay ?? 80, fill: 'backwards' });
+    }
+    setPart(s._p, kind === 'warp');
+    $$('svg', s).forEach((v) => v.unpauseAnimations && v.unpauseAnimations());
+    ctx = makeCtx(s);
+    try { H[s.id]?.enter?.(s, ctx, k, dir); } catch (e) { console.error(s.id, e); }
+    runAuto(s, ctx);
+  }
+  function leave(s, dir, kind) {
+    try { H[s.id]?.leave?.(s); } catch (e) { console.error(s.id, e); }
+    ctx && ctx.dispose();
+    ctx = null;
+    s.getAnimations().forEach((a) => a.cancel());
+    s.classList.add('leaving');
+    const t = TR[kind](dir);
+    const a = s.animate(t.out, { duration: reduced ? 1 : t.dOut, easing: 'cubic-bezier(.7,0,.3,1)', fill: 'forwards' });
+    a.onfinish = () => {
+      s.classList.add('no-trans');
+      s.classList.remove('active', 'leaving');
+      applySteps(s, -1);
+      resetAuto(s);
+      try { H[s.id]?.reset?.(s); } catch (e) { console.error(s.id, e); }
+      void s.offsetWidth;
+      s.classList.remove('no-trans');
+      a.cancel();
+      $$('svg', s).forEach((v) => v.pauseAnimations && v.pauseAnimations());
+    };
+  }
+  function go(n, k = 0, dir) {
+    n = Math.max(0, Math.min(slides.length - 1, n));
+    const s = slides[n];
+    k = Math.max(0, Math.min(s._steps, k));
+    if (n === cur) { if (k !== step) setStep(k, k > step ? 1 : -1); return; }
+    dir = dir ?? (n > cur ? 1 : -1);
+    const from = cur >= 0 ? slides[cur] : null;
+    if (from) leave(from, dir, transOf(s));
+    cur = n;
+    step = k;
+    enter(s, k, dir, !from);
+    hud();
+  }
+  function setStep(k, dir) {
+    const s = slides[cur];
+    step = k;
+    applySteps(s, k);
+    runAuto(s, ctx);
+    try { H[s.id]?.step?.(s, ctx, k, dir); } catch (e) { console.error(s.id, e); }
+    hud();
+  }
+  function next() {
+    const s = slides[cur];
+    if (step < s._steps) setStep(step + 1, 1);
+    else if (cur < slides.length - 1) go(cur + 1, 0, 1);
+    else { U.toast(CFG.next && CFG.next.ready ? '本章结束 · 可在最后一页进入下一章' : '本章结束'); setAuto(false); }
+  }
+  function prev() {
+    if (step > 0) setStep(step - 1, -1);
+    else if (cur > 0) go(cur - 1, slides[cur - 1]._steps, -1);
+  }
+  window.DECK = { go, next, prev, get cur() { return cur; }, get step() { return step; } };
+
+  /* ---------- 自动播放：每步停留 data-dur 毫秒（默认 AUTO_MS），翻到最后自动停止 ---------- */
+  const autoBtn = $('#autobtn');
+  let auto = false, autoT = 0;
+  function schedule() {
+    clearTimeout(autoT);
+    if (!auto || cur < 0) return;
+    const ms = +(slides[cur].dataset.dur || 0) || AUTO_MS;
+    if (autoBtn) { autoBtn.style.setProperty('--ms', ms + 'ms'); U.restart(autoBtn, 'tick'); }
+    autoT = setTimeout(() => {
+      if (isOpen()) { schedule(); return; }
+      next();
+    }, ms);
+  }
+  function setAuto(v) {
+    if (v === auto) return;
+    auto = v;
+    document.body.classList.toggle('autoplay', v);
+    if (!v && autoBtn) autoBtn.classList.remove('tick');
+    if (v) schedule(); else clearTimeout(autoT);
+    U.toast(v ? '自动播放：开（再按 P 关闭）' : '自动播放：关');
+  }
+  // 在页面里点按交互时，重新计时，给观看者留出时间
+  deck.addEventListener('pointerdown', () => { if (auto) schedule(); });
+
+  /* ---------- HUD / 目录 / 讲解 ---------- */
+  const rail = $('#rail');
+  PARTS.forEach((c, i) => {
+    const f = slides.findIndex((s) => s._p === i);
+    if (f < 0) return;
+    const b = document.createElement('button');
+    b.dataset.p = i;
+    b.innerHTML = `<span>${c.k ? c.k + ' ' : ''}${c.n}</span>`;
+    b.onclick = () => go(f, 0);
+    rail.appendChild(b);
+  });
+  function hud() {
+    const s = slides[cur], c = PARTS[s._p];
+    $('#hud-p').innerHTML = `<b>${c.k || ''}</b><span>${c.n}</span>`;
+    $('#count').textContent = `${cur + 1} / ${slides.length}`;
+    $('#progress').style.width = Math.min(100, ((cur + (s._steps ? step / (s._steps + 1) : 0)) / Math.max(1, slides.length - 1)) * 100) + '%';
+    $$('#rail button').forEach((b) => { const i = +b.dataset.p; b.classList.toggle('cur', i === s._p); b.classList.toggle('done', i < s._p); });
+    $('#notes-t').textContent = s.dataset.title || '';
+    $('#notes-b').innerHTML = s.dataset.notes || '（本页无讲解）';
+    history.replaceState(null, '', '#/' + (cur + 1) + (step ? '/' + step : ''));
+    // 记下观看位置，总目录据此显示“继续观看”；本地文件打开时浏览器可能禁用存储，失败就忽略
+    try {
+      localStorage.setItem('aab-last', JSON.stringify({ id: CFG.id, no: CFG.no, title: CFG.title, page: cur + 1, step, total: slides.length, slide: s.dataset.title || '' }));
+    } catch (e) { /* 无法记录时不影响播放 */ }
+    schedule();
+  }
+  const ovGrid = $('#ov-grid');
+  ovGrid.innerHTML = PARTS.map((c, pi) => {
+    const it = slides.filter((s) => s._p === pi);
+    if (!it.length) return '';
+    return `<div class="ov-ch" style="--c:${c.acc}"><div class="ov-h"><b>${c.k || ''}</b>${c.n}</div>${it.map((s) => `<button data-go="${s.dataset.i}"><span>${+s.dataset.i + 1}</span>${s.dataset.title || ''}</button>`).join('')}</div>`;
+  }).join('');
+  ovGrid.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { closeAll(); go(+b.dataset.go, 0); } });
+  const ovs = ['#overview', '#help'].map((q) => $(q));
+  const isOpen = () => ovs.some((o) => o.classList.contains('show'));
+  function closeAll() { ovs.forEach((o) => o.classList.remove('show')); }
+  function toggle(el) {
+    const was = el.classList.contains('show');
+    closeAll();
+    if (!was) {
+      el.classList.add('show');
+      if (el.id === 'overview') $$('#ov-grid button').forEach((b) => b.classList.toggle('cur', +b.dataset.go === cur));
+    }
+  }
+  ovs.forEach((o) => o.addEventListener('click', (e) => { if (e.target === o) closeAll(); }));
+  const notes = $('#notes');
+  function full() { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.(); }
+  $('#hud').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    ({
+      prev, next, full,
+      auto: () => setAuto(!auto),
+      overview: () => toggle($('#overview')),
+      help: () => toggle($('#help')),
+      notes: () => notes.classList.toggle('show'),
+    })[b.dataset.act]();
+  });
+
+  /* ---------- 离开本页（回总目录 / 去下一章）：从点击处展开的圆形转场 ---------- */
+  // 章末导航：<a data-nav="next|prev|hub"><span data-nav-label></span></a>，链接和文字从本章配置里取
+  $$('[data-nav]').forEach((a) => {
+    const t = a.dataset.nav, c = t === 'hub' ? { href: 'index.html', ready: true } : CFG[t];
+    if (!c) { a.remove(); return; }
+    a.setAttribute('href', c.href);
+    const label = a.querySelector('[data-nav-label]');
+    if (label && t !== 'hub') label.textContent = `${t === 'next' ? '下一章' : '上一章'}：${c.no} · ${c.title}`;
+    if (c.ready) a.setAttribute('data-leave', '');
+    else {
+      a.classList.add('soon');
+      a.addEventListener('click', (e) => { e.preventDefault(); U.toast(`${c.no} · ${c.title}：制作中`); });
+    }
+  });
+  const mask = $('#leaveMask');
+  function leaveTo(href, e) {
+    if (!href) return;
+    if (reduced || !mask) { location.href = href; return; }
+    mask.style.setProperty('--mx', (e ? e.clientX : innerWidth / 2) + 'px');
+    mask.style.setProperty('--my', (e ? e.clientY : innerHeight / 2) + 'px');
+    mask.classList.add('go');
+    BG.warp(1.2);
+    setTimeout(() => { location.href = href; }, 720);
+  }
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-leave]');
+    if (!a) return;
+    e.preventDefault();
+    leaveTo(a.getAttribute('href'), e);
+  });
+  // 从其他页面返回时（浏览器后退缓存），收起转场遮罩
+  addEventListener('pageshow', () => mask && mask.classList.remove('go'));
+
+  /* ---------- 输入 ---------- */
+  addEventListener('keydown', (e) => {
+    if (e.target.closest && e.target.closest('input,textarea,select,[contenteditable]')) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const k = e.key;
+    if (k === 'Escape') { isOpen() ? closeAll() : toggle($('#overview')); return; }
+    if (/^[oO]$/.test(k)) return toggle($('#overview'));
+    if (/^[hH?]$/.test(k)) return toggle($('#help'));
+    if (/^[nN]$/.test(k)) return notes.classList.toggle('show');
+    if (/^[fF]$/.test(k)) return full();
+    if (/^[pP]$/.test(k)) return setAuto(!auto);
+    if (isOpen()) return;
+    if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(k)) { e.preventDefault(); next(); }
+    else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(k)) { e.preventDefault(); prev(); }
+    else if (k === 'Home') go(0);
+    else if (k === 'End') go(slides.length - 1);
+    else if (/^[0-9]$/.test(k)) { const f = slides.findIndex((s) => s._p === +k); if (f >= 0) go(f, 0); }
+  });
+  let wt = 0;
+  addEventListener('wheel', (e) => {
+    if (isOpen() || e.target.closest('.scroll,#notes')) return;
+    const t = Date.now();
+    if (t - wt < 850 || Math.abs(e.deltaY) < 20) return;
+    wt = t;
+    e.deltaY > 0 ? next() : prev();
+  }, { passive: true });
+  let tx = 0, ty = 0;
+  addEventListener('touchstart', (e) => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) dx < 0 ? next() : prev();
+  }, { passive: true });
+  let it;
+  function wake() {
+    document.body.classList.remove('idle');
+    clearTimeout(it);
+    it = setTimeout(() => { if (!isOpen() && !notes.classList.contains('show')) document.body.classList.add('idle'); }, 2800);
+  }
+  addEventListener('mousemove', wake);
+  wake();
+  function fit() {
+    U.scale = Math.min(innerWidth / 1920, innerHeight / 1080);
+    deck.style.transform = `translate(-50%,-50%) scale(${U.scale})`;
+  }
+  addEventListener('resize', fit);
+  fit();
+
+  /* ---------- 启动：支持 #/页码/步骤 直达 ---------- */
+  const m = location.hash.match(/#\/(\d+)(?:\/(\d+))?/);
+  go(m ? +m[1] - 1 : 0, m && m[2] ? +m[2] : 0, 1);
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!-- ================= PART 01 上下文：决定 Agent 能力上限的关键 ================= -->
+<section class="slide chapter" id="c02-d1" data-part="1" data-title="PART 01 · 上下文：能力上限的关键" data-notes="大语言模型在标准测试中成绩亮眼，但到了实际业务场景中却常常让人失望。这是因为模型要执行具体任务，需要<b>通用模型根本不知道的背景信息</b>（如产品架构、业务规则、内部约定）。<br>这一部分回答一个问题：为什么说上下文决定了 Agent 能力的上限？">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:90px">上下文：<br>决定能力上限</h1>
+  <div class="ch-s fx fx-up" style="--d:3">测试里成绩亮眼，业务里却常常失望——缺的是背景信息</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">一个中等能力的模型配上精心组织的上下文，往往能胜过一个顶级模型在信息匮乏下的盲目摸索。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c02-genius" data-part="1" data-dur="14000" data-title="天才新员工与三类信息" data-notes="想象一位天才工程师加入你的团队，他具备深厚的理论功底和卓越的编程能力，但对你们的产品架构、业务逻辑、技术债务、团队规范一无所知。更糟的是，关键的架构决策散落在不同团队成员的记忆中，代码库也缺乏文档。这位天才即便智力超群，也难以发挥真正的价值——这恰恰是当前 AI Agent 面临的困境。<br>以一个 Coding Agent 为例，同样是“帮我修复这个 bug”的指令，Agent 拿到的上下文质量直接决定了它能否完成任务：<br><b>实时代码上下文</b>：目录结构、模块职责、核心数据结构的定义、团队的代码规范。没有这些，Agent 写出的代码可能语法正确但风格与项目格格不入，甚至引入架构层面的冲突。<br><b>流程规范</b>：Git 分支策略、代码提交规范、代码审查流程、CI/CD 管线的要求。缺少这些，Agent 可能直接往主分支提交未经测试的代码。<br><b>环境信息</b>：开发环境的配置、测试数据库的连接地址、测试环境的部署方式、API 密钥的管理方式。没有这些，Agent 在本地能跑通的修复，到了测试环境可能立刻崩溃。<br>这三类信息构成了 Agent 有效工作的<b>最低信息需求</b>。注意：这里进入上下文的是对环境的观察、描述或配置，而不是环境本身；Environment 仍是与 Agent 交互的外部对象。模型本身的智力只是基础，<b>上下文的质量才是 Agent 能力的真正关键</b>。上下文工程因此成为利用现有模型开发高效 Agent 的关键所在——它不是往 prompt（提示词）里多塞些信息那么简单，而是要系统性地设计、组织和提供 AI 完成任务所需的全部背景知识。<br>右侧三个开关会自动依次关闭，也可以手动拨动，看缺了哪一类信息会出什么问题。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">天才新员工，为什么<em>使不上劲</em>？</h2>
+  <p class="lead fx fx-up" style="--d:2">同样是“帮我修复这个 bug”，Agent 拿到的上下文质量直接决定它能否完成任务</p></header>
+  <div class="gn-body">
+    <div class="gn-hero panel fx fx-left" style="--d:3">
+      <div class="gn-av"><svg class="ic"><use href="#i-grad"/></svg></div>
+      <b class="gn-n">天才工程师</b>
+      <div class="gn-has"><span class="chip ok"><svg class="ic"><use href="#i-check"/></svg>深厚的理论功底</span><span class="chip ok"><svg class="ic"><use href="#i-check"/></svg>卓越的编程能力</span></div>
+      <div class="gn-lbl lbl">但对这些一无所知</div>
+      <div class="gn-no"><span>产品架构</span><span>业务逻辑</span><span>技术债务</span><span>团队规范</span></div>
+      <p class="gn-p">关键的架构决策散落在不同成员的<b>记忆</b>里，代码库也缺乏文档</p>
+      <p class="gn-eq">这恰恰是当前 AI Agent 面临的困境</p>
+    </div>
+    <div class="gn-task panel fx fx-right" style="--d:4">
+      <div class="gn-th"><svg class="ic"><use href="#i-bug"/></svg><b>Coding Agent 收到：</b><span class="gn-q">“帮我修复这个 bug”</span></div>
+      <div class="gn-rows"></div>
+      <div class="gn-res"><span class="gn-rl lbl">结果</span><div class="gn-rt"></div></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6">模型的智力只是基础，<b>上下文的质量才是 Agent 能力的真正关键</b>——进入上下文的是对环境的观察、描述或配置，而不是环境本身</p>
+  <div class="src">第二章 ·「上下文：决定 Agent 能力上限的关键」</div>
+</section>
+<style>
+.gn-body{display:flex;gap:30px;flex:1;min-height:0;margin-bottom:22px}
+.gn-hero{width:520px;flex:none;padding:26px 30px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+.gn-av{width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font-size:56px;color:var(--acc);background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid color-mix(in srgb,var(--acc) 60%,transparent);box-shadow:0 0 40px color-mix(in srgb,var(--acc) 35%,transparent);animation:floaty 4s ease-in-out infinite}
+.gn-n{font-size:30px}
+.gn-has{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.gn-has .chip{font-size:17px}
+.gn-lbl{margin-top:6px}
+.gn-no{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:100%}
+.gn-no span{padding:10px;border-radius:12px;font-size:19px;color:var(--text3);border:1px dashed color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 6%,transparent);position:relative}
+.gn-no span::after{content:"?";position:absolute;right:10px;top:50%;translate:0 -50%;font:800 18px var(--num);color:var(--bad);opacity:.7}
+.gn-p{font-size:18px;line-height:1.6;color:var(--text2)}
+.gn-p b{color:var(--warn)}
+.gn-eq{margin-top:auto;font-size:20px;color:var(--acc);font-weight:600}
+.gn-task{flex:1;min-width:0;padding:22px 26px;display:flex;flex-direction:column;gap:12px}
+.gn-th{display:flex;align-items:center;gap:12px;font-size:22px}
+.gn-th .ic{font-size:28px;color:var(--bad)}
+.gn-q{font-size:22px;color:var(--tool)}
+.gn-rows{display:flex;flex-direction:column;gap:10px}
+.gn-r{--c:var(--acc);display:grid;grid-template-columns:auto 1fr;gap:6px 16px;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(10,16,36,.9));transition:border-color .45s,background .45s,opacity .45s}
+.gn-r .tgl{--tc:var(--c);grid-row:span 2;align-self:center;font-size:20px;font-weight:600;color:var(--text);min-width:236px}
+.gn-r .tgl .ic{font-size:22px;color:var(--c)}
+.gn-hs{font-size:17px;color:var(--text2);line-height:1.5;align-self:end}
+.gn-ms{font-size:17px;line-height:1.5;color:var(--bad);opacity:0;max-height:0;transition:opacity .4s,max-height .4s}
+.gn-r.off{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 7%,rgba(10,16,36,.9))}
+.gn-r.off .gn-hs{text-decoration:line-through;color:var(--text3)}
+.gn-r.off .gn-ms{opacity:1;max-height:60px}
+.gn-res{margin-top:auto;display:flex;align-items:center;gap:16px;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.gn-rt{font-size:19px;line-height:1.5}
+.gn-rt.ok{color:var(--ok)}.gn-rt.bad{color:var(--bad)}
+.gn-res.sw .gn-rt{animation:swIn .45s var(--ease) both}
+</style>
+<script>
+HOOKS['c02-genius'] = {
+  I: [
+    { n: '实时代码上下文', ic: 'code', c: '#22d3ee', has: '目录结构 · 模块职责 · 核心数据结构定义 · 团队代码规范', miss: '代码语法正确，但风格与项目格格不入，甚至引入架构层面的冲突' },
+    { n: '流程规范', ic: 'branch', c: '#a78bfa', has: 'Git 分支策略 · 提交规范 · 代码审查流程 · CI/CD 管线要求', miss: '可能直接往主分支提交未经测试的代码' },
+    { n: '环境信息', ic: 'server', c: '#34d399', has: '开发环境配置 · 测试数据库地址 · 测试环境部署方式 · API 密钥管理方式', miss: '本地能跑通的修复，到了测试环境可能立刻崩溃' },
+  ],
+  init(s) {
+    s.querySelector('.gn-rows').innerHTML = this.I.map((p, i) => `
+      <div class="gn-r" data-k="${i}" style="--c:${p.c}">
+        <button class="tgl on" data-i="${i}"><i></i><svg class="ic"><use href="#i-${p.ic}"/></svg>${p.n}</button>
+        <div class="gn-hs">${p.has}</div>
+        <div class="gn-ms">缺少它：${p.miss}</div>
+      </div>`).join('');
+    s.querySelector('.gn-rows').addEventListener('click', (e) => {
+      const b = e.target.closest('.tgl');
+      if (!b) return;
+      this.auto = false;
+      this.on[+b.dataset.i] = !this.on[+b.dataset.i];
+      this.paint(s);
+    });
+    this.on = [true, true, true];
+  },
+  paint(s) {
+    s.querySelectorAll('.gn-r').forEach((r, i) => { r.classList.toggle('off', !this.on[i]); r.querySelector('.tgl').classList.toggle('on', this.on[i]); });
+    const miss = this.I.filter((p, i) => !this.on[i]), rt = s.querySelector('.gn-rt');
+    rt.className = 'gn-rt ' + (miss.length ? 'bad' : 'ok');
+    rt.textContent = miss.length ? `三类信息缺了 ${miss.length} 类：${miss.map((p) => p.n).join('、')}——修复可能“看起来对”，却落不了地` : '三类信息齐备：这是 Agent 有效工作的最低信息需求，修复才能真正落地';
+    U.restart(s.querySelector('.gn-res'), 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.on = [true, true, true];
+    this.paint(s);
+    let k = 0;
+    // 自动演示：全开 → 依次关掉一类 → 恢复
+    const seq = [[1, 1, 1], [0, 1, 1], [1, 0, 1], [1, 1, 0], [1, 1, 1]];
+    ctx.every(() => { if (!this.auto) return; k = (k + 1) % seq.length; this.on = seq[k].map(Boolean); this.paint(s); }, 2600);
+  },
+  reset(s) { this.on = [true, true, true]; this.paint(s); },
+};
+</script>
+
+<section class="slide" id="c02-org" data-part="1" data-trans="zoom" data-dur="15000" data-title="上下文是组织问题" data-notes="上下文工程不只是技术问题，更是<b>组织问题</b>。大多数团队的关键知识都是隐性的：架构决策只有老员工记得，业务规则靠口口相传，重要的背景信息锁在私聊记录里。如果团队本身就是一个信息黑洞，再好的 AI Agent 也无计可施。<br><b>对远程工作友好的团队往往也对 AI Agent 友好</b>。像 Linux 内核这样的开源项目就是一个很好的范例：分布在全球的开发者协作维护了三十多年，成功的秘诀是高度透明、文档驱动的沟通文化——所有讨论公开进行，每个决策都有详细的记录，任何新加入者都能通过阅读历史来理解代码的演化逻辑。这种工作方式天然创造了对 AI 友好的环境：信息是公开的、可检索的、结构化的。<br>AI Agent 就像一个<b>永远的新员工</b>：给足背景信息，它能干得很好；什么都不告诉它，再聪明也是白搭。所以构建 AI 原生团队，首先是一场文档化运动，而不只是部署新工具。<br>OpenAI 研究员翁家翌曾精辟地总结这个观点：<b>“人和模型一样，最重要的是 Context。”</b>他以自身经历举例——“自己在 OpenAI 的工作也没有那么难，如果换一个其他人，如果有他所有的 context，也是能干的。”同样的道理适用于 Agent：决定 Agent 在业务中发挥价值的往往不是模型参数量，而是它在每个决策点能获得多么丰富、精准的上下文。他还指出，“团队合作中最大的问题也是 context 的不一致”，而“AI 短时间内无法取代人的最大原因也是 context——因为 AI 跟人并不在同一个环境里面”。这恰恰是上下文工程要解决的核心问题：如何把 Agent 需要的背景信息系统性地、结构化地送到模型面前。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">这不只是技术问题，更是<em>组织问题</em></h2></div>
+    <div class="og-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="hole">信息黑洞</button><button data-v="doc">文档驱动</button></div></header>
+  <div class="og-body">
+    <div class="og-stage panel fx fx-left" style="--d:3">
+      <svg class="og-svg" viewBox="0 0 960 500" width="960" height="500">
+        <path class="fl og-l" d="M300 92 C 470 92, 520 250, 690 250"/>
+        <path class="fl og-l" d="M300 250 H690"/>
+        <path class="fl og-l" d="M300 408 C 470 408, 520 250, 690 250"/>
+        <circle class="pk og-k" r="8"/><circle class="pk og-k" r="8"/><circle class="pk og-k" r="8"/>
+      </svg>
+      <div class="og-src" style="top:46px"><svg class="ic"><use href="#i-hier"/></svg><div><b>架构决策</b><small class="og-h">只有老员工记得</small><small class="og-d">每个决策都有详细记录</small></div></div>
+      <div class="og-src" style="top:204px"><svg class="ic"><use href="#i-scale"/></svg><div><b>业务规则</b><small class="og-h">靠口口相传</small><small class="og-d">讨论公开进行</small></div></div>
+      <div class="og-src" style="top:362px"><svg class="ic"><use href="#i-chat"/></svg><div><b>背景信息</b><small class="og-h">锁在私聊记录里</small><small class="og-d">新人读历史就能理解演化</small></div></div>
+      <div class="og-mid"><span class="og-hole"></span><b class="og-mt"></b></div>
+      <div class="og-ag"><svg class="ic"><use href="#i-robot"/></svg><b>AI Agent</b><small>永远的新员工</small></div>
+      <div class="og-st"></div>
+    </div>
+    <div class="og-q glass fx fx-right" style="--d:4">
+      <svg class="ic og-qi"><use href="#i-quote"/></svg>
+      <p class="og-qt"></p>
+      <div class="og-qa">—— 翁家翌，OpenAI 研究员</div>
+      <div class="og-dots"></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6"><b>对远程工作友好的团队往往也对 AI Agent 友好</b>：构建 AI 原生团队，首先是一场<b>文档化运动</b>，而不只是部署新工具</p>
+  <div class="src">第二章 ·「上下文：决定 Agent 能力上限的关键」</div>
+</section>
+<style>
+#c02-org .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.og-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:22px}
+.og-stage{position:relative;width:1010px;flex:none;padding:0}
+.og-svg{position:absolute;left:25px;top:30px;overflow:visible}
+.og-l{opacity:.5}
+#c02-org[data-m=hole] .og-l{stroke:var(--bad);stroke-dasharray:4 12;opacity:.45}
+#c02-org[data-m=doc] .og-l{stroke:var(--ok);opacity:.9;animation:flow 1s linear infinite;filter:drop-shadow(0 0 5px var(--ok))}
+.og-k{fill:#34d399}
+.og-src{position:absolute;left:40px;width:290px;height:96px;display:flex;align-items:center;gap:14px;padding:0 18px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:border-color .5s,box-shadow .5s}
+.og-src>.ic{font-size:32px;color:var(--acc);flex:none}
+.og-src b{display:block;font-size:22px}
+.og-src small{font-size:17px}
+.og-h{color:var(--bad)}.og-d{color:var(--ok);display:none}
+#c02-org[data-m=doc] .og-h{display:none}
+#c02-org[data-m=doc] .og-d{display:block}
+#c02-org[data-m=hole] .og-src{border-style:dashed;border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+#c02-org[data-m=doc] .og-src{border-color:color-mix(in srgb,var(--ok) 50%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--ok) 20%,transparent)}
+.og-mid{position:absolute;left:420px;top:208px;width:190px;height:120px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.og-hole{width:74px;height:74px;border-radius:50%;background:radial-gradient(circle,#000 35%,color-mix(in srgb,var(--bad) 55%,transparent) 60%,transparent 72%);animation:spin 3s linear infinite;transition:opacity .5s}
+#c02-org[data-m=doc] .og-hole{background:radial-gradient(circle,color-mix(in srgb,var(--ok) 70%,#fff) 0 18%,color-mix(in srgb,var(--ok) 35%,transparent) 45%,transparent 70%);animation:pulse 2s ease-out infinite}
+.og-mt{font-size:18px;color:var(--text2);white-space:nowrap}
+.og-ag{position:absolute;left:740px;top:184px;width:230px;height:150px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(10,16,36,.92));transition:box-shadow .5s,border-color .5s}
+.og-ag .ic{font-size:44px;color:var(--acc)}
+.og-ag b{font-size:23px}
+.og-ag small{font-size:16px;color:var(--text3)}
+#c02-org[data-m=doc] .og-ag{box-shadow:0 0 40px color-mix(in srgb,var(--ok) 35%,transparent);border-color:var(--ok)}
+#c02-org[data-m=hole] .og-ag{opacity:.75}
+.og-st{position:absolute;left:740px;top:350px;width:230px;text-align:center;font-size:17px;line-height:1.5}
+#c02-org[data-m=hole] .og-st{color:var(--bad)}
+#c02-org[data-m=doc] .og-st{color:var(--ok)}
+.og-q{flex:1;min-width:0;padding:30px 32px;display:flex;flex-direction:column;gap:16px}
+.og-qi{font-size:44px;color:var(--acc)}
+.og-qt{font-family:var(--kai);font-size:30px;line-height:1.7;min-height:250px}
+.og-q.sw .og-qt{animation:swIn .55s var(--ease) both}
+.og-qa{font-size:18px;color:var(--text3)}
+.og-dots{margin-top:auto;display:flex;gap:10px}
+.og-dots button{width:34px;height:8px;border-radius:8px;background:rgba(255,255,255,.15);transition:background .3s,width .3s}
+.og-dots button.on{width:60px;background:var(--acc)}
+</style>
+<script>
+HOOKS['c02-org'] = {
+  Q: [
+    '人和模型一样，最重要的是 Context。',
+    '自己在 OpenAI 的工作也没有那么难，如果换一个其他人，如果有他所有的 context，也是能干的。',
+    '团队合作中最大的问题也是 context 的不一致。',
+    'AI 短时间内无法取代人的最大原因也是 context——因为 AI 跟人并不在同一个环境里面。',
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.og-seg'), (v) => { this.autoM = false; this.mode(s, v); });
+    s.querySelector('.og-dots').innerHTML = this.Q.map((q, i) => `<button data-i="${i}" aria-label="第 ${i + 1} 句"></button>`).join('');
+    s.querySelector('.og-dots').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.autoQ = false; this.quote(s, +b.dataset.i); } });
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    s.dataset.m = m;
+    this.set(m);
+    s.querySelector('.og-mt').textContent = m === 'hole' ? '信息黑洞' : '公开 · 可检索 · 结构化';
+    s.querySelector('.og-st').textContent = m === 'hole' ? '什么都不告诉它，再聪明也是白搭' : '给足背景信息，它能干得很好';
+    if (!ctx || m !== 'doc') return;
+    // 文档驱动：知识沿着连线流向 Agent
+    const paths = [...s.querySelectorAll('.og-l')], dots = [...s.querySelectorAll('.og-k')];
+    const run = async () => {
+      while (ctx.alive && tk === this.tk) {
+        await Promise.all(paths.map((p, i) => U.fly(dots[i], p, 1300, { ctx, delay: i * 260 })));
+        if (!ctx.alive || tk !== this.tk) return;
+        await U.wait(ctx, 300);
+      }
+    };
+    run();
+  },
+  quote(s, i) {
+    this.qi = i;
+    s.querySelector('.og-qt').textContent = '“' + this.Q[i] + '”';
+    s.querySelectorAll('.og-dots button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    U.restart(s.querySelector('.og-q'), 'sw');
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.autoM = true;
+    this.autoQ = true;
+    this.mode(s, 'hole');
+    this.quote(s, 0);
+    ctx.later(() => { if (this.autoM) this.mode(s, 'doc'); }, 3600);
+    ctx.every(() => { if (this.autoM) this.mode(s, s.dataset.m === 'doc' ? 'hole' : 'doc'); }, 7200);
+    ctx.every(() => { if (this.autoQ) this.quote(s, (this.qi + 1) % this.Q.length); }, 3600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.m = ''; },
+};
+</script>
+
+<section class="slide" id="c02-ct" data-part="1" data-steps="3" data-trans="flip" data-dur="9000" data-title="ReAct 论文里的上下文定义" data-notes="ReAct 被广泛视为基于大语言模型构建 Agent 的奠基性工作之一。论文开篇用一句话把 Agent、Environment、Context 和 Action 的关系连了起来：在时间步 t，Agent 从环境收到观察 o<sub>t</sub>，并按照策略 π(a<sub>t</sub> | c<sub>t</sub>) 采取行动 a<sub>t</sub>，其中 c<sub>t</sub> = (o<sub>1</sub>, a<sub>1</sub>, …, o<sub>t−1</sub>, a<sub>t−1</sub>, o<sub>t</sub>) 就是 Agent 的上下文。<br>这一定义最值得注意的不是符号本身，而是：<b>Agent 的下一步行动取决于截至当前的完整交互上下文，而不只是眼前这一条输入。</b><br>对 LLM Agent 来说，用户消息和工具执行结果是环境返回的观察，模型回复和工具调用请求是 Agent 已经采取的行动；这些观察与行动交替累积，就形成了交互历史。真实 API 请求还会在这段历史之前放入系统提示词和工具定义，共同组成模型本轮实际收到的上下文。<br>由于模型 API 本身是<b>无状态</b>的，每次调用时都必须由 Agent 框架重新构造足够的上下文。最直接、无损的做法是带上此前的完整消息历史；生产系统也可以做摘要和压缩，但不能悄悄丢掉决定下一步行动所需的信息。后文所有上下文布局、状态栏和压缩技术，都可以看作在回答同一个问题：<b>怎样以更低成本向模型提供一个信息充分的 c<sub>t</sub>？</b><br>那么，这些上下文信息在技术上到底是以什么形式送给大模型的？下一部分揭晓。按 → 逐步展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">ReAct 的定义里，<em>c<sub>t</sub></em> 就是上下文</h2></header>
+  <div class="ct-quote fx fx-up" style="--d:2">
+    <p>“…At time step <i>t</i>, an agent receives an observation <i>o<sub>t</sub></i> ∈ <span class="ct-cal">𝒪</span> from the environment and takes an action <i>a<sub>t</sub></i> ∈ <span class="ct-cal">𝒜</span> following some policy <b class="ct-pi">π(<i>a<sub>t</sub></i> | <i>c<sub>t</sub></i>)</b>, where <b class="ct-c">c<sub>t</sub> = (o<sub>1</sub>, a<sub>1</sub>, …, o<sub>t−1</sub>, a<sub>t−1</sub>, o<sub>t</sub>)</b> is the context to the agent.”</p>
+    <span class="ct-ref">Yao et al., ReAct: Synergizing Reasoning and Acting in Language Models, ICLR 2023</span>
+  </div>
+  <div class="ct-stage fx fx-scale" style="--d:3">
+    <div class="ct-row"></div>
+    <div class="ct-br"><span>c<sub>t</sub>：截至当前的完整交互上下文</span></div>
+    <div class="ct-next"><svg class="ic"><use href="#i-brain"/></svg><span>π → 下一步行动 <i>a<sub>t</sub></i></span></div>
+    <div class="ct-call"><span class="ct-cn">第 <b>1</b> 次调用</span><span>API 无状态：Agent 框架每次都重新构造 c<sub>t</sub></span></div>
+  </div>
+  <div class="ct-caps">
+    <p class="c0">行动不只取决于眼前这一条输入，而取决于<b>截至当前的完整交互上下文</b></p>
+    <p class="c1">用户消息、工具结果是<span class="c-env">观察 o</span>；模型回复、工具调用是<span class="c-llm">行动 a</span>——交替累积成交互历史</p>
+    <p class="c2">真实请求还会在历史之前放入<b>系统提示词</b>和<b>工具定义</b>；API 无状态，每次调用都要重新构造</p>
+    <p class="c3">本章所有技术都在回答：<b>怎样以更低成本，向模型提供一个信息充分的 c<sub>t</sub>？</b></p>
+  </div>
+  <div class="ct-ans" data-step="3"><span class="chip acc">上下文布局 · PART 02–05</span><span class="chip acc">提示词与 Skills · PART 06–07</span><span class="chip acc">状态栏 · PART 08</span><span class="chip acc">压缩与隔离 · PART 09</span></div>
+  <div class="src">第二章 ·「上下文：决定 Agent 能力上限的关键」· ReAct 论文定义</div>
+</section>
+<style>
+.ct-quote{padding:18px 26px;border-radius:16px;background:rgba(255,255,255,.035);border:1px solid var(--line);font-family:Georgia,"Times New Roman",serif}
+.ct-quote p{font-size:23px;line-height:1.7;color:var(--text2)}
+.ct-quote i{font-style:italic;color:var(--text)}
+.ct-cal{font-family:"Cambria Math","STIX Two Math","Segoe UI Symbol",serif}
+.ct-pi{color:var(--llm);font-weight:700}
+.ct-c{color:var(--acc);font-weight:700;padding:0 4px;border-radius:6px;background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.ct-ref{display:block;margin-top:6px;font:15px var(--font);color:var(--text3)}
+.ct-stage{position:relative;height:300px;margin-top:22px}
+.ct-row{position:absolute;left:0;top:96px;display:flex;gap:10px;align-items:center}
+.ct-t{--c:var(--text3);height:84px;min-width:118px;padding:0 14px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 12%,rgba(10,16,36,.92));animation:upIn .5s var(--spring) both}
+.ct-t b{font:italic 700 26px Georgia,serif;color:var(--c)}
+.ct-t small{font-size:15px;color:var(--text2);white-space:nowrap}
+.ct-t.pre{min-width:150px;border-style:dashed}
+.ct-t.pre b{font:700 18px var(--font)}
+.ct-row.flash{animation:ctFlash .9s ease}
+@keyframes ctFlash{40%{filter:drop-shadow(0 0 14px var(--har)) brightness(1.25)}}
+.ct-br{position:absolute;top:62px;height:22px;border:2px solid var(--acc);border-bottom:0;border-radius:12px 12px 0 0;opacity:0;transition:opacity .5s,left .6s var(--ease),width .6s var(--ease)}
+.ct-br span{position:absolute;left:50%;bottom:16px;translate:-50% 0;white-space:nowrap;font-size:19px;font-weight:700;color:var(--acc)}
+.ct-br.on{opacity:1}
+.ct-next{position:absolute;right:0;top:96px;height:84px;display:flex;align-items:center;gap:12px;padding:0 22px;border-radius:16px;font-size:21px;border:2px solid color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 10%,rgba(10,16,36,.92));opacity:0;transition:opacity .5s}
+.ct-next .ic{font-size:30px;color:var(--llm)}
+.ct-next i{font-family:Georgia,serif}
+.ct-next.on{opacity:1}
+.ct-call{position:absolute;left:0;top:206px;display:flex;align-items:center;gap:18px;font-size:19px;color:var(--text2);opacity:0;transition:opacity .5s}
+.ct-call.on{opacity:1}
+.ct-cn{padding:6px 14px;border-radius:999px;border:1px solid color-mix(in srgb,var(--har) 55%,transparent);color:var(--har)}
+.ct-cn b{font-family:var(--num)}
+.ct-caps{position:relative;height:44px;margin-top:4px}
+.ct-caps p{position:absolute;inset:0;text-align:center;font-size:23px;opacity:0;transform:translateY(10px);transition:all .55s var(--ease)}
+.ct-caps p b{color:var(--acc)}
+#c02-ct[data-k="0"] .c0,#c02-ct[data-k="1"] .c1,#c02-ct[data-k="2"] .c2,#c02-ct[data-k="3"] .c3{opacity:1;transform:none}
+.ct-ans{display:flex;justify-content:center;gap:12px;margin-top:18px;opacity:0;transform:translateY(12px);transition:all .6s var(--ease)}
+.ct-ans.on{opacity:1;transform:none}
+</style>
+<script>
+HOOKS['c02-ct'] = {
+  // 交替累积的观察与行动
+  SEQ: [
+    { k: 'o', n: 1, d: '用户消息', c: '#34d399' },
+    { k: 'a', n: 1, d: '工具调用', c: '#a78bfa' },
+    { k: 'o', n: 2, d: '工具结果', c: '#34d399' },
+    { k: 'a', n: 2, d: '工具调用', c: '#a78bfa' },
+    { k: 'o', n: 3, d: '工具结果', c: '#34d399' },
+  ],
+  tok(p) { return `<div class="ct-t" style="--c:${p.c}"><b>${p.k}<sub>${p.n}</sub></b><small>${p.d}</small></div>`; },
+  build(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    const row = s.querySelector('.ct-row'), br = s.querySelector('.ct-br'), nx = s.querySelector('.ct-next'), call = s.querySelector('.ct-call');
+    s.dataset.k = k;
+    row.innerHTML = '';
+    br.classList.remove('on');
+    nx.classList.toggle('on', k >= 1);
+    call.classList.toggle('on', k >= 2);
+    const pre = k >= 2 ? `<div class="ct-t pre" style="--c:#cbd5e1"><b>system</b><small>系统提示词</small></div><div class="ct-t pre" style="--c:#60a5fa"><b>tools</b><small>工具定义</small></div>` : '';
+    const place = () => {
+      const ts = [...row.children];
+      if (!ts.length) return;
+      const a = ts[0], b = ts[ts.length - 1];
+      br.style.left = a.offsetLeft + 'px';
+      br.style.width = b.offsetLeft + b.offsetWidth - a.offsetLeft + 'px';
+      br.classList.add('on');
+    };
+    if (k === 0) {
+      row.innerHTML = this.SEQ.map((p) => this.tok(p)).join('');
+      place();
+      return;
+    }
+    if (!ctx) return;
+    row.innerHTML = pre;
+    // 观察与行动一条条累积；第 2 步起，每次调用都把整段重新发给模型
+    let n = 0, calls = 0;
+    const tick = () => {
+      if (tk !== this.tk || !ctx.alive) return;
+      if (n >= this.SEQ.length) {
+        ctx.later(() => { if (tk === this.tk) { row.innerHTML = pre; n = 0; br.classList.remove('on'); tick(); } }, 2200);
+        return;
+      }
+      row.insertAdjacentHTML('beforeend', this.tok(this.SEQ[n]));
+      n++;
+      place();
+      if (k >= 2 && this.SEQ[n - 1].k === 'o') {
+        calls++;
+        call.querySelector('b').textContent = calls;
+        U.restart(row, 'flash');
+      }
+      ctx.later(tick, 1100);
+    };
+    tick();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.build(s, k); },
+  step(s, ctx, k) { this.build(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.k = 0; s.querySelector('.ct-row').innerHTML = ''; },
+};
+</script>

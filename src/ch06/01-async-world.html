@@ -1,0 +1,1620 @@
+<!-- ================= PART 01 异步：世界主动找上门 ================= -->
+<section class="slide chapter" id="c06-d1" data-part="1" data-title="PART 01 · 异步：世界主动找上门" data-notes="原书小节「异步与事件驱动：当世界主动找上门」。第四章讨论的感知、执行、协作三类工具都由 Agent 主动调用。Agent 如何响应随时可能到达的外部事件？这需要<b>事件驱动的异步架构</b>来支撑；第一章五类工具中剩下的两类——<b>事件触发工具与用户沟通工具</b>——正是依托这一架构发挥作用的，因此也放在本节一并讨论。<br>这一节里<b>模态没有变化，仍然是文本，变的只有时机</b>。它是从前五章的回合制世界迈出的第一步：观察从“Agent 主动去取”扩展为“世界主动推来”，动作从“回合内做完”扩展为“先发起、后续靠事件收尾”。<br>本部分依次讲：为什么需要异步、OpenClaw 与 PineClaw 的事件机制、事件触发工具、用户沟通工具，以及支撑 Agent 独立行动的虚拟身份与隔离执行环境；下一部分再讨论事件处理机制本身。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">异步：<br>世界主动找上门</h1>
+  <div class="ch-s fx fx-up" style="--d:3">模态没有变化，仍然是文本——变的只有时机</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">真正的“主动服务”不仅需要 Agent 能定时检查事件，更需要事件能主动通知 Agent。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c06-why" data-part="1" data-dur="16000" data-title="柜台与秘书：为什么需要异步" data-notes="先用一个比喻说明为什么需要异步。<b>同步</b>（Synchronous）意味着“做完一件事才能做下一件”，<b>异步</b>（Asynchronous）意味着“多件事可以同时进行”。传统的同步 Agent 架构就像一个只会排队的柜台，每次只能处理一个顾客，处理完才能叫下一个号；而真正智能的助手更像一个灵活的秘书，桌上摆着多个待处理的事项（邮件、电话、来访者），根据紧急程度决定先处理哪个，处理到一半如果有更紧急的事情也可以暂停切换。<br>在同步模式下，Agent 要么等待后台任务完成才能与用户对话，要么等对话结束才能处理新到达的事件，无法应对真实助理场景所需的几项核心能力：<b>异步执行是常态</b>——许多任务需要长时间运行，不应阻塞用户交互；<b>事件优先级的动态判断</b>——不是所有事件都同等重要，Agent 需要选择取消当前操作（紧急）、加入队列（常规）还是并行处理（独立的轻量级查询）；<b>中断和恢复的流畅性</b>——被打断的对话或任务应该能够自然恢复。<br>演示里是同一串事件（时间为示意）：同步架构下“现在几点？”要等报表生成完才有回答，“停！”更是在错误报表生成之后才被处理；异步架构下后台任务不阻塞对话，紧急指令立即生效，任务按新要求恢复。可以拖动右上角的时间轴逐帧查看。<br>将异步范式应用于 LLM 时，需要先检查模型和 API 是否支持这种消息时序：有些接口要求先补齐工具结果才能继续，有些已经允许工具挂起、模型继续工作，并在生成过程中接受用户更新。前者需要事件队列、任务句柄和兼容层，后者可以直接使用原生异步协议。两者都仍需要应用管理事件来源、工具生命周期与结果归属，<b>不能仅凭代码用了 asyncio，就认定模型也具备原生异步能力</b>。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同步是排队的柜台，<em>异步</em>是灵活的秘书</h2>
+    <p class="lead fx fx-up" style="--d:2">同一串事件，两种架构：做完一件才能做下一件，还是多件事同时进行</p></div>
+    <div class="wy-ctl fx fx-up" style="--d:3"><button class="btn wy-play"><svg class="ic"><use href="#i-pause"/></svg><span>暂停</span></button><input class="rng wy-rng" type="range" min="0" max="900" value="0" aria-label="时间轴"><b class="wy-t">0.0 s</b></div></header>
+  <div class="wy-leg fx fx-up" style="--d:3">
+    <span class="lbl">同一串事件</span>
+    <span class="wy-e"><i>1</i>用户：帮我整理本月报表</span>
+    <span class="wy-e"><i>2</i>用户：现在几点？</span>
+    <span class="wy-e"><i>3</i>邮件：会议改到周三</span>
+    <span class="wy-e bad"><i>4</i>用户：停！报表要用 4 月数据</span>
+    <span class="chip warn wy-sim">时间为示意</span>
+  </div>
+  <div class="wy-body">
+    <div class="wy-pan panel fx fx-left" style="--d:4" data-m="sync">
+      <div class="wy-h"><svg class="ic"><use href="#i-users"/></svg><b>只会排队的柜台</b><span class="chip">同步 · 做完一件才能做下一件</span></div>
+      <div class="wy-g" data-clip-ok></div>
+      <div class="wy-m"></div>
+    </div>
+    <div class="wy-pan panel fx fx-right" style="--d:5" data-m="async">
+      <div class="wy-h"><svg class="ic"><use href="#i-user"/></svg><b>灵活的秘书</b><span class="chip acc">异步 · 多件事同时进行</span></div>
+      <div class="wy-g" data-clip-ok></div>
+      <div class="wy-m"></div>
+    </div>
+  </div>
+  <div class="wy-caps">
+    <div class="fx fx-up" style="--d:6"><div class="wy-cap"><b>异步执行是常态</b><p>许多任务需要长时间运行，不应阻塞用户交互</p></div></div>
+    <div class="fx fx-up" style="--d:7"><div class="wy-cap"><b>事件优先级的动态判断</b><p>取消当前操作（紧急）· 加入队列（常规）· 并行处理（独立的轻量级查询）</p></div></div>
+    <div class="fx fx-up" style="--d:8"><div class="wy-cap"><b>中断和恢复的流畅性</b><p>被打断的对话或任务应该能够自然恢复</p></div></div>
+  </div>
+  <div class="wy-api fx fx-up" style="--d:9">
+    <span class="wy-ah"><svg class="ic"><use href="#i-alert"/></svg>先检查模型与 API 的消息时序</span>
+    <span class="wy-ao">要求先补齐工具结果才能继续<em>→ 事件队列 + 任务句柄 + 兼容层</em></span>
+    <span class="wy-ao">允许工具挂起、模型继续工作并接受中途更新<em>→ 原生异步协议</em></span>
+    <span class="wy-an">代码里用了 asyncio ≠ 模型具备原生异步能力</span>
+  </div>
+  <div class="src">第六章 ·「异步与事件驱动：当世界主动找上门」·「为什么需要异步」</div>
+</section>
+<style>
+#c06-why .sh{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px}
+#c06-why .wy-ctl{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+#c06-why .wy-rng{width:280px}
+#c06-why .wy-t{font:800 24px var(--num);color:var(--acc);min-width:80px;text-align:right}
+#c06-why .wy-leg{display:flex;align-items:center;gap:12px}
+#c06-why .wy-e{display:inline-flex;align-items:center;gap:8px;padding:5px 14px 5px 6px;border-radius:999px;font-size:17px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);white-space:nowrap}
+#c06-why .wy-e i{font-style:normal;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--num);color:#06101f;background:var(--acc)}
+#c06-why .wy-e.bad{color:#fecdd3;border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+#c06-why .wy-e.bad i{background:var(--bad)}
+#c06-why .wy-sim{font-size:15px;padding:4px 12px}
+#c06-why .wy-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:14px}
+#c06-why .wy-pan{padding:14px 18px 10px;display:flex;flex-direction:column;gap:8px}
+#c06-why .wy-h{display:flex;align-items:center;gap:10px;font-size:22px}
+#c06-why .wy-h>.ic{font-size:26px;color:var(--acc)}
+#c06-why .wy-h .chip{margin-left:auto;font-size:16px;padding:5px 14px}
+#c06-why .wy-g{position:relative;display:flex;flex-direction:column;gap:6px;overflow:hidden;padding-top:2px}
+#c06-why .wy-ax{position:relative;height:28px;margin-left:92px;width:684px}
+#c06-why .wy-mk{position:absolute;top:1px;width:26px;height:26px;margin-left:-13px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--num);color:#06101f;background:var(--acc);opacity:.15;transition:opacity .3s,box-shadow .3s}
+#c06-why .wy-mk.on{opacity:1;box-shadow:0 0 14px var(--acc)}
+#c06-why .wy-mk.bad{background:var(--bad)}
+#c06-why .wy-mk.bad.on{box-shadow:0 0 14px var(--bad)}
+#c06-why .wy-ln{display:flex;align-items:center;height:36px}
+#c06-why .wy-lb{width:92px;flex:none;font-size:15px;color:var(--text3)}
+#c06-why .wy-tr{position:relative;width:684px;height:36px;border-radius:8px;background:rgba(255,255,255,.035)}
+#c06-why .wy-b{--c:var(--acc);position:absolute;top:3px;height:30px;width:0;border-radius:7px;overflow:hidden;opacity:0;display:flex;align-items:center;font-style:normal;background:color-mix(in srgb,var(--c) 28%,rgba(10,16,36,.92));border:1px solid color-mix(in srgb,var(--c) 70%,transparent);transition:opacity .25s}
+#c06-why .wy-b.vis{opacity:1}
+#c06-why .wy-b span{padding:0 8px;font-size:15px;white-space:nowrap;color:var(--text)}
+#c06-why .wy-b.k-llm{--c:var(--llm)}
+#c06-why .wy-b.k-tool{--c:var(--tool)}
+#c06-why .wy-b.k-ok{--c:var(--ok)}
+#c06-why .wy-b.k-ctx{--c:var(--ctx)}
+#c06-why .wy-b.k-bad{--c:var(--bad)}
+#c06-why .wy-b.k-wait{background:repeating-linear-gradient(135deg,rgba(255,255,255,.1) 0 6px,rgba(255,255,255,.02) 6px 12px);border:1px dashed rgba(255,255,255,.3)}
+#c06-why .wy-b.k-wait span{color:var(--text2)}
+#c06-why .wy-b.k-wbad{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--bad) 32%,transparent) 0 6px,transparent 6px 12px);border:1px dashed var(--bad)}
+#c06-why .wy-b.cut{--c:var(--bad);border-style:dashed}
+#c06-why .wy-b.cut span{text-decoration:line-through}
+#c06-why .wy-tag{position:absolute;top:7px;margin-left:6px;font-style:normal;font-size:15px;white-space:nowrap;color:var(--acc);opacity:0;transition:opacity .3s}
+#c06-why .wy-tag.bad{color:var(--bad)}
+#c06-why .wy-tag.on{opacity:1}
+#c06-why .wy-tk{position:relative;height:20px;margin-left:92px;width:684px}
+#c06-why .wy-tk span{position:absolute;top:0;font:15px var(--num);color:var(--text3);transform:translateX(-50%)}
+#c06-why .wy-tk span:first-child{transform:none}
+#c06-why .wy-tk span:last-child{transform:translateX(-100%)}
+#c06-why .wy-ph{position:absolute;top:0;bottom:22px;left:92px;width:2px;border-radius:2px;background:#fff;box-shadow:0 0 10px var(--acc);opacity:.8}
+#c06-why .wy-m{display:flex;flex-direction:column;gap:2px}
+#c06-why .wy-m p{min-height:26px;font-size:17px;line-height:1.5}
+#c06-why .wy-pan[data-m=sync] .wy-m p{color:#fecdd3}
+#c06-why .wy-pan[data-m=async] .wy-m p{color:#a7f3d0}
+#c06-why .wy-m p.on{animation:upIn .5s var(--spring) both}
+#c06-why .wy-caps{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:16px}
+#c06-why .wy-cap{height:92px;padding:13px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .45s,background .45s,box-shadow .45s}
+#c06-why .wy-cap b{font-size:21px;color:var(--text2);transition:color .45s}
+#c06-why .wy-cap p{font-size:16px;color:var(--text3);margin-top:6px;line-height:1.5}
+#c06-why .wy-cap.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 11%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 22%,transparent)}
+#c06-why .wy-cap.on b{color:var(--acc)}
+#c06-why .wy-cap.on p{color:var(--text2)}
+#c06-why .wy-api{margin-top:14px;display:grid;grid-template-columns:auto 1fr 1fr auto;gap:18px;align-items:center;padding:10px 20px;border-radius:14px;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.3)}
+#c06-why .wy-ah{display:flex;align-items:center;gap:8px;font-size:19px;font-weight:700;color:var(--warn);white-space:nowrap}
+#c06-why .wy-ao{font-size:16px;color:var(--text2);line-height:1.45}
+#c06-why .wy-ao em{display:block;font-style:normal;color:var(--text);font-weight:600}
+#c06-why .wy-an{font-size:16px;color:var(--warn);font-weight:700;white-space:nowrap}
+</style>
+<script>
+HOOKS['c06-why'] = {
+  PX: 76,
+  T: 9,
+  // 到达时间、编号、是否紧急
+  EV: [[0, 1, 0], [1.0, 2, 0], [1.8, 3, 0], [4.0, 4, 1]],
+  LANE: { sync: ['处理中', '排队 · ②', '排队 · ③', '排队 · ④'], async: ['主任务', '后台工具', '并行会话', '待办队列'] },
+  // [泳道, 开始, 结束, 文字, 类型, 是否被取消]
+  BAR: {
+    sync: [[0, 0, 2.6, '① 规划报表', 'llm'], [0, 2.6, 5.6, '① 生成报表 · 3 月', 'tool'], [0, 5.6, 6.1, '②', 'ok'], [0, 6.1, 7.1, '③ 邮件', 'ctx'], [0, 7.1, 7.7, '④', 'bad'], [0, 7.7, 9, '① 返工', 'bad'],
+      [1, 1.0, 5.6, '② 干等', 'wait'], [2, 1.8, 6.1, '③ 干等', 'wait'], [3, 4.0, 7.1, '④ 紧急，也只能排队', 'wbad']],
+    async: [[0, 0, 2.6, '① 规划报表', 'llm'], [0, 2.6, 3.6, '③ 处理邮件', 'ctx'], [0, 4.0, 4.6, '④ 改计划', 'llm'], [0, 7.6, 8.4, '① 汇总', 'llm'],
+      [1, 2.6, 4.0, '① 生成 · 3 月', 'tool', 1], [1, 4.6, 7.6, '① 生成报表 · 4 月', 'tool'],
+      [2, 1.0, 1.5, '②', 'ok'], [3, 1.8, 2.6, '③ 入队', 'wait']],
+  },
+  TAG: { sync: [[1, 5.62, '此刻错误报表已生成', 'bad']], async: [[2, 1.56, '② 并行处理', ''], [2, 4.04, '④ 取消式：立即打断', 'bad'], [3, 2.64, '◆ 安全点：推理结束，消费 ③', '']] },
+  MET: {
+    sync: [[6.1, '② 问完 5.1 s 后才得到回答'], [7.7, '④ 喊停 3.1 s 后才被处理——错误报表早已生成，只能返工']],
+    async: [[1.5, '② 0.5 s 内回答，后台任务照常进行'], [4.6, '④ 立即取消后台工具，按 4 月数据恢复任务']],
+  },
+  CAP: [2.6, 1.0, 4.6],
+  init(s) {
+    const PX = this.PX;
+    s.querySelectorAll('.wy-pan').forEach((pan) => {
+      const m = pan.dataset.m;
+      let h = '<div class="wy-ax">' + this.EV.map(([t, n, b]) => `<span class="wy-mk${b ? ' bad' : ''}" data-t="${t}" style="left:${t * PX}px">${n}</span>`).join('') + '</div>';
+      h += this.LANE[m].map((l, i) => {
+        const bars = this.BAR[m].filter((b) => b[0] === i).map(([, st, en, lab, k, x]) => `<i class="wy-b k-${k}" data-s="${st}" data-e="${en}"${x ? ' data-x="1"' : ''} style="left:${st * PX}px"><span>${lab}</span></i>`).join('');
+        const tags = this.TAG[m].filter((g) => g[0] === i).map(([, t, lab, k]) => `<em class="wy-tag ${k}" data-t="${t}" style="left:${t * PX}px">${lab}</em>`).join('');
+        return `<div class="wy-ln"><span class="wy-lb">${l}</span><div class="wy-tr">${bars}${tags}</div></div>`;
+      }).join('');
+      h += '<div class="wy-tk">' + Array.from({ length: 10 }, (_, i) => `<span style="left:${i * PX}px">${i} s</span>`).join('') + '</div><i class="wy-ph"></i>';
+      pan.querySelector('.wy-g').innerHTML = h;
+      pan.querySelector('.wy-m').innerHTML = this.MET[m].map(([t, x]) => `<p data-t="${t}" data-x="${x}"></p>`).join('');
+    });
+    this.bars = [...s.querySelectorAll('.wy-b')].map((b) => ({ el: b, s: +b.dataset.s, e: +b.dataset.e, x: !!b.dataset.x }));
+    this.marks = [...s.querySelectorAll('.wy-tag,.wy-mk')].map((g) => ({ el: g, t: +g.dataset.t }));
+    this.mets = [...s.querySelectorAll('.wy-m p')].map((p) => ({ el: p, t: +p.dataset.t, x: p.dataset.x, on: null }));
+    this.phs = [...s.querySelectorAll('.wy-ph')];
+    this.caps = [...s.querySelectorAll('.wy-cap')];
+    this.rng = s.querySelector('.wy-rng');
+    this.tl = s.querySelector('.wy-t');
+    this.btn = s.querySelector('.wy-play');
+    this.t = 0;
+    this.btn.addEventListener('click', () => { if (this.t >= this.T) this.t = 0; this.setPlay(!this.play); });
+    this.rng.addEventListener('input', () => { this.setPlay(false); this.t = +this.rng.value / 100; this.render(); });
+    this.render();
+  },
+  setPlay(v) {
+    this.play = v;
+    this.hold = 0;
+    this.btn.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play');
+    this.btn.querySelector('span').textContent = v ? '暂停' : '播放';
+  },
+  // 按当前时刻 t 重画两条甘特图：条形长到 t 为止，标记与结论在对应时刻出现
+  render() {
+    const t = this.t, PX = this.PX;
+    this.bars.forEach((b) => {
+      b.el.style.width = Math.max(0, Math.min(t, b.e) - b.s) * PX + 'px';
+      b.el.classList.toggle('vis', t >= b.s);
+      if (b.x) b.el.classList.toggle('cut', t >= b.e);
+    });
+    this.marks.forEach((g) => g.el.classList.toggle('on', t >= g.t));
+    this.mets.forEach((m) => {
+      const on = t >= m.t;
+      if (on === m.on) return;
+      m.on = on;
+      m.el.textContent = on ? m.x : '';
+      m.el.classList.toggle('on', on);
+    });
+    this.phs.forEach((p) => (p.style.left = 92 + t * PX + 'px'));
+    this.caps.forEach((c, i) => c.classList.toggle('on', t >= this.CAP[i]));
+    this.tl.textContent = t.toFixed(1) + ' s';
+    this.rng.value = Math.round(t * 100);
+    this.rng.style.setProperty('--p', (t / this.T) * 100 + '%');
+  },
+  enter(s, ctx) {
+    this.t = 0;
+    this.setPlay(true);
+    this.render();
+    let last = performance.now();
+    ctx.raf((now) => {
+      const dt = Math.min(0.05, Math.max(0, now - last) / 1000);
+      last = now;
+      if (!this.play) return;
+      if (this.t < this.T) { this.t = Math.min(this.T, this.t + dt / 1.1); this.render(); }
+      else if ((this.hold += dt) > 2.8) { this.t = 0; this.hold = 0; this.render(); }
+    });
+  },
+  reset() {
+    this.t = 0;
+    this.mets.forEach((m) => (m.on = null));
+    this.setPlay(true);
+    this.render();
+  },
+};
+</script>
+<!-- END c06-why -->
+
+<section class="slide" id="c06-arch" data-part="1" data-trans="zoom" data-dur="16000" data-title="事件驱动的异步 Agent 架构" data-notes="为此我们需要<b>事件驱动的异步 Agent 架构</b>。技术上，这意味着系统不再主动地反复检查“有没有新消息”（这叫轮询，效率低），而是在新消息到达时自动触发处理逻辑。所有的输入、输出、思考过程和外部交互都被统一建模为<b>事件流</b>——一条时间线上依次排列的事件记录。<br>图6-1 给出了整体架构：左侧是事件源（Email、Timer、Webhook、User，各自带着结构化的载荷）；中间是事件队列，每个事件带有优先级，user.interrupt 这样的紧急事件会排到常规事件前面；右侧是 Agent 处理流程——取出事件，由路由器（LLM）判定紧急度，以结构化事件格式追加到轨迹，LLM 推理（观察 → 思考 → 行动），工具执行（异步 / 同步分派），结果处理（通知 / 响应 / 存储），然后循环。<br>右上角可以切换“事件触发”与“轮询”：轮询模式下 Agent 空闲时也要不停地检查队列，空转检查次数不断增加，新事件还要等到下一次检查才会被发现；事件触发模式下 Agent 休眠，事件一到立即被唤醒。点击左侧任一事件源可以手动投递一个事件；底部是不断追加的事件流。演示中的事件内容为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">事件到达时<em>自动触发</em>，而不是反复检查</h2></div>
+    <div class="ar-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="push">事件触发</button><button data-v="poll">轮询</button></div></header>
+  <div class="ar-stage fx fx-scale" style="--d:3">
+    <div class="ar-ct" style="left:0">事件源<small>点击可手动投递</small></div>
+    <div class="ar-ct" style="left:390px">事件队列</div>
+    <div class="ar-ct" style="left:800px">Agent 处理流程<small>事件内容为示意</small></div>
+    <button class="ar-src" style="top:40px;--c:#22d3ee"><span class="ar-sn"><svg class="ic"><use href="#i-mail"/></svg>Email<code>on_email_reply</code></span><span class="ar-pl">{"from":"alice@...",</span><span class="ar-pl"> "subject":"Re:会议"}</span></button>
+    <button class="ar-src" style="top:170px;--c:#34d399"><span class="ar-sn"><svg class="ic"><use href="#i-timer"/></svg>Timer<code>on_timer_expire</code></span><span class="ar-pl">{"task_id":"daily_report",</span><span class="ar-pl"> "scheduled":"09:00"}</span></button>
+    <button class="ar-src" style="top:300px;--c:#a78bfa"><span class="ar-sn"><svg class="ic"><use href="#i-link"/></svg>Webhook<code>on_webhook</code></span><span class="ar-pl">{"repo":"agent-lib",</span><span class="ar-pl"> "event":"pr_merged"}</span></button>
+    <button class="ar-src" style="top:430px;--c:#fbbf24"><span class="ar-sn"><svg class="ic"><use href="#i-user"/></svg>User<code>on_user_message</code></span><span class="ar-pl">{"text":"帮我查下</span><span class="ar-pl"> 明天的天气"}</span></button>
+    <div class="ar-q" data-clip-ok><div class="ar-ql"></div></div>
+    <div class="ar-st" style="top:40px"><div><b>路由器</b><small>LLM 判定紧急度</small></div><em></em></div>
+    <div class="ar-st" style="top:147px"><div><b>追加到轨迹</b><small>结构化事件格式</small></div><em></em></div>
+    <div class="ar-st" style="top:254px"><div><b>LLM 推理</b><small>观察 → 思考 → 行动</small></div><em></em></div>
+    <div class="ar-st" style="top:361px"><div><b>工具执行</b><small>异步 / 同步分派</small></div><em></em></div>
+    <div class="ar-st" style="top:468px"><div><b>结果处理</b><small>通知 / 响应 / 存储</small></div><em></em></div>
+    <div class="ar-wk" data-k="sleep"><span class="lbl">Agent 状态</span><b class="ar-ws">休眠</b><small class="ar-wd">等待事件唤醒</small><div class="ar-pc"><b>0</b><span>次空转检查</span></div></div>
+    <svg class="ar-svg" viewBox="0 0 1660 560" width="1660" height="560">
+      <defs><marker id="c06ar-m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7c86a6"/></marker></defs>
+      <path class="ar-p" data-src="0" d="M292 92 H388" marker-end="url(#c06ar-m)"/>
+      <path class="ar-p" data-src="1" d="M292 222 H388" marker-end="url(#c06ar-m)"/>
+      <path class="ar-p" data-src="2" d="M292 352 H388" marker-end="url(#c06ar-m)"/>
+      <path class="ar-p" data-src="3" d="M292 482 H388" marker-end="url(#c06ar-m)"/>
+      <path class="ar-p tk" d="M692 287 C 748 287, 744 73, 798 73" marker-end="url(#c06ar-m)"/>
+      <text class="ar-l" x="700" y="318">取出事件</text>
+      <path class="ar-a" d="M1080 108 V144" marker-end="url(#c06ar-m)"/>
+      <path class="ar-a" d="M1080 215 V251" marker-end="url(#c06ar-m)"/>
+      <path class="ar-a" d="M1080 322 V358" marker-end="url(#c06ar-m)"/>
+      <path class="ar-a" d="M1080 429 V465" marker-end="url(#c06ar-m)"/>
+      <path class="ar-p lp" d="M1362 501 C 1454 501, 1454 73, 1364 73" marker-end="url(#c06ar-m)"/>
+      <text class="ar-l" x="1442" y="292">循环</text>
+    </svg>
+  </div>
+  <div class="ar-strm fx fx-up" style="--d:5"><span class="lbl">事件流 · 统一建模的事件记录</span><div class="ar-sl" data-clip-ok></div></div>
+  <div class="src">第六章 ·「为什么需要异步」· 图6-1 事件驱动的异步 Agent 架构</div>
+</section>
+<style>
+#c06-arch .sh{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px}
+#c06-arch .ar-stage{position:relative;width:1660px;height:560px}
+#c06-arch .ar-ct{position:absolute;top:0;font-size:21px;font-weight:700;display:flex;align-items:baseline;gap:10px;white-space:nowrap}
+#c06-arch .ar-ct small{font-size:15px;font-weight:400;color:var(--text3)}
+#c06-arch .ar-src{--c:var(--acc);position:absolute;left:0;width:290px;height:104px;padding:11px 16px;border-radius:16px;text-align:left;display:flex;flex-direction:column;gap:3px;background:rgba(12,18,40,.88);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:border-color .3s}
+#c06-arch .ar-src:hover{border-color:var(--c)}
+#c06-arch .ar-src.hit{animation:c06ar-hit .7s var(--ease)}
+@keyframes c06ar-hit{30%{box-shadow:0 0 30px color-mix(in srgb,var(--c) 60%,transparent);border-color:var(--c)}}
+#c06-arch .ar-sn{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:700;color:var(--c)}
+#c06-arch .ar-sn code{margin-left:auto;font:15px var(--mono);color:var(--text2)}
+#c06-arch .ar-pl{font:15px/1.45 var(--mono);color:var(--text3);white-space:pre}
+#c06-arch .ar-q{position:absolute;left:390px;top:40px;width:300px;height:494px;border-radius:18px;border:2px dashed var(--line2);background:rgba(255,255,255,.02);padding:14px;overflow:hidden}
+#c06-arch .ar-ql{display:flex;flex-direction:column;gap:10px}
+#c06-arch .ar-qi{--c:var(--acc);height:70px;padding:8px 14px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;gap:2px;background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9));border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-arch .ar-qi b{font:700 18px var(--mono);color:var(--c)}
+#c06-arch .ar-qi span{font-size:15px;color:var(--text2)}
+#c06-arch .ar-qi.new{animation:upIn .5s var(--spring) both}
+#c06-arch .ar-qi.u{background:color-mix(in srgb,var(--bad) 22%,rgba(12,18,40,.9));border-color:var(--bad)}
+#c06-arch .ar-qi.u span{color:#fecdd3;font-weight:700}
+#c06-arch .ar-qi.jump{animation:c06ar-jump .8s var(--spring) both}
+@keyframes c06ar-jump{0%{transform:translateX(70px);opacity:0}60%{box-shadow:0 0 30px color-mix(in srgb,var(--bad) 60%,transparent)}100%{transform:none;opacity:1}}
+#c06-arch .ar-qi.un{opacity:.55;border-style:dashed}
+#c06-arch .ar-qi.un span{color:var(--warn)}
+#c06-arch .ar-st{position:absolute;left:800px;width:560px;height:66px;padding:0 20px;border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:rgba(12,18,40,.88);border:1px solid var(--line2);transition:all .35s var(--ease)}
+#c06-arch .ar-st b{display:block;font-size:20px}
+#c06-arch .ar-st small{display:block;font-size:15px;color:var(--text3);margin-top:1px}
+#c06-arch .ar-st em{font-style:normal;font-size:16px;color:var(--acc);text-align:right;white-space:nowrap}
+#c06-arch .ar-st.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 13%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--acc) 30%,transparent);translate:-4px 0}
+#c06-arch .ar-wk{position:absolute;left:1490px;top:40px;width:170px;padding:16px 12px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.88);display:flex;flex-direction:column;gap:6px;text-align:center;transition:border-color .3s}
+#c06-arch .ar-ws{font-size:26px;font-weight:800}
+#c06-arch .ar-wd{font-size:15px;color:var(--text3);min-height:22px}
+#c06-arch .ar-wk[data-k=sleep] .ar-ws{color:var(--ctx)}
+#c06-arch .ar-wk[data-k=poll]{border-color:color-mix(in srgb,var(--warn) 60%,transparent)}
+#c06-arch .ar-wk[data-k=poll] .ar-ws{color:var(--warn);animation:blink 1s steps(1) infinite}
+#c06-arch .ar-wk[data-k=busy] .ar-ws{color:var(--ok)}
+#c06-arch .ar-pc{margin-top:8px;padding-top:10px;border-top:1px solid var(--line)}
+#c06-arch .ar-pc b{display:block;font:800 40px var(--num);color:var(--warn)}
+#c06-arch .ar-pc span{font-size:15px;color:var(--text3)}
+#c06-arch .ar-pc.bump b{animation:c06ar-bump .4s var(--spring)}
+@keyframes c06ar-bump{50%{transform:scale(1.25)}}
+#c06-arch .ar-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+#c06-arch .ar-p{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2.5;stroke-dasharray:6 7;animation:flow 1.2s linear infinite}
+#c06-arch .ar-a{fill:none;stroke:rgba(255,255,255,.24);stroke-width:2}
+#c06-arch .ar-l{font-size:16px;fill:var(--text3)}
+#c06-arch .ar-d{filter:drop-shadow(0 0 8px currentColor)}
+#c06-arch .ar-strm{margin-top:18px;display:flex;align-items:center;gap:16px;height:56px;padding:0 18px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#c06-arch .ar-strm .lbl{white-space:nowrap}
+#c06-arch .ar-sl{flex:1;min-width:0;display:flex;gap:10px;overflow:hidden;justify-content:flex-end}
+#c06-arch .ar-sc{--c:var(--acc);flex:none;display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:10px;font-size:15px;color:var(--text2);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 9%,transparent);animation:upIn .45s var(--spring) both;white-space:nowrap}
+#c06-arch .ar-sc b{font:600 15px var(--mono);color:var(--c)}
+</style>
+<script>
+HOOKS['c06-arch'] = {
+  // 一轮演示里依次到达的事件（k 为事件源序号：0 Email、1 Timer、2 Webhook、3 User）
+  EV: [
+    { k: 3, ty: 'user.input', pr: '常规', tx: '帮我查下明天的天气', c: '#fbbf24', act: 'get_weather · 异步分派', res: '响应：明天晴', out: 'agent.reply' },
+    { k: 0, ty: 'email.reply', pr: '常规', tx: 'Re:会议', c: '#22d3ee', act: 'update_notes · 同步', res: '存储：纪要已更新', out: 'tool.result' },
+    { k: 3, ty: 'user.interrupt', pr: '紧急!', tx: '停！', c: '#fb7185', u: 1, act: '取消进行中的调用', res: '响应：已停止', out: 'agent.cancel' },
+    { k: 1, ty: 'timer.trigger', pr: '常规', tx: 'daily_report', c: '#34d399', act: 'make_report · 异步分派', res: '通知：日报已生成', out: 'notify.user' },
+    { k: 2, ty: 'webhook', pr: '常规', tx: 'pr_merged', c: '#a78bfa', act: 'summarize_pr · 异步分派', res: '通知：PR 已合并', out: 'notify.user' },
+  ],
+  ARR: [0, 800, 1500, 11000, 11700],
+  BY: [1, 3, 4, 0],
+  D: [560, 380, 560, 420, 380],
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.svg = q('.ar-svg');
+    this.pSrc = [...s.querySelectorAll('.ar-p[data-src]')];
+    this.pTake = q('.ar-p.tk');
+    this.pLoop = q('.ar-p.lp');
+    this.srcs = [...s.querySelectorAll('.ar-src')];
+    this.steps = [...s.querySelectorAll('.ar-st')];
+    this.ql = q('.ar-ql');
+    this.sl = q('.ar-sl');
+    this.wk = q('.ar-wk');
+    this.ws = q('.ar-ws');
+    this.wd = q('.ar-wd');
+    this.pcw = q('.ar-pc');
+    this.pc = q('.ar-pc b');
+    this.q = [];
+    this.mode = 'push';
+    this.segSet = U.seg(q('.ar-seg'), (v) => { this.auto = false; this.setMode(s, v); });
+    this.segSet('push');
+    this.srcs.forEach((b, k) => b.addEventListener('click', () => { if (this.ctx && this.ctx.alive) this.push(s, this.EV[this.BY[k]]); }));
+  },
+  dot(c) {
+    const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    d.setAttribute('r', '9');
+    d.setAttribute('class', 'ar-d');
+    d.style.fill = c;
+    d.style.color = c;
+    d.style.opacity = 0;
+    this.svg.appendChild(d);
+    return d;
+  },
+  fly(p, ms, c, rev) {
+    const d = this.dot(c);
+    return U.fly(d, p, ms, { ctx: this.ctx, reverse: rev }).then((r) => { d.remove(); return r; });
+  },
+  status(k, it) {
+    this.wk.dataset.k = k;
+    this.ws.textContent = { sleep: '休眠', poll: '轮询中', busy: '处理中' }[k];
+    this.wd.textContent = k === 'sleep' ? '等待事件唤醒' : k === 'poll' ? '有新消息吗？' : it.ty;
+  },
+  lit(i, note) {
+    this.steps.forEach((st, j) => { st.classList.toggle('on', j === i); st.querySelector('em').textContent = j === i ? note || '' : ''; });
+  },
+  chip(ty, tx, c) {
+    this.sl.insertAdjacentHTML('beforeend', `<span class="ar-sc" style="--c:${c}"><b>${ty}</b>${tx}</span>`);
+    while (this.sl.children.length > 7) this.sl.firstElementChild.remove();
+  },
+  renderQ(jump) {
+    this.ql.innerHTML = this.q.map((it) => `<div class="ar-qi${it.u ? ' u' : ''}${it.seen ? '' : ' un'}${it === jump ? ' jump' : it.fresh ? ' new' : ''}" style="--c:${it.c}"><b>${it.ty}</b><span>${it.seen ? '优先级：' + it.pr : '待发现：等下一次轮询'}</span></div>`).join('');
+    this.q.forEach((it) => (it.fresh = 0));
+  },
+  wakeUp() { if (this.wake) { const w = this.wake; this.wake = null; w(); } },
+  setMode(s, v) {
+    this.mode = v;
+    this.segSet(v);
+    this.polls = 0;
+    this.pc.textContent = 0;
+    if (v === 'push') { this.q.forEach((x) => (x.seen = true)); this.renderQ(); }
+    this.wakeUp();
+  },
+  // 事件从事件源飞进队列；紧急事件插到所有常规事件前面
+  push(s, e) {
+    const tk = this.tk, ctx = this.ctx;
+    U.restart(this.srcs[e.k], 'hit');
+    this.fly(this.pSrc[e.k], 450, e.c).then(() => {
+      if (tk !== this.tk || !ctx.alive) return;
+      const it = Object.assign({}, e, { seen: this.mode === 'push', fresh: 1 });
+      if (e.u) { const i = this.q.findIndex((x) => !x.u); this.q.splice(i < 0 ? this.q.length : i, 0, it); } else this.q.push(it);
+      this.renderQ(e.u ? it : null);
+      if (it.seen) this.wakeUp();
+    });
+  },
+  // 轮询：空闲时也要反复去队列里看一眼
+  async probe() {
+    const ctx = this.ctx;
+    await this.fly(this.pTake, 300, '#94a3b8', true);
+    if (!ctx.alive) return;
+    let found = false;
+    this.q.forEach((x) => { if (!x.seen) { x.seen = true; found = true; } });
+    if (found) this.renderQ();
+    else { this.polls++; this.pc.textContent = this.polls; U.restart(this.pcw, 'bump'); }
+    await U.wait(ctx, 260);
+  },
+  cycle(s) {
+    const tk = this.tk, ctx = this.ctx;
+    this.cyc++;
+    if (this.auto && this.cyc > 1) this.setMode(s, this.cyc % 2 === 0 ? 'poll' : 'push');
+    this.left = this.EV.length;
+    this.EV.forEach((e, i) => ctx.later(() => { if (tk === this.tk) { this.left--; this.push(s, e); } }, this.ARR[i] + 300));
+  },
+  async work(s) {
+    const tk = this.tk, ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      const idx = this.q.findIndex((x) => x.seen);
+      if (idx < 0) {
+        if (this.mode === 'poll') { this.status('poll'); await this.probe(); if (!ok()) return; continue; }
+        this.status('sleep');
+        await new Promise((r) => { this.wake = r; });
+        continue;
+      }
+      const it = this.q.splice(idx, 1)[0];
+      this.renderQ();
+      this.status('busy', it);
+      await this.fly(this.pTake, 420, it.c);
+      if (!ok()) return;
+      const notes = [it.u ? '判定：紧急 → 优先处理' : '判定：常规', '结构化事件 → 轨迹', '观察 → 思考 → 行动', it.act, it.res];
+      for (let i = 0; i < 5; i++) {
+        this.lit(i, notes[i]);
+        if (i === 1) this.chip(it.ty, it.tx, it.c);
+        if (i === 4) this.chip(it.out, '', '#a78bfa');
+        await U.wait(ctx, this.D[i]);
+        if (!ok()) return;
+      }
+      this.lit(-1);
+      await this.fly(this.pLoop, 380, '#c4b5fd');
+      if (!ok()) return;
+      if (!this.q.length && this.left <= 0 && !this.rs) {
+        this.rs = 1;
+        ctx.later(() => { this.rs = 0; if (tk === this.tk) this.cycle(s); }, 2600);
+      }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.tk = (this.tk || 0) + 1;
+    this.q = [];
+    this.cyc = 0;
+    this.auto = true;
+    this.rs = 0;
+    this.left = 0;
+    this.ql.innerHTML = '';
+    this.sl.innerHTML = '';
+    this.setMode(s, 'push');
+    this.work(s);
+    this.cycle(s);
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.wake = null;
+    this.q = [];
+    this.ql.innerHTML = '';
+    this.sl.innerHTML = '';
+    this.lit(-1);
+    this.status('sleep');
+    this.polls = 0;
+    this.pc.textContent = 0;
+    this.svg.querySelectorAll('.ar-d').forEach((d) => d.remove());
+  },
+};
+</script>
+<!-- END c06-arch -->
+
+<section class="slide" id="c06-openclaw" data-part="1" data-trans="rise" data-dur="15000" data-title="OpenClaw 的三种自动化机制" data-notes="开源框架 OpenClaw 通过 Gateway 控制平面接收多渠道消息并路由到 Agent 运行时，提供三种内置的事件驱动机制：<b>Hooks（事件钩子）</b>响应 Agent 生命周期中的事件，如会话创建、重置等，类似 GitHub Actions 中的事件触发器；<b>Cron（定时调度器）</b>按 cron 表达式执行周期性任务（Unix 系统广泛使用的定时任务语法，如 0 9 * * 5 代表每周五上午 9 点）；<b>Heartbeat（心跳守护进程）</b>每隔 N 分钟唤醒一次 Agent，检查是否有需要关注的事项。<br>这三种机制赋予了 OpenClaw Agent“自主”的外观——即使用户不在线，Agent 也能定时生成报告、检查系统状态、处理例行事务。Gateway 对内置渠道（如 IM、Web 界面）的消息本身是<b>推送式</b>的，消息一到就路由给 Agent；三种自动化机制里，真正让 Agent 在没有用户消息时“自己动起来”的只有 Cron 和 Heartbeat，而它们都是<b>时间驱动</b>的——Heartbeat 每隔固定间隔检查一次，Cron 按预设时间触发；Hooks 的事件来源是 OpenClaw 框架内部，而非外部。<br>真正的短板在于：对于内置渠道之外的第三方事件源——一封新邮件到达、一个外部 API 回调推送、一个紧急通知需要立即处理——OpenClaw 缺乏即时接入的通道，Agent 无法在事件发生后立即做出响应，只能等到下一个 Cron/Heartbeat 周期才可能察觉。右侧时间线可以拖动滑块改变 Heartbeat 间隔（时间与事件为示意）：间隔越短察觉越快，但空转唤醒也越多，而且再短也做不到“事件一到就响应”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">OpenClaw：消息是<em>推送</em>的，自动化是<em>时间驱动</em>的</h2>
+  <p class="lead fx fx-up" style="--d:2">Gateway 控制平面接收多渠道消息并路由到 Agent 运行时，另有三种内置的事件驱动机制</p></header>
+  <div class="oc-body">
+    <div class="oc-left">
+      <div class="fx fx-left" style="--d:3"><div class="oc-gw">
+        <span><svg class="ic"><use href="#i-msg"/></svg>IM / Web 界面</span><i class="oc-fl"></i>
+        <span><svg class="ic"><use href="#i-server"/></svg>Gateway 控制平面</span><i class="oc-fl"></i>
+        <span><svg class="ic"><use href="#i-robot"/></svg>Agent 运行时</span>
+        <em class="oc-push">推送式：内置渠道的消息一到就路由给 Agent</em>
+      </div></div>
+      <div class="fx fx-left" style="--d:4"><div class="oc-m">
+        <div class="oc-mh"><b>Hooks（事件钩子）</b><span class="chip">来源：框架内部</span></div>
+        <p>响应 Agent 生命周期中的事件，如会话创建、重置——类似 GitHub Actions 中的事件触发器</p></div></div>
+      <div class="fx fx-left" style="--d:5"><div class="oc-m">
+        <div class="oc-mh"><b>Cron（定时调度器）</b><span class="chip acc">时间驱动</span></div>
+        <p>按 cron 表达式执行周期性任务：<code>0 9 * * 5</code> 代表每周五上午 9 点</p></div></div>
+      <div class="fx fx-left" style="--d:6"><div class="oc-m">
+        <div class="oc-mh"><b>Heartbeat（心跳守护进程）</b><span class="chip acc">时间驱动</span></div>
+        <p>每隔 N 分钟唤醒一次 Agent，检查是否有需要关注的事项</p></div></div>
+    </div>
+    <div class="oc-sim panel fx fx-right" style="--d:4">
+      <div class="oc-sh"><b>一小时里，Agent 什么时候醒来？</b><span class="chip warn">示意</span>
+        <label class="oc-nl">Heartbeat 间隔<b class="oc-n">15</b>分钟</label><input class="rng oc-rng" type="range" min="1" max="30" step="1" value="15" aria-label="Heartbeat 间隔"></div>
+      <div class="oc-tl" data-clip-ok>
+        <div class="oc-r"><span class="oc-rl">内置渠道<small>IM / Web · 推送式</small></span><div class="oc-tr"></div></div>
+        <div class="oc-r"><span class="oc-rl">Hooks<small>框架内部事件</small></span><div class="oc-tr"></div></div>
+        <div class="oc-r"><span class="oc-rl">Cron<small>预设时间 · 时间驱动</small></span><div class="oc-tr"></div></div>
+        <div class="oc-r"><span class="oc-rl">Heartbeat<small>每 N 分钟 · 时间驱动</small></span><div class="oc-tr"></div></div>
+        <div class="oc-r bad"><span class="oc-rl">第三方事件<small>新邮件 · API 回调</small></span><div class="oc-tr"></div></div>
+        <div class="oc-r wk"><span class="oc-rl">Agent 醒来<small>实心：处理事件 · 空心：空转</small></span><div class="oc-tr"></div></div>
+        <div class="oc-ax"></div>
+        <i class="oc-ph"></i>
+      </div>
+      <div class="oc-kpi"><div><span>第三方事件平均察觉延迟</span><b class="oc-k1">—</b></div><div><span>Heartbeat 唤醒（每小时）</span><b class="oc-k2">—</b></div><p class="oc-tip">间隔越短察觉越快，空转唤醒也越多；再短也做不到“事件一到就响应”</p></div>
+    </div>
+  </div>
+  <p class="tagline oc-tag fx fx-up" style="--d:7">短板：内置渠道之外的<b>第三方事件源</b>缺乏即时接入的通道——只能等到下一个 Cron / Heartbeat 周期才可能察觉</p>
+  <div class="src">第六章 ·「OpenClaw 的事件驱动机制实现」</div>
+</section>
+<style>
+#c06-openclaw .oc-body{display:grid;grid-template-columns:540px 1fr;gap:30px}
+#c06-openclaw .oc-left{display:flex;flex-direction:column;gap:14px}
+#c06-openclaw .oc-gw{position:relative;display:grid;grid-template-columns:auto 1fr auto 1fr auto;align-items:center;gap:8px;padding:16px 16px 42px;border-radius:18px;background:rgba(12,18,40,.8);border:1px solid var(--line)}
+#c06-openclaw .oc-gw>span{display:inline-flex;align-items:center;gap:7px;padding:9px 11px;border-radius:12px;font-size:16px;font-weight:600;white-space:nowrap;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-openclaw .oc-gw .ic{font-size:19px;color:var(--ctx)}
+#c06-openclaw .oc-fl{height:3px;min-width:18px;border-radius:3px;background:repeating-linear-gradient(90deg,var(--ctx) 0 8px,transparent 8px 14px);background-size:28px 3px;animation:c06oc-fl .8s linear infinite;opacity:.75}
+@keyframes c06oc-fl{to{background-position:28px 0}}
+#c06-openclaw .oc-push{position:absolute;left:18px;bottom:11px;font-style:normal;font-size:16px;color:var(--ctx)}
+#c06-openclaw .oc-gw.hit{animation:c06oc-hit .8s var(--ease)}
+@keyframes c06oc-hit{40%{box-shadow:0 0 34px color-mix(in srgb,var(--ctx) 45%,transparent);border-color:var(--ctx)}}
+#c06-openclaw .oc-m{padding:13px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+#c06-openclaw .oc-mh{display:flex;align-items:center;gap:10px}
+#c06-openclaw .oc-mh b{font-size:21px}
+#c06-openclaw .oc-mh .chip{margin-left:auto;font-size:15px;padding:4px 12px}
+#c06-openclaw .oc-m p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:6px}
+#c06-openclaw .oc-m code{font:16px var(--mono);color:var(--tool);padding:1px 6px;border-radius:6px;background:rgba(255,255,255,.06)}
+#c06-openclaw .oc-m.hit{animation:c06oc-mhit .9s var(--ease)}
+@keyframes c06oc-mhit{35%{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 35%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}}
+#c06-openclaw .oc-sim{padding:16px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-openclaw .oc-sh{display:flex;align-items:center;gap:14px}
+#c06-openclaw .oc-sh>b{font-size:21px}
+#c06-openclaw .oc-sh .chip{font-size:15px;padding:4px 12px}
+#c06-openclaw .oc-nl{margin-left:auto;font-size:17px;color:var(--text2);white-space:nowrap}
+#c06-openclaw .oc-nl b{font:800 24px var(--num);color:var(--acc);margin:0 6px}
+#c06-openclaw .oc-rng{width:210px}
+#c06-openclaw .oc-tl{position:relative;--t:0;overflow:hidden}
+#c06-openclaw .oc-r{display:flex;align-items:center;height:50px;border-bottom:1px dashed var(--line)}
+#c06-openclaw .oc-rl{width:210px;flex:none;font-size:17px;font-weight:600;line-height:1.25}
+#c06-openclaw .oc-rl small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+#c06-openclaw .oc-r.bad .oc-rl{color:#fecdd3}
+#c06-openclaw .oc-r.wk .oc-rl{color:var(--acc)}
+#c06-openclaw .oc-tr{position:relative;flex:1;height:100%}
+#c06-openclaw .oc-ev{--c:var(--acc);position:absolute;top:0;bottom:0;width:0;opacity:.15;transition:opacity .25s}
+#c06-openclaw .oc-ev.on{opacity:1}
+#c06-openclaw .oc-ev i{position:absolute;left:-7px;top:12px;width:14px;height:14px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c)}
+#c06-openclaw .oc-ev em{position:absolute;left:-40px;width:80px;top:28px;font-style:normal;font-size:15px;color:var(--text2);text-align:center;white-space:nowrap}
+#c06-openclaw .oc-hb i{border-radius:3px;transform:rotate(45deg) scale(.8)}
+#c06-openclaw .oc-wkm i{top:18px}
+#c06-openclaw .oc-wkm.idle i{background:transparent;border:2px solid var(--c);box-shadow:none}
+#c06-openclaw .oc-wait{position:absolute;top:13px;height:12px;border-radius:6px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--bad) 50%,transparent) 0 5px,transparent 5px 10px);border:1px solid var(--bad);opacity:0}
+#c06-openclaw .oc-wait.on{opacity:1}
+#c06-openclaw .oc-wait em{position:absolute;left:12px;top:-14px;font-style:normal;font-size:15px;font-weight:700;color:var(--bad);white-space:nowrap}
+#c06-openclaw .oc-ax{position:relative;height:24px;margin-left:210px}
+#c06-openclaw .oc-ax span{position:absolute;top:4px;font:15px var(--num);color:var(--text3);transform:translateX(-50%)}
+#c06-openclaw .oc-ax span:first-child{transform:none}
+#c06-openclaw .oc-ax span:last-child{transform:translateX(-100%)}
+#c06-openclaw .oc-ph{position:absolute;top:0;bottom:24px;left:calc(210px + (100% - 210px) * var(--t));width:2px;background:#fff;box-shadow:0 0 10px var(--acc);opacity:.85}
+#c06-openclaw .oc-kpi{display:grid;grid-template-columns:auto auto 1fr;gap:16px;align-items:center}
+#c06-openclaw .oc-kpi div{padding:8px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-openclaw .oc-kpi span{display:block;font-size:15px;color:var(--text3)}
+#c06-openclaw .oc-kpi b{font:800 28px var(--num);color:var(--acc)}
+#c06-openclaw .oc-k1{color:var(--bad)!important}
+#c06-openclaw .oc-tip{font-size:16px;line-height:1.55;color:var(--text2)}
+#c06-openclaw .oc-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c06-openclaw'] = {
+  PUSH: [[8, 'IM 消息'], [41, 'Web 消息']],
+  HOOK: [[24, '会话重置']],
+  CRON: [[30, '例行报告']],
+  EXT: [[13, '新邮件'], [37, 'API 回调'], [52, '紧急通知']],
+  PRE: [15, 5, 30],
+  init(s) {
+    this.tl = s.querySelector('.oc-tl');
+    this.trs = [...s.querySelectorAll('.oc-tr')];
+    this.rng = s.querySelector('.oc-rng');
+    this.nEl = s.querySelector('.oc-n');
+    this.k1 = s.querySelector('.oc-k1');
+    this.k2 = s.querySelector('.oc-k2');
+    this.gw = s.querySelector('.oc-gw');
+    this.cards = [...s.querySelectorAll('.oc-m')];
+    s.querySelector('.oc-ax').innerHTML = [0, 10, 20, 30, 40, 50, 60].map((m) => `<span style="left:${(m / 60) * 100}%">${m === 60 ? '60 分钟' : m}</span>`).join('');
+    // 拖动时直接显示整小时的结果；松手后从头重放一遍
+    this.rng.addEventListener('input', () => { this.auto = false; this.build(+this.rng.value); this.t = 60; this.play = false; this.show(); });
+    this.rng.addEventListener('change', () => { this.t = 0; this.play = true; this.show(); });
+    this.t = 0;
+    this.build(15);
+    this.show();
+  },
+  build(N) {
+    this.N = N;
+    this.nEl.textContent = N;
+    this.rng.value = N;
+    this.rng.style.setProperty('--p', ((N - 1) / 29) * 100 + '%');
+    const P = (t) => `left:${(Math.min(60, t) / 60) * 100}%`;
+    const hb = [];
+    for (let k = 1; k * N <= 60; k++) hb.push(k * N);
+    // 第三方事件只能等下一次 Heartbeat（或 Cron）唤醒时才可能被察觉
+    const next = (t) => Math.min(Math.ceil(t / N) * N, ...this.CRON.map((c) => c[0]).filter((c) => c >= t));
+    const ev = (t, lab, c, cls) => `<span class="oc-ev ${cls || ''}" data-t="${t}" style="${P(t)};--c:${c}"><i></i>${lab ? `<em>${lab}</em>` : ''}</span>`;
+    this.trs[0].innerHTML = this.PUSH.map(([t, l]) => ev(t, l, 'var(--ctx)')).join('');
+    this.trs[1].innerHTML = this.HOOK.map(([t, l]) => ev(t, l, '#94a3b8')).join('');
+    this.trs[2].innerHTML = this.CRON.map(([t, l]) => ev(t, l, 'var(--acc)')).join('');
+    this.trs[3].innerHTML = hb.map((t) => ev(t, '', 'var(--warn)', 'oc-hb')).join('');
+    const det = this.EXT.map(([t]) => next(t));
+    this.trs[4].innerHTML = this.EXT.map(([t, l], i) => `<span class="oc-wait" data-s="${t}" data-e="${det[i]}" style="${P(t)};width:0"><em>等了 ${det[i] - t} 分钟</em></span>` + ev(t, l, 'var(--bad)')).join('');
+    const wakes = [].concat(this.PUSH.map(([t]) => [t, 'var(--ctx)', '']), this.HOOK.map(([t]) => [t, '#94a3b8', '']), this.CRON.map(([t]) => [t, 'var(--acc)', '']),
+      hb.filter((t) => !this.CRON.some((c) => c[0] === t)).map((t) => [t, det.includes(t) ? 'var(--ok)' : 'var(--warn)', det.includes(t) ? '' : 'idle']));
+    this.trs[5].innerHTML = wakes.map(([t, c, k]) => `<span class="oc-ev oc-wkm ${k}" data-t="${t}" style="${P(t)};--c:${c}"><i></i></span>`).join('');
+    const avg = det.reduce((a, d, i) => a + d - this.EXT[i][0], 0) / det.length;
+    this.k1.textContent = avg.toFixed(1) + ' 分钟';
+    this.k2.textContent = hb.length + ' 次';
+    this.evs = [...this.tl.querySelectorAll('.oc-ev')].map((e) => ({ el: e, t: +e.dataset.t }));
+    this.waits = [...this.tl.querySelectorAll('.oc-wait')].map((e) => ({ el: e, s: +e.dataset.s, e: +e.dataset.e }));
+    this.fires = [].concat(this.PUSH.map(([t]) => [t, -1]), this.HOOK.map(([t]) => [t, 0]), this.CRON.map(([t]) => [t, 1]), hb.map((t) => [t, 2]));
+  },
+  show() {
+    const t = this.t;
+    this.tl.style.setProperty('--t', t / 60);
+    this.evs.forEach((e) => e.el.classList.toggle('on', t >= e.t));
+    this.waits.forEach((w) => {
+      w.el.classList.toggle('on', t >= w.s);
+      w.el.style.width = (Math.max(0, Math.min(t, w.e, 60) - w.s) / 60) * 100 + '%';
+    });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.pi = 0;
+    this.build(this.PRE[0]);
+    this.t = 0;
+    this.play = true;
+    this.hold = 0;
+    this.show();
+    let last = performance.now();
+    ctx.raf((now) => {
+      const dt = Math.min(0.05, Math.max(0, now - last) / 1000);
+      last = now;
+      if (!this.play) return;
+      if (this.t < 60) {
+        const t0 = this.t;
+        this.t = Math.min(60, this.t + dt * 7.5);
+        this.fires.forEach(([ft, k]) => { if (ft > t0 && ft <= this.t) U.restart(k < 0 ? this.gw : this.cards[k], 'hit'); });
+        this.show();
+      } else if (!this.auto) this.play = false;
+      else if ((this.hold += dt) > 2.4) {
+        this.hold = 0;
+        this.pi = (this.pi + 1) % this.PRE.length;
+        this.build(this.PRE[this.pi]);
+        this.t = 0;
+        this.show();
+      }
+    });
+  },
+  reset() { this.t = 0; this.build(15); this.show(); },
+};
+</script>
+<!-- END c06-openclaw -->
+
+<section class="slide" id="c06-pineclaw" data-part="1" data-trans="flip" data-dur="16000" data-title="PineClaw：事件要能主动通知 Agent" data-notes="这种延迟在许多场景下是不可接受的。以 <b>PineClaw</b>（Pine AI 的 OpenClaw 插件）为例：Pine AI 是一款代替用户拨打真实电话的 AI 助手，典型场景包括协商账单、取消订阅和处理保险理赔。用户通过 OpenClaw Agent 发起一个 Pine 电话任务后，Pine 的语音 AI 会代表用户拨打电话，但通话过程中可能随时需要用户介入：<b>实时身份验证</b>——客服要求验证账户持有人身份，Pine 需要用户立即提供安全码或 OTP（一次性密码）；<b>三方通话确认</b>——客服要求与账户持有人直接对话，Pine 需要用户在几秒内接听电话；<b>进展同步与决策确认</b>——协商到关键节点（如对方提出降价方案），Pine 需要用户确认是否接受。<br>如果依靠 Heartbeat 的定时轮询，用户可能在客服等待验证码时迟迟收不到通知，导致客服挂断、通话失败。PineClaw 的解决方案是引入 <b>Channel 机制</b>——在 OpenClaw 的 Gateway 和 Pine API 之间建立实时的事件通道：电话接通、需要用户输入、通话结束等关键事件发生时，消息被即时推送到 OpenClaw Agent，Agent 立即处理并通知用户。<br>这个案例揭示了事件驱动架构对 Agent 框架的核心价值：<b>真正的 “主动服务” 不仅需要 Agent 能定时检查事件，更需要事件能主动通知 Agent</b>。将所有输入——用户消息、工具返回、外部回调、定时触发——统一建模为事件流，通过事件循环驱动 Agent 的思考和行动，是实现这一目标的架构基础。演示会依次在两种机制下重放同一个时刻；也可以点击上方的场景和右上角的开关。对话、金额与等待时间均为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">PineClaw：事件要能<em>主动通知</em> Agent</h2></div>
+    <div class="pc-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="poll">Heartbeat 定时轮询</button><button data-v="ch">Channel 机制</button></div></header>
+  <div class="pc-top fx fx-up" style="--d:3">
+    <span class="lbl">通话中需要用户介入的时刻</span>
+    <div class="pc-tabs tabs"><button data-i="0">实时身份验证</button><button data-i="1">三方通话确认</button><button data-i="2">进展同步与决策确认</button></div>
+    <span class="chip warn pc-sim">对话与数字为示意</span>
+  </div>
+  <div class="pc-stage">
+    <div class="pc-call panel fx fx-left" style="--d:4">
+      <div class="pc-ch"><svg class="ic"><use href="#i-phone"/></svg><b>Pine 语音 AI 代表用户致电客服</b><span class="pc-st">通话中</span></div>
+      <div class="pc-tx" data-clip-ok></div>
+      <div class="pc-pat"><span>客服耐心</span><div class="pc-pb"><i></i></div></div>
+      <div class="pc-res"></div>
+    </div>
+    <div class="pc-mid fx fx-scale" style="--d:5">
+      <div class="pc-n pc-api"><svg class="ic"><use href="#i-server"/></svg><b>Pine API</b><small class="pc-ev">电话事件</small></div>
+      <div class="pc-n pc-gate"><span class="pc-g1"><svg class="ic"><use href="#i-zap"/></svg><b>Channel · 实时事件通道</b><small>关键事件即时推送</small></span><span class="pc-g0"><svg class="ic"><use href="#i-hourglass"/></svg><b>等下一次 Heartbeat</b><small>约 12 分钟后才检查</small></span></div>
+      <div class="pc-n pc-gwy"><svg class="ic"><use href="#i-nodes"/></svg><b>OpenClaw Gateway</b><small>路由到 Agent</small></div>
+      <div class="pc-n pc-ag"><svg class="ic"><use href="#i-robot"/></svg><b>OpenClaw Agent</b><small>立即处理并通知用户</small></div>
+      <svg class="pc-svg" viewBox="0 0 560 470" width="560" height="470">
+        <path class="pc-ln" d="M280 35 V409 H556"/>
+        <path class="pc-pa" d="M280 35 V162" fill="none"/>
+        <path class="pc-pz" d="M280 162 V409 H556" fill="none"/>
+        <circle class="pc-dot" r="10" cx="280" cy="35"/>
+      </svg>
+    </div>
+    <div class="pc-phone fx fx-right" style="--d:6">
+      <div class="pc-ph"><div class="pc-sb"><span>用户的手机</span><svg class="ic"><use href="#i-bell"/></svg></div><div class="pc-ms" data-clip-ok></div></div>
+    </div>
+  </div>
+  <p class="tagline pc-tag fx fx-up" style="--d:8"><b>真正的 “主动服务” 不仅需要 Agent 能定时检查事件，更需要事件能主动通知 Agent</b></p>
+  <div class="src">第六章 ·「OpenClaw 的事件驱动机制实现」· PineClaw 与 Channel 机制</div>
+</section>
+<style>
+#c06-pineclaw .sh{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px}
+#c06-pineclaw .pc-top{display:flex;align-items:center;gap:16px}
+#c06-pineclaw .pc-tabs button{font-size:18px;padding:8px 18px}
+#c06-pineclaw .pc-sim{margin-left:auto;font-size:15px;padding:4px 12px}
+#c06-pineclaw .pc-stage{display:grid;grid-template-columns:600px 560px 1fr;gap:28px;height:470px;margin-top:18px}
+#c06-pineclaw .pc-call{padding:16px 20px;display:flex;flex-direction:column;gap:10px;min-height:0}
+#c06-pineclaw .pc-ch{display:flex;align-items:center;gap:10px;font-size:20px}
+#c06-pineclaw .pc-ch .ic{font-size:24px;color:var(--acc)}
+#c06-pineclaw .pc-st{margin-left:auto;font-size:15px;padding:3px 12px;border-radius:999px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+#c06-pineclaw .pc-st.end{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+#c06-pineclaw .pc-tx{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;overflow:hidden}
+#c06-pineclaw .pc-b{display:flex;flex-direction:column;align-items:flex-start;max-width:84%;animation:upIn .5s var(--spring) both}
+#c06-pineclaw .pc-b p{padding:8px 14px;border-radius:14px;font-size:17px;line-height:1.5}
+#c06-pineclaw .pc-w{font-size:15px;color:var(--text3);margin-bottom:2px}
+#c06-pineclaw .pc-b.k p{background:rgba(34,211,238,.09);border:1px solid rgba(34,211,238,.3);border-top-left-radius:4px}
+#c06-pineclaw .pc-b.p,#c06-pineclaw .pc-b.u{align-self:flex-end;align-items:flex-end}
+#c06-pineclaw .pc-b.p p{background:color-mix(in srgb,var(--acc) 12%,transparent);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-top-right-radius:4px}
+#c06-pineclaw .pc-b.u p{background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-top-right-radius:4px}
+#c06-pineclaw .pc-pat{display:flex;align-items:center;gap:12px;font-size:15px;color:var(--text3)}
+#c06-pineclaw .pc-pb{flex:1;height:10px;border-radius:10px;background:rgba(255,255,255,.08);overflow:hidden}
+#c06-pineclaw .pc-pb i{display:block;height:100%;width:100%;border-radius:10px;background:linear-gradient(90deg,var(--bad),var(--warn))}
+#c06-pineclaw .pc-res{min-height:34px;display:flex;align-items:center;gap:10px;font-size:19px;font-weight:700}
+#c06-pineclaw .pc-res.ok{color:var(--ok)}
+#c06-pineclaw .pc-res.bad{color:var(--bad)}
+#c06-pineclaw .pc-res.on{animation:upIn .5s var(--spring) both}
+#c06-pineclaw .pc-mid{position:relative}
+#c06-pineclaw .pc-n{position:absolute;left:100px;width:360px;height:70px;padding:0 18px;border-radius:16px;display:flex;align-items:center;gap:12px;background:rgba(12,18,40,.92);border:1px solid var(--line2);transition:border-color .4s,box-shadow .4s}
+#c06-pineclaw .pc-n .ic{font-size:26px;color:var(--text3)}
+#c06-pineclaw .pc-n b{font-size:19px;white-space:nowrap}
+#c06-pineclaw .pc-n small{margin-left:auto;font-size:15px;color:var(--text3);white-space:nowrap}
+#c06-pineclaw .pc-api{top:0}
+#c06-pineclaw .pc-gate{top:120px;height:84px;padding:0}
+#c06-pineclaw .pc-gwy{top:254px}
+#c06-pineclaw .pc-ag{top:374px}
+#c06-pineclaw .pc-gate>span{position:absolute;inset:0;padding:0 18px;display:flex;align-items:center;gap:12px;border-radius:16px;transition:opacity .4s}
+#c06-pineclaw .pc-g1 .ic{color:var(--ok)!important}
+#c06-pineclaw .pc-g0 .ic{color:var(--warn)!important}
+#c06-pineclaw .pc-g0{opacity:0}
+#c06-pineclaw[data-mode=poll] .pc-g1{opacity:0}
+#c06-pineclaw[data-mode=poll] .pc-g0{opacity:1}
+#c06-pineclaw .pc-n.on{border-color:var(--acc);box-shadow:0 0 28px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c06-pineclaw .pc-gate.on{border-color:var(--ok);box-shadow:0 0 28px color-mix(in srgb,var(--ok) 35%,transparent)}
+#c06-pineclaw .pc-gate.wait{border-color:var(--warn);animation:c06pc-wait 1.2s ease-in-out infinite}
+@keyframes c06pc-wait{50%{box-shadow:0 0 30px color-mix(in srgb,var(--warn) 40%,transparent)}}
+#c06-pineclaw .pc-gate.late{border-color:var(--bad)}
+#c06-pineclaw .pc-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+#c06-pineclaw .pc-ln{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2.5;stroke-dasharray:6 7}
+#c06-pineclaw[data-mode=ch] .pc-ln{stroke:color-mix(in srgb,var(--ok) 60%,transparent);animation:flow 1s linear infinite}
+#c06-pineclaw .pc-dot{fill:#fff;opacity:0;filter:drop-shadow(0 0 10px var(--acc))}
+#c06-pineclaw .pc-svg.hold .pc-dot{animation:blink 1s steps(1) infinite}
+#c06-pineclaw .pc-phone{display:flex;justify-content:center}
+#c06-pineclaw .pc-ph{width:380px;height:470px;border-radius:40px;padding:14px 16px 20px;border:2px solid var(--line2);background:linear-gradient(170deg,rgba(20,26,52,.95),rgba(8,12,28,.95));display:flex;flex-direction:column;gap:10px;box-shadow:0 30px 70px -30px rgba(0,0,0,.8)}
+#c06-pineclaw .pc-sb{display:flex;justify-content:space-between;align-items:center;font-size:15px;color:var(--text3);padding:4px 10px}
+#c06-pineclaw .pc-ms{flex:1;min-height:0;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+#c06-pineclaw .pc-bn{padding:12px 16px;border-radius:18px;background:rgba(255,255,255,.08);border:1px solid var(--line2);animation:c06pc-drop .6s var(--spring) both}
+@keyframes c06pc-drop{from{opacity:0;transform:translateY(-30px)}}
+#c06-pineclaw .pc-bn b{font-size:17px;color:var(--acc)}
+#c06-pineclaw .pc-bn p{font-size:17px;line-height:1.5;margin-top:4px}
+#c06-pineclaw .pc-bt{display:inline-block;margin-top:8px;padding:5px 14px;border-radius:10px;font-size:16px;font-weight:700;color:#06101f;background:var(--acc)}
+#c06-pineclaw .pc-bn.late{border-color:color-mix(in srgb,var(--bad) 50%,transparent)}
+#c06-pineclaw .pc-bn.late b{color:var(--bad)}
+#c06-pineclaw .pc-bn.late .pc-bt{background:var(--text3)}
+#c06-pineclaw .pc-ur{align-self:flex-end;max-width:85%;padding:9px 14px;border-radius:14px;border-top-right-radius:4px;font-size:17px;background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.35);animation:upIn .5s var(--spring) both}
+#c06-pineclaw .pc-tag{margin-top:22px;font-size:23px}
+</style>
+<script>
+HOOKS['c06-pineclaw'] = {
+  // 三个需要用户介入的时刻；k 客服、p Pine、u 用户本人（均为示意）
+  SC: [
+    { ev: 'need_user_input · OTP', a: ['为了核实身份，请提供账户持有人手机上收到的验证码。', '好的，请稍等，我马上联系账户持有人。'],
+      note: '客服正在等验证码，请立即回复收到的 6 位数字', ask: '回复验证码', reply: '482716',
+      ok: [['p', '验证码是 482716。'], ['k', '验证通过，我们继续办理。']], okr: '验证通过，通话继续',
+      bad: [['k', '……您好，还在线吗？'], ['k', '抱歉，一直没有收到验证码，我先挂断了。']], badr: '客服挂断，通话失败' },
+    { ev: 'need_user_join · 三方通话', a: ['这项变更需要账户持有人本人在线确认。', '明白，我请账户持有人加入通话。'],
+      note: '客服要与你直接对话，请在几秒内接听三方通话', ask: '接听', reply: '已接听三方通话',
+      ok: [['u', '你好，我是本人，同意这项变更。'], ['k', '好的，已经确认，谢谢。']], okr: '本人确认完成',
+      bad: [['k', '本人暂时联系不上的话，这项变更只能下次再办。'], ['k', '那这次就先到这里。']], badr: '未能联系到本人，通话结束' },
+    { ev: 'decision_needed · 降价方案', a: ['我们可以把月费从 80 美元降到 65 美元，您接受吗？', '我需要和用户确认一下，请稍等。'],
+      note: '对方提出：月费 80 → 65 美元，是否接受？', ask: '接受', reply: '接受这个方案',
+      ok: [['p', '用户接受这个方案。'], ['k', '好的，已为您调整，下个账单生效。']], okr: '方案已确认',
+      bad: [['k', '这个优惠只在本次通话中有效。'], ['k', '暂时定不下来的话，我们就先结束通话。']], badr: '通话结束，方案过期' },
+  ],
+  WHO: { k: '客服', p: 'Pine', u: '用户本人' },
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.tx = q('.pc-tx');
+    this.ms = q('.pc-ms');
+    this.res = q('.pc-res');
+    this.pb = q('.pc-pb i');
+    this.st = q('.pc-st');
+    this.evl = q('.pc-ev');
+    this.svg = q('.pc-svg');
+    this.pA = q('.pc-pa');
+    this.pZ = q('.pc-pz');
+    this.dot = q('.pc-dot');
+    this.nodes = [...s.querySelectorAll('.pc-n')];
+    this.gate = q('.pc-gate');
+    this.tabs = [...s.querySelectorAll('.pc-tabs button')];
+    this.sc = 0;
+    this.mode = 'poll';
+    this.segSet = U.seg(q('.pc-seg'), (v) => this.go(s, this.sc, v));
+    this.tabs.forEach((b) => b.addEventListener('click', () => this.go(s, +b.dataset.i, this.mode)));
+  },
+  say(who, txt) {
+    this.tx.insertAdjacentHTML('beforeend', `<div class="pc-b ${who}"><span class="pc-w">${this.WHO[who]}</span><p>${txt}</p></div>`);
+    while (this.tx.children.length > 5) this.tx.firstElementChild.remove();
+  },
+  patience(ms) {
+    const b = this.pb;
+    b.style.transition = 'none';
+    b.style.width = '100%';
+    void b.offsetWidth;
+    b.style.transition = `width ${ms}ms linear`;
+    b.style.width = '0%';
+  },
+  freeze() { const b = this.pb, w = getComputedStyle(b).width; b.style.transition = 'none'; b.style.width = w; },
+  result(ok, txt) {
+    this.res.className = 'pc-res on ' + (ok ? 'ok' : 'bad');
+    this.res.innerHTML = `<svg class="ic"><use href="#i-${ok ? 'check' : 'x'}"/></svg>${txt}`;
+  },
+  clear(s) {
+    this.tx.innerHTML = '';
+    this.ms.innerHTML = '';
+    this.res.className = 'pc-res';
+    this.res.innerHTML = '';
+    this.pb.style.transition = 'none';
+    this.pb.style.width = '100%';
+    this.st.textContent = '通话中';
+    this.st.classList.remove('end');
+    this.evl.textContent = '电话事件';
+    this.nodes.forEach((n) => n.classList.remove('on', 'wait', 'late'));
+    this.svg.classList.remove('hold');
+    this.dot.style.opacity = 0;
+  },
+  // 同一个时刻：轮询时通知卡在“等下一次心跳”，Channel 时立即送达用户
+  async run(s, i, mode) {
+    const tk = this.tk, ctx = this.ctx, ok = () => ctx.alive && tk === this.tk, w = (ms) => U.wait(ctx, ms);
+    const S = this.SC[i];
+    this.sc = i;
+    this.mode = mode;
+    s.dataset.mode = mode;
+    this.segSet(mode);
+    this.tabs.forEach((b, j) => b.classList.toggle('on', j === i));
+    this.clear(s);
+    await w(400); if (!ok()) return;
+    this.say('k', S.a[0]);
+    await w(1300); if (!ok()) return;
+    this.say('p', S.a[1]);
+    await w(800); if (!ok()) return;
+    this.evl.textContent = S.ev;
+    this.nodes[0].classList.add('on');
+    this.patience(mode === 'ch' ? 6000 : 5600);
+    await U.fly(this.dot, this.pA, 650, { ctx, keep: true }); if (!ok()) return;
+    if (mode === 'ch') {
+      this.gate.classList.add('on');
+      await U.fly(this.dot, this.pZ, 900, { ctx }); if (!ok()) return;
+      this.nodes[2].classList.add('on');
+      this.nodes[3].classList.add('on');
+      this.ms.insertAdjacentHTML('beforeend', `<div class="pc-bn"><b>Pine 需要你</b><p>${S.note}</p><span class="pc-bt">${S.ask}</span></div>`);
+      await w(1300); if (!ok()) return;
+      this.ms.insertAdjacentHTML('beforeend', `<div class="pc-ur">${S.reply}</div>`);
+      await w(400); if (!ok()) return;
+      await U.fly(this.dot, this.pZ, 600, { ctx, reverse: true, keep: true }); if (!ok()) return;
+      await U.fly(this.dot, this.pA, 450, { ctx, reverse: true }); if (!ok()) return;
+      this.freeze();
+      this.say(S.ok[0][0], S.ok[0][1]);
+      await w(1200); if (!ok()) return;
+      this.say(S.ok[1][0], S.ok[1][1]);
+      this.result(true, S.okr);
+    } else {
+      this.gate.classList.add('wait');
+      this.svg.classList.add('hold');
+      await w(2800); if (!ok()) return;
+      this.say(S.bad[0][0], S.bad[0][1]);
+      await w(2400); if (!ok()) return;
+      this.say(S.bad[1][0], S.bad[1][1]);
+      this.st.textContent = '已挂断';
+      this.st.classList.add('end');
+      this.result(false, S.badr);
+      await w(1100); if (!ok()) return;
+      this.svg.classList.remove('hold');
+      this.gate.classList.remove('wait');
+      this.gate.classList.add('late');
+      await U.fly(this.dot, this.pZ, 900, { ctx }); if (!ok()) return;
+      this.ms.insertAdjacentHTML('beforeend', `<div class="pc-bn late"><b>约 12 分钟后才送达</b><p>${S.note}</p><span class="pc-bt">通话早已结束</span></div>`);
+    }
+  },
+  go(s, i, mode) {
+    this.auto = false;
+    this.tk = (this.tk || 0) + 1;
+    this.run(s, i, mode);
+  },
+  async loop(s) {
+    const tk = this.tk, ctx = this.ctx, live = () => ctx.alive && tk === this.tk;
+    for (let i = 0; live(); i = (i + 1) % this.SC.length) {
+      for (const m of ['poll', 'ch']) {
+        await this.run(s, i, m);
+        if (!live()) return;
+        await U.wait(ctx, 1800);
+        if (!live()) return;
+      }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.tk = (this.tk || 0) + 1;
+    this.auto = true;
+    this.loop(s);
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.clear(s);
+    s.dataset.mode = '';
+    this.tabs.forEach((b) => b.classList.remove('on'));
+  },
+};
+</script>
+<!-- END c06-pineclaw -->
+
+<section class="slide" id="c06-trigger" data-part="1" data-trans="iris" data-dur="16000" data-title="事件触发工具：把世界的变化变成事件" data-notes="事件触发工具是外部事件驱动 Agent 行动的入口。如果没有事件触发工具，Agent 只能连续循环思考、调用工具，最后输出一个结果，然后等待用户的下一步输入。要让世界的变化转化为 Agent 可以处理的事件，常见的事件触发工具有三类。<br><b>定时器</b>（set_timer）处理依赖物理时间的事件：发送了一封邮件但对方没有回复，过一段时间应该再发一封询问进展；打了一个电话但对方不在工作时间，需要到下一个工作时间再尝试拨打。OpenClaw、Claude Code 等工具都支持定时器工具，在指定的物理时间唤醒自己。<b>一次性定时器</b>用于有明确时间点的任务：用户要求“给银行房贷部门打电话问办理进展”，当前是周六，Agent 就设置“下周一上午 10:00 致电银行”，定时器触发后自动拨打。<b>循环定时器</b>用于周期性的任务，比如每小时检查一次服务器健康状况；一些外部服务不支持主动推送进展、只能主动查询，此时也需要用循环定时器定时反复查询。OpenClaw 的 Heartbeat 正是这种机制的系统化实现，也是 OpenClaw 具备“主动服务”能力的根源。<br><b>后台任务监控</b>（monitor_shell）处理来自异步执行的工具或命令行任务的事件。让 Agent 不断“盯着命令行看”、反复调用工具查询进展，会浪费太多的 token；等命令行任务完全结束再让 Agent 思考和行动，又无法及时发现执行过程中的严重问题，命令行卡死时甚至无法介入，导致整个任务停滞。Claude Code 的解法是引入 monitor 工具，允许 Agent 监控命令行的新增输出或包含特定关键词的输出。<br><b>外部事件通道</b>（connect_channel）把新邮件到达、API 回调、IM 消息等外部事件实时推送给 Agent，PineClaw 的 Channel 机制就是典型实现。<br>设计层面，事件触发工具应定义清晰的触发条件和过滤规则，避免无关事件唤醒 Agent 浪费算力；事件载荷（payload）应包含足够的上下文信息，减少 Agent 被唤醒后还需要额外查询的次数。演示中的命令输出、时间与计数均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">事件触发工具：把世界的变化<em>变成事件</em></h2>
+  <p class="lead fx fx-up" style="--d:2">没有它们，Agent 只能连续思考、调用工具、输出结果，然后等用户的下一步输入</p></header>
+  <div class="tg-tabs fx fx-up" style="--d:3">
+    <div class="tabs"><button data-i="0"><svg class="ic"><use href="#i-timer"/></svg>定时器 · set_timer</button><button data-i="1"><svg class="ic"><use href="#i-term"/></svg>后台任务监控 · monitor_shell</button><button data-i="2"><svg class="ic"><use href="#i-plug"/></svg>外部事件通道 · connect_channel</button></div>
+    <span class="chip warn tg-sim">输出与计数为示意</span>
+    <div class="runbar tg-bar"><i></i></div>
+  </div>
+  <div class="tg-pane panel fx fx-up" style="--d:4">
+    <div class="tg-p" data-p="0">
+      <div class="tg-col">
+        <div class="tg-h"><b>一次性定时器</b><span>有明确时间点的任务</span></div>
+        <div class="tg-bub">用户（周六）：给银行房贷部门打电话问办理进展</div>
+        <div class="tg-call">set_timer(at="下周一 10:00", task="致电银行房贷部门")</div>
+        <div class="tg-week"><div class="tg-day"><b>周六</b></div><div class="tg-day off"><b>周日</b><small>非工作日</small></div><div class="tg-day"><b>周一</b><small>10:00</small></div><i class="tg-mk"></i></div>
+        <div class="tg-fire"><svg class="ic"><use href="#i-phone"/></svg>周一 10:00 定时器触发 → 唤醒 Agent → 自动拨打</div>
+        <p class="tg-more">同类场景：邮件发出后对方没回复，过一段时间再发一封询问进展；电话打过去对方不在工作时间，到下一个工作时间再拨</p>
+      </div>
+      <div class="tg-col">
+        <div class="tg-h"><b>循环定时器</b><span>周期性任务</span></div>
+        <div class="tg-cyc">
+          <svg class="tg-clock" viewBox="0 0 200 200" width="170" height="170"><circle cx="100" cy="100" r="86" class="tg-cr"/><g class="tg-ticks"></g><line class="tg-hand" x1="100" y1="100" x2="100" y2="30"/><circle cx="100" cy="100" r="7" class="tg-cc"/></svg>
+          <div class="tg-log" data-clip-ok></div>
+        </div>
+        <div class="tg-poll"><span>外部服务不支持推送进展 → 循环定时器定时反复查询</span><b class="tg-pq">查询中…</b></div>
+        <p class="tg-hb">OpenClaw 的 Heartbeat 正是这种机制的系统化实现，也是它具备“主动服务”能力的根源</p>
+      </div>
+    </div>
+    <div class="tg-p" data-p="1">
+      <div class="win tg-term"><div class="win-bar"><i></i><i></i><i></i><span>后台任务 · python migrate.py</span></div><div class="tg-tl" data-clip-ok></div></div>
+      <div class="tg-st">
+        <div class="tg-s"><div><b>一直盯着看</b><small>不断调用工具查询当前进展</small></div><span class="tg-v">查询 <em class="tg-c0">0</em> 次 · 约 <em class="tg-c1">0</em> token</span></div>
+        <div class="tg-s"><div><b>等它全部结束再看</b><small>执行过程中的问题无从得知</small></div><span class="tg-v tg-c2">等待结束…</span></div>
+        <div class="tg-s good"><div><b>monitor 工具</b><small>监控新增输出或包含特定关键词的输出</small></div><span class="tg-v tg-c3">休眠 · 监听 ERROR</span></div>
+        <p class="tg-cc2">Claude Code 引入 monitor 工具：既不浪费 token，又能在执行过程中及时介入</p>
+      </div>
+    </div>
+    <div class="tg-p" data-p="2">
+      <div class="tg-srcs"><span data-k="0"><svg class="ic"><use href="#i-mail"/></svg>新邮件到达</span><span data-k="1"><svg class="ic"><use href="#i-link"/></svg>API 回调</span><span data-k="2"><svg class="ic"><use href="#i-msg"/></svg>IM 消息</span></div>
+      <svg class="tg-pipe" viewBox="0 0 700 300" width="700" height="300">
+        <path class="tg-pp" d="M0 50 C 160 50, 200 150, 330 150 H 700"/>
+        <path class="tg-pp" d="M0 150 H 700"/>
+        <path class="tg-pp" d="M0 250 C 160 250, 200 150, 330 150 H 700"/>
+        <text x="430" y="132" class="tg-pt">connect_channel · 实时推送</text>
+      </svg>
+      <div class="tg-ag"><div class="tg-agh"><svg class="ic"><use href="#i-robot"/></svg><b>Agent</b><span>事件一到立即被唤醒</span></div><div class="tg-agl" data-clip-ok></div></div>
+      <p class="tg-chn">把新邮件到达、API 回调、IM 消息等外部事件实时推送给 Agent——PineClaw 的 Channel 机制就是典型实现</p>
+    </div>
+  </div>
+  <div class="tg-rules">
+    <div class="fx fx-up" style="--d:6"><div class="tg-rc"><div><b>清晰的触发条件和过滤规则</b><p>避免无关事件唤醒 Agent 浪费算力</p></div><div class="tg-flt"><span class="tg-fe"></span><span class="tg-fr"></span><small>已过滤 <em class="tg-fn">0</em> 个无关事件</small></div></div></div>
+    <div class="fx fx-up" style="--d:7"><div class="tg-rc"><div><b>载荷包含足够的上下文</b><p>减少 Agent 被唤醒后还需要额外查询的次数</p></div><div class="tg-pl"><code class="tg-p0">{"event":"changed"}</code><em class="bad">醒来后还要再查 3 次</em><code class="tg-p1">{"event":"email","from":"bank@…","subject":"贷款进度","thread":"#88"}</code><em class="ok">无需额外查询</em></div></div></div>
+  </div>
+  <div class="src">第六章 ·「事件触发工具」</div>
+</section>
+<style>
+#c06-trigger .tg-tabs{display:flex;align-items:center;gap:16px;position:relative;padding-bottom:10px}
+#c06-trigger .tg-tabs .tabs button{display:inline-flex;align-items:center;gap:10px;font-size:19px}
+#c06-trigger .tg-sim{margin-left:auto;font-size:15px;padding:4px 12px}
+#c06-trigger .tg-bar{position:absolute;left:0;right:0;bottom:0}
+#c06-trigger .tg-pane{position:relative;height:380px;margin-top:12px}
+#c06-trigger .tg-p{position:absolute;inset:0;padding:20px 26px;display:grid;gap:30px;opacity:0;visibility:hidden;transition:opacity .45s,visibility .45s}
+#c06-trigger .tg-p.on{opacity:1;visibility:visible}
+#c06-trigger .tg-p[data-p="0"]{grid-template-columns:1fr 1fr}
+#c06-trigger .tg-p[data-p="1"]{grid-template-columns:820px 1fr}
+#c06-trigger .tg-p[data-p="2"]{grid-template-columns:240px 700px 1fr;grid-template-rows:1fr auto;gap:10px 24px}
+#c06-trigger .tg-col{display:flex;flex-direction:column;gap:12px;min-width:0}
+#c06-trigger .tg-h{display:flex;align-items:baseline;gap:12px}
+#c06-trigger .tg-h b{font-size:22px;color:var(--acc)}
+#c06-trigger .tg-h span{font-size:16px;color:var(--text3)}
+#c06-trigger .tg-bub{align-self:flex-start;padding:9px 16px;border-radius:14px;border-top-left-radius:4px;font-size:18px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.32);opacity:0;transition:opacity .4s}
+#c06-trigger .tg-call{align-self:flex-start;padding:8px 14px;border-radius:10px;font:16px var(--mono);color:#c4b5fd;background:rgba(5,9,22,.8);border:1px solid color-mix(in srgb,var(--llm) 40%,transparent);opacity:0;transition:opacity .4s}
+#c06-trigger .tg-bub.on,#c06-trigger .tg-call.on{opacity:1}
+#c06-trigger .tg-week{position:relative;display:grid;grid-template-columns:repeat(3,1fr);height:62px;border-radius:12px;overflow:hidden;border:1px solid var(--line2)}
+#c06-trigger .tg-day{padding:8px 12px;display:flex;align-items:baseline;gap:10px;background:rgba(255,255,255,.04)}
+#c06-trigger .tg-day+.tg-day{border-left:1px solid var(--line)}
+#c06-trigger .tg-day b{font-size:18px}
+#c06-trigger .tg-day small{font-size:15px;color:var(--text3)}
+#c06-trigger .tg-day.off{background:rgba(255,255,255,.015)}
+#c06-trigger .tg-mk{position:absolute;top:0;bottom:0;left:21%;width:3px;background:var(--acc);box-shadow:0 0 12px var(--acc);transition:left 2.4s var(--eio)}
+#c06-trigger .tg-fire{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700;color:var(--ok);opacity:.2;transition:opacity .4s}
+#c06-trigger .tg-fire.on{opacity:1}
+#c06-trigger .tg-fire.on .ic{animation:shake .5s 3}
+#c06-trigger .tg-more{font-size:16px;line-height:1.6;color:var(--text3);margin-top:auto}
+#c06-trigger .tg-cyc{display:flex;gap:22px;align-items:center}
+#c06-trigger .tg-clock{flex:none}
+#c06-trigger .tg-cr{fill:rgba(12,18,40,.8);stroke:var(--line2);stroke-width:2}
+#c06-trigger .tg-ticks line{stroke:var(--text3);stroke-width:3;stroke-linecap:round}
+#c06-trigger .tg-hand{stroke:var(--acc);stroke-width:5;stroke-linecap:round;transform-origin:100px 100px;animation:spin 4s linear infinite}
+#c06-trigger .tg-cc{fill:var(--acc)}
+#c06-trigger .tg-log{flex:1;height:150px;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;overflow:hidden}
+#c06-trigger .tg-log span{font:16px var(--mono);color:var(--text2);animation:upIn .4s var(--spring) both}
+#c06-trigger .tg-log span b{color:var(--ok);font-weight:600}
+#c06-trigger .tg-poll{display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:12px;font-size:16px;color:var(--text2);background:rgba(255,255,255,.035);border:1px solid var(--line)}
+#c06-trigger .tg-pq{margin-left:auto;font-size:16px;color:var(--warn);white-space:nowrap}
+#c06-trigger .tg-pq.ok{color:var(--ok)}
+#c06-trigger .tg-hb{font-size:16px;line-height:1.6;color:var(--text3);margin-top:auto}
+#c06-trigger .tg-term{display:flex;flex-direction:column;min-height:0}
+#c06-trigger .tg-tl{flex:1;padding:12px 18px;font:16px/1.65 var(--mono);color:#cbd5f5;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+#c06-trigger .tg-tl span{white-space:pre;animation:upIn .3s var(--ease) both}
+#c06-trigger .tg-tl .w{color:var(--warn)}
+#c06-trigger .tg-tl .e{color:var(--bad);font-weight:700}
+#c06-trigger .tg-tl .d{color:var(--text3)}
+#c06-trigger .tg-st{display:flex;flex-direction:column;gap:10px;min-width:0}
+#c06-trigger .tg-s{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.035);transition:border-color .35s,background .35s}
+#c06-trigger .tg-s b{display:block;font-size:19px}
+#c06-trigger .tg-s small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+#c06-trigger .tg-v{margin-left:auto;font-size:16px;color:var(--text2);text-align:right;white-space:nowrap}
+#c06-trigger .tg-v em{font:800 20px var(--num);font-style:normal;color:var(--warn)}
+#c06-trigger .tg-s.bad{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+#c06-trigger .tg-s.bad .tg-v{color:var(--bad);font-weight:700}
+#c06-trigger .tg-s.good.hit{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 25%,transparent)}
+#c06-trigger .tg-s.good.hit .tg-v{color:var(--ok);font-weight:700}
+#c06-trigger .tg-cc2{font-size:16px;line-height:1.6;color:var(--text3)}
+#c06-trigger .tg-srcs{display:flex;flex-direction:column;justify-content:space-around;padding:10px 0}
+#c06-trigger .tg-srcs span{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;font-size:18px;border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:border-color .3s,box-shadow .3s}
+#c06-trigger .tg-srcs span .ic{font-size:22px;color:var(--acc)}
+#c06-trigger .tg-srcs span.hit{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c06-trigger .tg-pipe{overflow:visible}
+#c06-trigger .tg-pp{fill:none;stroke:color-mix(in srgb,var(--acc) 45%,transparent);stroke-width:3;stroke-dasharray:7 8;animation:flow 1s linear infinite}
+#c06-trigger .tg-pt{font-size:17px;fill:var(--acc);font-weight:700}
+#c06-trigger .tg-dt{filter:drop-shadow(0 0 8px var(--acc))}
+#c06-trigger .tg-ag{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:rgba(12,18,40,.85);min-width:0}
+#c06-trigger .tg-ag.hit{animation:c06tg-hit .6s var(--ease)}
+@keyframes c06tg-hit{40%{box-shadow:0 0 34px color-mix(in srgb,var(--acc) 45%,transparent)}}
+#c06-trigger .tg-agh{display:flex;align-items:center;gap:10px}
+#c06-trigger .tg-agh .ic{font-size:26px;color:var(--acc)}
+#c06-trigger .tg-agh b{font-size:20px}
+#c06-trigger .tg-agh span{margin-left:auto;font-size:15px;color:var(--text3)}
+#c06-trigger .tg-agl{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:6px;overflow:hidden}
+#c06-trigger .tg-agl span{font-size:16px;color:var(--text2);padding:6px 10px;border-radius:9px;background:rgba(255,255,255,.04);animation:upIn .4s var(--spring) both;white-space:nowrap}
+#c06-trigger .tg-agl span em{font-style:normal;color:var(--ok);margin-left:6px}
+#c06-trigger .tg-chn{grid-column:1/-1;font-size:17px;color:var(--text2)}
+#c06-trigger .tg-rules{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:16px}
+#c06-trigger .tg-rc{height:128px;display:flex;align-items:center;gap:20px;padding:14px 22px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+#c06-trigger .tg-rc>div:first-child{width:250px;flex:none}
+#c06-trigger .tg-rc b{font-size:20px;color:var(--acc)}
+#c06-trigger .tg-rc p{font-size:16px;line-height:1.5;color:var(--text2);margin-top:6px}
+#c06-trigger .tg-flt{flex:1;display:flex;flex-direction:column;gap:8px}
+#c06-trigger .tg-fe{align-self:flex-start;padding:6px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);background:rgba(255,255,255,.05)}
+#c06-trigger .tg-fe.on{animation:upIn .4s var(--spring) both}
+#c06-trigger .tg-fr{font-size:16px;font-weight:700}
+#c06-trigger .tg-fr.ok{color:var(--ok)}
+#c06-trigger .tg-fr.no{color:var(--text3)}
+#c06-trigger .tg-flt small{font-size:15px;color:var(--text3)}
+#c06-trigger .tg-flt small em{font-style:normal;font-weight:700;color:var(--acc)}
+#c06-trigger .tg-pl{flex:1;min-width:0;display:grid;grid-template-columns:auto auto;gap:8px 14px;align-items:center;justify-content:start}
+#c06-trigger .tg-pl code{font:15px var(--mono);padding:5px 10px;border-radius:8px;background:rgba(5,9,22,.8);border:1px solid var(--line2);white-space:nowrap;transition:border-color .4s,box-shadow .4s}
+#c06-trigger .tg-pl code.on{border-color:var(--acc);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 30%,transparent)}
+#c06-trigger .tg-pl em{font-style:normal;font-size:15px;font-weight:700;white-space:nowrap}
+#c06-trigger .tg-pl em.bad{color:var(--bad)}
+#c06-trigger .tg-pl em.ok{color:var(--ok)}
+</style>
+<script>
+HOOKS['c06-trigger'] = {
+  LINES: [
+    ['$ python migrate.py --batch 40', ''], ['[00:01] batch 1/40 ok', ''], ['[00:02] batch 2/40 ok', ''], ['[00:03] batch 3/40 ok', ''],
+    ['[00:04] WARN slow query on table orders', 'w'], ['[00:05] batch 4/40 ok', ''], ['[00:06] batch 5/40 ok', ''],
+    ['[00:07] ERROR disk quota exceeded', 'e'], ['[00:08] retrying batch 6/40 ...', ''], ['（此后再无输出：进程卡住）', 'd'],
+  ],
+  CH: [[0, '新邮件 · bank@… · 贷款进度'], [1, 'API 回调 · 订单 #8812 已退款'], [2, 'IM · 明天会议改到 3 点'], [0, '新邮件 · 物业 · 维修预约']],
+  FLT: [['银行来信 · 贷款进度', 1], ['订阅广告 · 周末大促', 0], ['系统通知 · 同步完成', 0], ['客户来信 · 合同修改', 1]],
+  init(s) {
+    this.tabs = [...s.querySelectorAll('.tg-tabs button')];
+    this.panes = [...s.querySelectorAll('.tg-p')];
+    this.bar = s.querySelector('.tg-bar');
+    this.tabs.forEach((b) => b.addEventListener('click', () => { this.auto = false; this.bar.classList.remove('run'); this.show(s, +b.dataset.i); }));
+    s.querySelector('.tg-ticks').innerHTML = Array.from({ length: 12 }, (_, i) => { const a = (i * Math.PI) / 6; return `<line x1="${(100 + 74 * Math.sin(a)).toFixed(1)}" y1="${(100 - 74 * Math.cos(a)).toFixed(1)}" x2="${(100 + 84 * Math.sin(a)).toFixed(1)}" y2="${(100 - 84 * Math.cos(a)).toFixed(1)}"/>`; }).join('');
+    this.pipes = [...s.querySelectorAll('.tg-pp')];
+    this.pipe = s.querySelector('.tg-pipe');
+  },
+  show(s, i) {
+    this.i = i;
+    const tk = (this.tk = (this.tk || 0) + 1);
+    this.tabs.forEach((b, j) => b.classList.toggle('on', j === i));
+    this.panes.forEach((p, j) => p.classList.toggle('on', j === i));
+    this.bar.classList.remove('run');
+    void this.bar.offsetWidth;
+    if (this.auto) { this.bar.style.setProperty('--dur', '6.5s'); this.bar.classList.add('run'); }
+    [this.timer, this.mon, this.chan][i].call(this, s, tk);
+  },
+  async timer(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk, q = (x) => s.querySelector(x);
+    const bub = q('.tg-bub'), call = q('.tg-call'), mk = q('.tg-mk'), fire = q('.tg-fire'), log = q('.tg-log'), pq = q('.tg-pq');
+    [bub, call, fire].forEach((e) => e.classList.remove('on'));
+    mk.style.transition = 'none';
+    mk.style.left = '21%';
+    void mk.offsetWidth;
+    mk.style.transition = '';
+    log.innerHTML = '';
+    let h = 9, n = 0;
+    // 循环定时器：每“小时”一次健康检查；不支持推送的外部服务靠定时查询
+    const tick = () => {
+      if (!ok()) return;
+      h = h >= 23 ? 0 : h + 1;
+      log.insertAdjacentHTML('beforeend', `<span>${String(h).padStart(2, '0')}:00 服务器健康检查 · <b>正常</b></span>`);
+      while (log.children.length > 5) log.firstElementChild.remove();
+      n++;
+      const done = n % 4 === 0;
+      pq.textContent = done ? '已完成 → 唤醒 Agent' : `第 ${n % 4} 次查询：处理中`;
+      pq.classList.toggle('ok', done);
+      ctx.later(tick, 1000);
+    };
+    tick();
+    await U.wait(ctx, 300); if (!ok()) return;
+    bub.classList.add('on');
+    await U.wait(ctx, 900); if (!ok()) return;
+    call.classList.add('on');
+    await U.wait(ctx, 700); if (!ok()) return;
+    mk.style.left = '81.5%';
+    await U.wait(ctx, 2500); if (!ok()) return;
+    fire.classList.add('on');
+  },
+  async mon(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk, q = (x) => s.querySelector(x);
+    const tl = q('.tg-tl'), c0 = q('.tg-c0'), c1 = q('.tg-c1'), c2 = q('.tg-c2'), c3 = q('.tg-c3');
+    const rows = [...s.querySelectorAll('.tg-s')];
+    tl.innerHTML = '';
+    c0.textContent = 0;
+    c1.textContent = 0;
+    c2.textContent = '等待结束…';
+    c3.textContent = '休眠 · 监听 ERROR';
+    rows.forEach((r) => r.classList.remove('bad', 'hit'));
+    for (let i = 0; i < this.LINES.length; i++) {
+      await U.wait(ctx, i ? 470 : 250); if (!ok()) return;
+      const [txt, k] = this.LINES[i];
+      tl.insertAdjacentHTML('beforeend', `<span class="${k}">${txt}</span>`);
+      if (i > 0 && k !== 'd') { c0.textContent = i; c1.textContent = (i * 350).toLocaleString('en-US'); }
+      if (k === 'e') {
+        c2.textContent = '没察觉：任务还没结束';
+        c3.textContent = '已唤醒：发现 ERROR，立即介入';
+        rows[2].classList.add('hit');
+      }
+      if (k === 'd') { c2.textContent = '命令行卡死：任务停滞，无法介入'; rows[1].classList.add('bad'); }
+    }
+  },
+  async chan(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const srcs = [...s.querySelectorAll('.tg-srcs span')], ag = s.querySelector('.tg-ag'), agl = s.querySelector('.tg-agl');
+    agl.innerHTML = '';
+    for (let n = 0; ok(); n++) {
+      const [k, txt] = this.CH[n % this.CH.length];
+      U.restart(srcs[k], 'hit');
+      const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      d.setAttribute('r', '9');
+      d.setAttribute('class', 'tg-dt');
+      d.style.fill = '#fff';
+      d.style.opacity = 0;
+      this.pipe.appendChild(d);
+      await U.fly(d, this.pipes[k], 900, { ctx });
+      d.remove();
+      if (!ok()) return;
+      U.restart(ag, 'hit');
+      agl.insertAdjacentHTML('beforeend', `<span>${txt}<em>即时送达</em></span>`);
+      while (agl.children.length > 5) agl.firstElementChild.remove();
+      await U.wait(ctx, 600);
+    }
+  },
+  // 底部两条设计原则的小演示：过滤无关事件、载荷是否自带上下文
+  async rules(s) {
+    const ctx = this.ctx, q = (x) => s.querySelector(x);
+    const fe = q('.tg-fe'), fr = q('.tg-fr'), fn = q('.tg-fn'), p0 = q('.tg-p0'), p1 = q('.tg-p1');
+    let blocked = 0;
+    for (let n = 0; ctx.alive; n++) {
+      const [txt, pass] = this.FLT[n % this.FLT.length];
+      fe.textContent = txt;
+      U.restart(fe, 'on');
+      fr.className = 'tg-fr ' + (pass ? 'ok' : 'no');
+      fr.textContent = pass ? '符合触发条件 → 唤醒 Agent' : '不符合 → 过滤，不唤醒';
+      if (!pass) fn.textContent = ++blocked;
+      p0.classList.toggle('on', n % 2 === 0);
+      p1.classList.toggle('on', n % 2 === 1);
+      await U.wait(ctx, 1500);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 6500);
+    this.rules(s);
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.tabs.forEach((b) => b.classList.remove('on'));
+    this.panes.forEach((p) => p.classList.remove('on'));
+    this.bar.classList.remove('run');
+    s.querySelectorAll('.tg-dt').forEach((d) => d.remove());
+    s.querySelector('.tg-fn').textContent = 0;
+  },
+};
+</script>
+<!-- END c06-trigger -->
+
+<section class="slide" id="c06-comm" data-part="1" data-steps="1" data-dur="14000" data-title="用户沟通工具与多渠道召回" data-notes="用户沟通工具是为了适应 Agent 与用户之间日益多元的沟通渠道而产生的。许多 Agent（如 Claude Code、Manus）采用原生 ReAct 循环，Agent“说”的所有话（即 assistant 消息）都直接发送给用户，用户必须在应用中打开指定的会话才能与 Agent 对话，往往还能看到 Agent 调用工具的过程。<br>OpenClaw 打破了这一人机沟通范式：用户无需感知会话的存在，也无需关心 Agent 调用工具的细节；用户和 Agent 都可以随时给对方发送消息，而不是用户发一条、Agent 回一条。因此很多人评价 OpenClaw 具备<b>“活人感”</b>，就像一个秘书一样通过文本消息与用户异步沟通。OpenClaw 并不是直接把模型输出的 assistant 消息呈现给用户，而是使用专门的工具发送消息；这些消息还可以附带图片和文件，并可根据紧急程度附加推送提醒。<br>除了文本，越来越多的 Agent 具备<b>多模态沟通能力</b>，例如发送结构化卡片消息、发送提醒邮件；一些 Agent 已经开始尝试<b>生成式 UI</b>（Generative UI），用 HTML 等方式生成交互式界面，以更友好的方式展示信息。设计上，用户沟通工具应支持异步消息模式（用户不一定在线），提供已读/未读状态追踪，并在多渠道场景下保持消息的一致性。<br>按 → 进入<b>多渠道的用户沟通与召回。</b><b>Agent 的响应不应局限于单一渠道，通知机制同时也是用户召回机制</b>：消息发送扩展到即时通讯、短信、邮件、电话、推送等多种渠道，Agent 根据紧急程度、用户状态、内容性质、用户偏好综合决定渠道的选择，既保证不错过重要的消息，又避免重复打扰。对于长时间运行的任务，Agent 需要在完成时主动通知用户，召回用户的注意力；对于定期性的任务（如每日总结、周报），通知可以帮助用户建立固定的交互习惯。演示中的消息内容与渠道选择规则均为示意，可以点击各个因素试试。<br>用户沟通工具解决了“如何触达用户”；但 Agent 以什么身份出现在这些渠道上、在什么环境中代表用户执行操作，还需要一层身份与环境的基础设施——这是下一页的主题。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">用户沟通工具：像秘书一样<em>异步沟通</em></h2></header>
+  <div class="cm-body">
+    <div class="cm-a panel fx fx-left" style="--d:2">
+      <div class="cm-h"><svg class="ic"><use href="#i-term"/></svg><b>原生 ReAct 会话</b><span class="chip">Claude Code、Manus</span></div>
+      <div class="cm-win"><div class="cm-wb"><svg class="ic"><use href="#i-lock"/></svg>会话 #42 · 用户必须打开这个会话</div><div class="ml cm-ml" data-clip-ok></div></div>
+      <ul class="cm-pts"><li>Agent “说”的所有话（assistant 消息）直接发给用户</li><li>用户必须在应用里打开指定会话才能对话</li><li>往往能看到 Agent 调用工具的过程</li></ul>
+    </div>
+    <div class="cm-b fx fx-up" style="--d:3">
+      <div class="cm-bh"><svg class="ic"><use href="#i-mobile"/></svg><b>OpenClaw：用专门的工具发消息</b></div>
+      <div class="cm-ph">
+        <div class="cm-pt"><span>与 Agent 的对话</span><em class="cm-un">未读 0</em></div>
+        <div class="cm-push"><svg class="ic"><use href="#i-bell"/></svg><span>【紧急】航班改签需要你确认</span></div>
+        <div class="cm-chat" data-clip-ok></div>
+      </div>
+      <p class="cm-cap">用户无需感知会话，也不必关心工具调用细节；双方都能随时给对方发消息（消息为示意）</p>
+    </div>
+    <div class="cm-c fx fx-right" style="--d:4">
+      <div class="cm-s0">
+        <div class="cm-card hl"><b>“活人感”</b><p>不是用户发一条、Agent 回一条——像秘书一样，通过文本消息与用户异步沟通；消息可附图片、文件，按紧急程度附加推送提醒</p></div>
+        <div class="cm-card"><b>多模态沟通能力</b><div class="cm-chips"><span>结构化卡片消息</span><span>提醒邮件</span><span>生成式 UI</span></div>
+          <div class="cm-gui"><div class="cm-gh"><span>生成式 UI：本月支出</span><em class="chip warn">示意</em></div><div class="cm-bars"><i style="--h:60%"></i><i style="--h:35%"></i><i style="--h:80%"></i><i style="--h:50%"></i><i style="--h:68%"></i></div><div class="cm-gt"><button class="cm-gb on" data-g="0">按周</button><button class="cm-gb" data-g="1">按类别</button></div></div></div>
+        <div class="cm-card"><b>设计要求</b><ul class="cm-req"><li>支持异步消息模式（用户不一定在线）</li><li>已读 / 未读状态追踪</li><li>多渠道场景下保持消息的一致性</li></ul></div>
+      </div>
+      <div class="cm-s1">
+        <div class="cm-rh"><b>多渠道的用户沟通与召回。</b><p>Agent 的响应不应局限于单一渠道，通知机制同时也是用户召回机制</p></div>
+        <div class="cm-fs">
+          <div class="cm-f" data-f="0"><span>紧急程度</span><button data-v="0">低</button><button data-v="1">中</button><button data-v="2">高</button></div>
+          <div class="cm-f" data-f="1"><span>用户状态</span><button data-v="0">在线</button><button data-v="1">忙碌</button><button data-v="2">离线</button></div>
+          <div class="cm-f" data-f="2"><span>内容性质</span><button data-v="0">进展通知</button><button data-v="1">需要决策</button><button data-v="2">定期总结</button></div>
+          <div class="cm-f" data-f="3"><span>用户偏好</span><button data-v="0">无特别偏好</button><button data-v="1">尽量少打扰</button></div>
+        </div>
+        <div class="cm-chs"><span data-c="im"><svg class="ic"><use href="#i-chat"/></svg>即时通讯</span><span data-c="sms"><svg class="ic"><use href="#i-msg"/></svg>短信</span><span data-c="mail"><svg class="ic"><use href="#i-mail"/></svg>邮件</span><span data-c="phone"><svg class="ic"><use href="#i-phone"/></svg>电话</span><span data-c="push"><svg class="ic"><use href="#i-bell"/></svg>推送</span></div>
+        <p class="cm-why"></p>
+        <p class="cm-tip">长任务完成时主动通知、召回注意力；定期任务（每日总结、周报）帮助用户建立固定的交互习惯 · 选择规则为示意</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「用户沟通工具」· 多渠道的用户沟通与召回</div>
+</section>
+<style>
+#c06-comm .cm-body{display:grid;grid-template-columns:470px 400px 1fr;gap:28px;height:650px}
+#c06-comm .cm-a{padding:18px 20px;display:flex;flex-direction:column;gap:14px;min-height:0}
+#c06-comm .cm-h{display:flex;align-items:center;gap:10px;font-size:21px}
+#c06-comm .cm-h>.ic{font-size:24px;color:var(--acc)}
+#c06-comm .cm-h .chip{margin-left:auto;font-size:15px;padding:4px 12px}
+#c06-comm .cm-win{flex:1;min-height:0;display:flex;flex-direction:column;border-radius:14px;border:1px solid var(--line2);background:rgba(5,9,22,.7);overflow:hidden}
+#c06-comm .cm-wb{display:flex;align-items:center;gap:8px;padding:9px 14px;font-size:15px;color:var(--text3);border-bottom:1px solid var(--line);background:rgba(255,255,255,.04)}
+#c06-comm .cm-ml{flex:1;min-height:0;padding:12px;justify-content:flex-end;overflow:hidden}
+#c06-comm .cm-ml .mr{font-size:16px;padding:8px 12px 8px 16px}
+#c06-comm .cm-ml .mr .rl{min-width:78px;font-size:15px}
+#c06-comm .cm-pts{display:flex;flex-direction:column;gap:6px}
+#c06-comm .cm-pts li{position:relative;padding-left:18px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c06-comm .cm-pts li::before{content:"";position:absolute;left:2px;top:.6em;width:7px;height:7px;border-radius:50%;background:var(--text3)}
+#c06-comm .cm-b{display:flex;flex-direction:column;gap:12px;min-height:0}
+#c06-comm .cm-bh{display:flex;align-items:center;gap:10px;font-size:20px}
+#c06-comm .cm-bh .ic{font-size:24px;color:var(--acc)}
+#c06-comm .cm-ph{position:relative;flex:1;min-height:0;border-radius:36px;padding:14px 14px 16px;border:2px solid var(--line2);background:linear-gradient(170deg,rgba(20,26,52,.95),rgba(8,12,28,.95));display:flex;flex-direction:column;gap:10px;overflow:hidden}
+#c06-comm .cm-pt{display:flex;justify-content:space-between;align-items:center;padding:2px 8px;font-size:15px;color:var(--text3)}
+#c06-comm .cm-un{font-style:normal;font-size:15px;padding:1px 10px;border-radius:999px;color:#06101f;background:var(--acc);transition:opacity .3s}
+#c06-comm .cm-un.zero{opacity:.35;background:var(--text3)}
+#c06-comm .cm-push{position:absolute;left:12px;right:12px;top:12px;z-index:2;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;font-size:16px;font-weight:700;background:rgba(251,113,133,.92);color:#fff;box-shadow:0 12px 30px -10px rgba(0,0,0,.7);opacity:0;translate:0 -80px;transition:opacity .45s,translate .55s var(--spring)}
+#c06-comm .cm-push.on{opacity:1;translate:0 0}
+#c06-comm .cm-push .ic{font-size:20px;animation:shake .6s 2}
+#c06-comm .cm-chat{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:flex-end;gap:8px;overflow:hidden}
+#c06-comm .cm-m{max-width:88%;padding:9px 13px;border-radius:14px;font-size:16px;line-height:1.5;animation:upIn .45s var(--spring) both}
+#c06-comm .cm-m.a{align-self:flex-start;background:color-mix(in srgb,var(--acc) 12%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);border-top-left-radius:4px}
+#c06-comm .cm-m.u{align-self:flex-end;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35);border-top-right-radius:4px}
+#c06-comm .cm-att{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 10px;border-radius:10px;font-size:15px;background:rgba(255,255,255,.07)}
+#c06-comm .cm-img{margin-top:6px;height:64px;border-radius:10px;display:grid;place-items:center;font-size:15px;color:var(--text2);background:linear-gradient(120deg,rgba(56,189,248,.35),rgba(244,114,182,.35))}
+#c06-comm .cm-cd{margin-top:6px;padding:8px 10px;border-radius:10px;border:1px solid var(--line2);background:rgba(255,255,255,.05)}
+#c06-comm .cm-cd b{display:block;font-size:15px;color:var(--ok)}
+#c06-comm .cm-cd span{display:block;font-size:15px;color:var(--text2)}
+#c06-comm .cm-cd i{display:inline-block;margin:6px 6px 0 0;font-style:normal;font-size:15px;padding:2px 10px;border-radius:8px;border:1px solid var(--line2)}
+#c06-comm .cm-cap{font-size:16px;line-height:1.55;color:var(--text3)}
+#c06-comm .cm-c{position:relative;min-height:0}
+#c06-comm .cm-s0,#c06-comm .cm-s1{position:absolute;inset:0;display:flex;flex-direction:column;gap:14px;transition:opacity .5s,translate .5s var(--ease)}
+#c06-comm .cm-s1{opacity:0;translate:40px 0;pointer-events:none}
+#c06-comm[data-k="1"] .cm-s0{opacity:0;translate:-40px 0;pointer-events:none}
+#c06-comm[data-k="1"] .cm-s1{opacity:1;translate:0 0;pointer-events:auto}
+#c06-comm .cm-card{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+#c06-comm .cm-card>b{font-size:21px;color:var(--acc)}
+#c06-comm .cm-card p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+#c06-comm .cm-card.hl{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+#c06-comm .cm-chips{display:flex;gap:8px;margin-top:10px}
+#c06-comm .cm-chips span{padding:5px 12px;border-radius:999px;font-size:15px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-comm .cm-gui{margin-top:12px;padding:10px 14px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--acc) 50%,transparent)}
+#c06-comm .cm-gh{display:flex;align-items:center;justify-content:space-between;font-size:15px;color:var(--text2)}
+#c06-comm .cm-gh .chip{font-size:15px;padding:2px 10px}
+#c06-comm .cm-bars{display:flex;align-items:flex-end;gap:12px;height:62px;margin-top:8px}
+#c06-comm .cm-bars i{flex:1;height:var(--h);border-radius:6px 6px 2px 2px;background:linear-gradient(var(--acc),color-mix(in srgb,var(--acc) 30%,transparent));transition:height .7s var(--spring)}
+#c06-comm .cm-gt{display:flex;gap:8px;margin-top:8px}
+#c06-comm .cm-gb{padding:3px 12px;border-radius:8px;font-size:15px;color:var(--text2);border:1px solid var(--line2)}
+#c06-comm .cm-gb.on{color:#06101f;background:var(--acc);border-color:var(--acc)}
+#c06-comm .cm-req{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#c06-comm .cm-req li{position:relative;padding-left:26px;font-size:17px;color:var(--text2)}
+#c06-comm .cm-req li::before{content:"";position:absolute;left:2px;top:.35em;width:14px;height:14px;border-radius:4px;border:2px solid var(--acc)}
+#c06-comm .cm-rh b{font-size:22px;color:var(--acc)}
+#c06-comm .cm-rh p{font-size:18px;line-height:1.6;margin-top:6px}
+#c06-comm .cm-fs{display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+#c06-comm .cm-f{display:flex;align-items:center;gap:8px}
+#c06-comm .cm-f span{width:86px;flex:none;font-size:16px;color:var(--text3)}
+#c06-comm .cm-f button{padding:5px 14px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .25s}
+#c06-comm .cm-f button.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc)}
+#c06-comm .cm-chs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+#c06-comm .cm-chs span{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;border-radius:14px;font-size:16px;color:var(--text3);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s var(--ease)}
+#c06-comm .cm-chs .ic{font-size:26px}
+#c06-comm .cm-chs span.on{color:var(--text);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 15%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 30%,transparent);translate:0 -4px}
+#c06-comm .cm-chs span.on .ic{color:var(--acc)}
+#c06-comm .cm-why{min-height:28px;font-size:17px;font-weight:600;color:var(--text)}
+#c06-comm .cm-tip{font-size:15px;line-height:1.6;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-comm'] = {
+  REACT: [['user', '把登录模块重构一下'], ['assistant', '好的，我先看看现有代码。'], ['tool', 'tool_call → read_file(auth.py)'], ['tool', 'tool_result → 182 行代码'], ['tool', 'tool_call → run_tests()'], ['assistant', '重构完成，测试全部通过。']],
+  CHAT: [
+    [900, 'a', '早上好，昨晚的周报整理好了。<div class="cm-att">周报.pdf · 2 页</div>'],
+    [2300, 'u', '好的，周五帮我订个会议室'],
+    [3800, 'a', '已经订好：<div class="cm-cd"><b>会议室已预订</b><span>周五 14:00 · 3 号会议室</span><i>查看</i><i>改时间</i></div>'],
+    [5600, 'push', ''],
+    [6400, 'a', '航班改签有两个方案，对比见图：<div class="cm-img">航班对比图</div>'],
+    [8600, 'u', '选第二个'],
+    [9600, 'a', '收到，已按第二个方案改签。'],
+  ],
+  PRE: [[2, 2, 0, 0], [2, 0, 0, 0], [1, 1, 1, 1], [0, 0, 0, 0], [1, 2, 0, 0], [0, 0, 2, 0]],
+  init(s) {
+    this.ml = s.querySelector('.cm-ml');
+    this.chat = s.querySelector('.cm-chat');
+    this.push = s.querySelector('.cm-push');
+    this.un = s.querySelector('.cm-un');
+    this.fs = [...s.querySelectorAll('.cm-f')];
+    this.chs = [...s.querySelectorAll('.cm-chs span')];
+    this.why = s.querySelector('.cm-why');
+    this.v = [2, 2, 0, 0];
+    this.fs.forEach((f, i) => f.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.v[i] = +b.dataset.v; this.pick(); })));
+    s.querySelectorAll('.cm-gb').forEach((b) => b.addEventListener('click', () => this.gui(s, +b.dataset.g)));
+    this.pick();
+  },
+  gui(s, g) {
+    s.querySelectorAll('.cm-gb').forEach((b) => b.classList.toggle('on', +b.dataset.g === g));
+    const H = g ? [85, 40, 30, 55, 20] : [60, 35, 80, 50, 68];
+    s.querySelectorAll('.cm-bars i').forEach((b, i) => b.style.setProperty('--h', H[i] + '%'));
+  },
+  // 渠道选择（示意规则）：综合紧急程度、用户状态、内容性质、用户偏好
+  decide([u, st, ty, pf]) {
+    if (ty === 2) return [['mail'], '定期总结：固定时间发邮件，帮助用户建立固定的交互习惯'];
+    if (u === 2) return st === 2 ? [['phone', 'sms'], '紧急且用户离线：电话 + 短信，保证不错过'] : [['push', 'im'], '紧急：推送提醒 + 即时消息，立即召回注意力'];
+    if (ty === 1) return pf === 1 && st === 1 ? [['im'], '需要决策但用户忙碌、偏好少打扰：只发带确认卡片的即时消息'] : [['im', 'push'], '需要决策：即时消息附确认卡片，并推送提醒'];
+    if (u === 1 && st === 2) return [['push'], '中等紧急、用户离线：推送一条提醒，回来后再看详情'];
+    if (u === 0 || pf === 1) return [['im'], '低紧急度：只发即时消息，不额外推送，避免重复打扰'];
+    return [['im', 'push'], '常规进展：即时消息 + 推送提醒'];
+  },
+  pick() {
+    this.fs.forEach((f, i) => f.querySelectorAll('button').forEach((b) => b.classList.toggle('on', +b.dataset.v === this.v[i])));
+    const [cs, why] = this.decide(this.v);
+    this.chs.forEach((c) => c.classList.toggle('on', cs.includes(c.dataset.c)));
+    this.why.textContent = '→ ' + why;
+  },
+  // 左：原生 ReAct 会话逐条出现；中：OpenClaw 的消息在任意时刻到达
+  async demo(s) {
+    const tk = this.tk, ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      this.ml.innerHTML = '';
+      this.chat.innerHTML = '';
+      this.unread = 0;
+      this.setUn();
+      this.push.classList.remove('on');
+      let t = 0, r = 0;
+      for (const [at, who, html] of this.CHAT) {
+        while (r < this.REACT.length && r * 1500 + 400 < at) {
+          await U.wait(ctx, Math.max(0, r * 1500 + 400 - t)); if (!ok()) return;
+          t = r * 1500 + 400;
+          const [role, txt] = this.REACT[r++];
+          this.ml.insertAdjacentHTML('beforeend', `<div class="mr new" data-r="${role}"><span class="rl">${role}</span><span class="tx">${txt}</span></div>`);
+        }
+        await U.wait(ctx, at - t); if (!ok()) return;
+        t = at;
+        if (who === 'push') { this.push.classList.add('on'); this.unread++; this.setUn(); ctx.later(() => this.push.classList.remove('on'), 2400); continue; }
+        this.chat.insertAdjacentHTML('beforeend', `<div class="cm-m ${who}">${html}</div>`);
+        while (this.chat.children.length > 6) this.chat.firstElementChild.remove();
+        if (who === 'a') this.unread++; else this.unread = 0;
+        this.setUn();
+      }
+      while (r < this.REACT.length) {
+        await U.wait(ctx, 700); if (!ok()) return;
+        const [role, txt] = this.REACT[r++];
+        this.ml.insertAdjacentHTML('beforeend', `<div class="mr new" data-r="${role}"><span class="rl">${role}</span><span class="tx">${txt}</span></div>`);
+      }
+      await U.wait(ctx, 3200);
+    }
+  },
+  setUn() { this.un.textContent = '未读 ' + this.unread; this.un.classList.toggle('zero', !this.unread); },
+  apply(s, k) {
+    s.dataset.k = k;
+    if (k === 1 && !this.recall) {
+      this.recall = true;
+      let n = 0;
+      this.ctx.every(() => { if (this.auto && this.ctx.alive) { this.v = this.PRE[n++ % this.PRE.length].slice(); this.pick(); } }, 2600);
+    }
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.tk = (this.tk || 0) + 1;
+    this.auto = true;
+    this.recall = false;
+    this.v = this.PRE[0].slice();
+    this.pick();
+    let g = 0;
+    ctx.every(() => this.gui(s, ++g % 2), 2400);
+    this.apply(s, k);
+    this.demo(s);
+  },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.k = 0;
+    this.ml.innerHTML = '';
+    this.chat.innerHTML = '';
+    this.push.classList.remove('on');
+    this.gui(s, 0);
+  },
+};
+</script>
+<!-- END c06-comm -->
+
+<section class="slide" id="c06-identity" data-part="1" data-trans="zoom" data-dur="15000" data-title="虚拟身份：秘书有自己的电话和邮箱" data-notes="第四章开头以《Her》中的 Samantha 为例，说明 Agent 如何借助工具与真实数字世界交互。要实现这样的通用助理，首先面临一个关键的架构选择：Agent 应该直接管理用户的个人账号，还是拥有自己的虚拟身份？直接管理看似便捷，但一旦 Agent 出现错误或被攻破，用户的全部数字身份将会暴露。更稳妥的方案是赋予 Agent 一套独立的虚拟身份——如同秘书拥有自己的办公电话和邮箱。这套虚拟身份包括专属的通讯账号、存储空间、计算环境，使 Agent 能以透明的身份代表用户工作。身份的明确性不仅没有削弱信任，反而增强了沟通的真实性。<br>虚拟身份需要部署在隔离的执行环境中。<b>虚拟电脑</b>（VM/容器）和<b>虚拟手机</b>（Android 模拟器）为 Agent 提供操作系统级的隔离和完整的桌面/移动操作能力：首先，虚拟电脑可以全天候运行，不受用户设备联网状态的影响，也不影响用户正在操作的应用；其次，即使 Agent 执行了错误操作，最多也只会导致虚拟环境崩溃，不会影响用户的真实设备；最后，隔离环境可以防止 Agent 随意访问用户的本地文件，提高了安全性。<br>演示会在两种模式之间切换，并各模拟一次“Agent 出错或被攻破”：直接管理时波及用户的全部账号；使用独立虚拟身份时，影响被限制在虚拟环境之内。也可以手动切换模式、点击“模拟事故”。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">虚拟身份：秘书有<em>自己的</em>办公电话和邮箱</h2></div>
+    <div class="id-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="direct">直接管理用户账号</button><button data-v="virtual">独立虚拟身份</button></div></header>
+  <div class="id-body">
+    <div class="id-stage fx fx-scale" style="--d:3">
+      <div class="id-user"><b class="id-t">用户本人的数字身份</b></div>
+      <div class="id-acc" style="top:50px"><svg class="ic"><use href="#i-mail"/></svg>个人邮箱<em></em></div>
+      <div class="id-acc" style="top:122px"><svg class="ic"><use href="#i-phone"/></svg>手机号<em></em></div>
+      <div class="id-acc" style="top:194px"><svg class="ic"><use href="#i-users"/></svg>社交账号<em></em></div>
+      <div class="id-acc" style="top:266px"><svg class="ic"><use href="#i-card"/></svg>网银<em></em></div>
+      <div class="id-acc" style="top:338px"><svg class="ic"><use href="#i-cloud"/></svg>云盘<em></em></div>
+      <div class="id-acc" style="top:410px"><svg class="ic"><use href="#i-folder"/></svg>本地文件<em></em></div>
+      <div class="id-dev"><svg class="ic"><use href="#i-browser"/></svg><div><b>用户的设备</b><small class="id-ds">在线 · 正在使用</small></div></div>
+      <div class="id-ag"><svg class="ic"><use href="#i-robot"/></svg><b>Agent</b><small class="id-as">正常工作</small></div>
+      <div class="id-env">
+        <b class="id-t">隔离执行环境</b>
+        <div class="id-vm"><svg class="ic"><use href="#i-cpu"/></svg><div><b>虚拟电脑</b><small>VM / 容器 · <span class="id-vs">运行中 24/7</span></small></div></div>
+        <div class="id-vm"><svg class="ic"><use href="#i-mobile"/></svg><div><b>虚拟手机</b><small>Android 模拟器</small></div></div>
+        <div class="id-own"><span class="lbl">Agent 自己的身份</span><div><i>专属邮箱</i><i>专属电话号码</i><i>存储空间</i><i>计算环境</i></div></div>
+        <div class="id-crash">虚拟环境崩溃 → 重建，用户设备不受影响</div>
+      </div>
+      <svg class="id-svg" viewBox="0 0 1000 600" width="1000" height="600">
+        <g class="id-dl"><path d="M422 300 C 370 300, 360 81, 312 81"/><path d="M422 300 C 370 300, 360 153, 312 153"/><path d="M422 300 C 370 300, 360 225, 312 225"/><path d="M422 300 C 370 300, 360 297, 312 297"/><path d="M422 300 C 370 300, 360 369, 312 369"/><path d="M422 300 C 370 300, 360 441, 312 441"/></g>
+        <path class="id-vl" d="M592 300 H658"/>
+        <path class="id-no" d="M658 441 H312"/>
+        <text class="id-nt" x="485" y="430">禁止访问用户本地文件</text>
+      </svg>
+      <button class="btn id-boom"><svg class="ic"><use href="#i-bug"/></svg>模拟事故：Agent 出错或被攻破</button>
+    </div>
+    <div class="id-side">
+      <div class="fx fx-right" style="--d:4"><div class="id-mode"><b class="id-mt"></b><p class="id-mp"></p></div></div>
+      <div class="fx fx-right" style="--d:5"><div class="id-bn"><svg class="ic"><use href="#i-clock"/></svg><div><b>全天候运行</b><p>不受用户设备联网状态的影响，也不影响用户正在操作的应用</p></div></div></div>
+      <div class="fx fx-right" style="--d:6"><div class="id-bn"><svg class="ic"><use href="#i-shield"/></svg><div><b>错误被隔离</b><p>即使执行了错误操作，最多只会导致虚拟环境崩溃，不会影响用户的真实设备</p></div></div></div>
+      <div class="fx fx-right" style="--d:7"><div class="id-bn"><svg class="ic"><use href="#i-lock"/></svg><div><b>访问受限</b><p>隔离环境防止 Agent 随意访问用户的本地文件，提高了安全性</p></div></div></div>
+      <blockquote class="quote id-q fx fx-up" style="--d:8">身份的明确性不仅没有削弱信任，反而增强了沟通的真实性。</blockquote>
+    </div>
+  </div>
+  <div class="src">第六章 ·「虚拟身份与隔离执行环境」</div>
+</section>
+<style>
+#c06-identity .sh{display:flex;justify-content:space-between;align-items:flex-end}
+#c06-identity .id-body{display:grid;grid-template-columns:1000px 1fr;gap:34px}
+#c06-identity .id-stage{position:relative;width:1000px;height:640px}
+#c06-identity .id-t{display:block;font-size:19px;color:var(--text2)}
+#c06-identity .id-user{position:absolute;left:0;top:0;width:330px;height:600px;border-radius:20px;padding:14px 16px;border:1px solid var(--line);background:rgba(255,255,255,.02)}
+#c06-identity .id-acc{position:absolute;left:16px;width:296px;height:62px;padding:0 16px;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:19px;border:1px solid color-mix(in srgb,var(--env) 40%,transparent);background:color-mix(in srgb,var(--env) 8%,rgba(12,18,40,.9));transition:border-color .4s,background .4s,box-shadow .4s}
+#c06-identity .id-acc .ic{font-size:22px;color:var(--env);transition:color .4s}
+#c06-identity .id-acc em{margin-left:auto;font-style:normal;font-size:15px;font-weight:700;color:var(--bad);opacity:0;transition:opacity .3s}
+#c06-identity .id-acc.exp{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,rgba(12,18,40,.9));box-shadow:0 0 22px color-mix(in srgb,var(--bad) 35%,transparent)}
+#c06-identity .id-acc.exp .ic{color:var(--bad)}
+#c06-identity .id-acc.exp em,#c06-identity .id-acc.safe em{opacity:1}
+#c06-identity .id-acc.safe em{color:var(--ok)}
+#c06-identity .id-dev{position:absolute;left:16px;top:494px;width:296px;height:90px;padding:0 16px;border-radius:14px;display:flex;align-items:center;gap:14px;border:1px solid var(--line2);background:rgba(12,18,40,.9)}
+#c06-identity .id-dev .ic{font-size:30px;color:var(--ctx)}
+#c06-identity .id-dev b{display:block;font-size:19px}
+#c06-identity .id-dev small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+#c06-identity .id-ag{position:absolute;left:422px;top:236px;width:170px;height:128px;border-radius:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--acc) 25%,transparent);transition:all .4s}
+#c06-identity .id-ag .ic{font-size:40px;color:var(--acc)}
+#c06-identity .id-ag b{font-size:22px}
+#c06-identity .id-ag small{font-size:15px;color:var(--text3)}
+#c06-identity .id-ag.hit{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 22%,rgba(12,18,40,.92));box-shadow:0 0 40px color-mix(in srgb,var(--bad) 55%,transparent);animation:shake .5s 2}
+#c06-identity .id-ag.hit .ic,#c06-identity .id-ag.hit small{color:var(--bad)}
+#c06-identity .id-env{position:absolute;left:660px;top:0;width:340px;height:600px;border-radius:20px;padding:14px 16px;border:2px dashed color-mix(in srgb,var(--env) 55%,transparent);background:color-mix(in srgb,var(--env) 5%,transparent);display:flex;flex-direction:column;gap:12px;transition:opacity .5s,filter .5s,border-color .4s,background .4s}
+#c06-identity[data-m=direct] .id-env{opacity:.3;filter:saturate(.2)}
+#c06-identity .id-env.down{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+#c06-identity .id-vm{display:flex;align-items:center;gap:12px;padding:14px;border-radius:14px;border:1px solid var(--line2);background:rgba(12,18,40,.9)}
+#c06-identity .id-vm .ic{font-size:28px;color:var(--env)}
+#c06-identity .id-vm b{display:block;font-size:19px}
+#c06-identity .id-vm small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+#c06-identity .id-vs{color:var(--ok)}
+#c06-identity .id-own{padding:12px 14px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c06-identity .id-own div{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+#c06-identity .id-own i{font-style:normal;font-size:15px;padding:4px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-identity .id-crash{margin-top:auto;padding:10px 12px;border-radius:12px;font-size:16px;font-weight:700;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 50%,transparent);opacity:0;transition:opacity .4s}
+#c06-identity .id-env.down .id-crash{opacity:1}
+#c06-identity .id-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+#c06-identity .id-dl path{fill:none;stroke:color-mix(in srgb,var(--acc) 55%,transparent);stroke-width:2.5;stroke-dasharray:6 7;animation:flow 1s linear infinite;transition:opacity .4s}
+#c06-identity .id-vl{fill:none;stroke:var(--env);stroke-width:4;stroke-dasharray:8 7;animation:flow 1s linear infinite;transition:opacity .4s}
+#c06-identity .id-no{fill:none;stroke:var(--bad);stroke-width:2.5;stroke-dasharray:4 8;transition:opacity .4s}
+#c06-identity .id-nt{font-size:15px;fill:var(--bad);text-anchor:middle;transition:opacity .4s}
+#c06-identity[data-m=virtual] .id-dl path{opacity:0}
+#c06-identity[data-m=direct] .id-vl,#c06-identity[data-m=direct] .id-no,#c06-identity[data-m=direct] .id-nt{opacity:0}
+#c06-identity .id-dot{filter:drop-shadow(0 0 8px var(--bad))}
+#c06-identity .id-boom{position:absolute;left:336px;top:592px;font-size:16px}
+#c06-identity .id-side{display:flex;flex-direction:column;gap:14px}
+#c06-identity .id-mode{padding:16px 20px;border-radius:16px;border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:border-color .4s,background .4s}
+#c06-identity .id-mode b{font-size:21px}
+#c06-identity .id-mode p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+#c06-identity[data-m=direct] .id-mode{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+#c06-identity[data-m=direct] .id-mode b{color:var(--bad)}
+#c06-identity[data-m=virtual] .id-mode{border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c06-identity[data-m=virtual] .id-mode b{color:var(--ok)}
+#c06-identity .id-bn{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.4;transition:opacity .45s,border-color .45s,background .45s}
+#c06-identity .id-bn .ic{flex:none;font-size:26px;color:var(--env);margin-top:2px}
+#c06-identity .id-bn b{font-size:19px}
+#c06-identity .id-bn p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:4px}
+#c06-identity .id-bn.on{opacity:1;border-color:color-mix(in srgb,var(--env) 50%,transparent);background:color-mix(in srgb,var(--env) 8%,transparent)}
+#c06-identity .id-q{font-size:22px;margin-top:4px}
+</style>
+<script>
+HOOKS['c06-identity'] = {
+  MODE: {
+    direct: ['直接管理：看似便捷', 'Agent 直接持有用户的个人账号。一旦出现错误或被攻破，用户的全部数字身份都会暴露。'],
+    virtual: ['独立虚拟身份：更稳妥', '如同秘书拥有自己的办公电话和邮箱：专属通讯账号、存储空间、计算环境，以透明的身份代表用户工作。'],
+  },
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.accs = [...s.querySelectorAll('.id-acc')];
+    this.paths = [...s.querySelectorAll('.id-dl path')];
+    this.vl = q('.id-vl');
+    this.svg = q('.id-svg');
+    this.ag = q('.id-ag');
+    this.as = q('.id-as');
+    this.env = q('.id-env');
+    this.ds = q('.id-ds');
+    this.bns = [...s.querySelectorAll('.id-bn')];
+    this.segSet = U.seg(q('.id-seg'), (v) => { this.auto = false; this.tk = (this.tk || 0) + 1; this.setMode(s, v); });
+    q('.id-boom').addEventListener('click', () => { if (!this.ctx || !this.ctx.alive) return; this.auto = false; this.tk = (this.tk || 0) + 1; this.boom(s); });
+    this.setMode(s, 'direct');
+  },
+  setMode(s, m) {
+    this.m = m;
+    s.dataset.m = m;
+    this.segSet(m);
+    s.querySelector('.id-mt').textContent = this.MODE[m][0];
+    s.querySelector('.id-mp').textContent = this.MODE[m][1];
+    this.calm();
+    this.bns.forEach((b) => b.classList.toggle('on', m === 'virtual'));
+  },
+  calm() {
+    this.accs.forEach((a) => { a.classList.remove('exp', 'safe'); a.querySelector('em').textContent = ''; });
+    this.ag.classList.remove('hit');
+    this.as.textContent = '正常工作';
+    this.env.classList.remove('down');
+  },
+  dot(p, ms) {
+    const d = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    d.setAttribute('r', '8');
+    d.setAttribute('class', 'id-dot');
+    d.style.fill = '#fb7185';
+    d.style.opacity = 0;
+    this.svg.appendChild(d);
+    return U.fly(d, p, ms, { ctx: this.ctx }).then((r) => { d.remove(); return r; });
+  },
+  // 事故：直接管理时沿六条连线扩散到全部账号；虚拟身份时只波及虚拟环境
+  async boom(s) {
+    const tk = this.tk, ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    this.calm();
+    await U.wait(ctx, 200); if (!ok()) return;
+    this.ag.classList.add('hit');
+    this.as.textContent = '出错 / 被攻破';
+    if (this.m === 'direct') {
+      await Promise.all(this.paths.map((p, i) => U.wait(ctx, i * 90).then(() => (ok() ? this.dot(p, 700) : 0))));
+      if (!ok()) return;
+      this.accs.forEach((a) => { a.classList.add('exp'); a.querySelector('em').textContent = '暴露'; });
+    } else {
+      await this.dot(this.vl, 600);
+      if (!ok()) return;
+      this.env.classList.add('down');
+      this.accs.forEach((a) => { a.classList.add('safe'); a.querySelector('em').textContent = '未受影响'; });
+      await U.wait(ctx, 2200); if (!ok()) return;
+      this.env.classList.remove('down');
+      this.ag.classList.remove('hit');
+      this.as.textContent = '已在新环境中恢复';
+    }
+  },
+  async loop(s) {
+    const tk = this.tk, ctx = this.ctx, ok = () => ctx.alive && tk === this.tk && this.auto;
+    while (ok()) {
+      for (const m of ['direct', 'virtual']) {
+        this.setMode(s, m);
+        await U.wait(ctx, 1400); if (!ok()) return;
+        await this.boom(s); if (!ok()) return;
+        await U.wait(ctx, 3000); if (!ok()) return;
+      }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.tk = (this.tk || 0) + 1;
+    this.auto = true;
+    let off = false;
+    // 用户的设备时而离线，虚拟电脑照常运行
+    ctx.every(() => { off = !off; this.ds.textContent = off ? '离线 · 已合上盖子' : '在线 · 正在使用'; }, 2200);
+    this.loop(s);
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.setMode(s, 'direct');
+    this.ds.textContent = '在线 · 正在使用';
+    this.svg.querySelectorAll('.id-dot').forEach((d) => d.remove());
+  },
+};
+</script>
+<!-- END c06-identity -->

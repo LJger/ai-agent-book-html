@@ -1,0 +1,83 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    {
+      "n": "开篇",
+      "k": "OPENING",
+      "short": "开篇",
+      "acc": "#22d3ee",
+      "acc2": "#a78bfa"
+    },
+    {
+      "n": "核心公式",
+      "k": "PART 01",
+      "short": "公式",
+      "acc": "#a78bfa",
+      "acc2": "#22d3ee"
+    },
+    {
+      "n": "观察与动作空间",
+      "k": "PART 02",
+      "short": "空间",
+      "acc": "#2dd4bf",
+      "acc2": "#60a5fa"
+    },
+    {
+      "n": "工具：手脚",
+      "k": "PART 03",
+      "short": "工具",
+      "acc": "#fbbf24",
+      "acc2": "#fb923c"
+    },
+    {
+      "n": "LLM：大脑",
+      "k": "PART 04",
+      "short": "大脑",
+      "acc": "#c084fc",
+      "acc2": "#818cf8"
+    },
+    {
+      "n": "上下文：眼睛",
+      "k": "PART 05",
+      "short": "眼睛",
+      "acc": "#22d3ee",
+      "acc2": "#38bdf8"
+    },
+    {
+      "n": "ReAct 循环",
+      "k": "PART 06",
+      "short": "ReAct",
+      "acc": "#34d399",
+      "acc2": "#22d3ee"
+    },
+    {
+      "n": "Harness 工程",
+      "k": "PART 07",
+      "short": "Harness",
+      "acc": "#60a5fa",
+      "acc2": "#818cf8"
+    },
+    {
+      "n": "编排模式",
+      "k": "PART 08",
+      "short": "编排",
+      "acc": "#f472b6",
+      "acc2": "#a78bfa"
+    },
+    {
+      "n": "护栏与安全",
+      "k": "PART 09",
+      "short": "护栏",
+      "acc": "#fb7185",
+      "acc2": "#fb923c"
+    },
+    {
+      "n": "收束",
+      "k": "CLOSING",
+      "short": "收束",
+      "acc": "#22d3ee",
+      "acc2": "#a78bfa"
+    }
+  ]
+}

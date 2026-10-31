@@ -1,0 +1,534 @@
+<!-- ================= PART 04 RAG 与稠密嵌入 ================= -->
+<section class="slide chapter" id="c03-d4" data-part="4" data-title="PART 04 · RAG 与稠密嵌入" data-notes="前面我们关注的是记忆的表示和管理——用什么格式存、如何更新和压缩。接下来要解决的是记忆的检索问题：当记忆量增长到成千上万条时，如何快速找到相关的那几条？这正是 RAG 技术要解决的核心问题，它既服务于共享知识库，也将在本章末增强用户记忆的检索能力。<br>这一部分先看 RAG 的基本结构和查询流程（图3-5），再看文档进入知识库的第一道工序——分块，然后讲检索器的第一条技术路线：稠密嵌入——什么是嵌入、余弦相似度、从 Word2Vec 到上下文感知（图3-6），以及实验 3-4 的 ANN 索引对比（图3-7、表3-2）。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">RAG 与<br>稠密嵌入</h1>
+  <div class="ch-s fx fx-up" style="--d:3">检索器 + 生成器 · 分块 · 语义向量 · ANN 索引</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型的训练数据有截止日期，而知识库可以随时更新。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c03-rag" data-part="4" data-dur="18000" data-title="检索增强生成：检索器 + 生成器" data-notes="前面关注的是记忆的<b>表示和管理</b>——用什么格式存、如何更新和压缩；接下来要解决的是记忆的<b>检索</b>问题：当记忆量增长到成千上万条时，如何快速找到相关的那几条？<br>构建共享知识库的核心技术是检索增强生成（Retrieval-Augmented Generation, RAG），其核心思想是将大型语言模型的思考和生成能力，与外部知识库的广度和时效性相结合。模型本身的训练数据有截止日期，而知识库可以随时更新。典型的 RAG 系统由两部分构成：检索器负责从知识库里找出相关片段，生成器（通常是 LLM）拿到这些片段作为上下文来生成答案。<br>以公司知识库为例，用户问：“我买的东西想退款，流程是什么？”检索器用“退款流程”取回两个片段——退款政策（签收后 7 天内可申请全额退款，需提供订单号，3–5 个工作日到账）和退款操作步骤（进入“我的订单”→选择订单→点击“申请退款”），再交给 LLM 生成答案。RAG 的核心流程是：<b>检索相关片段 → 注入上下文 → LLM 基于上下文生成答案</b>。左侧代码取自原书。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">检索增强生成：<em>检索器 + 生成器</em></h2></header>
+  <div class="w4b-top fx fx-up" style="--d:2"><div class="w4b-cnt"><span>记忆与知识条目</span><b class="w4b-n">12</b></div><p>从“怎么存”到“怎么找”：条目增长到成千上万条时，如何快速找到相关的那几条？——这正是 <b>RAG</b> 要解决的问题</p></div>
+  <div class="w4b-body">
+    <div class="win w4b-cw fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>公司知识库 · 原书示例</span></div><div class="c3-code w4b-code"></div></div>
+    <div class="w4b-r fx fx-right" style="--d:4">
+      <div class="w4b-q"><span class="lbl">用户</span><p>“我买的东西想退款，流程是什么？”</p></div>
+      <div class="w4b-res"><span class="lbl">检索器 → top_k = 2</span><div class="w4b-rl"></div></div>
+      <div class="w4b-ans"><span class="lbl">生成器（LLM）</span><p class="w4b-at"></p></div>
+    </div>
+  </div>
+  <p class="w4b-core fx fx-up" style="--d:5"><b>检索相关片段 → 注入上下文 → LLM 基于上下文生成答案</b></p>
+  <div class="src">第三章 ·「RAG 基础：构建 Agent 的知识获取管道」</div>
+</section>
+<style>
+.w4b-top{display:flex;align-items:center;gap:20px;padding:10px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w4b-cnt{display:flex;flex-direction:column;align-items:center;min-width:170px}
+.w4b-cnt span{font-size:15px;color:var(--text3)}
+.w4b-cnt b{font:800 34px var(--num);color:var(--acc)}
+.w4b-top p{font-size:17px;line-height:1.55;color:var(--text2)}
+.w4b-top b{color:var(--text)}
+.w4b-body{display:grid;grid-template-columns:1.05fr 1fr;gap:22px;margin-top:16px;flex:1;min-height:0}
+.w4b-cw{display:flex;flex-direction:column;min-height:0}
+.w4b-code{font-size:16px;white-space:pre-wrap;word-break:break-all}
+.w4b-code div{padding:1px 6px;border-radius:6px;transition:background .3s,opacity .3s}
+.w4b-code div.dim{opacity:.25}
+.w4b-code div.hl{background:color-mix(in srgb,var(--acc) 18%,transparent);opacity:1}
+.w4b-r{display:flex;flex-direction:column;gap:12px}
+.w4b-q p{margin-top:4px;font-size:20px}
+.w4b-rl{display:flex;flex-direction:column;gap:8px;margin-top:6px;min-height:150px}
+.w4b-rl div{padding:10px 14px;border-radius:12px;font-size:16px;line-height:1.55;color:var(--text2);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent);animation:upIn .4s var(--spring) both}
+.w4b-ans p{margin-top:6px;min-height:84px;padding:12px 16px;border-radius:12px;font-size:17px;line-height:1.6;color:var(--text);border:1px solid rgba(167,139,250,.5);background:rgba(167,139,250,.07)}
+.w4b-core{margin-top:14px;text-align:center;font-size:22px}
+.w4b-core b{background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+</style>
+<script>
+HOOKS['c03-rag'] = {
+  L: ['query = "退款流程"', 'results = retriever.search(query, top_k=2)', 'answer = llm.generate(system="你是客服助手。", context=results, question=query)'],
+  R: ['退款政策：订单签收后7天内可申请全额退款，需提供订单号。退款将在3-5个工作日内…', "退款操作步骤：1.进入'我的订单' 2.选择需退款的订单 3.点击'申请退款'…"],
+  A: "您可以在签收后7天内申请全额退款。操作步骤：进入'我的订单'→选择订单→点击'申请退款'…",
+  init(s) { s.querySelector('.w4b-code').innerHTML = this.L.map((l) => `<div>${C3.esc(l)}</div>`).join(''); },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const ls = [...s.querySelectorAll('.w4b-code div')], rl = s.querySelector('.w4b-rl'), at = s.querySelector('.w4b-at'), n = s.querySelector('.w4b-n');
+    while (ok()) {
+      ls.forEach((l) => (l.className = 'dim')); rl.innerHTML = ''; at.textContent = '';
+      let c = 12; n.textContent = c;
+      for (let i = 0; i < 18; i++) { c = Math.round(c * 1.6 + 7); n.textContent = c.toLocaleString(); await U.wait(ctx, 60); if (!ok()) return; }
+      for (let i = 0; i < 3; i++) {
+        ls.forEach((l, j) => (l.className = j === i ? 'hl' : j < i ? '' : 'dim'));
+        await U.wait(ctx, 800); if (!ok()) return;
+        if (i === 1) for (const r of this.R) { rl.insertAdjacentHTML('beforeend', `<div>${C3.esc(r)}</div>`); await U.wait(ctx, 500); if (!ok()) return; }
+        if (i === 2) for (let k = 1; k <= this.A.length; k += 2) { at.textContent = this.A.slice(0, k); await U.wait(ctx, 30); if (!ok()) return; }
+      }
+      ls.forEach((l) => (l.className = ''));
+      await U.wait(ctx, 3600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-ragflow" data-part="4" data-trans="zoom" data-dur="16000" data-title="图3-5 RAG 查询流程" data-notes="图3-5 展示的是 RAG 在查询时的核心流程：检索、增强、生成。① 用户查询：“故意杀人罪判几年？”② 检索（Retrieval）：稠密检索加 BM25，得到 Top-K 文本块。③ 增强（Augment）：把查询和检索结果拼起来，构造完整的 Prompt。④ 生成（Generate）：LLM 综合上下文生成回答。下方是具体的数据流示例：检索到的文本块是《刑法》第 232 条；增强后的 Prompt 是“基于以下法条回答问题”加上法条与问题；生成的回答是：根据《刑法》第 232 条，故意杀人罪处死刑、无期徒刑或十年以上有期徒刑；情节较轻的，处三年以上十年以下有期徒刑。图中的检索器同时用了稠密检索和 BM25——这两条技术路线正是本部分和下一部分的主题。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-5 RAG 查询流程：<em>检索、增强与生成</em></h2></header>
+  <div class="w4c-stages fx fx-up" style="--d:2"></div>
+  <div class="w4c-data fx fx-up" style="--d:3">
+    <div class="w4c-d" data-i="1"><span class="lbl">检索到的文本块</span><p>《刑法》第232条：故意杀人的，处死刑、无期徒刑或十年以上有期徒刑...</p></div>
+    <div class="w4c-d" data-i="2"><span class="lbl">增强后的 Prompt</span><p>基于以下法条回答问题：<br>[《刑法》第232条...]　问：故意杀人罪判几年？</p></div>
+    <div class="w4c-d" data-i="3"><span class="lbl">生成的回答</span><p>根据《刑法》第232条，故意杀人罪处死刑、无期徒刑或十年以上有期徒刑；情节较轻的，处三年以上十年以下有期徒刑。</p></div>
+  </div>
+  <div class="src">第三章 ·「RAG 基础：构建 Agent 的知识获取管道」· 图3-5 RAG 查询流程：检索、增强与生成</div>
+</section>
+<style>
+.w4c-stages{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.w4c-s{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .4s}
+.w4c-s em{font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.w4c-s b{font-size:20px}
+.w4c-s span{font-size:16px;line-height:1.5;color:var(--text2)}
+.w4c-s.on{border-color:var(--acc);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 28%,transparent);transform:translateY(-4px)}
+.w4c-s:not(:last-child)::after{content:"→";position:absolute;right:-14px;top:50%;transform:translateY(-50%);font-size:20px;color:var(--text3)}
+.w4c-data{display:grid;grid-template-columns:1fr 1.2fr 1.3fr;gap:14px;margin-top:22px;flex:1;min-height:0}
+.w4c-d{display:flex;flex-direction:column;gap:8px;padding:16px 18px;border-radius:16px;border:1px dashed var(--line2);opacity:.3;transition:all .45s}
+.w4c-d.on{opacity:1;border-style:solid;border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.w4c-d p{font-size:18px;line-height:1.7;color:var(--text)}
+</style>
+<script>
+HOOKS['c03-ragflow'] = {
+  S: [['①', '用户查询', '“故意杀人罪判几年？”'], ['②', '检索 Retrieval', '稠密检索 + BM25 → Top-K 文本块'], ['③', '增强 Augment', '查询 + 检索结果 → 构造完整 Prompt'], ['④', '生成 Generate', 'LLM 综合上下文 → 生成回答']],
+  init(s) { s.querySelector('.w4c-stages').innerHTML = this.S.map(([e, b, t]) => `<div class="w4c-s"><em>${e}</em><b>${b}</b><span>${t}</span></div>`).join(''); },
+  enter(s, ctx) {
+    const ss = [...s.querySelectorAll('.w4c-s')], ds = [...s.querySelectorAll('.w4c-d')]; let k = 0;
+    const tick = () => { const i = k % 6; ss.forEach((x, j) => x.classList.toggle('on', j === i)); ds.forEach((d) => d.classList.toggle('on', +d.dataset.i <= i && i < 4)); k++; };
+    tick(); ctx.every(tick, 1400);
+  },
+  reset(s) { s.querySelectorAll('.w4c-s,.w4c-d').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-chunk" data-part="4" data-dur="20000" data-title="文档分块：切多大、怎么切" data-notes="在能够检索之前，还有一步不可或缺的离线预处理——<b>分块（Chunking）</b>：把长文档切成适合独立检索的片段（chunk）。分块必不可少，原因有二：其一，嵌入模型对输入长度有限制，且一整篇文档只压缩成一个向量时，多个主题混在一起，向量无法精确表达任何一个——这与前面 Enhanced Notes 遇到的问题同源；其二，检索的目标是只把相关的那部分注入上下文，片段太大会连带引入大量无关内容，浪费窗口、稀释注意力。<br>常见的分块策略有三类。<b>固定大小切分</b>：按固定的 token 数（如 512）切分，相邻块保留一定重叠（如 50–100 token），避免关键句子恰好被切断；实现简单、结果可预测，但完全无视文档结构，段落、代码、表格都可能被拦腰截断。<b>递归/结构感知切分</b>：按文档的自然边界（章节标题、段落、句子）递归切分，先尝试按大边界切块，仍超长时再降级到更小的边界；Markdown、HTML 这类有显式结构的文档尤其适合，这是目前生产系统最常用的默认选择。<b>语义切分</b>：计算相邻句子的嵌入相似度，在语义“断崖”处下刀，使每个块内部主题尽量单一；切分质量更高，代价是需要额外的嵌入计算。<br>块大小与重叠量是一对典型权衡：块太小，单块信息不完整，脱离上下文后语义模糊（“该公司收入增长了 3%”——哪家公司？哪个季度？）；块太大，一个块混杂多个主题，嵌入被稀释，命中后还带入更多无关内容。实践中常见的起点是每块 256–1024 token、相邻块重叠 10%–20%，再根据检索质量实测调优。最后埋一个伏笔：无论哪种策略，分块都会切断片段与其原始上下文的联系——这是分块的固有缺陷，后文“上下文感知检索”一节将正面解决它。左侧示例文档为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">文档分块：<em>切多大、怎么切</em></h2></div>
+    <div class="w4d-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="fix">固定大小</button><button data-v="rec">递归 / 结构感知</button><button data-v="sem">语义切分</button></div></header>
+  <div class="w4d-body">
+    <div class="w4d-doc panel fx fx-left" style="--d:3"><div class="w4d-h"><b>年度报告（节选）</b><span class="c3-shi">示意</span></div><div class="w4d-txt"></div></div>
+    <div class="w4d-r fx fx-right" style="--d:4">
+      <div class="w4d-info c3-data"><b class="w4d-it"></b><p class="w4d-id"></p></div>
+      <div class="w4d-ctl"><span>块大小</span><input class="rng w4d-sz" type="range" min="0" max="2" step="1" value="1"><em class="w4d-szv"></em></div>
+      <div class="w4d-tr"><div class="w4d-sm"><b>块太小</b><span>“该公司收入增长了 3%”——哪家公司？哪个季度？</span></div><div class="w4d-lg"><b>块太大</b><span>混杂多个主题，嵌入被稀释，命中后带入无关内容</span></div></div>
+      <p class="w4d-st">常见起点：每块 <b>256–1024 token</b>，相邻块重叠 <b>10%–20%</b>，再实测调优</p>
+      <p class="w4d-fs">伏笔：无论哪种策略，分块都会切断片段与原始上下文的联系 → 后文“上下文感知检索”</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「文档分块（Chunking）」</div>
+</section>
+<style>
+#c03-chunk .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-chunk .seg button{padding:8px 18px;font-size:18px}
+.w4d-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.w4d-doc{padding:14px 20px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.w4d-h{display:flex;align-items:center;justify-content:space-between}
+.w4d-h b{font-size:19px}
+.w4d-txt{display:flex;flex-direction:column;gap:2px;font-size:16px;line-height:1.65;color:var(--text2)}
+.w4d-u{padding:2px 8px;border-radius:6px;border-left:4px solid var(--c,transparent);background:color-mix(in srgb,var(--c,transparent) 10%,transparent);transition:all .4s}
+.w4d-u.h{font-weight:700;color:var(--text)}
+.w4d-u.code{font-family:var(--mono);font-size:15px}
+.w4d-cut{height:0;border-top:2px dashed var(--bad);margin:2px 0;position:relative}
+.w4d-cut::after{content:"✂";position:absolute;left:-2px;top:-14px;font-size:15px;color:var(--bad)}
+.w4d-r{display:flex;flex-direction:column;gap:12px}
+.w4d-it{font-size:20px}
+.w4d-id{margin-top:6px;font-size:16px;line-height:1.6;color:var(--text2)}
+.w4d-ctl{display:grid;grid-template-columns:auto 1fr 150px;gap:14px;align-items:center;font-size:16px;color:var(--text2)}
+.w4d-ctl em{font:700 16px var(--num);font-style:normal;color:var(--text);text-align:right}
+.w4d-tr{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.w4d-tr>div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);transition:all .35s}
+.w4d-tr b{font-size:17px}
+.w4d-tr span{font-size:15px;line-height:1.5;color:var(--text2)}
+.w4d-tr>div.on{border-color:rgba(251,146,60,.6);background:rgba(251,146,60,.08)}
+.w4d-st{font-size:17px;color:var(--text2)}
+.w4d-st b{color:var(--acc)}
+.w4d-fs{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text3);padding-left:12px;border-left:3px solid var(--acc2)}
+</style>
+<script>
+HOOKS['c03-chunk'] = {
+  // 单元：[文本, 类型, 主题]
+  U: [['## 一、经营概况', 'h', 0], ['公司全年营业收入 128 亿元，同比增长 3%。', 'p', 0], ['海外业务占比提升至 27%。', 'p', 0], ['## 二、研发投入', 'h', 1], ['研发人员增加 400 人，重点投向电池管理系统。', 'p', 1], ['def soc(v, t):  # 电量估算示例', 'code', 1], ['    return model.predict(v, t)', 'code', 1], ['## 三、风险提示', 'h', 2], ['原材料价格波动可能影响毛利率。', 'p', 2], ['汇率变动对海外收入有一定影响。', 'p', 2]],
+  CUT: {
+    fix: { 0: [2, 6], 1: [3, 6, 8], 2: [5] },
+    rec: { 0: [2, 6], 1: [3, 7], 2: [7] },
+    sem: { 0: [3, 7], 1: [3, 7], 2: [3, 7] },
+  },
+  INFO: {
+    fix: ['固定大小切分', '按固定的 token 数（如 512）切分，相邻块保留 50–100 token 的重叠。实现简单、结果可预测，但完全无视文档结构——这里代码块被拦腰截断'],
+    rec: ['递归 / 结构感知切分', '先按大边界（章节标题）切，仍超长时再降级到段落、句子。Markdown、HTML 尤其适合——目前生产系统最常用的默认选择'],
+    sem: ['语义切分', '计算相邻句子的嵌入相似度，在语义“断崖”处下刀，使每个块内部主题尽量单一；质量更高，代价是额外的嵌入计算'],
+  },
+  C: ['#2dd4bf', '#fbbf24', '#a78bfa', '#f472b6'],
+  init(s) {
+    this.set = U.seg(s.querySelector('.w4d-seg'), (v) => { this.auto = false; this.v = v; this.draw(s); });
+    this.sz = s.querySelector('.w4d-sz');
+    this.sz.addEventListener('input', () => { this.auto = false; this.draw(s); });
+    this.v = 'fix';
+  },
+  draw(s) {
+    const v = this.v, z = +this.sz.value; this.set(v);
+    this.sz.style.setProperty('--p', z * 50 + '%');
+    s.querySelector('.w4d-szv').textContent = ['小 · 约 128 token', '中 · 约 512 token', '大 · 约 1024 token'][z];
+    const cuts = this.CUT[v][z]; let ci = 0;
+    s.querySelector('.w4d-txt').innerHTML = this.U.map(([t, k], i) => { if (i && cuts.includes(i)) ci++; return `${i && cuts.includes(i) ? '<i class="w4d-cut"></i>' : ''}<div class="w4d-u ${k === 'h' ? 'h' : k === 'code' ? 'code' : ''}" style="--c:${this.C[ci % 4]}">${C3.esc(t)}</div>`; }).join('');
+    const [t, d] = this.INFO[v];
+    s.querySelector('.w4d-it').textContent = t; s.querySelector('.w4d-id').textContent = d;
+    const [sm, lg] = s.querySelectorAll('.w4d-tr>div'); sm.classList.toggle('on', z === 0); lg.classList.toggle('on', z === 2);
+  },
+  enter(s, ctx) {
+    this.auto = true; this.v = 'fix'; this.sz.value = 1; this.draw(s);
+    const seq = [['fix', 1], ['rec', 1], ['sem', 1], ['fix', 0], ['fix', 2]]; let k = 0;
+    ctx.every(() => { if (!this.auto) return; k = (k + 1) % seq.length; [this.v, this.sz.value] = [seq[k][0], seq[k][1]]; this.draw(s); }, 3600);
+  },
+};
+</script>
+
+<section class="slide" id="c03-embed" data-part="4" data-trans="rise" data-dur="16000" data-title="什么是嵌入：一张语义地图" data-notes="<b>什么是嵌入（Embedding）？</b>计算机只能处理数字，不能直接理解“苹果”和“橙子”的含义。嵌入的思路是：把每个词或句子转化成一串数字（称为“向量”，比如 [0.2, -0.5, 0.8, ...]），并且让语义相近的内容转化出来的数字串也“相近”。这些向量所在的数学空间称为“向量空间”，可以把它想象成一张高维地图，每个词或句子都是其中一个点，语义越接近的内容彼此就越靠近，如同北京和上海在地图上的位置反映它们的地理相关性。经典例子是：“国王” - “男性” + “女性” ≈ “女王”，说明向量运算可以捕捉到语义关系。<br>“稠密”是相对于后面将介绍的“稀疏嵌入”而言：稠密向量的每个维度都有数值，稀疏向量大部分维度为零。稠密嵌入用深度学习把文本映射到向量空间——语义相近的内容，向量距离也近。实际的嵌入模型使用 768 维甚至更高维度的向量；左侧的二维坐标只是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">什么是嵌入：<em>一张语义地图</em></h2></header>
+  <div class="w4e-body">
+    <div class="w4e-map panel fx fx-left" style="--d:2"><div class="w4e-h"><b>向量空间（二维示意）</b><span class="c3-shi">坐标示意</span></div><svg class="w4e-svg" viewBox="0 0 640 420"></svg><p class="w4e-say"></p></div>
+    <div class="w4e-r fx fx-right" style="--d:3">
+      <div class="c3-data w4e-k"><b>把每个词或句子转化成一串数字</b><code>“苹果” → [0.2, -0.5, 0.8, …]</code><p>语义越接近的内容，在这张高维地图上彼此就越靠近——如同北京和上海的位置反映它们的地理相关性</p></div>
+      <div class="w4e-ds"><div><b>稠密向量</b><code>[0.21, -0.53, 0.08, 0.77, -0.12, …]</code><span>每个维度都有数值</span></div><div><b>稀疏向量</b><code>[0, 0, 3, 0, 0, 0, 1, 0, …]</code><span>大部分维度为零（下一部分）</span></div></div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「稠密嵌入：从词汇关联到语义理解」</div>
+</section>
+<style>
+.w4e-body{display:grid;grid-template-columns:1.25fr 1fr;gap:24px;flex:1;min-height:0}
+.w4e-map{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.w4e-h{display:flex;align-items:center;justify-content:space-between}
+.w4e-h b{font-size:19px}
+.w4e-svg{width:100%;flex:1;min-height:0}
+.w4e-p circle{fill:var(--c);stroke:#050816;stroke-width:2}
+.w4e-p text{font-size:18px;font-weight:700;fill:var(--text);text-anchor:middle}
+.w4e-grp{fill:color-mix(in srgb,var(--c) 10%,transparent);stroke:color-mix(in srgb,var(--c) 40%,transparent);stroke-dasharray:5 5}
+.w4e-v{stroke:var(--c);stroke-width:3;fill:none;marker-end:url(#w4e-ar);opacity:0;transition:opacity .4s}
+.w4e-v.on{opacity:1}
+.w4e-res{fill:none;stroke:#fff;stroke-width:2.5;stroke-dasharray:4 4;opacity:0;transition:opacity .4s}
+.w4e-res.on{opacity:1}
+.w4e-say{min-height:30px;font-size:18px;text-align:center;color:var(--acc)}
+.w4e-r{display:flex;flex-direction:column;gap:14px}
+.w4e-k b{font-size:19px}
+.w4e-k code{display:block;margin:8px 0;font:17px var(--mono);color:#fde68a}
+.w4e-k p{font-size:16px;line-height:1.6;color:var(--text2)}
+.w4e-ds{display:flex;flex-direction:column;gap:10px}
+.w4e-ds>div{display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w4e-ds b{font-size:18px}
+.w4e-ds code{font:16px var(--mono);color:var(--acc)}
+.w4e-ds span{font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c03-embed'] = {
+  P: [['猫', 120, 300, '#2dd4bf'], ['小猫', 165, 330, '#2dd4bf'], ['狗', 110, 240, '#2dd4bf'], ['宠物', 190, 270, '#2dd4bf'], ['股票', 520, 330, '#fbbf24'], ['基金', 560, 280, '#fbbf24'], ['投资', 480, 290, '#fbbf24'], ['国王', 300, 90, '#a78bfa'], ['女王', 440, 110, '#a78bfa'], ['男性', 300, 180, '#f472b6'], ['女性', 440, 200, '#f472b6']],
+  init(s) {
+    const sv = s.querySelector('.w4e-svg'), by = {}; this.P.forEach((p) => (by[p[0]] = p));
+    let h = '<defs><marker id="w4e-ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fff"/></marker></defs>';
+    h += '<ellipse class="w4e-grp" style="--c:#2dd4bf" cx="150" cy="285" rx="105" ry="75"/><ellipse class="w4e-grp" style="--c:#fbbf24" cx="520" cy="300" rx="95" ry="60"/>';
+    const [kx, ky] = [by['国王'][1], by['国王'][2]], [mx, my] = [by['男性'][1], by['男性'][2]], [wx, wy] = [by['女性'][1], by['女性'][2]];
+    const rx = kx - mx + wx, ry = ky - my + wy;
+    h += `<path class="w4e-v" data-k="b" style="--c:#fff" d="M${kx} ${ky} L${rx - 6} ${ry + 4}"/><circle class="w4e-res" cx="${rx}" cy="${ry}" r="22"/>`;
+    h += this.P.map(([t, x, y, c]) => `<g class="w4e-p" style="--c:${c}"><circle cx="${x}" cy="${y}" r="9"/><text x="${x}" y="${y - 16}">${t}</text></g>`).join('');
+    sv.innerHTML = h;
+    this.res = [rx, ry];
+  },
+  enter(s, ctx) {
+    const say = s.querySelector('.w4e-say'), vb = s.querySelector('.w4e-v[data-k="b"]'), rc = s.querySelector('.w4e-res');
+    const msgs = ['养猫相关的词聚在一起，投资相关的词聚在另一处', '“国王” − “男性” + “女性” = ？', '≈ “女王”：向量运算捕捉到了语义关系'];
+    let k = 0;
+    const tick = () => { const i = k % 4; say.textContent = msgs[Math.min(i, 2)]; vb.classList.toggle('on', i >= 1 && i < 3); rc.classList.toggle('on', i === 2); k++; };
+    tick(); ctx.every(tick, 2600);
+  },
+  reset(s) { s.querySelectorAll('.w4e-v,.w4e-res').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-cosine" data-part="4" data-dur="18000" data-title="余弦相似度：看方向，不看长度" data-notes="衡量两个向量有多“近”的常用方法是<b>余弦相似度</b>：它计算两个向量夹角的余弦值，值越接近 1 表示方向越一致、语义越相似。为什么用夹角而不是距离？因为我们关心的是两个向量的<b>方向</b>是否一致（语义是否相近），而不是它们的<b>长度</b>（文本的长度或频率）。两篇内容相同但长度不同的文档，向量长度不同但方向一致，余弦相似度能正确判断它们语义相同。直觉上：养猫相关的两个表达在向量空间中几乎重合（余弦值接近 1），而养猫和股票投资则方向迥异（余弦值接近 0）。<br><b>补充说明（可选的手算示例，跳过不影响后续阅读）</b>：在一个简化的 3 维向量空间中，“如何养猫” A = (0.9, 0.5, 0.1)、“猫咪饲养指南” B = (0.8, 0.6, 0.1)、“股票投资策略” C = (0.1, 0.1, 0.9)。cos(θ) = (A·B) / (|A| × |B|)。A 与 B：点积 = 0.9×0.8 + 0.5×0.6 + 0.1×0.1 = 1.03，|A| ≈ 1.03，|B| ≈ 1.00，cos ≈ <b>0.99</b>（非常相似）。A 与 C：点积 = 0.9×0.1 + 0.5×0.1 + 0.1×0.9 = 0.23，|C| ≈ 0.91，cos ≈ <b>0.25</b>（差异很大）。0.99 vs 0.25 清晰地反映了语义距离。<br>左侧可以拖动蓝色向量的端点（二维示意），看余弦值随夹角变化、与长度无关。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">余弦相似度：<em>看方向，不看长度</em></h2></header>
+  <div class="w4f-body">
+    <div class="w4f-pl panel fx fx-left" style="--d:2">
+      <div class="w4f-h"><b>拖动蓝色端点</b><span class="c3-shi">二维示意</span></div>
+      <svg class="w4f-svg" viewBox="0 0 520 400"><line class="w4f-ax" x1="40" y1="360" x2="500" y2="360"/><line class="w4f-ax" x1="40" y1="360" x2="40" y2="20"/><path class="w4f-arc"/><line class="w4f-a" x1="40" y1="360"/><line class="w4f-b" x1="40" y1="360"/><circle class="w4f-ha" r="10"/><circle class="w4f-hb" r="14"/></svg>
+      <div class="w4f-read"><div><span>夹角</span><b class="w4f-deg">—</b></div><div><span>余弦相似度</span><b class="w4f-cos">—</b></div><div><span>两向量长度比</span><b class="w4f-len">—</b></div></div>
+    </div>
+    <div class="w4f-r fx fx-right" style="--d:3">
+      <div class="c3-data w4f-calc"><b>手算示例（3 维）</b>
+        <div class="w4f-vec"><span><i style="--c:#2dd4bf"></i>“如何养猫” A = (0.9, 0.5, 0.1)</span><span><i style="--c:#60a5fa"></i>“猫咪饲养指南” B = (0.8, 0.6, 0.1)</span><span><i style="--c:#fbbf24"></i>“股票投资策略” C = (0.1, 0.1, 0.9)</span></div>
+        <code>cos(θ) = (A·B) / (|A| × |B|)</code>
+        <div class="w4f-res"><div><span>A·B = 0.72 + 0.30 + 0.01 = 1.03</span><b data-count="0.99" data-dec="2">0</b><em>非常相似</em></div><div><span>A·C = 0.09 + 0.05 + 0.09 = 0.23</span><b class="lo" data-count="0.25" data-dec="2">0</b><em>差异很大</em></div></div>
+      </div>
+      <p class="w4f-why">两篇内容相同但长度不同的文档：向量<b>长度</b>不同、<b>方向</b>一致——余弦相似度能正确判断它们语义相同</p>
+    </div>
+  </div>
+  <div class="src">第三章 ·「稠密嵌入：从词汇关联到语义理解」· 余弦相似度与手算示例</div>
+</section>
+<style>
+.w4f-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.w4f-pl{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.w4f-h{display:flex;align-items:center;justify-content:space-between}
+.w4f-h b{font-size:19px}
+.w4f-svg{width:100%;flex:1;min-height:0;touch-action:none}
+.w4f-ax{stroke:var(--line2);stroke-width:1.5}
+.w4f-a{stroke:#2dd4bf;stroke-width:5;stroke-linecap:round}
+.w4f-b{stroke:#60a5fa;stroke-width:5;stroke-linecap:round}
+.w4f-ha{fill:#2dd4bf}
+.w4f-hb{fill:#60a5fa;stroke:#fff;stroke-width:3;cursor:grab}
+.w4f-arc{fill:color-mix(in srgb,var(--acc) 20%,transparent);stroke:var(--acc);stroke-width:2}
+.w4f-read{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.w4f-read>div{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w4f-read span{font-size:15px;color:var(--text3)}
+.w4f-read b{font:800 26px var(--num);color:var(--text)}
+.w4f-read .w4f-cos{color:var(--acc)}
+.w4f-r{display:flex;flex-direction:column;gap:14px}
+.w4f-calc b{font-size:19px}
+.w4f-vec{display:flex;flex-direction:column;gap:6px;margin:10px 0}
+.w4f-vec span{display:flex;align-items:center;gap:8px;font:16px var(--mono);color:var(--text2)}
+.w4f-vec i{width:12px;height:12px;border-radius:3px;background:var(--c)}
+.w4f-calc code{display:block;font:17px var(--mono);color:#fde68a;margin-bottom:10px}
+.w4f-res{display:flex;flex-direction:column;gap:8px}
+.w4f-res>div{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.04)}
+.w4f-res span{font:15px var(--mono);color:var(--text2)}
+.w4f-res b{font:800 32px var(--num);color:var(--ok)}
+.w4f-res b.lo{color:var(--warn)}
+.w4f-res em{font-style:normal;font-size:15px;color:var(--text3)}
+.w4f-why{font-size:18px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.w4f-why b{color:var(--text)}
+</style>
+<script>
+HOOKS['c03-cosine'] = {
+  O: [40, 360], A: [380, 250],
+  init(s) {
+    const sv = s.querySelector('.w4f-svg'), hb = s.querySelector('.w4f-hb');
+    let drag = false;
+    const pt = (e) => { const p = sv.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; return p.matrixTransform(sv.getScreenCTM().inverse()); };
+    hb.addEventListener('pointerdown', (e) => { drag = true; this.auto = false; hb.setPointerCapture(e.pointerId); });
+    hb.addEventListener('pointermove', (e) => { if (!drag) return; const p = pt(e); this.set(s, Math.max(45, Math.min(500, p.x)), Math.max(20, Math.min(355, p.y))); });
+    hb.addEventListener('pointerup', () => { drag = false; });
+    this.set(s, 300, 120);
+  },
+  set(s, x, y) {
+    const [ox, oy] = this.O, [ax, ay] = this.A;
+    const a = [ax - ox, oy - ay], b = [x - ox, oy - y];
+    const la = Math.hypot(...a), lb = Math.hypot(...b), cos = (a[0] * b[0] + a[1] * b[1]) / (la * lb);
+    const ta = Math.atan2(a[1], a[0]), tb = Math.atan2(b[1], b[0]);
+    s.querySelector('.w4f-a').setAttribute('x2', ax); s.querySelector('.w4f-a').setAttribute('y2', ay);
+    s.querySelector('.w4f-ha').setAttribute('cx', ax); s.querySelector('.w4f-ha').setAttribute('cy', ay);
+    s.querySelector('.w4f-b').setAttribute('x2', x); s.querySelector('.w4f-b').setAttribute('y2', y);
+    s.querySelector('.w4f-hb').setAttribute('cx', x); s.querySelector('.w4f-hb').setAttribute('cy', y);
+    const r = 60, p1 = [ox + r * Math.cos(ta), oy - r * Math.sin(ta)], p2 = [ox + r * Math.cos(tb), oy - r * Math.sin(tb)];
+    const sweep = tb > ta ? 0 : 1;
+    s.querySelector('.w4f-arc').setAttribute('d', `M${ox} ${oy} L${p1[0].toFixed(1)} ${p1[1].toFixed(1)} A${r} ${r} 0 0 ${sweep} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} Z`);
+    s.querySelector('.w4f-deg').textContent = (Math.abs(tb - ta) * 180 / Math.PI).toFixed(0) + '°';
+    s.querySelector('.w4f-cos').textContent = cos.toFixed(2);
+    s.querySelector('.w4f-len').textContent = (lb / la).toFixed(2);
+  },
+  enter(s, ctx) {
+    this.auto = true; let t = 0;
+    ctx.every(() => { if (!this.auto) return; t += 0.04; const ang = 0.15 + (Math.sin(t) + 1) * 0.65, len = 180 + Math.sin(t * 1.7) * 110; this.set(s, this.O[0] + len * Math.cos(ang), this.O[1] - len * Math.sin(ang)); }, 60);
+  },
+};
+</script>
+
+<section class="slide" id="c03-evo" data-part="4" data-trans="zoom" data-dur="18000" data-title="从 Word2Vec 到上下文感知" data-notes="在稠密嵌入的早期，以 Word2Vec 为代表的技术通过分析海量文本中词汇的共现关系，为每个词生成一个固定向量。这种向量能捕捉有趣的语言规律，比如向量运算 king − man + woman ≈ queen，证明词向量空间能以线性可计算的方式编码复杂语义关系。然而，静态词向量存在根本局限：无法处理一词多义。“bank”在“river bank”（河岸）和“investment bank”（投资银行）中含义截然不同，但 Word2Vec 赋予完全相同的向量。<br>现代嵌入模型（如 BERT、BGE-M3）能在生成一个词的向量时充分考虑其所在的整个句子甚至段落的上下文，这得益于自注意力（Self-Attention）机制——模型在计算每个词的向量时，会同时参考句子中所有其他词的信息。因此，同一个词“苹果”在“苹果公司发布新产品”和“买了两斤苹果”中会得到不同的向量表示，实现了从“词汇级”到“语境级”语义的飞跃；BGE-M3 等新一代模型还进一步支持多语言与长文本输入（BERT 这类较早的上下文模型输入长度上限仅为 512 个 token）。需要说明：BGE-M3 实际同时输出稠密、稀疏、多向量三种表示，这里仅用它的稠密输出作为例子。<br>上方时间线取自图3-6；下方切换例句，看静态词向量与上下文感知嵌入的区别（连线与向量为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图3-6 从 Word2Vec 到<em>上下文感知</em></h2></div>
+    <div class="w4g-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">苹果公司发布新产品</button><button data-v="1">买了两斤苹果</button></div></header>
+  <div class="w4g-tl fx fx-up" style="--d:2"></div>
+  <div class="w4g-body">
+    <div class="w4g-st panel fx fx-left" style="--d:3"><div class="w4g-h"><b>静态词向量</b><span>一词一向量</span></div><div class="w4g-sent w4g-s1"></div><div class="w4g-vec"><span>“苹果”的向量</span><code class="w4g-v1">[0.42, -0.17, 0.66, …]</code><em>两句里完全相同</em></div></div>
+    <div class="w4g-ct panel fx fx-right" style="--d:4"><div class="w4g-h"><b>上下文感知嵌入</b><span>一词多向量 · 自注意力</span><span class="c3-shi">示意</span></div><svg class="w4g-att" viewBox="0 0 600 120"></svg><div class="w4g-vec"><span>“苹果”的向量</span><code class="w4g-v2"></code><em class="w4g-m"></em></div></div>
+  </div>
+  <div class="src">第三章 ·「从 Word2Vec 到上下文感知」· 图3-6 稠密嵌入技术演进</div>
+</section>
+<style>
+#c03-evo .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c03-evo .seg button{padding:8px 16px;font-size:17px}
+.w4g-tl{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.w4g-e{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.w4g-e b{font-size:19px}
+.w4g-e em{font:700 16px var(--num);font-style:normal;color:var(--acc)}
+.w4g-e span{font-size:15px;line-height:1.45;color:var(--text2)}
+.w4g-e.ctx{border-color:color-mix(in srgb,var(--acc2) 50%,transparent)}
+.w4g-e.on{box-shadow:0 0 22px color-mix(in srgb,var(--acc) 28%,transparent);border-color:var(--acc)}
+.w4g-body{display:grid;grid-template-columns:1fr 1.3fr;gap:22px;margin-top:16px;flex:1;min-height:0}
+.w4g-st,.w4g-ct{padding:14px 20px;display:flex;flex-direction:column;gap:12px}
+.w4g-h{display:flex;align-items:baseline;gap:12px}
+.w4g-h b{font-size:20px}
+.w4g-h span:not(.c3-shi){font-size:15px;color:var(--text3)}
+.w4g-h .c3-shi{margin-left:auto}
+.w4g-sent{font-size:24px;letter-spacing:.06em}
+.w4g-sent mark{background:color-mix(in srgb,var(--acc) 30%,transparent);color:var(--text);border-radius:6px;padding:0 4px}
+.w4g-att{width:100%;height:140px}
+.w4g-att text{font-size:24px;fill:var(--text);text-anchor:middle}
+.w4g-att text.k{fill:var(--acc);font-weight:800}
+.w4g-att path{fill:none;stroke:var(--acc);stroke-linecap:round;opacity:.0;transition:opacity .4s}
+.w4g-att path.on{opacity:var(--o)}
+.w4g-vec{display:flex;flex-direction:column;gap:4px;margin-top:auto}
+.w4g-vec span{font-size:15px;color:var(--text3)}
+.w4g-vec code{font:18px var(--mono);color:#fde68a}
+.w4g-vec em{font-style:normal;font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-evo'] = {
+  T: [['Word2Vec', '2013 · 300维', '静态词向量 · 共现关系 · 预测训练', 0], ['GloVe', '2014 · 300维', '全局统计 · 矩阵分解 + 共现', 0], ['BERT', '2018 · 768维', '上下文感知 · Transformer · MLM 预训练', 1], ['Sentence-BERT', '2019 · 768维', '句子级嵌入 · 孪生网络 · 对比学习', 1], ['BGE-M3', '2024 · 1024维', '多语言长文本 · 多阶段混合训练', 1]],
+  S: [{ w: ['苹果', '公司', '发布', '新', '产品'], k: 0, a: [0, 0.9, 0.6, 0.3, 0.8], v: '[0.71, 0.05, -0.38, …]', m: '偏向“科技企业”' }, { w: ['买', '了', '两斤', '苹果'], k: 3, a: [0.7, 0.2, 0.9, 0], v: '[-0.12, 0.64, 0.51, …]', m: '偏向“水果”' }],
+  init(s) {
+    s.querySelector('.w4g-tl').innerHTML = this.T.map(([n, y, t, c]) => `<div class="w4g-e${c ? ' ctx' : ''}"><b>${n}</b><em>${y}</em><span>${t}</span></div>`).join('');
+    this.set = U.seg(s.querySelector('.w4g-seg'), (v) => { this.auto = false; this.show(s, +v); });
+  },
+  show(s, i) {
+    const d = this.S[i]; this.i = i; this.set(String(i));
+    s.querySelector('.w4g-s1').innerHTML = d.w.map((w, j) => (j === d.k ? `<mark>${w}</mark>` : w)).join('');
+    const n = d.w.length, X = (j) => 60 + (j * 480) / (n - 1);
+    let h = d.w.map((w, j) => `<text x="${X(j)}" y="100" class="${j === d.k ? 'k' : ''}">${w}</text>`).join('');
+    h += d.w.map((w, j) => (j === d.k ? '' : `<path class="on" style="--o:${d.a[j]};stroke-width:${1 + d.a[j] * 5}" d="M${X(d.k)} 70 Q ${(X(d.k) + X(j)) / 2} ${10} ${X(j)} 70"/>`)).join('');
+    s.querySelector('.w4g-att').innerHTML = h;
+    s.querySelector('.w4g-v2').textContent = d.v; s.querySelector('.w4g-m').textContent = `参考整句的其他词后：${d.m}`;
+  },
+  enter(s, ctx) {
+    this.auto = true; this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, 1 - this.i); }, 4000);
+    const es = [...s.querySelectorAll('.w4g-e')]; let k = 0;
+    const tick = () => { es.forEach((e, j) => e.classList.toggle('on', j === k % 5)); k++; };
+    tick(); ctx.every(tick, 1200);
+  },
+  reset(s) { s.querySelectorAll('.w4g-e').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-exp34" data-part="4" data-trans="flip" data-dur="20000" data-title="实验 3-4 ★★：ANN 索引算法的比较研究" data-notes="<b>实验 3-4 ★★：构建向量检索服务：ANN 索引算法的比较研究。</b>dense-embedding 项目的重点不在于实现本身，而在于对比：它提供了 ANNOY 和 HNSW 两种可切换的后端，让你直接观察两类主流 ANN（Approximate Nearest Neighbor，近似最近邻）算法在实践中的区别。所谓 ANN，是指在海量向量中快速找到与查询向量最接近的那些向量的算法——当知识库有上百万条文档时，逐一计算相似度太慢，ANN 通过巧妙的索引结构实现近似但极快的查找。<br>图3-7 是 HNSW 的索引结构：Layer 2 稀疏、只有长程连接；Layer 1 中等密度；Layer 0 稠密、包含全部节点。搜索从顶层开始，逐层向下精炼；支持增量更新、召回率高，查询复杂度 O(log N)。ANNOY 则基于树：用随机超平面递归切分向量空间，查询沿树落到叶子，只与叶子里的候选比较。<br>左侧演示 HNSW 的逐层贪心下降，右侧演示 ANNOY 的超平面切分（结构为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 3-4 ★★：<em>ANN 索引算法</em>的比较研究</h2></div></header>
+  <div class="w4h-ann fx fx-up" style="--d:2"><b>ANN · 近似最近邻</b><span>知识库有上百万条文档时，逐一计算相似度太慢——用巧妙的索引结构实现<em>近似但极快</em>的查找</span></div>
+  <div class="w4h-body">
+    <div class="w4h-hnsw panel fx fx-left" style="--d:3"><div class="w4h-h"><b>HNSW（基于图）· 图3-7</b><span class="c3-shi">结构示意</span></div><svg class="w4h-svg" viewBox="0 0 640 420"></svg><p class="w4h-n">搜索从顶层开始，逐层向下精炼 · 支持增量更新 · 高召回率 · O(log N) 查询复杂度</p></div>
+    <div class="w4h-annoy panel fx fx-right" style="--d:4"><div class="w4h-h"><b>ANNOY（基于树）</b><span class="c3-shi">结构示意</span></div><svg class="w4h-svg2" viewBox="0 0 420 420"></svg><p class="w4h-n">随机超平面递归切分 → 查询落到叶子，只与叶子里的候选比较 · 数据变化需要完全重建</p></div>
+  </div>
+  <div class="src">第三章 ·「从 Word2Vec 到上下文感知」· 实验 3-4 · 图3-7 HNSW 索引结构</div>
+</section>
+<style>
+.w4h-ann{display:flex;align-items:baseline;gap:16px;padding:10px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.w4h-ann b{font-size:19px;color:var(--acc);white-space:nowrap}
+.w4h-ann span{font-size:16px;color:var(--text2)}
+.w4h-ann em{font-style:normal;font-weight:700;color:var(--text)}
+.w4h-body{display:grid;grid-template-columns:1.4fr 1fr;gap:22px;margin-top:14px;flex:1;min-height:0}
+.w4h-hnsw,.w4h-annoy{padding:12px 18px;display:flex;flex-direction:column;gap:6px}
+.w4h-h{display:flex;align-items:center;justify-content:space-between}
+.w4h-h b{font-size:19px}
+.w4h-svg,.w4h-svg2{width:100%;height:470px}
+.w4h-ly{fill:rgba(255,255,255,.03);stroke:var(--line2);stroke-width:1.5}
+.w4h-lt{font-size:15px;fill:var(--text3)}
+.w4h-e{stroke:rgba(255,255,255,.18);stroke-width:1.5}
+.w4h-nd{fill:rgba(12,18,40,.95);stroke:rgba(255,255,255,.4);stroke-width:1.5;transition:all .3s}
+.w4h-nd.vis{fill:var(--acc);stroke:var(--acc)}
+.w4h-nd.cur{fill:#fff;stroke:var(--acc);stroke-width:3}
+.w4h-q{fill:var(--tool);filter:drop-shadow(0 0 6px var(--tool))}
+.w4h-path{fill:none;stroke:var(--acc);stroke-width:3;stroke-linecap:round}
+.w4h-dv{stroke:var(--acc2);stroke-width:2;stroke-dasharray:6 5}
+.w4h-pt{fill:var(--text3)}
+.w4h-pt.cand{fill:var(--acc)}
+.w4h-rg{fill:color-mix(in srgb,var(--acc) 14%,transparent);opacity:0;transition:opacity .4s}
+.w4h-rg.on{opacity:1}
+.w4h-n{font-size:15px;line-height:1.5;color:var(--text2)}
+</style>
+<script>
+HOOKS['c03-exp34'] = {
+  // 三层：y 坐标；节点 [x, 所在最高层]
+  L: [80, 210, 340],
+  N: [[90, 2], [200, 0], [270, 1], [330, 0], [400, 2], [460, 0], [520, 1], [580, 0], [140, 1], [360, 1], [240, 0], [500, 0], [430, 0], [160, 0]],
+  init(s) {
+    const sv = s.querySelector('.w4h-svg');
+    let h = this.L.map((y, i) => `<ellipse class="w4h-ly" cx="330" cy="${y}" rx="300" ry="48"/><text class="w4h-lt" x="16" y="${y - 30}">Layer ${2 - i}</text>`).join('');
+    // 每层的边：同层相邻节点相连
+    for (let l = 0; l < 3; l++) {
+      const lv = 2 - l, xs = this.N.filter((n) => n[1] >= lv).map((n) => n[0]).sort((a, b) => a - b);
+      for (let i = 1; i < xs.length; i++) h += `<line class="w4h-e" x1="${xs[i - 1]}" y1="${this.L[l]}" x2="${xs[i]}" y2="${this.L[l]}"/>`;
+      h += xs.map((x) => `<circle class="w4h-nd" data-l="${l}" data-x="${x}" cx="${x}" cy="${this.L[l]}" r="9"/>`).join('');
+    }
+    h += '<path class="w4h-path"/><circle class="w4h-q" r="9" cx="440" cy="390"/><text class="w4h-lt" x="456" y="396">查询向量</text>';
+    sv.innerHTML = h;
+    const s2 = s.querySelector('.w4h-svg2'), rnd = U.rand(11), pts = Array.from({ length: 34 }, () => [20 + rnd() * 380, 20 + rnd() * 380]);
+    let g = '<rect x="10" y="10" width="400" height="400" rx="16" fill="none" stroke="rgba(255,255,255,.18)"/>';
+    g += '<rect class="w4h-rg" x="210" y="10" width="200" height="190"/>';
+    g += '<line class="w4h-dv" x1="210" y1="10" x2="210" y2="410"/><line class="w4h-dv" x1="210" y1="200" x2="410" y2="200"/><line class="w4h-dv" x1="10" y1="260" x2="210" y2="260"/>';
+    g += pts.map(([x, y]) => `<circle class="w4h-pt${x > 210 && y < 200 ? ' in' : ''}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="6"/>`).join('');
+    g += '<circle class="w4h-q" r="9" cx="320" cy="110"/>';
+    s2.innerHTML = g;
+  },
+  async run(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const path = s.querySelector('.w4h-path'), nd = (l, x) => s.querySelector(`.w4h-nd[data-l="${l}"][data-x="${x}"]`);
+    const route = [[0, 90], [0, 400], [1, 400], [1, 360], [1, 520], [2, 520], [2, 460], [2, 430]];
+    const rg = s.querySelector('.w4h-rg'), ins = [...s.querySelectorAll('.w4h-pt.in')];
+    while (ok()) {
+      s.querySelectorAll('.w4h-nd').forEach((n) => n.setAttribute('class', 'w4h-nd'));
+      path.setAttribute('d', ''); rg.classList.remove('on'); ins.forEach((p) => p.setAttribute('class', 'w4h-pt in'));
+      const pts = [];
+      for (const [l, x] of route) {
+        s.querySelectorAll('.w4h-nd.cur').forEach((n) => n.setAttribute('class', 'w4h-nd vis'));
+        const n = nd(l, x); if (n) n.setAttribute('class', 'w4h-nd cur');
+        pts.push(`${x} ${this.L[l]}`);
+        path.setAttribute('d', 'M' + pts.join(' L'));
+        await U.wait(ctx, 650); if (!ok()) return;
+      }
+      rg.classList.add('on'); ins.forEach((p) => p.setAttribute('class', 'w4h-pt in cand'));
+      await U.wait(ctx, 3200);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c03-tab32" data-part="4" data-trans="rise" data-dur="16000" data-title="表3-2 ANNOY 与 HNSW 索引算法对比" data-notes="表3-2 从构建速度、内存占用、增量更新、查询精度和适用场景五个维度对比两种算法：构建速度 ANNOY 快、HNSW 较慢；内存占用 ANNOY 低、HNSW 较高；增量更新 ANNOY 不支持（需完全重建），HNSW 支持（但长期增量插入后建议定期重建以保持查询精度）；查询精度 ANNOY 较高、HNSW 极高；适用场景 ANNOY 适合数据不常变的静态数据集，HNSW 适合需要实时索引新信息的动态场景。选择合适的索引策略与选择嵌入模型同等重要，它直接决定了系统的性能、成本和可维护性。<br>右侧是配套仓库 dense-embedding 的验收记录（2026-07-29，Qwen/Qwen3-Embedding-0.6B，1024 维，300 篇文档、20 条查询，top_k = 10，与精确搜索对照）：构建 ANNOY 13.2 毫秒、HNSW 77.7 毫秒，与表中“快 / 较慢”一致；recall@10 两者都是 1.0——这个规模下都没有误差；平均查询延迟 0.234 毫秒与 0.257 毫秒；增量加入 60 条时，ANNOY 需要完全重建，HNSW 用 33.8 毫秒直接插入，更新后召回仍为 1.0。序列化体积 ANNOY 1.40 MB、HNSW 1.02 MB，与表中“内存占用”的定性比较方向相反——序列化体积并不等于运行内存，而且这只是 300 篇文档的小规模验收。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表3-2 ANNOY 与 HNSW <em>索引算法对比</em></h2></header>
+  <div class="w4i-body">
+    <div class="w4i-t panel fx fx-left" style="--d:2">
+      <table class="c3-tbl w4i-tb"><thead><tr><th>特性</th><th>ANNOY（基于树）</th><th>HNSW（基于图）</th></tr></thead><tbody>
+        <tr data-r="0"><td>构建速度</td><td>快</td><td>较慢</td></tr>
+        <tr data-r="1"><td>内存占用</td><td>低</td><td>较高</td></tr>
+        <tr data-r="2"><td>增量更新</td><td>不支持（需完全重建）</td><td>支持（长期增量插入后建议定期重建）</td></tr>
+        <tr data-r="3"><td>查询精度</td><td>较高</td><td>极高</td></tr>
+        <tr data-r="4"><td>适用场景</td><td>数据不常变的静态数据集</td><td>需要实时索引新信息的动态场景</td></tr>
+      </tbody></table>
+      <p class="w4i-nt">选择合适的索引策略与选择嵌入模型<b>同等重要</b>：它直接决定系统的性能、成本和可维护性</p>
+    </div>
+    <div class="w4i-d c3-data fx fx-right" style="--d:3">
+      <div class="c3-data-h"><svg class="ic"><use href="#i-clipboard"/></svg>验收记录 · 同一批向量与查询，对照精确搜索</div>
+      <div class="w4i-rows"></div>
+      <div class="c3-data-s">Qwen/Qwen3-Embedding-0.6B · 1024 维 · 300 篇文档 · 20 条查询 · top_k = 10 · 2026-07-29 · CPU</div>
+    </div>
+  </div>
+  <div class="src">第三章 ·「从 Word2Vec 到上下文感知」· 实验 3-4 · 表3-2 ANNOY 与 HNSW 索引算法对比</div>
+</section>
+<style>
+.w4i-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.w4i-t{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.w4i-tb td{font-size:17px}
+.w4i-tb td:first-child{color:var(--acc);font-weight:700;white-space:nowrap}
+.w4i-nt{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2)}
+.w4i-nt b{color:var(--text)}
+.w4i-d{display:flex;flex-direction:column;gap:10px}
+.w4i-r{display:grid;grid-template-columns:110px 1fr 1fr;gap:10px;align-items:center;padding:8px 10px;border-radius:12px;transition:background .35s}
+.w4i-r.on{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.w4i-r>span{font-size:15px;color:var(--text3)}
+.w4i-r b{font:700 18px var(--num);color:var(--text)}
+.w4i-r b small{display:block;font:400 15px var(--font);color:var(--text3)}
+.w4i-r.neg b small{color:#fda4af}
+</style>
+<script>
+HOOKS['c03-tab32'] = {
+  R: [[0, '构建', '13.2 ms', '77.7 ms', '与“快 / 较慢”一致'], [1, '序列化体积', '1.40 MB', '1.02 MB', '方向与“内存占用”相反：序列化体积 ≠ 运行内存，且仅 300 篇', 1], [2, '增量 +60 条', '需要完全重建', '33.8 ms 直接插入', '更新后召回仍为 1.0'], [3, 'recall@10', '1.0', '1.0', '这个规模下两者都没有误差'], [3, '平均查询', '0.234 ms', '0.257 ms', '']],
+  init(s) { s.querySelector('.w4i-rows').innerHTML = '<div class="w4i-r"><span></span><span>ANNOY</span><span>HNSW</span></div>' + this.R.map(([r, n, a, b, nt, neg]) => `<div class="w4i-r${neg ? ' neg' : ''}" data-r="${r}"><span>${n}</span><b>${a}</b><b>${b}${nt ? `<small>${nt}</small>` : ''}</b></div>`).join(''); },
+  enter(s, ctx) {
+    let k = 0; const trs = [...s.querySelectorAll('.w4i-tb tbody tr')];
+    const tick = () => { const r = k % 5; trs.forEach((t) => t.classList.toggle('on', +t.dataset.r === r)); s.querySelectorAll('.w4i-r[data-r]').forEach((x) => x.classList.toggle('on', +x.dataset.r === r)); k++; };
+    tick(); ctx.every(tick, 2200);
+  },
+  reset(s) { s.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); },
+};
+</script>

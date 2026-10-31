@@ -1,0 +1,1714 @@
+<!-- ================= PART 02 事件处理机制（下）：兼容方案 · 任务句柄 · 注意力 · 实验 6-2 · 原生异步 · 实验 6-3 ================= -->
+<section class="slide" id="c06-compat" data-part="2" data-dur="16000" data-title="兼容同步格式：五条规则" data-notes="实验 6-1 只处理串行事件——事件依次进入队列，Agent 一个接一个处理完毕。如果选用的模型或接口不支持原生异步，当工具尚未返回时用户突然打断，就需要<b>在同步格式中表达异步语义</b>。假设 Agent 正在帮用户起草一封邮件（工具调用：搜索联系人信息），搜索还没返回结果时，用户突然说“等一下，先帮我查一下明天的天气”。如果接口要求未完成的工具调用先获得对应结果，Agent 就无法直接带着悬空调用处理这条新消息。<b>这里的限制来自所选协议与模型组合，并非所有 LLM 都必须遵循的规律。</b><br><b>兼容同步格式的异步实现。</b>核心思想是：<b>在没有打断发生的常态下，让 LLM 看到标准的同步轨迹，只在打断时才插入占位符来修复格式</b>。五条关键规则——<b>规则 1</b>：及时记录 API 已完成的 assistant 消息和工具调用项；对服务端管理的 reasoning 状态，按提供商的续接协议保留，不自行拼接不可见的思考文本。<b>规则 2</b>：工具调用完成时才记录 tool result，执行中轨迹处于“部分完成”状态。<b>规则 3</b>：工具执行中的打断需要占位符——为未完成的工具生成占位符响应（如“工具正在后台执行，请优先处理新事件”），追加打断事件，重新调用 LLM；从 LLM 的视角看，assistant message 仍然有配对的 tool result。<b>规则 4</b>：在没有原生 steering 或受支持的中途续接接口时，取消未完成的生成，保留已经确认完成的消息和工具状态，将新事件追加后重新请求；不能假定半截输出或隐藏推理可以作为合法前缀任意回灌。<b>规则 5</b>：非打断事件进入队列等待批处理，当前周期完成后才一次性追加。<br>左侧逐条演示五条规则（轨迹内容为示意），点击右侧任一规则可以单独重放。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">兼容同步格式：<em>只在打断时才修补轨迹</em></h2></header>
+  <div class="cp-scene fx fx-up" style="--d:2">
+    <span class="cp-tg">场景</span>
+    <p>Agent 正在帮用户起草邮件，<code>search_contacts</code> 还没返回，用户突然说：“等一下，先帮我查一下明天的天气。”如果接口要求未完成的工具调用先获得对应结果，Agent 就无法带着悬空调用处理这条新消息。</p>
+    <em>这个限制来自所选协议与模型组合，并非所有 LLM 都必须遵循的规律</em>
+  </div>
+  <div class="cp-body">
+    <div class="cp-traj panel fx fx-left" style="--d:3">
+      <div class="cp-th"><b>LLM 看到的轨迹</b><span class="cp-sc"></span><span class="cp-val" data-st="idle">—</span></div>
+      <div class="cp-rows" data-clip-ok></div>
+      <div class="cp-rt"><span class="lbl">运行时</span><span class="cp-pend" data-st="idle"><i></i><code>search_contacts</code><em>空闲</em></span><span class="cp-q"><svg class="ic"><use href="#i-inbox"/></svg>队列 <b>0</b></span><span class="chip warn cp-sim">轨迹内容为示意</span></div>
+    </div>
+    <ol class="sl cp-rules fx fx-right" style="--d:4">
+      <li data-i="0"><span>1</span><div><b>规则 1 · 及时记录</b><p>API 已完成的 assistant 消息和工具调用项立即写入；reasoning 状态按提供商续接协议保留，不自行拼接不可见的思考文本</p></div></li>
+      <li data-i="1"><span>2</span><div><b>规则 2 · 完成才记</b><p>工具调用完成时才记录 tool result，执行中的轨迹处于“部分完成”状态</p></div></li>
+      <li data-i="2"><span>3</span><div><b>规则 3 · 打断用占位符</b><p>为未完成的工具生成占位符响应，追加打断事件，重新调用 LLM——assistant message 仍有配对的 tool result</p></div></li>
+      <li data-i="3"><span>4</span><div><b>规则 4 · 无续接接口就取消生成</b><p>保留已确认完成的消息和工具状态，追加新事件后重新请求；半截输出或隐藏推理不能当合法前缀任意回灌</p></div></li>
+      <li data-i="4"><span>5</span><div><b>规则 5 · 非打断事件排队</b><p>进入队列等待批处理，当前周期完成后才一次性追加</p></div></li>
+    </ol>
+  </div>
+  <p class="tagline cp-tag fx fx-up" style="--d:6"><b>核心思想</b>：在没有打断发生的常态下，让 LLM 看到标准的同步轨迹，只在打断时才插入占位符来修复格式</p>
+  <div class="src">第六章 ·「不支持原生异步时的兼容方案」· 兼容同步格式的异步实现</div>
+</section>
+<style>
+#c06-compat .cp-scene{display:flex;align-items:flex-start;gap:16px;padding:14px 22px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);margin-top:-8px}
+#c06-compat .cp-tg{flex:none;margin-top:3px;padding:3px 12px;border-radius:999px;font-size:16px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+#c06-compat .cp-scene p{flex:1;font-size:19px;line-height:1.6;color:var(--text)}
+#c06-compat .cp-scene code{font:18px var(--mono);color:var(--tool)}
+#c06-compat .cp-scene em{flex:none;width:290px;font-style:normal;font-size:16px;line-height:1.55;color:var(--warn);padding-left:16px;border-left:2px solid color-mix(in srgb,var(--warn) 50%,transparent)}
+#c06-compat .cp-body{display:flex;gap:24px;margin-top:18px;height:520px}
+#c06-compat .cp-traj{width:930px;flex:none;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-compat .cp-th{display:flex;align-items:center;gap:14px}
+#c06-compat .cp-th b{font-size:21px}
+#c06-compat .cp-sc{font-size:16px;color:var(--acc);letter-spacing:.04em}
+#c06-compat .cp-val{margin-left:auto;padding:5px 14px;border-radius:999px;font-size:16px;font-weight:600;border:1px solid var(--line2);color:var(--text3);transition:color .35s,border-color .35s,background .35s}
+#c06-compat .cp-val[data-st=wait]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+#c06-compat .cp-val[data-st=ok]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c06-compat .cp-val[data-st=bad]{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 12%,transparent);animation:shake .5s}
+#c06-compat .cp-rows{flex:1;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+#c06-compat .cp-r{font-size:17px;padding:8px 14px 8px 16px;align-items:center}
+#c06-compat .cp-r .rl{min-width:96px;font-size:15px}
+#c06-compat .cp-tgg{flex:none;font-style:normal;font-size:15px;padding:2px 10px;border-radius:8px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);white-space:nowrap}
+#c06-compat .cp-ghost{opacity:.62;border-style:dashed;background:transparent}
+#c06-compat .cp-ph{border-style:dashed}
+#c06-compat .cp-x{opacity:.5}
+#c06-compat .cp-x .tx{text-decoration:line-through;color:var(--text3)}
+#c06-compat .cp-keep{box-shadow:0 0 0 1px color-mix(in srgb,var(--ok) 45%,transparent),0 0 18px color-mix(in srgb,var(--ok) 20%,transparent)}
+#c06-compat .cp-rt{display:flex;align-items:center;gap:18px;padding-top:12px;border-top:1px solid var(--line);font-size:17px;color:var(--text2)}
+#c06-compat .cp-pend{display:flex;align-items:center;gap:8px}
+#c06-compat .cp-pend i{width:12px;height:12px;border-radius:50%;background:var(--text3)}
+#c06-compat .cp-pend code{font:16px var(--mono);color:var(--tool)}
+#c06-compat .cp-pend em{font-style:normal;color:var(--text3)}
+#c06-compat .cp-pend[data-st=run] i{background:var(--tool);animation:c06cp-pulse 1s ease-in-out infinite}
+#c06-compat .cp-pend[data-st=run] em{color:var(--tool)}
+#c06-compat .cp-pend[data-st=done] i{background:var(--ok)}
+#c06-compat .cp-pend[data-st=done] em{color:var(--ok)}
+#c06-compat .cp-q{position:relative;display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:10px;border:1px solid transparent;transition:all .35s}
+#c06-compat .cp-q.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+#c06-compat .cp-q b{font:800 20px var(--num);color:var(--acc)}
+#c06-compat .cp-sim{margin-left:auto;font-size:15px;padding:4px 12px}
+#c06-compat .cp-fly{position:absolute;left:50%;bottom:44px;padding:6px 14px;border-radius:10px;font-size:16px;white-space:nowrap;color:var(--text);background:color-mix(in srgb,var(--tool) 16%,rgba(10,16,36,.95));border:1px solid color-mix(in srgb,var(--tool) 50%,transparent);animation:c06cp-fly 1.2s var(--ease) forwards;pointer-events:none}
+#c06-compat .cp-rules{flex:1;gap:8px}
+#c06-compat .cp-rules li{padding:10px 14px;gap:14px;cursor:pointer;opacity:.45}
+#c06-compat .cp-rules li>span{width:36px;height:36px;font-size:17px}
+#c06-compat .cp-rules b{font-size:20px}
+#c06-compat .cp-rules p{font-size:16px;line-height:1.5;margin-top:3px}
+#c06-compat .cp-rules li.done{opacity:.72}
+#c06-compat .cp-rules li.cur{opacity:1}
+#c06-compat .cp-tag{margin-top:20px;font-size:23px}
+@keyframes c06cp-pulse{50%{opacity:.35;transform:scale(.7)}}
+@keyframes c06cp-fly{0%{opacity:0;transform:translate(-50%,-70px)}30%{opacity:1;transform:translate(-50%,-50px)}100%{opacity:0;transform:translate(-50%,0) scale(.6)}}
+</style>
+<script>
+HOOKS['c06-compat'] = {
+  NAMES: ['规则 1 · 及时记录', '规则 2 · 完成才记', '规则 3 · 打断用占位符', '规则 4 · 取消未完成的生成', '规则 5 · 非打断事件排队'],
+  init(s) {
+    this.s = s;
+    this.box = s.querySelector('.cp-rows');
+    this.lis = [...s.querySelectorAll('.cp-rules li')];
+    this.lis.forEach((li, i) => li.addEventListener('click', () => { this.auto = false; this.play(i); }));
+  },
+  row(r, txt, o = {}) {
+    const el = document.createElement('div');
+    el.className = 'mr cp-r' + (o.cls ? ' ' + o.cls : '') + (o.quiet ? '' : ' new');
+    el.dataset.r = r;
+    if (o.c) el.style.setProperty('--c', o.c);
+    el.innerHTML = `<span class="rl">${r}</span><span class="tx">${txt}</span>${o.tag ? `<em class="cp-tgg">${o.tag}</em>` : ''}`;
+    this.box.appendChild(el);
+    return el;
+  },
+  val(st, t) { const v = this.s.querySelector('.cp-val'); v.dataset.st = st; v.textContent = t; },
+  pend(st, t) { const p = this.s.querySelector('.cp-pend'); p.dataset.st = st; p.querySelector('em').textContent = t; },
+  qn(n) { this.s.querySelector('.cp-q b').textContent = n; this.s.querySelector('.cp-q').classList.toggle('on', n > 0); },
+  base(withCall) {
+    this.box.innerHTML = '';
+    this.row('user', '帮我给王经理起草一封邮件，约他下周开会', { quiet: 1 });
+    if (withCall) this.row('assistant', 'tool_call · search_contacts(“王经理”)', { quiet: 1 });
+  },
+  async play(i) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx.alive && tk === this.tk, W = (ms) => U.wait(ctx, ms);
+    this.lis.forEach((li, j) => { li.classList.toggle('cur', j === i); li.classList.toggle('done', this.auto && j < i); });
+    this.s.querySelector('.cp-sc').textContent = this.NAMES[i];
+    this.s.querySelectorAll('.cp-fly').forEach((f) => f.remove());
+    this.qn(0); this.pend('idle', '空闲'); this.val('idle', '—');
+    if (i === 0) {
+      this.base(false);
+      await W(700); if (!ok()) return;
+      this.row('assistant', 'tool_call · search_contacts(“王经理”)', { tag: '规则 1 · 立即写入' });
+      this.pend('run', '运行中'); this.val('wait', '部分完成 · 等待工具结果');
+      await W(1300); if (!ok()) return;
+      this.row('reasoning', '服务端管理的推理状态：按提供商的续接协议保留', { c: 'var(--pink)', tag: '不自行拼接思考文本' });
+    } else if (i === 1) {
+      this.base(true); this.pend('run', '运行中'); this.val('wait', '部分完成');
+      await W(500); if (!ok()) return;
+      const g = this.row('tool', 'search_contacts 执行中……', { cls: 'cp-ghost', tag: '规则 2 · 未完成不写入' });
+      await W(2100); if (!ok()) return;
+      this.pend('done', '已返回');
+      g.classList.remove('cp-ghost'); U.restart(g, 'new');
+      g.querySelector('.tx').textContent = '联系人：王经理（市场部），邮箱已找到';
+      g.querySelector('.cp-tgg').textContent = '完成时才记录 tool result';
+      this.val('ok', '配对完好');
+    } else if (i === 2) {
+      this.base(true); this.pend('run', '运行中'); this.val('wait', '部分完成');
+      await W(800); if (!ok()) return;
+      const bad = this.row('user', '等一下，先帮我查一下明天的天气', { cls: 'bad', tag: '直接追加？' });
+      this.val('bad', '不合法：tool_call 缺少配对的 tool result');
+      await W(1900); if (!ok()) return;
+      bad.remove();
+      this.row('tool', '占位：工具正在后台执行，请优先处理新事件', { c: 'var(--warn)', cls: 'cp-ph', tag: '规则 3 · 占位符' });
+      await W(800); if (!ok()) return;
+      this.row('user', '等一下，先帮我查一下明天的天气', { tag: '打断事件' });
+      this.val('ok', '配对完好 · 重新调用 LLM');
+      await W(1000); if (!ok()) return;
+      this.row('assistant', 'tool_call · get_weather(“明天”)', { tag: '先处理新事件' });
+    } else if (i === 3) {
+      this.base(true);
+      this.row('tool', '联系人：王经理（市场部），邮箱已找到', { quiet: 1 });
+      this.val('wait', 'LLM 正在生成');
+      const g = this.row('assistant', '', { cls: 'cp-ghost', tag: '生成中' });
+      const tx = g.querySelector('.tx'), full = '好的，我来起草：“王经理您好，想约您下周……';
+      for (let n = 1; n <= full.length; n++) { tx.textContent = full.slice(0, n); await W(60); if (!ok()) return; }
+      await W(300); if (!ok()) return;
+      this.val('bad', '新事件到达：用户打断');
+      g.classList.add('cp-x'); g.querySelector('.cp-tgg').textContent = '取消生成 · 半截输出不回灌';
+      await W(1700); if (!ok()) return;
+      g.remove();
+      [...this.box.children].forEach((r) => r.classList.add('cp-keep'));
+      this.val('wait', '保留已确认完成的消息和工具状态');
+      await W(1100); if (!ok()) return;
+      this.row('user', '等一下，先帮我查一下明天的天气', { tag: '追加新事件' });
+      this.val('ok', '重新请求');
+    } else {
+      this.base(true); this.pend('run', '运行中'); this.val('wait', '部分完成');
+      await W(800); if (!ok()) return;
+      const f = document.createElement('span');
+      f.className = 'cp-fly';
+      f.textContent = '补充：语气正式一些';
+      this.s.querySelector('.cp-q').appendChild(f);
+      await W(1000); if (!ok()) return;
+      f.remove();
+      this.qn(1); this.val('wait', '非打断事件进入队列，不打断当前周期');
+      await W(1700); if (!ok()) return;
+      this.pend('done', '已返回');
+      this.row('tool', '联系人：王经理（市场部），邮箱已找到', { tag: '本周期完成' });
+      await W(800); if (!ok()) return;
+      this.row('user', '补充：语气正式一些', { tag: '规则 5 · 批量追加' });
+      this.qn(0);
+      this.val('ok', '当前周期完成后一次性追加');
+    }
+    await W(2600); if (!ok()) return;
+    if (this.auto) this.play((i + 1) % 5);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.play(0), 900); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.box.innerHTML = '';
+    this.lis.forEach((li) => li.classList.remove('cur', 'done'));
+    s.querySelectorAll('.cp-fly').forEach((f) => f.remove());
+    this.val('idle', '—'); this.pend('idle', '空闲'); this.qn(0);
+    s.querySelector('.cp-sc').textContent = '';
+  },
+};
+</script>
+
+<section class="slide" id="c06-compat-run" data-part="2" data-steps="3" data-trans="zoom" data-dur="11000" data-title="五条规则的运作过程" data-notes="以 Agent 正在起草邮件时用户打断询问天气为例，按 → 逐步看五条规则如何运作（左边是真实发生的事，右边是 LLM 看到的轨迹，内容与时长为示意）：<br>① Agent 调用 search_contacts 搜索联系人信息，assistant message 立即写入轨迹（规则 1）；结果尚未返回，tool result 暂不记录（规则 2）。<br>② 搜索工具尚未返回结果时，用户发来“先帮我查一下明天的天气”。由于这是用户打断，系统为未完成的 search_contacts 生成占位符 tool result（“工具正在后台执行，请优先处理新事件”，规则 3），然后将用户的天气查询追加到轨迹，重新调用 LLM。此刻 LLM 看到的轨迹格式完全合法——assistant message 与 tool result 配对完好。<br>③ 天气查询完成并回复用户后，原先的 search_contacts 结果到达，作为新事件追加到轨迹（规则 2），Agent 读取联系人信息后继续起草邮件。<br>这套方案的作用是<b>维持同步接口要求的工具配对关系</b>：只有需要打断时才引入明确表示“未完成”的占位符；后台真实结果到达后，再通过有来源和任务 ID 的事件送入轨迹。对于已经支持原生异步的模型，系统可以保留任务的未完成状态，等真实结果到达后再交给模型处理。<br>④ 占位符也带来<b>语义上的风险</b>：模型可能把“任务已启动”误当成“任务已完成”，在真实结果返回前作出依赖该结果的判断。应通过明确的任务状态和结果校验防止这种混淆，并在评估中检查是否编造了未到达的数据。不能仅凭一次失败，就把原因归结为某个未公开的训练过程。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一次打断的全过程：<em>轨迹始终配对完好</em></h2></div>
+    <button class="btn cr-re fx fx-up" style="--d:2"><svg class="ic"><use href="#i-refresh"/></svg>重放本步</button></header>
+  <div class="cr-body">
+    <div class="cr-tl panel fx fx-left" style="--d:3">
+      <div class="cr-h"><b>运行时视角：真实发生的事</b><span class="chip warn">时长为示意</span></div>
+      <div class="cr-lanes">
+        <div class="cr-ln"><span>用户</span><div class="cr-tr" data-l="u"></div></div>
+        <div class="cr-ln"><span>LLM</span><div class="cr-tr" data-l="m"></div></div>
+        <div class="cr-ln"><span class="cr-mono">search_contacts</span><div class="cr-tr" data-l="c"></div></div>
+        <div class="cr-ln"><span>天气查询</span><div class="cr-tr" data-l="w"></div></div>
+        <div class="cr-ax"><span>时间</span><div class="cr-tk"><i style="left:0%">0</i><i style="left:20%">2</i><i style="left:40%">4</i><i style="left:60%">6</i><i style="left:80%">8</i><i style="left:100%">10</i></div></div>
+        <i class="cr-cur"></i>
+      </div>
+    </div>
+    <div class="cr-tj panel fx fx-right" style="--d:4">
+      <div class="cr-h"><b>LLM 看到的轨迹</b><span class="chip warn">内容为示意</span><span class="cr-val" data-st="wait"></span></div>
+      <div class="cr-rows" data-clip-ok></div>
+      <div class="cr-def"><b><svg class="ic"><use href="#i-shield"/></svg>防护</b><span>明确的任务状态（running / done）</span><span>结果校验</span><span>评估中检查是否编造了未到达的数据</span></div>
+    </div>
+  </div>
+  <div class="cr-cap">
+    <span data-k="0">① Agent 调用 search_contacts，assistant message 立即写入轨迹（规则 1）；结果未到，暂不写 tool result（规则 2）</span>
+    <span data-k="1">② 用户打断：为未完成的调用生成占位符 tool result（规则 3），追加天气查询后重新调用 LLM——此刻轨迹格式完全合法</span>
+    <span data-k="2">③ 天气查询完成并回复用户后，search_contacts 的真实结果带着来源和任务 ID 作为新事件到达（规则 2），Agent 继续起草邮件</span>
+    <span data-k="3">④ 语义风险：模型可能把“任务已启动”误当成“任务已完成”——用明确的任务状态和结果校验拦住，并在评估中检查编造</span>
+  </div>
+  <div class="src">第六章 ·「不支持原生异步时的兼容方案」· 五条规则的运作过程</div>
+</section>
+<style>
+#c06-compat-run .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-compat-run .cr-body{display:flex;gap:24px;height:560px}
+#c06-compat-run .cr-tl{width:820px;flex:none;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-compat-run .cr-tj{flex:1;min-width:0;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-compat-run .cr-h{display:flex;align-items:center;gap:12px}
+#c06-compat-run .cr-h b{font-size:21px}
+#c06-compat-run .cr-h .chip{font-size:15px;padding:4px 12px}
+#c06-compat-run .cr-lanes{position:relative;flex:1;display:flex;flex-direction:column;--t:0}
+#c06-compat-run .cr-ln{flex:1;display:flex;align-items:center;border-bottom:1px dashed var(--line)}
+#c06-compat-run .cr-ln>span{width:160px;flex:none;font-size:17px;color:var(--text2)}
+#c06-compat-run .cr-ln>span.cr-mono{font:15px var(--mono);color:var(--tool)}
+#c06-compat-run .cr-tr{position:relative;flex:1;height:100%}
+#c06-compat-run .cr-b{--c:var(--llm);position:absolute;top:50%;height:24px;margin-top:-12px;border-radius:7px;background:color-mix(in srgb,var(--c) 30%,rgba(10,16,36,.9));border:1px solid var(--c);transform-origin:left center}
+#c06-compat-run .cr-b.tool{--c:var(--tool)}
+#c06-compat-run .cr-b.bad{--c:var(--bad);box-shadow:0 0 16px color-mix(in srgb,var(--bad) 50%,transparent)}
+#c06-compat-run .cr-b.run{background:repeating-linear-gradient(-45deg,color-mix(in srgb,var(--c) 40%,transparent) 0 8px,transparent 8px 16px);border-right-style:dashed}
+#c06-compat-run .cr-b span{position:absolute;left:0;white-space:nowrap;font-size:15px;color:var(--text)}
+#c06-compat-run .cr-b.up span{bottom:30px}
+#c06-compat-run .cr-b.dn span{top:30px}
+#c06-compat-run .cr-b.in span{left:10px;top:50%;transform:translateY(-50%)}
+#c06-compat-run .cr-b.bad span{color:var(--bad);font-weight:700}
+#c06-compat-run .cr-b.grow{animation:c06cr-grow .8s var(--ease) both}
+#c06-compat-run .cr-m{--c:var(--tool);position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c)}
+#c06-compat-run .cr-m.env{--c:var(--env)}
+#c06-compat-run .cr-m span{position:absolute;left:22px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:15px;color:var(--c)}
+#c06-compat-run .cr-m.grow{animation:c06cr-pop .6s var(--spring) both}
+#c06-compat-run .cr-ax{height:26px;flex:none;display:flex;align-items:center;font-size:15px;color:var(--text3)}
+#c06-compat-run .cr-ax>span{width:160px;flex:none}
+#c06-compat-run .cr-tk{position:relative;flex:1;height:100%}
+#c06-compat-run .cr-tk i{position:absolute;top:4px;font-style:normal;transform:translateX(-50%)}
+#c06-compat-run .cr-cur{position:absolute;top:0;bottom:26px;left:calc(160px + (100% - 160px) * var(--t));width:2px;background:var(--acc);box-shadow:0 0 12px var(--acc);transition:left 1.2s var(--ease)}
+#c06-compat-run .cr-rows{flex:1;display:flex;flex-direction:column;gap:7px;overflow:hidden}
+#c06-compat-run .cr-r{font-size:16px;padding:7px 12px 7px 16px;align-items:center}
+#c06-compat-run .cr-r .rl{min-width:84px;font-size:15px}
+#c06-compat-run .cr-r em{flex:none;font-style:normal;font-size:15px;padding:2px 9px;border-radius:8px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);white-space:nowrap}
+#c06-compat-run .cr-r.ph{border-style:dashed}
+#c06-compat-run .cr-r.bad em{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+#c06-compat-run .cr-val{margin-left:auto;padding:5px 14px;border-radius:999px;font-size:16px;font-weight:600;border:1px solid var(--line2);color:var(--text3)}
+#c06-compat-run .cr-val[data-st=wait]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+#c06-compat-run .cr-val[data-st=ok]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c06-compat-run .cr-val[data-st=bad]{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+#c06-compat-run .cr-def{display:none;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c06-compat-run .cr-def b{display:flex;align-items:center;gap:8px;font-size:18px;color:var(--ok)}
+#c06-compat-run .cr-def span{padding:4px 12px;border-radius:999px;font-size:16px;color:var(--text);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+#c06-compat-run[data-k="3"] .cr-def{display:flex;animation:upIn .6s var(--spring) both}
+#c06-compat-run[data-k="3"] .cr-rows .mr:not(.bad){opacity:.5}
+#c06-compat-run .cr-cap{position:relative;height:64px;margin-top:18px}
+#c06-compat-run .cr-cap span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:20px;line-height:1.5;color:var(--acc);opacity:0;transform:translateY(10px);transition:opacity .6s var(--ease),transform .6s var(--ease)}
+#c06-compat-run[data-k="0"] .cr-cap [data-k="0"],#c06-compat-run[data-k="1"] .cr-cap [data-k="1"],#c06-compat-run[data-k="2"] .cr-cap [data-k="2"],#c06-compat-run[data-k="3"] .cr-cap [data-k="3"]{opacity:1;transform:none}
+@keyframes c06cr-grow{from{transform:scaleX(0);opacity:.2}}
+@keyframes c06cr-pop{from{transform:scale(0)}}
+</style>
+<script>
+HOOKS['c06-compat-run'] = {
+  T: 10,
+  CUR: [2.0, 3.4, 9.9, 4.4],
+  VAL: [['wait', '部分完成 · 工具执行中'], ['ok', '格式完全合法 · 重新调用 LLM'], ['ok', 'assistant 与 tool 始终配对'], ['bad', '把“已启动”当成“已完成”']],
+  // [步骤, 泳道, 开始, 结束, 标签, 样式]
+  B: [
+    [0, 'm', 0.2, 1.1, '调用工具', 'up'],
+    [0, 'c', 1.1, 8.2, '', 'tool in'],
+    [1, 'm', 2.5, 3.3, '重新调用', 'dn'],
+    [2, 'm', 3.3, 3.8, '查天气', 'up'],
+    [2, 'w', 3.8, 4.9, '查询', 'tool in'],
+    [2, 'm', 4.9, 5.7, '回复', 'dn'],
+    [2, 'm', 8.3, 9.8, '继续起草', 'in'],
+    [3, 'm', 3.3, 4.3, '编造结果', 'bad up'],
+  ],
+  // [步骤, 泳道, 时刻, 标签, 样式]
+  M: [
+    [1, 'u', 2.2, '打断：先查明天天气', ''],
+    [2, 'u', 5.8, '收到天气回复', ''],
+    [2, 'c', 8.2, '真实结果 → 新事件', 'env'],
+  ],
+  // [步骤, 角色, 文本, 标签, 样式]
+  R: [
+    [0, 'user', '帮我给王经理起草一封邮件，约他下周开会'],
+    [0, 'assistant', 'tool_call · search_contacts(“王经理”)', '规则 1 · 立即写入'],
+    [1, 'tool', '占位：工具正在后台执行，请优先处理新事件', '规则 3 · 占位符', 'ph'],
+    [1, 'user', '等一下，先帮我查一下明天的天气', '打断事件'],
+    [2, 'assistant', 'tool_call · get_weather(“明天”)'],
+    [2, 'tool', '明天：晴'],
+    [2, 'assistant', '明天晴。（回复用户，继续等待联系人结果）'],
+    [2, 'event', 'search_contacts 结果到达（task_id T-1）', '规则 2 · 完成才记录', 'ev'],
+    [2, 'assistant', '读取联系人信息，继续起草邮件……'],
+    [3, 'assistant', '王经理的邮箱是 wang@……，邮件已起草好', '编造：结果尚未到达', 'bad'],
+  ],
+  vis(st, k) { return k === 3 ? st <= 1 || st === 3 : st <= k; },
+  init(s) { s.querySelector('.cr-re').addEventListener('click', () => this.render(s, this.k || 0, true)); },
+  render(s, k, anim) {
+    this.k = k;
+    s.dataset.k = k;
+    const T = this.T;
+    s.querySelectorAll('.cr-tr').forEach((t) => (t.innerHTML = ''));
+    let n = 0;
+    this.B.forEach(([st, l, t0, t1, lab, cls]) => {
+      if (!this.vis(st, k)) return;
+      let end = t1, c = cls, txt = lab;
+      if (l === 'c') {
+        if (k === 2) txt = 'search_contacts 执行完毕';
+        else { end = this.CUR[k]; c += ' run'; txt = '执行中……'; }
+      }
+      const fresh = anim && (st === k || (l === 'c' && k === 2));
+      const el = document.createElement('div');
+      el.className = `cr-b ${c}${fresh ? ' grow' : ''}`;
+      el.style.left = (t0 / T) * 100 + '%';
+      el.style.width = ((end - t0) / T) * 100 + '%';
+      if (fresh) el.style.animationDelay = n++ * 420 + 'ms';
+      el.innerHTML = `<span>${txt}</span>`;
+      s.querySelector(`.cr-tr[data-l="${l}"]`).appendChild(el);
+    });
+    this.M.forEach(([st, l, t, lab, cls]) => {
+      if (!this.vis(st, k)) return;
+      const fresh = anim && st === k;
+      const el = document.createElement('div');
+      el.className = `cr-m ${cls}${fresh ? ' grow' : ''}`;
+      el.style.left = (t / T) * 100 + '%';
+      if (fresh) el.style.animationDelay = n++ * 420 + 'ms';
+      el.innerHTML = `<span>${lab}</span>`;
+      s.querySelector(`.cr-tr[data-l="${l}"]`).appendChild(el);
+    });
+    const rows = s.querySelector('.cr-rows');
+    rows.innerHTML = '';
+    let m = 0;
+    this.R.forEach(([st, r, txt, tag, cls]) => {
+      if (!this.vis(st, k)) return;
+      const fresh = anim && st === k;
+      const el = document.createElement('div');
+      el.className = `mr cr-r${cls ? ' ' + cls : ''}${fresh ? ' new' : ''}`;
+      el.dataset.r = r;
+      if (cls === 'ph') el.style.setProperty('--c', 'var(--warn)');
+      if (cls === 'ev') el.style.setProperty('--c', 'var(--env)');
+      if (fresh) el.style.animationDelay = 200 + m++ * 380 + 'ms';
+      el.innerHTML = `<span class="rl">${r}</span><span class="tx">${txt}</span>${tag ? `<em>${tag}</em>` : ''}`;
+      rows.appendChild(el);
+    });
+    const [vs, vt] = this.VAL[k], v = s.querySelector('.cr-val');
+    v.dataset.st = vs;
+    v.textContent = vt;
+    s.querySelector('.cr-lanes').style.setProperty('--t', this.CUR[k] / T);
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.render(s, k, true); },
+  step(s, ctx, k, dir) { this.render(s, k, dir > 0); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    s.dataset.k = '';
+    s.querySelectorAll('.cr-tr').forEach((t) => (t.innerHTML = ''));
+    s.querySelector('.cr-rows').innerHTML = '';
+    s.querySelector('.cr-lanes').style.setProperty('--t', 0);
+  },
+};
+</script>
+
+<section class="slide" id="c06-handle" data-part="2" data-trans="flip" data-dur="15000" data-title="用任务句柄表达异步语义" data-notes="<b>通过任务句柄表达异步语义。</b>无论是否使用原生异步协议，都可以<b>从工具接口的设计层面明确异步语义</b>。对同步接口尤其有用的方法，是让“启动任务”成为一次有真实返回值的完整调用。<br>传统的工具设计隐含了“调用即完成”的语义。例如 phone_call 这个名字暗示“调用将拨打电话并等待通话结束，返回通话记录”。在异步范式下应该将“启动”和“完成”解耦：initiate_phone_call 启动电话呼叫，立即返回任务标识符和初始状态（如“呼叫已发起，正在拨号”）；通话进展通过事件通知（phone_call_connected、phone_call_ended）。<br>关键在于<b>工具的名称和描述本身就要传达异步的语义</b>。当模型看到 initiate_phone_call 时，它会自然推断这是“发起”而非“完成”。工具描述应进一步强化这一点：“此工具将启动由子 Agent 处理的电话任务。任务成功发起后立即返回任务 ID，你可以继续处理其他事项。通话结束后会收到单独的通知事件。”<br>右侧时间线为示意：同步设计下，Agent 被一通电话锁住，用户消息只能积压；句柄设计下，启动立即返回，Agent 继续处理其他事项，通话的进展由事件送回。点击上方开关可以切换两种设计。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">把“启动”和“完成”<em>拆成两件事</em></h2></div>
+    <div class="hd-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="sync">phone_call</button><button data-v="async">initiate_phone_call</button></div></header>
+  <div class="hd-body">
+    <div class="hd-def win fx fx-left" style="--d:3">
+      <div class="win-bar"><i></i><i></i><i></i><span>工具定义 · 模型读到的就是这些</span></div>
+      <div class="hd-code"></div>
+    </div>
+    <div class="hd-tl panel fx fx-right" style="--d:4">
+      <div class="hd-th"><b class="hd-tt">调用之后发生了什么</b><span class="chip warn">时间线为示意</span></div>
+      <div class="hd-lanes">
+        <div class="hd-ln" data-l="a"><span>Agent</span><div class="hd-tr"></div></div>
+        <div class="hd-ln" data-l="t"><span>工具</span><div class="hd-tr"></div></div>
+        <div class="hd-ln" data-l="p"><span>电话（子 Agent）</span><div class="hd-tr"></div></div>
+        <div class="hd-ln" data-l="u"><span>用户</span><div class="hd-tr"></div></div>
+        <i class="hd-cur"></i>
+      </div>
+      <div class="hd-sum"></div>
+    </div>
+  </div>
+  <div class="hd-ins">
+    <div class="fx fx-up" style="--d:6"><b>名字和描述本身就是语义</b><p>看到 initiate_phone_call，模型会自然推断这是“发起”而非“完成”；工具描述再进一步强化这一点</p></div>
+    <div class="fx fx-up" style="--d:7"><b>启动是一次有真实返回值的完整调用</b><p>对同步接口尤其有用：启动立即得到任务 ID 与初始状态，通话进展另由事件通知</p></div>
+  </div>
+  <div class="src">第六章 ·「不支持原生异步时的兼容方案」· 通过任务句柄表达异步语义</div>
+</section>
+<style>
+#c06-handle .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-handle .hd-seg button{font-family:var(--mono);font-size:19px}
+#c06-handle .hd-body{display:flex;gap:24px;height:520px}
+#c06-handle .hd-def{width:640px;flex:none;display:flex;flex-direction:column}
+#c06-handle .hd-code{flex:1;padding:22px 26px;display:flex;flex-direction:column;gap:18px}
+#c06-handle .hd-kv{display:grid;grid-template-columns:136px 1fr;gap:14px;align-items:baseline;animation:upIn .5s var(--spring) both}
+#c06-handle .hd-kv:nth-child(2){animation-delay:.12s}#c06-handle .hd-kv:nth-child(3){animation-delay:.24s}#c06-handle .hd-kv:nth-child(4){animation-delay:.36s}
+#c06-handle .hd-kv>span{font:16px var(--mono);color:var(--text3)}
+#c06-handle .hd-kv>b{font:700 23px var(--mono);color:var(--tool)}
+#c06-handle .hd-kv>p{font-size:18px;line-height:1.65;color:var(--text)}
+#c06-handle .hd-kv code{font:16px var(--mono);color:var(--ctx)}
+#c06-handle .hd-kv em{font-style:normal;color:var(--bad);font-weight:700}
+#c06-handle .hd-kv .hd-bad{color:var(--bad)}
+#c06-handle .hd-kv .hd-good{color:var(--ok)}
+#c06-handle .hd-tl{flex:1;min-width:0;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-handle .hd-th{display:flex;align-items:center;gap:12px}
+#c06-handle .hd-th b{font-size:21px}
+#c06-handle .hd-th .chip{font-size:15px;padding:4px 12px;margin-left:auto}
+#c06-handle .hd-lanes{position:relative;flex:1;display:flex;flex-direction:column;--t:0}
+#c06-handle .hd-ln{flex:1;display:flex;align-items:center;border-bottom:1px dashed var(--line)}
+#c06-handle .hd-ln>span{width:170px;flex:none;font-size:17px;color:var(--text2)}
+#c06-handle .hd-tr{position:relative;flex:1;height:100%}
+#c06-handle .hd-b{--c:var(--llm);position:absolute;top:50%;height:26px;margin-top:-13px;width:0;border-radius:7px;background:color-mix(in srgb,var(--c) 30%,rgba(10,16,36,.9));border:1px solid var(--c);opacity:0}
+#c06-handle .hd-b.on{opacity:1}
+#c06-handle .hd-b.tool{--c:var(--tool)}
+#c06-handle .hd-b.call{--c:var(--env)}
+#c06-handle .hd-b.block{--c:#94a3b8;background:repeating-linear-gradient(-45deg,rgba(148,163,184,.28) 0 8px,transparent 8px 16px)}
+#c06-handle .hd-b span{position:absolute;white-space:nowrap;font-size:15px;color:var(--text)}
+#c06-handle .hd-b.up span{left:0;bottom:32px}
+#c06-handle .hd-b.in span{left:10px;top:50%;transform:translateY(-50%)}
+#c06-handle .hd-b.block span{color:var(--text2)}
+#c06-handle .hd-m{--c:var(--tool);position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:var(--c);box-shadow:0 0 12px var(--c);opacity:0;transform:scale(0);transition:opacity .3s,transform .4s var(--spring)}
+#c06-handle .hd-m.on{opacity:1;transform:none}
+#c06-handle .hd-m span{position:absolute;left:22px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:15px;color:var(--c)}
+#c06-handle .hd-m.ev{--c:var(--ctx)}
+#c06-handle .hd-m.ev span{font-family:var(--mono)}
+#c06-handle .hd-m.wait{--c:var(--bad)}
+#c06-handle .hd-m.wait.late{--c:var(--warn)}
+#c06-handle .hd-m.ok{--c:var(--ok)}
+#c06-handle .hd-cur{position:absolute;top:0;bottom:0;left:calc(170px + (100% - 170px) * var(--t));width:2px;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+#c06-handle .hd-sum{min-height:30px;font-size:19px;color:var(--acc);opacity:0;transform:translateY(8px);transition:opacity .5s,transform .5s var(--ease)}
+#c06-handle .hd-sum.on{opacity:1;transform:none}
+#c06-handle .hd-ins{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:20px}
+#c06-handle .hd-ins>div{padding:16px 22px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-handle .hd-ins b{font-size:21px;color:var(--acc)}
+#c06-handle .hd-ins p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+</style>
+<script>
+HOOKS['c06-handle'] = {
+  T: 12,
+  M: {
+    sync: {
+      tt: 'phone_call：调用即完成',
+      def: '<div class="hd-kv"><span>name</span><b>phone_call</b></div>'
+        + '<div class="hd-kv"><span>名字暗示</span><p>调用将拨打电话并<em>等待通话结束</em>，返回通话记录</p></div>'
+        + '<div class="hd-kv"><span>返回</span><p>通话记录——通话结束后才返回</p></div>'
+        + '<div class="hd-kv"><span>隐含语义</span><p class="hd-bad">“调用即完成”：通话多长，Agent 就要等多长</p></div>',
+      items: [
+        ['a', 0, 0.7, '调用 phone_call', 'up'],
+        ['a', 0.7, 9.0, '阻塞：等待返回', 'block in'],
+        ['a', 9.2, 11.6, '处理积压消息', 'in'],
+        ['t', 0.7, 9.0, 'phone_call 执行中', 'tool in'],
+        ['t', 9.0, null, '返回通话记录', 'ev'],
+        ['p', 1.0, 2.0, '拨号', 'call in'],
+        ['p', 2.0, 8.8, '通话中', 'call in'],
+        ['u', 3.0, null, '帮我把会议改到周五', 'wait'],
+        ['u', 5.8, null, '还有，订一张周五的车票', 'wait'],
+      ],
+      sum: '一通电话锁住了 Agent：用户消息只能积压，直到通话结束才被处理',
+    },
+    async: {
+      tt: 'initiate_phone_call：启动即返回',
+      def: '<div class="hd-kv"><span>name</span><b>initiate_phone_call</b></div>'
+        + '<div class="hd-kv"><span>description</span><p class="hd-ty">此工具将启动由子 Agent 处理的电话任务。任务成功发起后立即返回任务 ID，你可以继续处理其他事项。通话结束后会收到单独的通知事件。</p></div>'
+        + '<div class="hd-kv"><span>立即返回</span><p><code>task_id</code> + 初始状态“呼叫已发起，正在拨号”</p></div>'
+        + '<div class="hd-kv"><span>进展事件</span><p><code>phone_call_connected</code> · <code>phone_call_ended</code></p></div>',
+      items: [
+        ['a', 0, 0.7, '调用 initiate_phone_call', 'up'],
+        ['a', 3.1, 4.1, '改会议', 'in'],
+        ['a', 5.9, 6.9, '订车票', 'in'],
+        ['a', 9.0, 10.4, '汇报结果', 'in'],
+        ['t', 0.7, 1.0, '立即返回 task_id', 'tool up'],
+        ['t', 2.0, null, 'phone_call_connected', 'ev'],
+        ['t', 8.8, null, 'phone_call_ended', 'ev'],
+        ['p', 1.0, 2.0, '拨号', 'call in'],
+        ['p', 2.0, 8.8, '通话中（子 Agent 处理）', 'call in'],
+        ['u', 3.0, null, '帮我把会议改到周五', 'ok'],
+        ['u', 5.8, null, '还有，订一张周五的车票', 'ok'],
+      ],
+      sum: '启动立即返回，Agent 继续处理其他事项；通话进展由事件送回',
+    },
+  },
+  init(s) { this.set = U.seg(s.querySelector('.hd-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  run(s, m) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), D = this.M[m], T = this.T;
+    this.set(m);
+    s.querySelector('.hd-code').innerHTML = D.def;
+    s.querySelector('.hd-tt').textContent = D.tt;
+    const sum = s.querySelector('.hd-sum');
+    sum.textContent = '';
+    sum.classList.remove('on');
+    const ty = s.querySelector('.hd-ty');
+    if (ty) U.type(ty, { ctx, speed: 26, delay: 400 });
+    s.querySelectorAll('.hd-tr').forEach((t) => (t.innerHTML = ''));
+    const els = D.items.map(([l, t0, t1, lab, cls]) => {
+      const el = document.createElement('div');
+      el.className = (t1 == null ? 'hd-m ' : 'hd-b ') + cls;
+      el.style.left = (t0 / T) * 100 + '%';
+      el.innerHTML = `<span>${lab}</span>`;
+      s.querySelector(`.hd-ln[data-l="${l}"] .hd-tr`).appendChild(el);
+      return { el, t0, t1, lab, cls, sp: el.querySelector('span') };
+    });
+    const lanes = s.querySelector('.hd-lanes'), dur = 7200, start = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const t = Math.min(T, ((now - start) / dur) * T);
+      lanes.style.setProperty('--t', t / T);
+      els.forEach((e) => {
+        const on = t >= e.t0;
+        e.el.classList.toggle('on', on);
+        if (e.t1 != null) e.el.style.width = on ? ((Math.min(t, e.t1) - e.t0) / T) * 100 + '%' : '0%';
+        if (e.cls === 'wait') {
+          const late = t >= 9.2;
+          e.el.classList.toggle('late', late);
+          const want = e.lab + (late ? '（迟到处理）' : '（未处理）');
+          if (e.sp.textContent !== want) e.sp.textContent = want;
+        }
+      });
+      if (t >= T) {
+        sum.textContent = D.sum;
+        sum.classList.add('on');
+        if (this.auto) ctx.later(() => { if (tk === this.tk && this.auto) this.run(s, m === 'sync' ? 'async' : 'sync'); }, 2800);
+        return false;
+      }
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.run(s, 'sync'), 700); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.hd-tr').forEach((t) => (t.innerHTML = ''));
+    s.querySelector('.hd-code').innerHTML = '';
+    s.querySelector('.hd-tt').textContent = '调用之后发生了什么';
+    const sum = s.querySelector('.hd-sum');
+    sum.textContent = '';
+    sum.classList.remove('on');
+    s.querySelector('.hd-lanes').style.setProperty('--t', 0);
+    s.querySelectorAll('.hd-seg button').forEach((b) => b.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c06-attn" data-part="2" data-trans="rise" data-dur="15000" data-title="批量事件的注意力分散" data-notes="<b>队列式处理中的注意力分散问题。</b>在批量事件处理时，模型可能只回应最后一个事件而遗漏前面的要求。原生异步解决了消息能否在运行中到达的问题，仍需检查模型是否综合使用了所有更新。<br>可以从两个层面进行干预——<b>提示词层面</b>：告知模型“当收到多个连续事件时，请确保全面考虑所有信息”。<b>Agent 状态栏标记</b>：在每个事件前添加显式标记，例如：[未处理事件 1/4] Tool result from database_query；[未处理事件 2/4] User 补充说明：只看北京地区的数据；[未处理事件 3/4] 系统提醒：报告截止时间还有 30 分钟；[未处理事件 4/4] User 询问：进度如何？并在末尾添加汇总：“上面有 4 个未处理事件，包括 1 个工具结果、2 条用户消息、1 个系统提醒。请确保回应涵盖所有信息。”<br>演示中的注意力分布与模型回复都是示意：直接追加时，回复只覆盖了最后一条“进度如何？”；加上编号标记与末尾汇总后，四个事件都得到回应。点击上方开关可以切换。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一次追加四个事件，模型却<em>只回应了最后一个</em></h2></div>
+    <div class="at-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="plain">直接追加</button><button data-v="mark">状态栏标记</button></div></header>
+  <div class="at-body">
+    <div class="at-ev panel fx fx-left" style="--d:3">
+      <div class="at-h"><b>批量追加到轨迹的事件</b><span class="chip warn">注意力分布为示意</span></div>
+      <div class="at-list">
+        <div class="at-e" style="--c:var(--env)"><span class="at-mk">[未处理事件 1/4]</span><span class="at-tx">Tool result from database_query：……</span></div>
+        <div class="at-e" style="--c:var(--tool)"><span class="at-mk">[未处理事件 2/4]</span><span class="at-tx">User 补充说明：只看北京地区的数据</span></div>
+        <div class="at-e" style="--c:#94a3b8"><span class="at-mk">[未处理事件 3/4]</span><span class="at-tx">系统提醒：报告截止时间还有 30 分钟</span></div>
+        <div class="at-e" style="--c:var(--tool)"><span class="at-mk">[未处理事件 4/4]</span><span class="at-tx">User 询问：进度如何？</span></div>
+        <div class="at-sum">上面有 4 个未处理事件，包括 1 个工具结果、2 条用户消息、1 个系统提醒。请确保回应涵盖所有信息。</div>
+      </div>
+    </div>
+    <svg class="at-svg" viewBox="0 0 1660 470" width="1660" height="470">
+      <g class="at-ls"></g>
+      <path class="fl on at-o" d="M990 235 H1094"/>
+      <circle class="at-orb" cx="930" cy="235" r="56"/>
+      <text class="at-ot" x="930" y="231">LLM</text><text class="at-os" x="930" y="257">读取轨迹</text>
+    </svg>
+    <div class="at-out panel fx fx-right" style="--d:5">
+      <div class="at-h"><b>模型的回应</b><span class="chip warn">示意</span></div>
+      <p class="at-reply"></p>
+      <ul class="at-cov">
+        <li><i></i>工具结果：database_query</li>
+        <li><i></i>补充：只看北京地区的数据</li>
+        <li><i></i>提醒：报告 30 分钟后截止</li>
+        <li><i></i>询问：进度如何</li>
+      </ul>
+    </div>
+  </div>
+  <div class="at-fix">
+    <div class="fx fx-up" style="--d:6"><b>提示词层面</b><p>告知模型：“当收到多个连续事件时，请确保全面考虑所有信息”</p></div>
+    <div class="fx fx-up" style="--d:7"><b>Agent 状态栏标记</b><p>每个事件前加显式编号标记，末尾汇总事件的数量与类型，要求回应涵盖所有信息</p></div>
+    <div class="fx fx-up" style="--d:8"><b>原生异步也要检查</b><p>原生异步解决了消息能否在运行中到达，仍需检查模型是否综合使用了所有更新</p></div>
+  </div>
+  <div class="src">第六章 ·「不支持原生异步时的兼容方案」· 队列式处理中的注意力分散问题</div>
+</section>
+<style>
+#c06-attn .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-attn .at-body{position:relative;height:470px;display:flex;justify-content:space-between}
+#c06-attn .at-ev{width:740px;flex:none;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c06-attn .at-out{width:560px;flex:none;padding:18px 24px;display:flex;flex-direction:column;gap:14px}
+#c06-attn .at-h{display:flex;align-items:center;gap:12px}
+#c06-attn .at-h b{font-size:21px}
+#c06-attn .at-h .chip{font-size:15px;padding:4px 12px;margin-left:auto}
+#c06-attn .at-list{display:flex;flex-direction:column;gap:10px}
+#c06-attn .at-e{position:relative;display:flex;align-items:center;padding:12px 16px 12px 18px;border-radius:12px;font-size:18px;background:color-mix(in srgb,var(--c) 8%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 30%,transparent);--w:0}
+#c06-attn .at-e::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:4px;background:var(--c)}
+#c06-attn .at-e::after{content:"";position:absolute;inset:-1px;border-radius:12px;box-shadow:0 0 0 2px var(--acc),0 0 26px color-mix(in srgb,var(--acc) 60%,transparent);opacity:var(--w);transition:opacity .7s var(--ease);pointer-events:none}
+#c06-attn .at-mk{flex:none;max-width:200px;overflow:hidden;white-space:nowrap;font:600 16px var(--mono);color:var(--acc);margin-right:12px;transition:max-width .7s var(--ease),opacity .6s,margin .6s}
+#c06-attn[data-m=plain] .at-mk{max-width:0;opacity:0;margin-right:0}
+#c06-attn .at-tx{color:var(--text)}
+#c06-attn .at-sum{max-height:0;overflow:hidden;opacity:0;padding:0 16px;border-radius:12px;font-size:17px;line-height:1.6;color:var(--acc);border:1px dashed color-mix(in srgb,var(--acc) 55%,transparent);transition:max-height .7s var(--ease),opacity .6s,padding .6s}
+#c06-attn[data-m=mark] .at-sum{max-height:120px;opacity:1;padding:10px 16px}
+#c06-attn .at-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+#c06-attn .at-l{fill:none;stroke:var(--acc);stroke-linecap:round;transition:stroke-width .7s var(--ease),opacity .7s var(--ease)}
+#c06-attn .at-dot{fill:#fff;opacity:0;filter:drop-shadow(0 0 8px var(--acc))}
+#c06-attn .at-o{--c:var(--llm)}
+#c06-attn .at-orb{fill:rgba(12,18,40,.95);stroke:var(--llm);stroke-width:3;filter:drop-shadow(0 0 22px color-mix(in srgb,var(--llm) 55%,transparent))}
+#c06-attn .at-ot{fill:var(--llm);font:800 26px var(--num);text-anchor:middle}
+#c06-attn .at-os{fill:var(--text3);font-size:15px;text-anchor:middle}
+#c06-attn .at-reply{min-height:110px;font-size:19px;line-height:1.65;color:var(--text);padding:12px 16px;border-radius:14px;background:color-mix(in srgb,var(--llm) 9%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--llm) 35%,transparent)}
+#c06-attn .at-cov{display:flex;flex-direction:column;gap:9px}
+#c06-attn .at-cov li{display:flex;align-items:center;gap:12px;font-size:17px;color:var(--text2);transition:color .4s}
+#c06-attn .at-cov li i{position:relative;width:24px;height:24px;flex:none;border-radius:7px;border:2px solid var(--line2);transition:all .4s var(--spring)}
+#c06-attn .at-cov li.yes{color:var(--text)}
+#c06-attn .at-cov li.yes i{background:var(--ok);border-color:var(--ok);box-shadow:0 0 12px color-mix(in srgb,var(--ok) 60%,transparent)}
+#c06-attn .at-cov li.yes i::after{content:"";position:absolute;left:6px;top:2px;width:6px;height:11px;border:solid #04121a;border-width:0 3px 3px 0;transform:rotate(45deg)}
+#c06-attn .at-cov li.no{color:var(--bad)}
+#c06-attn .at-cov li.no i{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 18%,transparent)}
+#c06-attn .at-cov li.no i::before,#c06-attn .at-cov li.no i::after{content:"";position:absolute;left:9px;top:3px;width:3px;height:14px;border-radius:2px;background:var(--bad);transform:rotate(45deg)}
+#c06-attn .at-cov li.no i::after{transform:rotate(-45deg)}
+#c06-attn .at-fix{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:22px}
+#c06-attn .at-fix>div{padding:16px 22px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-attn .at-fix b{font-size:21px;color:var(--acc)}
+#c06-attn .at-fix p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+</style>
+<script>
+HOOKS['c06-attn'] = {
+  W: { plain: [0.06, 0.12, 0.2, 1], mark: [0.95, 0.95, 0.9, 1] },
+  REPLY: {
+    plain: '目前进度约 60%，正在汇总数据，预计很快完成。',
+    mark: '已收到 database_query 的结果；按你的补充只统计北京地区的数据；离报告截止还有 30 分钟，会在截止前提交；当前进度：数据已汇总，正在撰写报告。',
+  },
+  COV: { plain: [0, 0, 0, 1], mark: [1, 1, 1, 1] },
+  init(s) {
+    this.set = U.seg(s.querySelector('.at-seg'), (v) => { this.auto = false; this.run(s, v); });
+    this.rows = [...s.querySelectorAll('.at-e')];
+    this.covs = [...s.querySelectorAll('.at-cov li')];
+  },
+  // 连线从每个事件的右缘连到模型；纵坐标按实际布局计算
+  lines(s) {
+    const ev = s.querySelector('.at-ev'), g = s.querySelector('.at-ls'), x0 = ev.offsetLeft + ev.offsetWidth + 4;
+    g.innerHTML = this.rows.map((r) => {
+      const y = Math.round(ev.offsetTop + r.offsetTop + r.offsetHeight / 2);
+      return `<path class="at-l" d="M${x0} ${y} C ${x0 + 70} ${y}, 800 235, 870 235"/><circle class="at-dot" r="7"/>`;
+    }).join('');
+    this.paths = [...g.querySelectorAll('.at-l')];
+    this.dots = [...g.querySelectorAll('.at-dot')];
+  },
+  weigh(w) {
+    this.paths.forEach((p, i) => { p.style.strokeWidth = (1.5 + 8 * w[i]).toFixed(1); p.style.opacity = (0.12 + 0.88 * w[i]).toFixed(2); });
+    this.rows.forEach((r, i) => r.style.setProperty('--w', w[i]));
+  },
+  run(s, m) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx.alive && tk === this.tk;
+    this.set(m);
+    s.dataset.m = m;
+    this.weigh([0, 0, 0, 0]);
+    const rp = s.querySelector('.at-reply'), txt = this.REPLY[m];
+    rp.dataset.orig = txt;
+    rp.textContent = '';
+    this.covs.forEach((c) => c.classList.remove('yes', 'no'));
+    (async () => {
+      await U.wait(ctx, 900); if (!ok()) return;
+      const w = this.W[m];
+      this.weigh(w);
+      for (let round = 0; round < 2; round++) {
+        for (let i = 0; i < 4; i++) {
+          if (w[i] < 0.5 && round > 0) continue;
+          U.fly(this.dots[i], this.paths[i], 900, { ctx });
+          await U.wait(ctx, 240); if (!ok()) return;
+        }
+        await U.wait(ctx, 800); if (!ok()) return;
+      }
+      U.type(rp, { ctx, speed: 32 });
+      await U.wait(ctx, txt.length * 32 + 500); if (!ok()) return;
+      for (let i = 0; i < 4; i++) {
+        this.covs[i].classList.add(this.COV[m][i] ? 'yes' : 'no');
+        await U.wait(ctx, 380); if (!ok()) return;
+      }
+      await U.wait(ctx, 2800); if (!ok()) return;
+      if (this.auto) this.run(s, m === 'plain' ? 'mark' : 'plain');
+    })();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.lines(s);
+    s.dataset.m = 'plain';
+    ctx.later(() => this.run(s, 'plain'), 600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.m = '';
+    const rp = s.querySelector('.at-reply');
+    rp.textContent = '';
+    rp.classList.remove('typing');
+    this.covs.forEach((c) => c.classList.remove('yes', 'no'));
+    this.rows.forEach((r) => r.style.setProperty('--w', 0));
+    s.querySelector('.at-ls').innerHTML = '';
+    s.querySelectorAll('.at-seg button').forEach((b) => b.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp2" data-part="2" data-dur="16000" data-title="实验 6-2 ★★★：带并行执行和打断能力的异步 Agent" data-notes="<b>实验 6-2 ★★★</b>在实验 6-1 的简单事件队列基础上，通过兼容同步接口的运行时实现<b>并行工具执行、执行取消和状态管理</b>：Agent 不再只是逐个处理事件，而是需要同时管理多个并发任务，处理打断和恢复，并根据实时状态做出动态决策（原生 Astra 接口的对照见实验 6-3）。四项能力：<b>1. 异步工具执行</b>——支持耗时工具的异步执行（至少 3-5 秒），启动后立即返回占位符；<b>2. 事件队列与批量处理</b>——累积非紧急事件，批量追加到轨迹；<b>3. 打断机制</b>——用户的“停止”立即终止执行流并取消异步工具；<b>4. 并行工具的取消与状态查询</b>——异步工具完成后通过新事件将真实结果注入对话，支持通过任务 ID 取消或查询进度。<br>配套仓库的实现（Flux）是 asyncio 单线程的事件循环：事件进入 inbox，dispatcher 按简单可解释的规则判定紧急度——含“取消 / 停止”等打断关键词为 INTERRUPT（取消式处理），提问为 IMMEDIATE（立即回应但不打断后台任务），其他补充性指令为 DEFERRED（排队，异步结果到达时批量追加）。<br>右侧回放 2026-07-30 的验收运行：长任务是白名单内的真实子进程，进度来自子进程输出，时间轴加速为 1 逻辑秒 = 0.15 秒；这次验收只检验运行时、不调用模型，四个场景全部通过。README 还保留了真实调用 gpt-5.6-luna 的场景日志（例如场景 2 中两条指令排队后与任务结果一起追加，最终输出日语 HTML）。点击上方任一能力可以单独回放。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-2 ★★★：<em>带并行执行和打断能力的异步 Agent</em></h2></header>
+  <div class="e2-caps fx fx-up" style="--d:2">
+    <button data-i="0"><em>1</em>异步工具执行</button>
+    <button data-i="1"><em>2</em>事件队列与批量处理</button>
+    <button data-i="2"><em>3</em>打断机制</button>
+    <button data-i="3"><em>4</em>并行工具的取消与状态查询</button>
+  </div>
+  <div class="e2-body">
+    <div class="e2-l panel fx fx-left" style="--d:3">
+      <div class="e2-route"><span class="lbl">紧急度判定</span><i data-r="INTERRUPT">INTERRUPT</i><i data-r="IMMEDIATE">IMMEDIATE</i><i data-r="DEFERRED">DEFERRED</i><i data-r="TASK">任务 ID</i></div>
+      <p class="e2-rt"></p>
+      <b class="e2-name"></b>
+      <p class="e2-req"></p>
+      <div class="e2-sc"><span class="lbl">验证场景</span><p></p></div>
+      <div class="e2-res"><span class="lbl">实测</span><p></p></div>
+    </div>
+    <div class="e2-r fx fx-right" style="--d:4">
+      <div class="e2-tl panel">
+        <div class="e2-th"><b>真实事件时间线</b><span class="e2-qw">排队缓冲 <b class="e2-q">0</b> 条</span><span class="e2-clk">t = 0.000 s</span><span class="e2-sp"></span></div>
+        <div class="e2-strip"></div>
+        <div class="e2-bars"></div>
+      </div>
+      <div class="e2-log win"><div class="win-bar"><i></i><i></i><i></i><span>运行日志 · 真实时间戳（运行时验收，不调用模型）</span></div><div class="e2-ll" data-clip-ok></div></div>
+    </div>
+  </div>
+  <div class="src">第六章 · 实验 6-2 · 数据：配套仓库 chapter6/async-agent 验收运行 real_subprocess_20260730T052500Z（真实受限子进程）</div>
+</section>
+<style>
+#c06-exp2 .e2-caps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:-6px}
+#c06-exp2 .e2-caps button{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:14px;font-size:20px;text-align:left;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s var(--ease)}
+#c06-exp2 .e2-caps em{flex:none;width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font:700 18px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-exp2 .e2-caps button.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 25%,transparent)}
+#c06-exp2 .e2-caps button.on em{color:#06101f;background:var(--acc)}
+#c06-exp2 .e2-body{display:flex;gap:22px;margin-top:18px;height:590px}
+#c06-exp2 .e2-l{width:560px;flex:none;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+#c06-exp2 .e2-route{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+#c06-exp2 .e2-route .lbl{margin-right:4px}
+#c06-exp2 .e2-route i{font-style:normal;padding:4px 10px;border-radius:8px;font:600 15px var(--mono);color:var(--text3);border:1px solid var(--line2);transition:all .35s}
+#c06-exp2 .e2-route i.on{color:#06101f;background:var(--acc);border-color:var(--acc);box-shadow:0 0 14px color-mix(in srgb,var(--acc) 50%,transparent)}
+#c06-exp2 .e2-rt{font-size:16px;color:var(--acc);min-height:24px}
+#c06-exp2 .e2-name{font-size:26px}
+#c06-exp2 .e2-req{font-size:18px;line-height:1.6;color:var(--text)}
+#c06-exp2 .e2-sc,#c06-exp2 .e2-res{padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-exp2 .e2-res{border-color:color-mix(in srgb,var(--env) 40%,transparent);background:color-mix(in srgb,var(--env) 7%,transparent)}
+#c06-exp2 .e2-sc p,#c06-exp2 .e2-res p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:4px}
+#c06-exp2 .e2-res p{color:var(--text)}
+#c06-exp2 .e2-r{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+#c06-exp2 .e2-tl{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-exp2 .e2-th{display:flex;align-items:center;gap:16px}
+#c06-exp2 .e2-th>b{font-size:20px}
+#c06-exp2 .e2-qw{display:none;font-size:16px;color:var(--tool);padding:3px 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--tool) 45%,transparent)}
+#c06-exp2[data-sc="1"] .e2-qw{display:inline-block}
+#c06-exp2 .e2-qw b{font:800 18px var(--num)}
+#c06-exp2 .e2-clk{margin-left:auto;font:700 20px var(--mono);color:var(--acc)}
+#c06-exp2 .e2-sp{font-size:15px;color:var(--text3)}
+#c06-exp2 .e2-strip{position:relative;height:56px;margin:0 10px;border-bottom:2px solid var(--line2)}
+#c06-exp2 .e2-mk{--c:var(--acc);position:absolute;bottom:-7px;width:12px;height:12px;margin-left:-6px;border-radius:50%;background:var(--c);opacity:.25;transition:opacity .3s,box-shadow .3s}
+#c06-exp2 .e2-mk.on{opacity:1;box-shadow:0 0 12px var(--c)}
+#c06-exp2 .e2-mk em{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);font-style:normal;font-size:15px;white-space:nowrap;color:var(--c)}
+#c06-exp2 .e2-mk.lt em{transform:translateX(-90%)}
+#c06-exp2 .e2-mk.up em{bottom:36px}
+#c06-exp2 .e2-cur{position:absolute;bottom:-12px;top:-4px;width:2px;margin-left:-1px;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+#c06-exp2 .e2-bars{display:flex;flex-direction:column;gap:10px}
+#c06-exp2 .e2-t{display:grid;grid-template-columns:270px 1fr 64px 80px;align-items:center;gap:12px;font-size:16px}
+#c06-exp2 .e2-tn{font:15px var(--mono);color:var(--text2);white-space:nowrap}
+#c06-exp2 .e2-tk{height:20px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+#c06-exp2 .e2-tk i{display:block;height:100%;width:0;border-radius:999px;background:linear-gradient(90deg,var(--tool),color-mix(in srgb,var(--tool) 60%,#fff))}
+#c06-exp2 .e2-t[data-st=ok] .e2-tk i{background:linear-gradient(90deg,var(--ok),color-mix(in srgb,var(--ok) 60%,#fff))}
+#c06-exp2 .e2-t[data-st=x] .e2-tk i{background:repeating-linear-gradient(-45deg,var(--bad) 0 8px,color-mix(in srgb,var(--bad) 50%,transparent) 8px 16px)}
+#c06-exp2 .e2-t>b{font:700 18px var(--num);text-align:right}
+#c06-exp2 .e2-t>em{font-style:normal;font-size:15px;text-align:center;padding:2px 0;border-radius:8px;color:var(--text3);border:1px solid var(--line2)}
+#c06-exp2 .e2-t[data-st=run]>em{color:var(--tool);border-color:color-mix(in srgb,var(--tool) 50%,transparent)}
+#c06-exp2 .e2-t[data-st=ok]>em{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+#c06-exp2 .e2-t[data-st=x]>em{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+#c06-exp2 .e2-log{flex:1;display:flex;flex-direction:column;min-height:0}
+#c06-exp2 .e2-ll{flex:1;padding:12px 18px;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;overflow:hidden}
+#c06-exp2 .e2-ln{display:grid;grid-template-columns:96px 84px 1fr;gap:10px;align-items:baseline;font:15px/1.5 var(--mono);animation:upIn .4s var(--spring) both}
+#c06-exp2 .e2-ln span{color:var(--text3)}
+#c06-exp2 .e2-ln b{font-weight:700;color:var(--c,#cbd5f5)}
+#c06-exp2 .e2-ln p{color:#cbd5f5;font-family:var(--font);font-size:16px}
+#c06-exp2 .e2-ln[data-s=TASK]{--c:var(--tool)}#c06-exp2 .e2-ln[data-s=TOOL]{--c:var(--har)}#c06-exp2 .e2-ln[data-s=AGENT]{--c:var(--llm)}
+#c06-exp2 .e2-ln[data-s=USER]{--c:var(--bad)}#c06-exp2 .e2-ln[data-s=QUEUE]{--c:var(--warn)}#c06-exp2 .e2-ln[data-s=SYSTEM]{--c:var(--ctx)}#c06-exp2 .e2-ln[data-s=TRAJ]{--c:var(--env)}
+</style>
+<script>
+HOOKS['c06-exp2'] = {
+  S: [
+    {
+      name: '1. 异步工具执行', route: 'IMMEDIATE', rt: '提问 → IMMEDIATE：立即回应，但不打断后台任务',
+      req: '支持耗时工具的异步执行（至少 3-5 秒），启动后立即返回占位符。',
+      sc: 'Agent 执行一个长时间的终端命令，期间用户问“现在几点了？”，Agent 立即回应，等分析结果返回后再呈现。',
+      res: '占位符 0.000241 s 返回；0.502 s 回答当前时间，任务仍在运行；3.635 s 真实结果作为新事件注入。',
+      T: 4.0, rate: 0.5,
+      tasks: [{ label: 'T1 · analyze_logs.py', pts: [[0, 0], [0.803, 22], [1.426, 40], [2.207, 63], [2.84, 81], [3.622, 100]], done: 3.635 }],
+      marks: [[0.502, '即时回答', 'llm', ''], [3.635, 'async.result', 'env', 'lt']],
+      log: [
+        [0, 'TASK', '启动真实子进程 T1：python analyze_logs.py（4%/逻辑秒）'],
+        [0, 'TOOL', '占位符立即返回 task_id = T1（0.000241 s）'],
+        [0.502, 'AGENT', '回答“现在几点了？”——05:28:26，T1 仍在运行'],
+        [0.803, 'TASK', 'T1 进度 22%'],
+        [2.207, 'TASK', 'T1 进度 63%'],
+        [3.635, 'TASK', 'T1 完成，returncode 0'],
+        [3.635, 'TRAJ', '+ async.result：真实结果作为新事件注入'],
+      ],
+    },
+    {
+      name: '2. 事件队列与批量处理', route: 'DEFERRED', rt: '补充性指令 → DEFERRED：排队，异步结果到达时批量追加',
+      req: '累积非紧急事件，批量追加到轨迹。',
+      sc: 'Agent 执行长任务，用户连续发送“记得用日语回复”和“整理成网页”，任务完成时一次性处理所有事件，生成日语网页。',
+      res: '两条指令在 0.503 s、0.703 s 入队；3.599 s 任务完成时只追加一次（3 个事件），产出日语 HTML。',
+      T: 4.0, rate: 0.5,
+      tasks: [{ label: 'T1 · analyze_logs.py', pts: [[0, 0], [0.796, 22], [1.42, 40], [2.198, 63], [2.817, 81], [3.592, 100]], done: 3.599 }],
+      queue: [[0.503, 1], [0.703, 2], [3.599, 0]],
+      marks: [[0.503, '入队', 'warn', ''], [0.703, '入队', 'warn', 'up'], [3.599, '批量追加', 'env', 'lt']],
+      log: [
+        [0, 'TASK', '启动真实子进程 T1，占位符立即返回'],
+        [0.503, 'QUEUE', '“记得用日语回复”进入排队缓冲（积压 1 条）'],
+        [0.703, 'QUEUE', '“整理成网页”进入排队缓冲（积压 2 条）'],
+        [3.599, 'TASK', 'T1 完成，returncode 0'],
+        [3.599, 'SYSTEM', '一次性批量追加 3 个事件：async.result + 2 条排队指令'],
+        [3.599, 'TRAJ', '产物：日语 HTML 网页（含 DOCTYPE、lang=ja，已哈希）'],
+      ],
+    },
+    {
+      name: '3. 打断机制', route: 'INTERRUPT', rt: '打断关键词 → INTERRUPT：取消式处理',
+      req: '用户的“停止”立即终止执行流并取消异步工具。',
+      sc: 'Agent 执行长任务，用户发送“取消”，Agent 立即停止，轨迹记录打断事件和取消操作。',
+      res: '0.803 s 打断 → 0.004 s 内终止子进程（进度停在 18%）→ 0.807 s 运行时恢复，接受并跑完新任务。',
+      T: 4.6, rate: 0.5,
+      tasks: [
+        { label: 'T1 · analyze_logs.py', pts: [[0, 0], [0.803, 18]], cancel: 0.806 },
+        { label: 'T2 · re_run_summary.py', pts: [[0.807, 0], [1.619, 22], [2.245, 40], [3.019, 63], [3.644, 81], [4.423, 100]], done: 4.436 },
+      ],
+      marks: [[0.803, '打断', 'bad', ''], [0.807, '恢复', 'env', 'up'], [4.436, 'T2 完成', 'env', 'lt']],
+      log: [
+        [0, 'TASK', '启动真实子进程 T1：python analyze_logs.py'],
+        [0.803, 'USER', '（打断）取消'],
+        [0.806, 'TASK', 'T1 子进程已终止：进度停在 18%，returncode −15'],
+        [0.806, 'TRAJ', '+ user.interrupt；取消回执记录被取消的 T1（耗时 0.004 s）'],
+        [0.807, 'SYSTEM', '运行时恢复，启动新任务 T2：python re_run_summary.py'],
+        [4.436, 'TASK', 'T2 完成，returncode 0'],
+      ],
+    },
+    {
+      name: '4. 并行工具的取消与状态查询', route: 'TASK', rt: '按任务 ID：query_task 查询进度，cancel_task 取消',
+      req: '异步工具完成后通过新事件将真实结果注入对话，支持通过任务 ID 取消或查询进度。',
+      sc: '“帮我同时运行这三个脚本，哪个先完成了，就看看剩下的脚本进度怎么样，如果还没超过 50%，就取消。”三个脚本每秒 3%、2%、1%。',
+      res: 'T1 在 5.345 s 完成 → 查询 T2 68%、T3 34% → 只取消 T3 → T2 在 7.829 s 完成 → 整合报告（下一页展开）。',
+      T: 8.0, rate: 1,
+      tasks: [
+        { label: 'T1 · analyze_fast.py（3%）', pts: [[0, 0], [1.121, 21], [2.219, 42], [3.144, 60], [4.235, 81], [5.332, 100]], done: 5.345 },
+        { label: 'T2 · analyze_mid.py（2%）', pts: [[0, 0], [1.605, 20], [3.145, 40], [4.699, 60], [6.254, 80], [7.815, 100]], done: 7.829 },
+        { label: 'T3 · analyze_slow.py（1%）', pts: [[0, 0], [3.133, 20], [5.345, 34]], cancel: 5.347 },
+      ],
+      marks: [[5.345, '查询 + 取消', 'tool', ''], [7.829, '整合报告', 'env', 'lt']],
+      log: [
+        [0, 'TASK', '同时启动 T1 / T2 / T3（3% / 2% / 1% 每逻辑秒）'],
+        [5.345, 'TASK', 'T1 完成 → async.result 注入'],
+        [5.345, 'TOOL', 'query_task(T2) → 68% · query_task(T3) → 34%'],
+        [5.345, 'TOOL', 'cancel_task(T3)：未超过 50%，取消'],
+        [7.829, 'TASK', 'T2 完成 → 整合 T1、T2 结果与 T3 取消记录，报告已哈希'],
+      ],
+    },
+  ],
+  init(s) {
+    this.caps = [...s.querySelectorAll('.e2-caps button')];
+    this.caps.forEach((b, i) => b.addEventListener('click', () => { this.auto = false; this.play(s, i); }));
+  },
+  // 分段线性插值：进度点之间按直线估计
+  pv(pts, t) {
+    if (t <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i++) {
+      if (t <= pts[i][0]) { const [a, pa] = pts[i - 1], [b, pb] = pts[i]; return pa + ((pb - pa) * (t - a)) / (b - a); }
+    }
+    return pts[pts.length - 1][1];
+  },
+  play(s, i) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), D = this.S[i];
+    s.dataset.sc = i;
+    this.caps.forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelectorAll('.e2-route i').forEach((x) => x.classList.toggle('on', x.dataset.r === D.route));
+    s.querySelector('.e2-rt').textContent = D.rt;
+    s.querySelector('.e2-name').textContent = D.name;
+    s.querySelector('.e2-req').textContent = D.req;
+    s.querySelector('.e2-sc p').textContent = D.sc;
+    s.querySelector('.e2-res p').textContent = D.res;
+    s.querySelector('.e2-sp').textContent = `按真实时间戳 ${D.rate}× 回放`;
+    const bars = s.querySelector('.e2-bars');
+    bars.innerHTML = D.tasks.map((t) => `<div class="e2-t"><span class="e2-tn">${t.label}</span><div class="e2-tk"><i></i></div><b>0%</b><em>等待</em></div>`).join('');
+    const rows = [...bars.querySelectorAll('.e2-t')];
+    const strip = s.querySelector('.e2-strip');
+    strip.innerHTML = D.marks.map(([t, lab, c, cls]) => `<span class="e2-mk ${cls}" data-t="${t}" style="left:${(t / D.T) * 100}%;--c:var(--${c})"><em>${lab}</em></span>`).join('') + '<i class="e2-cur"></i>';
+    const mks = [...strip.querySelectorAll('.e2-mk')], cur = strip.querySelector('.e2-cur');
+    const ll = s.querySelector('.e2-ll'), clk = s.querySelector('.e2-clk'), q = s.querySelector('.e2-q');
+    ll.innerHTML = '';
+    let li = 0;
+    const start = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const t = Math.min(D.T, ((now - start) / 1000) * D.rate);
+      clk.textContent = 't = ' + t.toFixed(3) + ' s';
+      cur.style.left = (t / D.T) * 100 + '%';
+      mks.forEach((m) => m.classList.toggle('on', t >= +m.dataset.t));
+      D.tasks.forEach((tt, j) => {
+        const r = rows[j];
+        let p = 0, st = '等待', cls = '';
+        if (t >= tt.pts[0][0]) {
+          p = this.pv(tt.pts, Math.min(t, tt.cancel == null ? t : tt.cancel));
+          st = '运行中';
+          cls = 'run';
+          if (tt.cancel != null && t >= tt.cancel) { st = '已取消'; cls = 'x'; }
+          if (tt.done != null && t >= tt.done) { p = 100; st = '已完成'; cls = 'ok'; }
+        }
+        r.dataset.st = cls;
+        r.querySelector('i').style.width = p.toFixed(1) + '%';
+        r.querySelector('b').textContent = Math.round(p) + '%';
+        r.querySelector('em').textContent = st;
+      });
+      let n = 0;
+      (D.queue || []).forEach(([qt, qn]) => { if (t >= qt) n = qn; });
+      q.textContent = n;
+      while (li < D.log.length && D.log[li][0] <= t) {
+        const [lt, src, tx] = D.log[li++];
+        ll.insertAdjacentHTML('beforeend', `<div class="e2-ln" data-s="${src}"><span>[${lt.toFixed(3)}s]</span><b>${src}</b><p>${tx}</p></div>`);
+        while (ll.children.length > 7) ll.firstElementChild.remove();
+      }
+      if (t >= D.T) {
+        ctx.later(() => { if (tk === this.tk) this.play(s, this.auto ? (i + 1) % this.S.length : i); }, this.auto ? 2600 : 3600);
+        return false;
+      }
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.play(s, 0), 800); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.sc = '';
+    this.caps.forEach((b) => b.classList.remove('on'));
+    s.querySelectorAll('.e2-route i').forEach((x) => x.classList.remove('on'));
+    ['.e2-bars', '.e2-strip', '.e2-ll'].forEach((q) => (s.querySelector(q).innerHTML = ''));
+    ['.e2-rt', '.e2-name', '.e2-req', '.e2-sc p', '.e2-res p', '.e2-sp'].forEach((q) => (s.querySelector(q).textContent = ''));
+    s.querySelector('.e2-clk').textContent = 't = 0.000 s';
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp2-par" data-part="2" data-trans="zoom" data-dur="16000" data-title="三个脚本的赛跑：并行、查询与按阈值取消" data-notes="实验 6-2 的第 4 个验证场景（图6-4）：用户请求“帮我同时运行这三个脚本，哪个先完成了，就看看剩下的脚本进度怎么样，如果还没超过 50%，就取消”。三个脚本模拟分析进程，运行时不断输出进度，速度分别为每秒 3%、2%、1%。Agent 同时启动三个异步终端命令（立即得到占位符）；当每秒 3% 的脚本在约 33 秒后完成时，Agent 查询剩下两个终端的状态，发现一个执行到约 66%、另一个约 33%，于是取消不超过 50% 的那个；两个终端都完成后整合结果生成完整报告——A 结果 + B 结果 + C 的取消记录。图中点出的关键是三件事的组合：<b>占位符注入 + 异步完成事件 + cancel_tool(task_id) API</b>。<br>左侧按逻辑时间示意回放，可以拖动右上角的阈值，看取消决策如何随之改变。右侧是配套仓库的两份真实记录：运行时验收（不调用模型，1 逻辑秒 = 0.15 秒）在 T1 完成的 5.345 秒查询到 T2 68%、T3 34%，只取消 T3，T2 于 7.829 秒完成并生成带哈希的报告；README 中真实调用 gpt-5.6-luna 的一次运行（1 逻辑秒 = 0.4 秒）在 19.84 秒查询到 T2 84%、T3 42%，21.93 秒取消 T3（取消时进度 47%），22.89 秒 T2 完成，26.50 秒输出汇总报告。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三个脚本的赛跑：<em>查询进度，按阈值取消</em></h2></div>
+    <div class="ep-ctl fx fx-up" style="--d:2"><span>取消阈值</span><input class="rng ep-rng" type="range" min="10" max="90" step="1" value="50"><b class="ep-tv">50%</b><button class="btn ep-re"><svg class="ic"><use href="#i-refresh"/></svg>重放</button></div></header>
+  <div class="ep-body">
+    <div class="ep-fig panel fx fx-left" style="--d:3">
+      <div class="ep-top"><p>用户：“帮我同时运行这三个脚本，哪个先完成了，就看看剩下的脚本进度怎么样，如果还没超过 <b class="ep-tv">50%</b>，就取消。”</p><span class="ep-clk">t = 0 逻辑秒</span></div>
+      <div class="ep-lanes">
+        <div class="ep-ln" data-l="ag"><span>Agent</span><div class="ep-tr"></div></div>
+        <div class="ep-ln" data-l="A"><span>工具 A<small>每秒 3%</small></span><div class="ep-tr"></div></div>
+        <div class="ep-ln" data-l="B"><span>工具 B<small>每秒 2%</small></span><div class="ep-tr"></div></div>
+        <div class="ep-ln" data-l="C"><span>工具 C<small>每秒 1%</small></span><div class="ep-tr"></div></div>
+        <div class="ep-ln" data-l="tj"><span>轨迹</span><div class="ep-tr"></div></div>
+        <div class="ep-ax"><span>逻辑秒</span><div><i style="left:0%">0</i><i style="left:19.05%">20</i><i style="left:38.1%">40</i><i style="left:57.14%">60</i><i style="left:76.19%">80</i><i style="left:95.24%">100</i></div></div>
+        <div class="ep-vl"></div>
+        <i class="ep-cur"></i>
+      </div>
+      <div class="ep-key"><svg class="ic"><use href="#i-key"/></svg>关键：占位符注入 + 异步完成事件 + <code>cancel_tool(task_id)</code> API</div>
+    </div>
+    <div class="ep-real fx fx-right" style="--d:4">
+      <div class="ep-card">
+        <div class="ep-ch"><b>运行时验收 · 真实子进程</b><small>不调用模型 · 1 逻辑秒 = 0.15 s</small></div>
+        <ul><li><span>5.345 s</span>T1 完成，结果作为新事件注入</li><li><span>5.345 s</span>query_task：T2 68% · T3 34%</li><li><span>5.345 s</span>cancel_task(T3)：34% 未超过 50%</li><li><span>7.829 s</span>T2 完成，生成带哈希的整合报告</li></ul>
+      </div>
+      <div class="ep-card">
+        <div class="ep-ch"><b>真实调用 gpt-5.6-luna</b><small>README 节选 · 1 逻辑秒 = 0.4 s</small></div>
+        <ul><li><span>16.47 s</span>T1 完成</li><li><span>19.84 s</span>query_task：T2 84% · T3 42%</li><li><span>21.93 s</span>cancel_task(T3)：取消时 47%</li><li><span>22.89 s</span>T2 完成</li><li><span>26.50 s</span>汇总报告：analyze_slow.py 已取消</li></ul>
+      </div>
+      <p class="ep-note">两次运行都只取消了未过半的 T3；模型版本里，从查询到取消的约 2 秒中 T3 又走了 5 个百分点</p>
+    </div>
+  </div>
+  <div class="src">第六章 · 实验 6-2 · 图6-4 · 数据：配套仓库 chapter6/async-agent（验收运行与 README 中的真实调用记录）</div>
+</section>
+<style>
+#c06-exp2-par .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp2-par .ep-ctl{display:flex;align-items:center;gap:14px;font-size:18px;color:var(--text2)}
+#c06-exp2-par .ep-ctl .rng{width:220px}
+#c06-exp2-par .ep-ctl>b{font:800 24px var(--num);color:var(--acc);min-width:64px}
+#c06-exp2-par .ep-body{display:flex;gap:22px;height:600px}
+#c06-exp2-par .ep-fig{width:1190px;flex:none;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c06-exp2-par .ep-top{display:flex;align-items:center;gap:16px}
+#c06-exp2-par .ep-top p{flex:1;font-size:18px;line-height:1.55;color:var(--text2)}
+#c06-exp2-par .ep-top p b{color:var(--acc)}
+#c06-exp2-par .ep-clk{flex:none;font:700 20px var(--mono);color:var(--acc)}
+#c06-exp2-par .ep-lanes{position:relative;flex:1;display:flex;flex-direction:column;--t:0}
+#c06-exp2-par .ep-ln{flex:1;display:flex;align-items:center;border-bottom:1px dashed var(--line)}
+#c06-exp2-par .ep-ln>span{width:150px;flex:none;font-size:18px;font-weight:600}
+#c06-exp2-par .ep-ln>span small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+#c06-exp2-par .ep-tr{position:relative;flex:1;height:100%}
+#c06-exp2-par .ep-b{position:absolute;left:0;top:50%;height:28px;margin-top:-14px;width:0;border-radius:7px;background:color-mix(in srgb,var(--tool) 26%,rgba(10,16,36,.9));border:1px solid var(--tool)}
+#c06-exp2-par .ep-b span{position:absolute;right:10px;top:50%;transform:translateY(-50%);white-space:nowrap;font:600 15px var(--num);color:var(--text)}
+#c06-exp2-par .ep-b.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 22%,rgba(10,16,36,.9))}
+#c06-exp2-par .ep-b.ok span{right:auto;left:10px;font-family:var(--font)}
+#c06-exp2-par .ep-b.x{border-color:#94a3b8;background:repeating-linear-gradient(-45deg,rgba(148,163,184,.3) 0 8px,transparent 8px 16px)}
+#c06-exp2-par .ep-chip{position:absolute;top:50%;padding:5px 12px;border-radius:10px;font-size:16px;white-space:nowrap;color:var(--text);background:rgba(12,18,40,.95);border:1px solid var(--line2);opacity:0;translate:0 -50%;scale:.85;transition:opacity .4s,scale .5s var(--spring)}
+#c06-exp2-par .ep-chip.on{opacity:1;scale:1}
+#c06-exp2-par .ep-chip.rt{translate:-100% -50%}
+#c06-exp2-par .ep-chip.d1{transition-delay:.25s}
+#c06-exp2-par .ep-chip.d2{transition-delay:.7s}
+#c06-exp2-par .ep-chip.d3{transition-delay:1.1s}
+#c06-exp2-par .ep-ln[data-l=ag] .ep-chip{border-color:color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 14%,rgba(10,16,36,.95))}
+#c06-exp2-par .ep-ln[data-l=tj] .ep-chip{border-color:color-mix(in srgb,var(--env) 55%,transparent);background:color-mix(in srgb,var(--env) 12%,rgba(10,16,36,.95))}
+#c06-exp2-par .ep-chip.cx{margin-left:8px;color:var(--bad);border-color:color-mix(in srgb,var(--bad) 60%,transparent)}
+#c06-exp2-par .ep-chip.cx b{margin-right:6px;font-size:18px}
+#c06-exp2-par .ep-ax{height:28px;flex:none;display:flex;align-items:center;font-size:15px;color:var(--text3)}
+#c06-exp2-par .ep-ax>span{width:150px;flex:none}
+#c06-exp2-par .ep-ax>div{position:relative;flex:1;height:100%}
+#c06-exp2-par .ep-ax i{position:absolute;top:5px;font-style:normal;transform:translateX(-50%)}
+#c06-exp2-par .ep-vl{position:absolute;left:150px;right:0;top:0;bottom:28px;pointer-events:none}
+#c06-exp2-par .ep-v{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed var(--text2);opacity:0;transition:opacity .4s}
+#c06-exp2-par .ep-v.on{opacity:.75}
+#c06-exp2-par .ep-v em{position:absolute;top:-2px;left:6px;font-style:normal;font-size:15px;font-weight:700;color:var(--text);white-space:nowrap}
+#c06-exp2-par .ep-cur{position:absolute;top:0;bottom:28px;left:calc(150px + (100% - 150px) * var(--t));width:2px;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+#c06-exp2-par .ep-key{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:12px;font-size:18px;color:var(--text);background:rgba(255,255,255,.04);border:1px solid var(--line2)}
+#c06-exp2-par .ep-key .ic{color:var(--acc);font-size:22px}
+#c06-exp2-par .ep-key code{font:17px var(--mono);color:var(--tool)}
+#c06-exp2-par .ep-real{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-exp2-par .ep-card{padding:16px 18px;border-radius:16px;background:color-mix(in srgb,var(--env) 6%,rgba(12,18,40,.8));border:1px solid color-mix(in srgb,var(--env) 35%,transparent)}
+#c06-exp2-par .ep-ch b{display:block;font-size:19px;color:var(--env)}
+#c06-exp2-par .ep-ch small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+#c06-exp2-par .ep-card ul{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+#c06-exp2-par .ep-card li{display:grid;grid-template-columns:78px 1fr;gap:8px;font-size:16px;line-height:1.45;color:var(--text)}
+#c06-exp2-par .ep-card li span{font:600 15px var(--mono);color:var(--acc)}
+#c06-exp2-par .ep-note{font-size:16px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c06-exp2-par'] = {
+  TT: 105,
+  init(s) {
+    const rng = s.querySelector('.ep-rng');
+    this.thr = 50;
+    rng.addEventListener('input', () => { this.thr = +rng.value; this.showThr(s); this.auto = false; this.play(s); });
+    s.querySelector('.ep-re').addEventListener('click', () => this.play(s));
+    this.showThr(s);
+  },
+  showThr(s) {
+    const rng = s.querySelector('.ep-rng');
+    rng.value = this.thr;
+    rng.style.setProperty('--p', ((this.thr - 10) / 80) * 100 + '%');
+    s.querySelectorAll('.ep-tv').forEach((e) => (e.textContent = this.thr + '%'));
+  },
+  play(s) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), TT = this.TT, thr = this.thr;
+    const R = { A: 3, B: 2, C: 1 }, tA = 100 / 3, pB = 2 * tA, pC = tA;
+    // A 完成时，进度不超过阈值的脚本被取消
+    const cut = { A: false, B: pB <= thr, C: pC <= thr };
+    const end = { A: tA, B: cut.B ? tA : 50, C: cut.C ? tA : 100 };
+    const tLast = Math.max(end.A, end.B, end.C), tRep = Math.max(tLast, tA + 16);
+    const pos = (t) => (t / TT) * 100;
+    const tr = (l) => s.querySelector(`.ep-ln[data-l="${l}"] .ep-tr`);
+    s.querySelectorAll('.ep-tr').forEach((x) => (x.innerHTML = ''));
+    const vl = s.querySelector('.ep-vl');
+    vl.innerHTML = '';
+    const items = [];
+    const chip = (l, t, html, cls = '') => {
+      const el = document.createElement('div');
+      el.className = 'ep-chip ' + cls + (pos(t) > 62 ? ' rt' : '');
+      el.style.left = pos(t) + '%';
+      el.innerHTML = html;
+      tr(l).appendChild(el);
+      items.push({ el, t });
+    };
+    const vline = (t, txt) => {
+      const el = document.createElement('div');
+      el.className = 'ep-v';
+      el.style.left = pos(t) + '%';
+      el.innerHTML = `<em>${txt}</em>`;
+      vl.appendChild(el);
+      items.push({ el, t });
+    };
+    const bars = {};
+    ['A', 'B', 'C'].forEach((x) => {
+      const el = document.createElement('div');
+      el.className = 'ep-b';
+      el.innerHTML = '<span></span>';
+      tr(x).appendChild(el);
+      bars[x] = el;
+    });
+    chip('ag', 0, 'LLM：启动 3 个工具');
+    chip('tj', 0, '占位符 T1 · T2 · T3');
+    vline(tA, 'A 完成');
+    chip('ag', tA, '查询 B、C 进度', 'd1');
+    chip('tj', tA, `B≈${Math.floor(pB)}%　C≈${Math.floor(pC)}%`, 'd2');
+    const gone = ['B', 'C'].filter((x) => cut[x]), kept = ['A', 'B', 'C'].filter((x) => !cut[x]);
+    gone.forEach((x) => chip(x, tA, `<b>×</b>取消（${Math.floor(x === 'B' ? pB : pC)}%）`, 'cx d3'));
+    if (!cut.B) vline(50, 'B 完成');
+    if (!cut.C) vline(100, 'C 完成');
+    chip('ag', tRep, 'LLM：整合结果生成报告');
+    chip('tj', tRep, kept.map((x) => x + ' 结果').join(' + ') + (gone.length ? ' + ' + gone.join('、') + ' 取消记录' : ''));
+    const clk = s.querySelector('.ep-clk'), lanes = s.querySelector('.ep-lanes');
+    let t = 0, last = null, hold = 0, paused = false;
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const dt = last == null ? 0 : Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (hold > 0) hold -= dt;
+      else {
+        const nt = t + dt * 12;
+        if (!paused && nt >= tA) { t = tA; paused = true; hold = 1.8; }
+        else t = Math.min(tRep + 6, nt);
+      }
+      lanes.style.setProperty('--t', Math.min(t, TT) / TT);
+      clk.textContent = 't = ' + Math.round(Math.min(t, tRep)) + ' 逻辑秒';
+      ['A', 'B', 'C'].forEach((x) => {
+        const e = Math.min(t, end[x]), b = bars[x], p = Math.min(100, R[x] * e), dead = cut[x] && t >= tA;
+        b.style.width = pos(e) + '%';
+        b.classList.toggle('x', dead);
+        b.classList.toggle('ok', p >= 100);
+        const txt = dead ? '' : p >= 100 ? `每秒 ${R[x]}% → ${Math.round(100 / R[x])} 秒完成` : Math.floor(p) + '%';
+        const sp = b.firstElementChild;
+        if (sp.textContent !== txt) sp.textContent = txt;
+      });
+      items.forEach((it) => it.el.classList.toggle('on', t >= it.t));
+      if (t >= tRep + 6) {
+        ctx.later(() => { if (tk === this.tk) this.play(s); }, 1600);
+        return false;
+      }
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.play(s), 800); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.ep-tr').forEach((x) => (x.innerHTML = ''));
+    s.querySelector('.ep-vl').innerHTML = '';
+    s.querySelector('.ep-lanes').style.setProperty('--t', 0);
+    s.querySelector('.ep-clk').textContent = 't = 0 逻辑秒';
+  },
+};
+</script>
+
+<section class="slide" id="c06-astra" data-part="2" data-trans="iris" data-dur="16000" data-title="模型原生异步：GPT-6 Astra" data-notes="前面的兼容方案由运行时安排事件的接入顺序，让使用同步接口的模型参与异步任务。另一条路线是让模型原生理解这种交互节奏：工具还在运行时，自己可以继续做别的事；用户中途补充要求时，也可以据此调整后续工作。截至 2026 年 9 月，GPT-6 Astra 已支持异步工具调用（Async tool calling）与回合中途引导（Mid-turn steering），体现了这一变化（图6-5）。<br><b>异步工具调用将“发起行动”和“获得结果”分开。</b>Agent 发起耗时查询后，可以继续推理、调用其他工具，或处理不依赖查询结果的部分。例如查询会议场地时，可以先整理议程和准备清单；等场地信息返回，再比较方案。关键是分清工作的依赖关系：能独立推进的工作继续做，必须依据结果的决策留到结果到达之后。<br><b>回合中途引导让用户可以在任务进行中修正方向。</b>当 Agent 还在思考或组织回答时，用户就可以追加“预算减少了”“参会人数变了”等要求。系统保留已完成的工作，把新的约束带入后续处理，使 Agent 能够在同一次任务中调整计划。接收到更新与作出调整之间仍可能有延迟，但用户不必等一整轮回答结束才表达变化。<br>这两种能力扩展的是交互的时机：工具结果与用户要求都可以在任务推进过程中到达。系统仍要分清它们的来源，记住哪些工作已经完成、哪些还在等待。<b>修改计划也不等于停止正在运行的工具，更不会自动撤销已经发生的动作</b>；实际执行、取消和状态管理仍由运行时负责。<br>并非所有模型都具备原生异步能力。构建 Agent 时，应根据模型的支持范围选择原生交互或兼容方案，再检查整个系统能否正确应对延迟返回、中途修改与任务恢复。异步训练可以继续改善这些能力，但开发者已经可以利用现有模型构建这样的交互方式。点击上方开关切换两条路线。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型原生异步：<em>GPT-6 Astra</em></h2>
+    <p class="lead fx fx-up" style="--d:2">另一条路线：让模型自己理解等待与中途变化</p></div>
+    <div class="as-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="compat">兼容方案</button><button data-v="native">原生异步</button></div></header>
+  <div class="as-body">
+    <div class="as-fig fx fx-scale" style="--d:3">
+      <div class="as-pan as-p1"><b>兼容方案：运行时安排异步节奏</b></div>
+      <div class="as-pan as-p2"><b>原生异步：模型理解等待与中途变化</b></div>
+      <div class="as-bx" data-k="c1" style="left:24px;top:52px"><b>任务在后台运行</b><small>明确记录“尚未完成”</small><span class="as-chip as-c1s">status: running</span></div>
+      <div class="as-bx" data-k="c2" style="left:380px;top:52px"><b>运行时接入新事件</b><small>决定排队、打断或并行处理</small><span class="as-rt"><i>排队</i><i>打断</i><i>并行</i></span></div>
+      <div class="as-bx" data-k="c3" style="left:736px;top:52px"><b>模型继续处理任务</b><small>仍按同步交互方式接收信息</small><span class="as-chip as-c3s">收到的是同步格式的轨迹</span></div>
+      <div class="as-bx as-n" data-k="n1" style="left:24px;top:238px"><b>发起耗时查询</b><small>例如：查询会议场地</small><span class="as-pg"><i></i><em>lookup_venues</em></span></div>
+      <div class="as-bx as-n" data-k="n2" style="left:380px;top:238px"><b>等待期间继续工作</b><small>例如：整理议程与准备清单</small><span class="as-cs"><span class="as-chip as-w1">议程 ✓</span><span class="as-chip as-w2">准备清单 ✓</span></span></div>
+      <div class="as-bx as-n" data-k="n3" style="left:736px;top:238px"><b>结果到达后作出决策</b><small>依据真实信息比较场地</small><span class="as-cs"><span class="as-lock"><svg class="ic"><use href="#i-lock"/></svg><svg class="ic"><use href="#i-unlock"/></svg></span><span class="as-chip as-n3s">按全部约束比较场地</span></span></div>
+      <div class="as-bx as-n" data-k="n4" style="left:24px;top:384px"><b>用户中途补充要求</b><small>例如：预算与人数变化</small><span class="as-cs"><span class="as-chip as-u as-u1">预算减少了</span><span class="as-chip as-u as-u2">参会人数变了</span></span></div>
+      <div class="as-bx as-n" data-k="n5" style="left:380px;top:384px"><b>保留已完成的工作</b><small>将新要求纳入当前任务</small><span class="as-chip as-k1">议程、清单不必重做</span></div>
+      <div class="as-bx as-n" data-k="n6" style="left:736px;top:384px"><b>调整后续行动</b><small>综合已有信息与全部更新</small><span class="as-chip as-k2">新约束进入后续计划</span></div>
+      <div class="as-bar"><b>模型理解变化、调整计划；运行时管理工具执行、任务状态与事件来源</b><small>能接收异步消息，还需要能正确恢复任务并控制实际动作。</small></div>
+      <svg class="as-svg" viewBox="0 0 1060 610" width="1060" height="610">
+        <defs><marker id="c06as-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f472b6"/></marker></defs>
+        <path class="as-a as-p-c1" d="M326 102 H376" marker-end="url(#c06as-ar)"/><path class="as-a as-p-c2" d="M682 102 H732" marker-end="url(#c06as-ar)"/>
+        <path class="as-a as-p-n1" d="M326 294 H376" marker-end="url(#c06as-ar)"/><path class="as-a as-p-n2" d="M682 294 H732" marker-end="url(#c06as-ar)"/>
+        <path class="as-a as-p-n4" d="M326 440 H376" marker-end="url(#c06as-ar)"/><path class="as-a as-p-n5" d="M682 440 H732" marker-end="url(#c06as-ar)"/>
+        <circle class="pk as-d-c" r="8"/><circle class="pk as-d-r1" r="8"/><circle class="pk as-d-r2" r="8"/>
+      </svg>
+    </div>
+    <div class="as-side">
+      <div class="as-cap fx fx-right" style="--d:4"><span class="badge">Async tool calling</span><b>异步工具调用将“发起行动”和“获得结果”分开。</b><p>发起耗时查询后，可以继续推理、调用其他工具，处理不依赖结果的部分；必须依据结果的决策，留到结果到达之后</p></div>
+      <div class="as-cap fx fx-right" style="--d:5"><span class="badge">Mid-turn steering</span><b>回合中途引导让用户可以在任务进行中修正方向。</b><p>系统保留已完成的工作，把新约束带入后续处理；接收更新与作出调整之间仍可能有延迟，但用户不必等一整轮回答结束</p></div>
+      <div class="as-lim fx fx-right" style="--d:6"><b><svg class="ic"><use href="#i-alert"/></svg>边界</b><ul><li>修改计划不等于停止正在运行的工具，更不会自动撤销已经发生的动作</li><li>并非所有模型都具备原生异步能力：按支持范围选择原生交互或兼容方案</li></ul></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「模型原生异步：GPT-6 Astra」· 图6-5</div>
+</section>
+<style>
+#c06-astra .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-astra .as-body{display:flex;gap:24px}
+#c06-astra .as-fig{position:relative;width:1060px;height:610px;flex:none}
+#c06-astra .as-pan{position:absolute;left:0;width:1060px;border-radius:20px;transition:opacity .6s,border-color .6s,box-shadow .6s}
+#c06-astra .as-pan>b{position:absolute;left:24px;top:14px;font-size:20px}
+#c06-astra .as-p1{top:0;height:168px;border:2px dashed color-mix(in srgb,var(--har) 60%,transparent);background:color-mix(in srgb,var(--har) 5%,transparent)}
+#c06-astra .as-p1>b{color:var(--har)}
+#c06-astra .as-p2{top:186px;height:330px;border:2px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 5%,transparent)}
+#c06-astra .as-p2>b{color:var(--acc)}
+#c06-astra .as-bx{position:absolute;width:302px;height:100px;padding:12px 16px;border-radius:14px;display:flex;flex-direction:column;gap:3px;background:rgba(12,18,40,.92);border:1px solid var(--line2);transition:border-color .45s,box-shadow .45s,opacity .5s}
+#c06-astra .as-bx.as-n{height:112px}
+#c06-astra .as-bx>b{font-size:19px}
+#c06-astra .as-bx>small{font-size:15px;color:var(--text3)}
+#c06-astra .as-bx.on{border-color:var(--acc);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c06-astra .as-bx[data-k^=c].on{border-color:var(--har);box-shadow:0 0 26px color-mix(in srgb,var(--har) 35%,transparent)}
+#c06-astra[data-m=compat] .as-p2,#c06-astra[data-m=compat] .as-n{opacity:.32}
+#c06-astra[data-m=native] .as-p1,#c06-astra[data-m=native] .as-bx[data-k^=c]{opacity:.32}
+#c06-astra .as-chip{display:inline-block;align-self:flex-start;margin-top:6px;padding:3px 10px;border-radius:8px;font-size:15px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent);opacity:0;translate:0 6px;transition:opacity .4s,translate .5s var(--spring)}
+#c06-astra .as-chip.on{opacity:1;translate:0 0}
+#c06-astra .as-c1s,#c06-astra .as-c3s{font-family:var(--mono);border-color:color-mix(in srgb,var(--har) 50%,transparent);background:color-mix(in srgb,var(--har) 12%,transparent)}
+#c06-astra .as-c3s{font-family:var(--font)}
+#c06-astra .as-u{border-color:color-mix(in srgb,var(--tool) 55%,transparent);background:color-mix(in srgb,var(--tool) 14%,transparent)}
+#c06-astra .as-cs{display:flex;align-items:center;gap:8px}
+#c06-astra .as-rt{display:flex;gap:6px;margin-top:6px}
+#c06-astra .as-rt i{font-style:normal;font-size:15px;padding:2px 10px;border-radius:8px;color:var(--text3);border:1px solid var(--line2);transition:all .3s}
+#c06-astra .as-rt i.on{color:#06101f;background:var(--har);border-color:var(--har)}
+#c06-astra .as-pg{position:relative;margin-top:8px;height:24px;border-radius:7px;background:rgba(255,255,255,.06);overflow:hidden}
+#c06-astra .as-pg i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,color-mix(in srgb,var(--tool) 40%,transparent),var(--tool))}
+#c06-astra .as-pg em{position:relative;padding-left:10px;font:15px/24px var(--mono);font-style:normal;color:var(--text)}
+#c06-astra .as-lock{position:relative;width:28px;height:28px;margin-top:6px;display:grid;place-items:center;font-size:22px;color:var(--warn)}
+#c06-astra .as-lock .ic{position:absolute;transition:opacity .4s}
+#c06-astra .as-lock .ic:last-child{opacity:0;color:var(--ok)}
+#c06-astra .as-lock.open .ic:first-child{opacity:0}
+#c06-astra .as-lock.open .ic:last-child{opacity:1}
+#c06-astra .as-bar{position:absolute;left:0;top:532px;width:1060px;height:78px;border-radius:16px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;background:rgba(255,255,255,.06);border:1px solid var(--line2)}
+#c06-astra .as-bar b{font-size:19px}
+#c06-astra .as-bar small{font-size:16px;color:var(--text2)}
+#c06-astra .as-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+#c06-astra .as-a{fill:none;stroke:color-mix(in srgb,var(--acc) 70%,transparent);stroke-width:3;stroke-dasharray:6 6;animation:flow 1s linear infinite}
+#c06-astra .as-p-c1,#c06-astra .as-p-c2{stroke:color-mix(in srgb,var(--har) 70%,transparent)}
+#c06-astra .as-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:16px}
+#c06-astra .as-cap{padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.8);border:1px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+#c06-astra .as-cap .badge{align-self:flex-start;font:600 15px var(--mono)}
+#c06-astra .as-cap b{font-size:21px;line-height:1.45;color:var(--acc)}
+#c06-astra .as-cap p{font-size:17px;line-height:1.6;color:var(--text2)}
+#c06-astra .as-lim{padding:16px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c06-astra .as-lim>b{display:flex;align-items:center;gap:8px;font-size:19px;color:var(--warn)}
+#c06-astra .as-lim ul{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+#c06-astra .as-lim li{position:relative;padding-left:18px;font-size:17px;line-height:1.55;color:var(--text)}
+#c06-astra .as-lim li::before{content:"";position:absolute;left:2px;top:.62em;width:7px;height:7px;border-radius:50%;background:var(--warn)}
+</style>
+<script>
+HOOKS['c06-astra'] = {
+  init(s) {
+    this.set = U.seg(s.querySelector('.as-seg'), (v) => { this.auto = false; this.run(s, v); });
+    this.bx = {};
+    s.querySelectorAll('.as-bx').forEach((b) => (this.bx[b.dataset.k] = b));
+  },
+  clear(s) {
+    s.querySelectorAll('.as-bx').forEach((b) => b.classList.remove('on'));
+    s.querySelectorAll('.as-chip,.as-rt i').forEach((c) => c.classList.remove('on'));
+    s.querySelector('.as-lock').classList.remove('open');
+    const bar = s.querySelector('.as-pg i');
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+  },
+  async run(s, m) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx.alive && tk === this.tk, W = (ms) => U.wait(ctx, ms);
+    this.set(m);
+    s.dataset.m = m;
+    this.clear(s);
+    const on = (k) => this.bx[k].classList.add('on'), chip = (c) => s.querySelector(c).classList.add('on');
+    const fly = (d, p, ms) => U.fly(s.querySelector('.as-d-' + d), s.querySelector('.as-p-' + p), ms, { ctx });
+    if (m === 'compat') {
+      for (let r = 0; r < 2; r++) {
+        on('c1'); chip('.as-c1s');
+        await W(700); if (!ok()) return;
+        await fly('c', 'c1', 800); if (!ok()) return;
+        on('c2');
+        const rts = [...s.querySelectorAll('.as-rt i')];
+        for (let j = 0; j < 3; j++) { rts.forEach((x, q) => x.classList.toggle('on', q === j)); await W(560); if (!ok()) return; }
+        await fly('c', 'c2', 800); if (!ok()) return;
+        on('c3'); chip('.as-c3s');
+        await W(1500); if (!ok()) return;
+        this.clear(s);
+        await W(400); if (!ok()) return;
+      }
+    } else {
+      on('n1');
+      const bar = s.querySelector('.as-pg i');
+      void bar.offsetWidth;
+      bar.style.transition = 'width 5.4s linear';
+      bar.style.width = '100%';
+      await W(500); if (!ok()) return;
+      await fly('r1', 'n1', 700); if (!ok()) return;
+      on('n2');
+      await W(500); if (!ok()) return;
+      chip('.as-w1');
+      await W(700); if (!ok()) return;
+      on('n4'); chip('.as-u1');
+      await W(500); if (!ok()) return;
+      chip('.as-w2');
+      await W(500); if (!ok()) return;
+      chip('.as-u2');
+      await fly('r2', 'n4', 700); if (!ok()) return;
+      on('n5'); chip('.as-k1');
+      await W(600); if (!ok()) return;
+      await fly('r2', 'n5', 700); if (!ok()) return;
+      on('n6'); chip('.as-k2');
+      await W(500); if (!ok()) return;
+      await fly('r1', 'n2', 700); if (!ok()) return;
+      on('n3'); s.querySelector('.as-lock').classList.add('open'); chip('.as-n3s');
+      await W(2400); if (!ok()) return;
+    }
+    await W(this.auto ? 700 : 1600); if (!ok()) return;
+    this.run(s, this.auto ? (m === 'compat' ? 'native' : 'compat') : m);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.run(s, 'compat'), 900); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.m = '';
+    this.clear(s);
+    s.querySelectorAll('.as-seg button').forEach((b) => b.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c06-reliable" data-part="2" data-trans="rise" data-dur="16000" data-title="从“能接收异步消息”到“可靠处理异步任务”" data-notes="原生异步解决了消息能否在运行中到达的问题，复杂任务中的可靠性还取决于模型如何使用这些消息。至少要检查三件事：<br>1. <b>结果归属与未完成状态</b>：能否把延迟到达的结果归入正确任务，在结果缺席时避免编造数据？<br>2. <b>任务恢复与动作控制</b>：能否在处理新要求后继续原任务，并区分修改计划与停止执行？<br>3. <b>多条更新的综合使用</b>：能否同时遵守预算与人数等约束，而不是只记住最后一条消息？<br>针对这些问题，可以通过异步环境中的训练改进模型，也可以通过清晰的任务状态、事件来源和执行反馈改进系统。<b>评估需要覆盖两层：模型是否理解了变化，系统是否按变化正确执行。</b><br>三张卡片依次演示每项检查的反例与应有的行为（均为示意，场地数字沿用实验 6-3 的设定：初始预算 2000、人数 20），点击任一卡片可以单独重放。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">能接收异步消息，<em>不等于能可靠处理异步任务</em></h2>
+  <p class="lead fx fx-up" style="--d:2">原生异步解决了消息能否在运行中到达；复杂任务的可靠性，还取决于模型怎样使用这些消息</p></header>
+  <div class="rb-row">
+    <div class="fx fx-up" style="--d:3"><div class="rb-c" data-i="0" data-mode="" data-ph="0">
+      <div class="rb-h"><span class="rb-bx"></span><em>1</em><b>结果归属与未完成状态</b><span class="chip warn">示意</span></div>
+      <p class="rb-q">能否把延迟到达的结果归入正确任务，在结果缺席时避免编造数据？</p>
+      <div class="rb-demo rb-d0">
+        <div class="rb-tk"><b>T1 · 查询场地</b><code>call_id c-17</code><span class="rb-s">等待中</span></div>
+        <div class="rb-tk"><b>T2 · 查询餐饮</b><code>call_id c-18</code><span class="rb-s">等待中</span></div>
+        <div class="rb-res">迟到的结果 · <code>c-17</code> · 场地表</div>
+        <p class="rb-say"></p>
+      </div>
+      <p class="rb-v"></p>
+    </div></div>
+    <div class="fx fx-up" style="--d:4"><div class="rb-c" data-i="1" data-mode="" data-ph="0">
+      <div class="rb-h"><span class="rb-bx"></span><em>2</em><b>任务恢复与动作控制</b><span class="chip warn">示意</span></div>
+      <p class="rb-q">能否在处理新要求后继续原任务，并区分修改计划与停止执行？</p>
+      <div class="rb-demo rb-d1">
+        <div class="rb-run"><b>查询场地</b><div class="rb-pg"><i></i></div><span class="rb-s">运行中</span></div>
+        <div class="rb-msg">用户：预算改为 1000</div>
+        <p class="rb-say"></p>
+      </div>
+      <p class="rb-v"></p>
+    </div></div>
+    <div class="fx fx-up" style="--d:5"><div class="rb-c" data-i="2" data-mode="" data-ph="0">
+      <div class="rb-h"><span class="rb-bx"></span><em>3</em><b>多条更新的综合使用</b><span class="chip warn">示意</span></div>
+      <p class="rb-q">能否同时遵守预算与人数等约束，而不是只记住最后一条消息？</p>
+      <div class="rb-demo rb-d2">
+        <div class="rb-ups"><span>① 参会人数改为 10 人</span><span>② 预算降到 1000</span></div>
+        <div class="rb-vs"><span data-v="A">A · 1800 元 · 30 人</span><span data-v="B">B · 900 元 · 12 人</span><span data-v="C">C · 600 元 · 8 人</span></div>
+        <p class="rb-say"></p>
+      </div>
+      <p class="rb-v"></p>
+    </div></div>
+  </div>
+  <div class="rb-foot fx fx-up" style="--d:7">
+    <div><b>两条改进路线</b><span>在异步环境中训练，改进模型</span><span>用清晰的任务状态、事件来源和执行反馈，改进系统</span></div>
+    <div><b>评估覆盖两层</b><span>模型是否理解了变化</span><span>系统是否按变化正确执行</span></div>
+  </div>
+  <div class="src">第六章 ·「从“能接收异步消息”到“可靠处理异步任务”」</div>
+</section>
+<style>
+#c06-reliable .rb-row{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;height:556px}
+#c06-reliable .rb-row>div{display:flex}
+#c06-reliable .rb-c{flex:1;position:relative;padding:18px 22px;border-radius:20px;display:flex;flex-direction:column;gap:12px;cursor:pointer;background:rgba(12,18,40,.78);border:1px solid var(--line2);transition:border-color .45s,box-shadow .45s}
+#c06-reliable .rb-c.cur{border-color:color-mix(in srgb,var(--acc) 60%,transparent);box-shadow:0 0 34px color-mix(in srgb,var(--acc) 22%,transparent)}
+#c06-reliable .rb-h{display:flex;align-items:center;gap:10px}
+#c06-reliable .rb-h em{font-style:normal;font:800 20px var(--num);color:var(--acc)}
+#c06-reliable .rb-h b{font-size:22px}
+#c06-reliable .rb-h .chip{margin-left:auto;font-size:15px;padding:3px 10px}
+#c06-reliable .rb-bx{position:relative;width:30px;height:30px;flex:none;border-radius:9px;border:2px solid var(--line2);transition:all .45s var(--spring)}
+#c06-reliable .rb-c.done .rb-bx{background:var(--ok);border-color:var(--ok);box-shadow:0 0 14px color-mix(in srgb,var(--ok) 60%,transparent);transform:scale(1.08)}
+#c06-reliable .rb-c.done .rb-bx::after{content:"";position:absolute;left:8px;top:3px;width:8px;height:14px;border:solid #04121a;border-width:0 3px 3px 0;transform:rotate(45deg)}
+#c06-reliable .rb-q{font-size:17px;line-height:1.6;color:var(--text2);min-height:54px}
+#c06-reliable .rb-demo{position:relative;flex:1;padding:14px;border-radius:14px;background:rgba(5,9,22,.6);border:1px solid var(--line)}
+#c06-reliable .rb-say{position:absolute;left:14px;right:14px;bottom:14px;min-height:56px;padding:9px 14px;border-radius:12px;font-size:16px;line-height:1.55;color:var(--text);background:color-mix(in srgb,var(--llm) 10%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--llm) 35%,transparent);opacity:0;transition:opacity .35s,border-color .35s}
+#c06-reliable .rb-say:not(:empty){opacity:1}
+#c06-reliable .rb-c[data-mode=bad] .rb-say{border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 10%,rgba(10,16,36,.9))}
+#c06-reliable .rb-c[data-mode=ok] .rb-say{border-color:color-mix(in srgb,var(--ok) 60%,transparent);background:color-mix(in srgb,var(--ok) 9%,rgba(10,16,36,.9))}
+#c06-reliable .rb-v{min-height:52px;font-size:16px;line-height:1.6;font-weight:600}
+#c06-reliable .rb-c[data-mode=bad] .rb-v{color:var(--bad)}
+#c06-reliable .rb-c[data-mode=ok] .rb-v{color:var(--ok)}
+#c06-reliable .rb-tk{display:flex;align-items:center;gap:10px;height:54px;padding:0 12px;margin-bottom:10px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:border-color .4s,background .4s}
+#c06-reliable .rb-tk b{font-size:17px}
+#c06-reliable .rb-tk code{font:15px var(--mono);color:var(--text3)}
+#c06-reliable .rb-s{margin-left:auto;font-size:15px;color:var(--text3)}
+#c06-reliable .rb-tk.hit-ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent)}
+#c06-reliable .rb-tk.hit-ok .rb-s{color:var(--ok)}
+#c06-reliable .rb-tk.hit-bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+#c06-reliable .rb-tk.hit-bad .rb-s{color:var(--bad)}
+#c06-reliable .rb-res{position:absolute;left:14px;top:150px;padding:6px 12px;border-radius:10px;font-size:15px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--env) 55%,transparent);background:color-mix(in srgb,var(--env) 16%,rgba(10,16,36,.95));opacity:0;transition:top .8s var(--ease),opacity .4s,left .8s var(--ease)}
+#c06-reliable .rb-res code{font:15px var(--mono);color:var(--env)}
+#c06-reliable .rb-c[data-i="0"][data-ph="1"] .rb-res{opacity:1}
+#c06-reliable .rb-c[data-i="0"][data-ph="2"] .rb-res{opacity:0}
+#c06-reliable .rb-run{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+#c06-reliable .rb-run b{font-size:17px;flex:none}
+#c06-reliable .rb-pg{flex:1;height:16px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden}
+#c06-reliable .rb-pg i{display:block;height:100%;width:0;border-radius:999px;background:var(--tool)}
+#c06-reliable .rb-c[data-i="1"][data-mode=bad][data-ph="2"] .rb-pg i{background:var(--bad)}
+#c06-reliable .rb-c[data-i="1"][data-mode=ok][data-ph="2"] .rb-pg i{background:var(--ok)}
+#c06-reliable .rb-msg{margin-top:14px;display:inline-block;padding:8px 14px;border-radius:12px;font-size:16px;color:var(--text);background:color-mix(in srgb,var(--tool) 14%,transparent);border:1px solid color-mix(in srgb,var(--tool) 45%,transparent);opacity:0;translate:0 10px;transition:opacity .4s,translate .5s var(--spring)}
+#c06-reliable .rb-c[data-i="1"]:not([data-ph="0"]) .rb-msg{opacity:1;translate:0 0}
+#c06-reliable .rb-ups{display:flex;flex-direction:column;gap:8px}
+#c06-reliable .rb-ups span{align-self:flex-start;padding:6px 12px;border-radius:10px;font-size:16px;color:var(--text);background:color-mix(in srgb,var(--tool) 14%,transparent);border:1px solid color-mix(in srgb,var(--tool) 45%,transparent);opacity:0;transition:opacity .4s}
+#c06-reliable .rb-c[data-i="2"]:not([data-ph="0"]) .rb-ups span{opacity:1}
+#c06-reliable .rb-c[data-i="2"][data-mode=bad][data-ph="2"] .rb-ups span:first-child{opacity:.4;text-decoration:line-through}
+#c06-reliable .rb-vs{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+#c06-reliable .rb-vs span{padding:5px 12px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line);transition:all .4s}
+#c06-reliable .rb-c[data-i="2"][data-mode=ok][data-ph="2"] .rb-vs [data-v=B]{color:var(--text);border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+#c06-reliable .rb-c[data-i="2"][data-mode=bad][data-ph="2"] .rb-vs span{opacity:.5}
+#c06-reliable .rb-foot{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px}
+#c06-reliable .rb-foot>div{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-reliable .rb-foot b{font-size:19px;color:var(--acc);margin-right:6px}
+#c06-reliable .rb-foot span{padding:5px 12px;border-radius:999px;font-size:16px;color:var(--text);border:1px solid var(--line2)}
+</style>
+<script>
+HOOKS['c06-reliable'] = {
+  SAY: [
+    { bad: ['Agent：场地 A 可以预订。', '（场地表）……收到？'], ok: ['Agent：场地数据还没返回，先整理议程。', '已收到场地表'] },
+    { bad: ['', 'Agent：好的，已停止全部任务。'], ok: ['', 'Agent：新预算已记下；场地查询继续，结果到达后按新预算比较。'] },
+    { bad: ['', 'Agent：预算 1000 以内、能容纳 20 人的场地没有，建议提高预算。'], ok: ['', 'Agent：同时满足 10 人与预算 1000——选 B（900 元，容纳 12 人）。'] },
+  ],
+  VERD: [
+    { bad: '反例：结果缺席时编造数据，迟到的结果又被归到了别的任务', ok: '应当：缺席时如实等待，到达后按 call_id 归入原任务' },
+    { bad: '反例：把“修改计划”当成“停止执行”，原任务就此中断', ok: '应当：处理新要求后继续原任务；停止需要明确的指令' },
+    { bad: '反例：只记住最后一条消息，前一条更新被遗忘', ok: '应当：所有更新同时生效' },
+  ],
+  init(s) {
+    this.cards = [...s.querySelectorAll('.rb-c')];
+    this.cards.forEach((c, i) => c.addEventListener('click', () => { this.auto = false; this.run(s, [i]); }));
+  },
+  blank(c) {
+    c.dataset.mode = '';
+    c.dataset.ph = 0;
+    c.querySelector('.rb-say').textContent = '';
+    c.querySelector('.rb-v').textContent = '';
+    c.querySelectorAll('.rb-tk').forEach((t) => { t.classList.remove('hit-ok', 'hit-bad'); t.querySelector('.rb-s').textContent = '等待中'; });
+    const pg = c.querySelector('.rb-pg i');
+    if (pg) { pg.style.transition = 'none'; pg.style.width = '0%'; }
+    const st = c.querySelector('.rb-run .rb-s');
+    if (st) st.textContent = '运行中';
+  },
+  async demo(i, ok, W) {
+    const c = this.cards[i], say = c.querySelector('.rb-say'), v = c.querySelector('.rb-v');
+    for (const mode of ['bad', 'ok']) {
+      this.blank(c);
+      c.dataset.mode = mode;
+      const pg = c.querySelector('.rb-pg i');
+      if (pg) { void pg.offsetWidth; pg.style.transition = 'width 4.2s linear'; pg.style.width = '100%'; }
+      await W(800); if (!ok()) return false;
+      c.dataset.ph = 1;
+      say.textContent = this.SAY[i][mode][0];
+      await W(1400); if (!ok()) return false;
+      c.dataset.ph = 2;
+      if (i === 0) {
+        const tks = c.querySelectorAll('.rb-tk'), t = tks[mode === 'bad' ? 1 : 0];
+        t.classList.add(mode === 'bad' ? 'hit-bad' : 'hit-ok');
+        t.querySelector('.rb-s').textContent = this.SAY[0][mode][1];
+      } else {
+        say.textContent = this.SAY[i][mode][1];
+        if (i === 1) {
+          const st = c.querySelector('.rb-run .rb-s');
+          if (mode === 'bad') { const w = pg.getBoundingClientRect().width / pg.parentElement.getBoundingClientRect().width; pg.style.transition = 'none'; pg.style.width = (w * 100).toFixed(1) + '%'; st.textContent = '已停止'; }
+          else st.textContent = '继续运行';
+        }
+      }
+      v.textContent = this.VERD[i][mode];
+      await W(2000); if (!ok()) return false;
+    }
+    c.classList.add('done');
+    return true;
+  },
+  async run(s, list) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx.alive && tk === this.tk, W = (ms) => U.wait(ctx, ms);
+    if (this.auto) this.cards.forEach((c) => { c.classList.remove('done'); this.blank(c); });
+    for (const i of list) {
+      this.cards.forEach((c, j) => c.classList.toggle('cur', j === i));
+      if (!this.auto) this.cards[i].classList.remove('done');
+      if (!(await this.demo(i, ok, W))) return;
+    }
+    this.cards.forEach((c) => c.classList.remove('cur'));
+    if (this.auto) { await W(2600); if (ok()) this.run(s, [0, 1, 2]); }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.run(s, [0, 1, 2]), 900); },
+  leave() { this.ctx = null; },
+  reset() {
+    this.tk = (this.tk || 0) + 1;
+    this.cards.forEach((c) => { c.classList.remove('done', 'cur'); this.blank(c); });
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp3" data-part="2" data-trans="flip" data-dur="16000" data-title="实验 6-3 ★★★：模型原生异步与回合中途引导" data-notes="<b>实验 6-3 ★★★</b>为一次会议选择场地：Agent 发起耗时查询后，先完成不依赖查询结果的准备工作；期间用户补充预算与人数要求。等查询完成，再根据全部约束选择场地。调用 GPT-6 Astra API，对比同步工具、原生异步工具和回合中途引导三种交互方式，观察等待是否阻塞其他工作、新要求是否进入后续计划，以及结果到达后能否继续原任务；再选择一个不支持原生能力的模型作为对照，理解模型能力与运行时编排各自解决什么问题。<br>配套仓库的正式运行（2026-09-05，真实 OpenAI Responses WebSocket API，五组各三次）<b>15/15 达到验收</b>：场地表与 8 秒的工具延迟由本地脚本控制，模型响应和服务端事件来自真实 API。初始预算 2000、人数 20 应选 A；只有 steering 组收到两条更新（预算 1000、人数 10），两条都生效时应选 B。九次带工具的运行均只有一次工具调用、一次本地执行和一次真实结果提交，最终回执全部匹配；六次 Astra steering 的最终答案都同时采用预算 1000 和人数 10；reasoning 组的三次 steering 都落在同一个 reasoning 项的开始与完成之间；旧模型 gpt-5.6-sol 三次都返回 steering_not_supported。<br>几处限定要注意：<b>这次没有显示最终完成更快</b>——同步与异步两组耗时中位数接近，异步组只是在等待数据期间先完成了独立工作；其余组的任务和推理设置不同，耗时不能直接当作性能排名。steer.accepted 只表示服务端接收了更新，还不能据此宣布已生效；steering 承载用户消息，工具结果仍用原始 call_id 归还，不能把工具结果改写成用户消息。本次没有测 custom 工具、多工具乱序返回、长期任务、取消副作用、断线恢复与 pending 分支。正式运行的 Astra token 用量合计输入 11,616、输出 1,655。上方开关切换两次真实运行的事件时间线。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-3 ★★★：<em>模型原生异步与回合中途引导</em></h2></div>
+    <div class="e3-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="tool">工具挂起时引导</button><button data-v="reason">推理期间引导</button></div></header>
+  <div class="e3-top">
+    <div class="e3-v panel fx fx-left" style="--d:3">
+      <p class="e3-task">为会议选满足人数与预算的最便宜场地；查询要等 8 秒，期间先做不依赖结果的准备</p>
+      <div class="e3-cons"><span>预算 <b class="e3-bg">2000</b></span><span>人数 <b class="e3-pp">20</b></span><em class="e3-cst">初始条件</em></div>
+      <div class="e3-tb">
+        <div class="e3-tr e3-th2"><span>场地</span><span>价格</span><span>容量</span><span data-c="i">初始要求</span><span data-c="u">更新后</span></div>
+        <div class="e3-tr" data-v="A"><span>A</span><span>1800</span><span>30</span><span data-c="i" class="y">选择 A</span><span data-c="u">超预算</span></div>
+        <div class="e3-tr" data-v="B"><span>B</span><span>900</span><span>12</span><span data-c="i">容量不足</span><span data-c="u" class="y">选择 B</span></div>
+        <div class="e3-tr" data-v="C"><span>C</span><span>600</span><span>8</span><span data-c="i">容量不足</span><span data-c="u">容量不足</span></div>
+      </div>
+      <div class="e3-pick">最终选择 <b>—</b><small></small></div>
+    </div>
+    <div class="e3-tl panel fx fx-right" style="--d:4">
+      <div class="e3-th"><b class="e3-tt"></b><span class="e3-clk">0.000 s</span></div>
+      <div class="e3-lanes">
+        <div class="e3-ln" data-l="r"><span>模型 response</span><div class="e3-trk"></div></div>
+        <div class="e3-ln" data-l="t"><span>本地工具</span><div class="e3-trk"></div></div>
+        <div class="e3-ln" data-l="c"><span>客户端发送</span><div class="e3-trk"></div></div>
+        <i class="e3-cur"></i>
+      </div>
+      <div class="e3-evs" data-clip-ok></div>
+    </div>
+  </div>
+  <div class="e3-res fx fx-up" style="--d:5">
+    <div class="e3-rr e3-rh"><span>组别</span><span>模型与设置</span><span>验收</span><span>关键观测</span><span>耗时中位数</span></div>
+    <div class="e3-rr" data-a="sync"><span>同步工具</span><span>Astra · async: false</span><span>3/3</span><span>0/3 在工具完成前输出独立清单，均选 A</span><span>12.583 s</span></div>
+    <div class="e3-rr" data-a="async"><span>原生异步工具</span><span>Astra · async: true</span><span>3/3</span><span>3/3 在工具执行期间输出独立清单，均选 A</span><span>12.684 s</span></div>
+    <div class="e3-rr" data-a="reason"><span>推理期间引导</span><span>Astra · 无工具</span><span>3/3</span><span>原 response 以 incomplete(steered) 结束，自动续接，选 B</span><span>8.107 s</span></div>
+    <div class="e3-rr" data-a="tool"><span>工具挂起时引导</span><span>Astra · async: true</span><span>3/3</span><span>原 response 正常完成后自动续接，再接收原调用结果，选 B</span><span>12.575 s</span></div>
+    <div class="e3-rr" data-a="neg"><span>旧模型负对照</span><span>gpt-5.6-sol</span><span>3/3</span><span>返回 steering_not_supported</span><span>不计</span></div>
+    <p class="e3-nt"><b>这次没有显示最终完成更快</b>：同步与异步中位数接近，异步组只是在等待数据期间先完成了独立工作；各组任务与推理设置不同，耗时不能当作性能排名</p>
+  </div>
+  <div class="src">第六章 ·「模型原生异步：GPT-6 Astra」· 实验 6-3 · 数据：配套仓库 chapter6/astra-async-steering 正式运行（2026-09-05，15/15 达到验收）</div>
+</section>
+<style>
+#c06-exp3 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp3 .e3-top{display:flex;gap:22px;height:392px}
+#c06-exp3 .e3-v{width:520px;flex:none;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+#c06-exp3 .e3-task{font-size:16px;line-height:1.55;color:var(--text2)}
+#c06-exp3 .e3-cons{display:flex;align-items:center;gap:12px}
+#c06-exp3 .e3-cons>span{padding:5px 14px;border-radius:10px;font-size:17px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+#c06-exp3 .e3-cons b{font:800 22px var(--num);color:var(--acc);display:inline-block;transition:color .3s}
+#c06-exp3 .e3-cons b.flash{animation:c06e3-flash .8s var(--ease)}
+#c06-exp3 .e3-cst{margin-left:auto;font-style:normal;font-size:15px;color:var(--warn);text-align:right;max-width:200px;line-height:1.4}
+#c06-exp3 .e3-tb{display:flex;flex-direction:column;gap:4px}
+#c06-exp3 .e3-tr{display:grid;grid-template-columns:56px 70px 70px 1fr 1fr;align-items:center;gap:6px;padding:6px 10px;border-radius:10px;font-size:16px;border:1px solid transparent;transition:all .4s}
+#c06-exp3 .e3-th2{font-size:15px;color:var(--text3)}
+#c06-exp3 .e3-tr>span:first-child{font:800 18px var(--num)}
+#c06-exp3 .e3-tr [data-c]{color:var(--text3);transition:color .4s,opacity .4s}
+#c06-exp3 .e3-tr [data-c].y{font-weight:700}
+#c06-exp3[data-col=i] .e3-tr [data-c=i],#c06-exp3[data-col=u] .e3-tr [data-c=u]{color:var(--text)}
+#c06-exp3[data-col=i] .e3-tr [data-c=i].y,#c06-exp3[data-col=u] .e3-tr [data-c=u].y{color:var(--ok)}
+#c06-exp3[data-col=i] .e3-tr [data-c=u],#c06-exp3[data-col=u] .e3-tr [data-c=i]{opacity:.4}
+#c06-exp3 .e3-tr.pick{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);box-shadow:0 0 20px color-mix(in srgb,var(--ok) 25%,transparent)}
+#c06-exp3 .e3-pick{margin-top:auto;display:flex;align-items:baseline;gap:12px;font-size:17px;color:var(--text2)}
+#c06-exp3 .e3-pick b{font:800 30px var(--num);color:var(--ok)}
+#c06-exp3 .e3-pick small{font-size:15px;color:var(--env)}
+#c06-exp3 .e3-tl{flex:1;min-width:0;padding:16px 22px;display:flex;flex-direction:column;gap:8px}
+#c06-exp3 .e3-th{display:flex;align-items:center;gap:12px}
+#c06-exp3 .e3-th b{font-size:19px}
+#c06-exp3 .e3-clk{margin-left:auto;font:700 20px var(--mono);color:var(--acc)}
+#c06-exp3 .e3-lanes{position:relative;height:156px;flex:none;display:flex;flex-direction:column;--t:0}
+#c06-exp3 .e3-ln{flex:1;display:flex;align-items:center;border-bottom:1px dashed var(--line)}
+#c06-exp3 .e3-ln>span{width:140px;flex:none;font-size:16px;color:var(--text2)}
+#c06-exp3 .e3-trk{position:relative;flex:1;height:100%}
+#c06-exp3 .e3-b{--c:var(--llm);position:absolute;top:50%;height:26px;margin-top:-13px;width:0;border-radius:7px;background:color-mix(in srgb,var(--c) 28%,rgba(10,16,36,.9));border:1px solid var(--c);opacity:0}
+#c06-exp3 .e3-b.on{opacity:1}
+#c06-exp3 .e3-b.tool{--c:var(--tool)}
+#c06-exp3 .e3-b.st{--c:var(--warn)}
+#c06-exp3 .e3-b span{position:absolute;left:8px;top:50%;transform:translateY(-50%);white-space:nowrap;font:600 15px var(--num);color:var(--text)}
+#c06-exp3 .e3-m{--c:var(--acc);position:absolute;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;transform:rotate(45deg);background:var(--c);box-shadow:0 0 10px var(--c);opacity:0;transition:opacity .3s}
+#c06-exp3 .e3-m.on{opacity:1}
+#c06-exp3 .e3-m span{position:absolute;left:18px;top:-2px;transform:rotate(-45deg);transform-origin:left top;white-space:nowrap;font:15px var(--mono);color:var(--c)}
+#c06-exp3 .e3-m.acc{--c:var(--ok)}
+#c06-exp3 .e3-cur{position:absolute;top:0;bottom:0;left:calc(140px + (100% - 140px) * var(--t));width:2px;background:var(--acc);box-shadow:0 0 12px var(--acc)}
+#c06-exp3 .e3-evs{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;overflow:hidden}
+#c06-exp3 .e3-ev{display:grid;grid-template-columns:78px 330px 1fr;gap:10px;align-items:baseline;padding:4px 10px;border-radius:9px;font-size:15px;color:var(--text2);animation:upIn .4s var(--spring) both}
+#c06-exp3 .e3-ev b{font:600 15px var(--mono);color:var(--acc)}
+#c06-exp3 .e3-ev code{font:15px var(--mono);color:var(--text)}
+#c06-exp3 .e3-ev:last-child{background:color-mix(in srgb,var(--acc) 12%,transparent);color:var(--text)}
+#c06-exp3 .e3-res{margin-top:16px;display:flex;flex-direction:column;gap:3px}
+#c06-exp3 .e3-rr{display:grid;grid-template-columns:190px 210px 70px 1fr 140px;gap:12px;align-items:center;padding:6px 14px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid transparent;transition:all .4s}
+#c06-exp3 .e3-rh{font-size:15px;color:var(--text3)}
+#c06-exp3 .e3-rr>span:nth-child(3){font:700 17px var(--num);color:var(--ok)}
+#c06-exp3 .e3-rr>span:nth-child(5){font:600 16px var(--num);text-align:right}
+#c06-exp3 .e3-rr>span:first-child{color:var(--text);font-weight:600}
+#c06-exp3 .e3-rr.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent);color:var(--text)}
+#c06-exp3 .e3-nt{margin-top:6px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c06-exp3 .e3-nt b{color:var(--warn)}
+@keyframes c06e3-flash{0%{transform:scale(1.5);color:var(--warn)}100%{transform:none}}
+</style>
+<script>
+HOOKS['c06-exp3'] = {
+  R: {
+    tool: {
+      tt: '异步工具挂起时引导 · 第一次运行的真实事件', T: 13,
+      bars: [['r', 1.001, 3.628, 'R1', ''], ['r', 3.689, 5.076, 'R2', ''], ['r', 11.196, 12.575, 'R3', ''], ['t', 2.886, 10.886, 'lookup_venues · 8 秒', 'tool']],
+      marks: [['c', 2.886, 'response.steer', ''], ['r', 3.127, '', 'acc'], ['c', 10.887, 'response.create', '']],
+      ev: [
+        [1.001, 'response.created：R1', '原任务开始'],
+        [2.886, 'tool.started → 发送 response.steer', '查询已在后台运行，预算 / 人数更新进入同一连接'],
+        [3.127, 'response.steer.accepted', '服务端接收更新；还不能据此宣布已生效'],
+        [3.628, 'R1 response.completed', '原 response 正常完成；steering 不必总产生 incomplete'],
+        [3.689, '自动 response.created：R2', 'parent 为 R1，客户端没有重新发起模型请求'],
+        [5.076, 'R2 response.completed', '已处理更新，仍在等待真实场地数据'],
+        [10.886, '本地 tool.ready', '8 秒查询完成，生成真实回执'],
+        [10.887, '客户端 response.create', '使用原始工具 call_id，parent 指向最新的 R2'],
+        [11.196, 'response.created：R3', '接收工具数据并接续任务'],
+        [12.575, 'R3 response.completed', '同时满足新预算、新人数与真实回执，选 B'],
+      ],
+      ph: [[0, 'i', '初始条件'], [2.886, 'i', '发送更新：预算 1000 · 人数 10'], [3.127, 'u', '更新已被接收（尚未生效）'], [5.076, 'u', '已纳入计划，等待真实场地数据']],
+      pick: 12.575,
+    },
+    reason: {
+      tt: '推理期间引导 · 第一次运行的真实事件', T: 8.5,
+      bars: [['r', 2.19, 3.824, 'R1 · reasoning', 'st'], ['r', 3.95, 7.763, 'R2 · 自动续接', '']],
+      marks: [['c', 2.19, 'response.steer（紧随其后）', ''], ['r', 3.824, '', 'acc']],
+      ev: [
+        [2.19, 'reasoning 项开始 → 随后发送 response.steer', '原 response 尚未结束，更新进入同一连接'],
+        [3.824, 'R1 incomplete(reason=steered)', '原 response 因引导而提前结束'],
+        [3.95, '自动创建后继 response：R2', '客户端没有重新发起请求'],
+        [7.763, 'R2 完成最终答案', '采用预算 1000 与人数 10，选 B'],
+      ],
+      ph: [[0, 'i', '初始条件（表格直接放入输入）'], [2.19, 'i', '发送更新：预算 1000 · 人数 10'], [3.824, 'u', '原 response 被引导，自动续接']],
+      pick: 7.763,
+    },
+  },
+  init(s) { this.set = U.seg(s.querySelector('.e3-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  run(s, m) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), D = this.R[m], T = D.T;
+    this.set(m);
+    s.querySelector('.e3-tt').textContent = D.tt;
+    s.querySelectorAll('.e3-rr[data-a]').forEach((r) => r.classList.toggle('on', r.dataset.a === m));
+    const trk = (l) => s.querySelector(`.e3-ln[data-l="${l}"] .e3-trk`);
+    s.querySelectorAll('.e3-trk').forEach((x) => (x.innerHTML = ''));
+    const bars = D.bars.map(([l, t0, t1, lab, cls]) => {
+      const el = document.createElement('div');
+      el.className = 'e3-b ' + cls;
+      el.style.left = (t0 / T) * 100 + '%';
+      el.innerHTML = `<span>${lab}</span>`;
+      trk(l).appendChild(el);
+      return { el, t0, t1 };
+    });
+    const marks = D.marks.map(([l, t, lab, cls]) => {
+      const el = document.createElement('div');
+      el.className = 'e3-m ' + cls;
+      el.style.left = (t / T) * 100 + '%';
+      el.innerHTML = lab ? `<span>${lab}</span>` : '';
+      trk(l).appendChild(el);
+      return { el, t };
+    });
+    const evs = s.querySelector('.e3-evs'), lanes = s.querySelector('.e3-lanes'), clk = s.querySelector('.e3-clk');
+    const bg = s.querySelector('.e3-bg'), pp = s.querySelector('.e3-pp'), cst = s.querySelector('.e3-cst'), pick = s.querySelector('.e3-pick');
+    evs.innerHTML = '';
+    s.querySelectorAll('.e3-tr').forEach((r) => r.classList.remove('pick'));
+    pick.querySelector('b').textContent = '—';
+    pick.querySelector('small').textContent = '';
+    let ei = 0, phase = -1;
+    const start = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const t = Math.min(T, (now - start) / 1000);
+      lanes.style.setProperty('--t', t / T);
+      clk.textContent = t.toFixed(3) + ' s';
+      bars.forEach((b) => { const on = t >= b.t0; b.el.classList.toggle('on', on); b.el.style.width = on ? ((Math.min(t, b.t1) - b.t0) / T) * 100 + '%' : '0%'; });
+      marks.forEach((mk) => mk.el.classList.toggle('on', t >= mk.t));
+      while (ei < D.ev.length && D.ev[ei][0] <= t) {
+        const [et, name, mean] = D.ev[ei++];
+        evs.insertAdjacentHTML('beforeend', `<div class="e3-ev"><b>${et.toFixed(3)}</b><code>${name}</code><span>${mean}</span></div>`);
+        while (evs.children.length > 4) evs.firstElementChild.remove();
+      }
+      let p = 0;
+      D.ph.forEach(([pt], j) => { if (t >= pt) p = j; });
+      if (p !== phase) {
+        phase = p;
+        const [, col, txt] = D.ph[p];
+        s.dataset.col = col;
+        cst.textContent = txt;
+        const nb = col === 'u' ? '1000' : '2000', np = col === 'u' ? '10' : '20';
+        if (bg.textContent !== nb) { bg.textContent = nb; U.restart(bg, 'flash'); }
+        if (pp.textContent !== np) { pp.textContent = np; U.restart(pp, 'flash'); }
+      }
+      if (t >= D.pick && pick.querySelector('b').textContent !== 'B') {
+        pick.querySelector('b').textContent = 'B';
+        pick.querySelector('small').textContent = m === 'tool' ? '回执匹配 · source: demo' : '同时采用预算 1000 与人数 10';
+        s.querySelector('.e3-tr[data-v="B"]').classList.add('pick');
+        cst.textContent = '两条更新都已生效';
+      }
+      if (t >= T) {
+        ctx.later(() => { if (tk === this.tk) this.run(s, this.auto ? (m === 'tool' ? 'reason' : 'tool') : m); }, this.auto ? 2600 : 3600);
+        return false;
+      }
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; s.dataset.col = 'i'; ctx.later(() => this.run(s, 'tool'), 800); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.col = '';
+    s.querySelectorAll('.e3-trk').forEach((x) => (x.innerHTML = ''));
+    s.querySelector('.e3-evs').innerHTML = '';
+    s.querySelectorAll('.e3-tr').forEach((r) => r.classList.remove('pick'));
+    s.querySelectorAll('.e3-rr').forEach((r) => r.classList.remove('on'));
+    s.querySelector('.e3-bg').textContent = '2000';
+    s.querySelector('.e3-pp').textContent = '20';
+    s.querySelector('.e3-cst').textContent = '初始条件';
+    s.querySelector('.e3-pick b').textContent = '—';
+    s.querySelector('.e3-pick small').textContent = '';
+    s.querySelector('.e3-clk').textContent = '0.000 s';
+    s.querySelector('.e3-lanes').style.setProperty('--t', 0);
+    s.querySelectorAll('.e3-seg button').forEach((b) => b.classList.remove('on'));
+  },
+};
+</script>
+
+<!-- ==== 03-async-compat:END ==== -->

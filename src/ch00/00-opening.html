@@ -1,0 +1,189 @@
+<!-- ================= 开篇 ================= -->
+<script>
+// 本章共用的小工具：跳到某个部分的第一页
+window.C00 = {
+  jump(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+};
+</script>
+
+<section class="slide" id="c00-cover" data-part="0" data-title="封面" data-notes="这是全书的<b>引言</b>。它交代了四件事：这本书从哪里来——以 2025 年图灵《AI Agent 实战营》的课程讲义和配套实验为基础，并以 <b>whisper coding</b>（口述式协作）的方式与 Pine 的语音 Agent 共同完成；书中的原则从哪里来——来自 Pine 长流程、高风险场景中的工程实践，<b>实践在前，命名在后</b>；全书唯一的核心公式——<b>Agent = LLM + 上下文 + 工具</b>；以及十章如何组织、读者如何选择阅读路径、需要哪些前置知识。<br>右侧的“全书罗盘”外圈是十章：右半圈（青色）是第一至六章“如何构建 Agent”，左半圈（紫色）是第七至十章“如何提升 Agent 能力”；内圈是公式里的三个组件，环绕着中心的 Agent。扫描光束每经过一章，那一章就会亮起。">
+  <div class="c0cv-dial fx fx-scale" style="--d:4"></div>
+  <div class="c0cv-text">
+    <div class="c0cv-tag fx fx-up"><i></i>深入理解 AI Agent · 引言</div>
+    <h1 class="c0cv-title"><span class="split">引言</span><span class="split c0cv-t2" data-off="3" data-grad="#7dd3fc,#a5b4fc,#c4b5fd">实践在前，命名在后</span></h1>
+    <p class="c0cv-sub fx fx-up" style="--d:14">这本书从哪里来、原则从哪里来、核心公式是什么，<br>十章怎样组织，以及你该怎样读</p>
+    <div class="c0cv-meta fx fx-up" style="--d:16"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c0cv-hint fx fx-up" style="--d:18"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c00-cover{justify-content:center;padding-left:150px}
+.c0cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c0cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c0cv-title{margin-top:30px;font-size:150px;line-height:1.08;font-weight:800;letter-spacing:.04em}
+.c0cv-title .c0cv-t2{font-size:84px;letter-spacing:.02em;margin-top:18px}
+.c0cv-sub{margin-top:32px;font-size:30px;color:var(--text2);line-height:1.6}
+.c0cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c0cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c0cv-dial{position:absolute;right:120px;top:50%;width:720px;height:720px;margin-top:-372px}
+.c0cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c0cv-hint span{margin:0 4px}
+.c0cv-svg{width:100%;height:100%;overflow:visible}
+.c0cv-r0{fill:none;stroke:rgba(255,255,255,.1);stroke-width:1.4;stroke-dasharray:2 10;transform-box:fill-box;transform-origin:center;animation:spin 120s linear infinite}
+.c0cv-r1{fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.2}
+.c0cv-r2{fill:none;stroke:rgba(255,255,255,.12);stroke-width:1.2;stroke-dasharray:3 8;transform-box:fill-box;transform-origin:center;animation:spin 60s linear infinite reverse}
+.c0cv-arc{fill:none;stroke:var(--c);stroke-width:3;stroke-linecap:round;opacity:.5;stroke-dasharray:900;stroke-dashoffset:900}
+.active .c0cv-arc{animation:arcDraw 1.8s var(--ease) .6s forwards}
+.c0cv-sec{fill:url(#c0cv-bg)}
+.c0cv-bi{transform-box:fill-box;transform-origin:center;transition:transform .45s var(--spring)}
+.c0cv-bc{fill:#0a1024;stroke:var(--c);stroke-width:2.6;transition:fill .45s,filter .45s}
+.c0cv-bn{fill:var(--c);font:700 19px var(--num);text-anchor:middle;dominant-baseline:central;transition:fill .45s}
+.c0cv-bd.hot .c0cv-bi{transform:scale(1.22)}
+.c0cv-bd.hot .c0cv-bc{fill:var(--c);filter:drop-shadow(0 0 14px var(--c))}
+.c0cv-bd.hot .c0cv-bn{fill:#06101f}
+.c0cv-bp{opacity:0;transform:scale(.3);transform-box:fill-box;transform-origin:center}
+.active .c0cv-bp{animation:nodeIn .7s var(--spring) forwards;animation-delay:calc(var(--i)*90ms + 700ms)}
+.c0cv-bl{fill:var(--text3);font-size:18px;font-weight:600;dominant-baseline:middle;transition:fill .45s}
+.c0cv-bl.hot{fill:var(--c)}
+.c0cv-nd circle{fill:rgba(8,12,30,.94);stroke:var(--c);stroke-width:2.4}
+.c0cv-nd text{fill:var(--c);font-size:16px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.c0cv-halo{opacity:.6}
+.c0cv-core{fill:#0a1024;stroke:var(--acc);stroke-width:3}
+.c0cv-wave{fill:none;stroke:var(--acc);stroke-width:2;transform-box:fill-box;transform-origin:center;animation:pulse 3.2s ease-out infinite}
+.c0cv-wave.w2{animation-delay:1.6s}
+.c0cv-ct{fill:var(--text);font:800 34px var(--num);text-anchor:middle;dominant-baseline:central}
+.c0cv-cs{fill:var(--text2);font-size:15px;text-anchor:middle;dominant-baseline:central}
+.c0cv-leg{fill:var(--text3);font-size:15px;text-anchor:middle;letter-spacing:.12em}
+</style>
+<script>
+HOOKS['c00-cover'] = {
+  CH: [['01', '入门'], ['02', '上下文'], ['03', '记忆'], ['04', '工具'], ['05', 'Coding'], ['06', '交互'], ['07', '评估'], ['08', '后训练'], ['09', '进化'], ['10', '协作']],
+  init(s) {
+    const S = 720, c = 360, R = 270, f = (n) => n.toFixed(1);
+    const P = (a, r) => [c + r * Math.cos((a * Math.PI) / 180), c + r * Math.sin((a * Math.PI) / 180)];
+    const arc = (a1, a2, r) => { const [x1, y1] = P(a1, r), [x2, y2] = P(a2, r); return `M${f(x1)} ${f(y1)}A${r} ${r} 0 ${a2 - a1 > 180 ? 1 : 0} 1 ${f(x2)} ${f(y2)}`; };
+    const sec = (a1, a2, r) => { const [x1, y1] = P(a1, r), [x2, y2] = P(a2, r); return `M${c} ${c}L${f(x1)} ${f(y1)}A${r} ${r} 0 0 1 ${f(x2)} ${f(y2)}Z`; };
+    let h = `<svg class="c0cv-svg" viewBox="0 0 ${S} ${S}" width="${S}" height="${S}"><defs>
+      <linearGradient id="c0cv-bg" gradientUnits="userSpaceOnUse" x1="${c}" y1="${c}" x2="${c + R + 30}" y2="${c}"><stop offset="0" stop-color="#7dd3fc" stop-opacity="0"/><stop offset="1" stop-color="#7dd3fc" stop-opacity=".85"/></linearGradient>
+      <radialGradient id="c0cv-cg"><stop offset="0" stop-color="#fff" stop-opacity=".85"/><stop offset=".4" stop-color="#a5b4fc" stop-opacity=".45"/><stop offset="1" stop-color="#a5b4fc" stop-opacity="0"/></radialGradient></defs>`;
+    h += `<circle class="c0cv-r0" cx="${c}" cy="${c}" r="344"/><circle class="c0cv-r1" cx="${c}" cy="${c}" r="${R}"/><circle class="c0cv-r2" cx="${c}" cy="${c}" r="168"/>`;
+    h += `<path class="c0cv-arc" style="--c:#22d3ee" d="${arc(-90, 90, R)}"/><path class="c0cv-arc" style="--c:#a78bfa" d="${arc(126, 234, R)}"/>`;
+    // 扫描光束：领头扇区最亮，后面三段逐渐变淡
+    h += `<g class="c0cv-beam" transform="rotate(-90 ${c} ${c})">` + [[-10, 4, 0.55], [-22, -10, 0.3], [-34, -22, 0.15], [-46, -34, 0.06]].map(([a1, a2, o]) => `<path class="c0cv-sec" d="${sec(a1, a2, R + 26)}" opacity="${o}"/>`).join('') + '</g>';
+    this.CH.forEach(([no, t], i) => {
+      const a = -90 + i * 36, [x, y] = P(a, R), [lx, ly] = P(a, R + 50), co = Math.cos((a * Math.PI) / 180), col = i < 6 ? '#22d3ee' : '#a78bfa';
+      const an = co > 0.3 ? 'start' : co < -0.3 ? 'end' : 'middle';
+      h += `<g class="c0cv-bd" data-k="${i}" style="--c:${col}" transform="translate(${f(x)} ${f(y)})"><g class="c0cv-bp" style="--i:${i}"><g class="c0cv-bi"><circle class="c0cv-bc" r="25"/><text class="c0cv-bn">${no}</text></g></g></g>`;
+      h += `<text class="c0cv-bl" style="--c:${col}" x="${f(lx)}" y="${f(ly)}" text-anchor="${an}">${t}</text>`;
+    });
+    [['LLM', '#a78bfa'], ['上下文', '#22d3ee'], ['工具', '#fbbf24']].forEach(([t, col], j) => {
+      const [x, y] = P(-90 + j * 120, 168);
+      h += `<g class="c0cv-nd" style="--c:${col}" transform="translate(${f(x)} ${f(y)})"><circle r="38"/><text>${t}</text></g>`;
+    });
+    h += `<circle class="c0cv-halo" cx="${c}" cy="${c}" r="130" fill="url(#c0cv-cg)"/><circle class="c0cv-core" cx="${c}" cy="${c}" r="82"/>`;
+    h += `<circle class="c0cv-wave" cx="${c}" cy="${c}" r="82"/><circle class="c0cv-wave w2" cx="${c}" cy="${c}" r="82"/>`;
+    h += `<text class="c0cv-ct" x="${c}" y="${c - 12}">Agent</text><text class="c0cv-cs" x="${c}" y="${c + 26}">LLM + 上下文 + 工具</text>`;
+    h += `<text class="c0cv-leg" x="${c}" y="${S + 34}">右半圈 · 如何构建 Agent　　左半圈 · 如何提升 Agent 能力</text>`;
+    s.querySelector('.c0cv-dial').innerHTML = h + '</svg>';
+    this.beam = s.querySelector('.c0cv-beam');
+    this.bds = [...s.querySelectorAll('.c0cv-bd')];
+    this.lbs = [...s.querySelectorAll('.c0cv-bl')];
+    this.nds = [...s.querySelectorAll('.c0cv-nd')];
+  },
+  enter(s, ctx) {
+    let t0 = null;
+    ctx.raf((t) => {
+      if (t0 === null) t0 = t;
+      const e = (t - t0) / 1000, th = -90 + e * 30;
+      this.beam.setAttribute('transform', `rotate(${(th % 360).toFixed(2)} 360 360)`);
+      this.bds.forEach((b, i) => {
+        const d = Math.abs(((((-90 + i * 36 - th) % 360) + 540) % 360) - 180), hot = d < 13;
+        if (b._hot !== hot) { b._hot = hot; b.classList.toggle('hot', hot); this.lbs[i].classList.toggle('hot', hot); }
+      });
+      this.nds.forEach((n, j) => {
+        const a = ((-90 + j * 120 - e * 8) * Math.PI) / 180;
+        n.setAttribute('transform', `translate(${(360 + 168 * Math.cos(a)).toFixed(1)} ${(360 + 168 * Math.sin(a)).toFixed(1)})`);
+      });
+    });
+  },
+  reset() {
+    this.bds.forEach((b, i) => { b._hot = false; b.classList.remove('hot'); this.lbs[i].classList.remove('hot'); });
+  },
+};
+</script>
+
+<section class="slide" id="c00-map" data-part="0" data-title="引言导览：五个问题" data-notes="引言可以读成五个依次展开的问题。<br>① <b>这本书从哪里来？</b>——一门课的讲义与配套实验，一种由 Agent 深度参与的写作方式（whisper coding），以及 2025 年以来行业重心从基座模型向 Agent 系统化落地的转移。<br>② <b>书里的原则从哪里来？</b>——来自 Pine 这类长流程、高风险的真实业务：实践在前，命名在后；以及更早识别并解决问题的两个关键条件。<br>③ <b>原则是什么？</b>——几乎所有成功的 Agent 系统都遵循同一种架构模式：Agent = LLM + 上下文 + 工具，也可以说成大脑 + 眼睛 + 手脚，或者强化学习里的策略、观察空间与动作空间。<br>④ <b>十章怎样组织？</b>——“如何构建 Agent”（第一至六章）与“如何提升 Agent 能力”（第七至十章）两个相互衔接的问题。<br>⑤ <b>我该怎样读？</b>——按身份选择阅读路径、动手跑实验、对照前置知识自检。<br>卡片会自动轮播，点击任一卡片直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">引言要回答的<em>五个问题</em></h2>
+  <p class="lead fx fx-up" style="--d:2">先讲原则的来历，再讲原则本身，最后给出十章的地图和读法</p></header>
+  <div class="c0mp-stage">
+    <svg class="c0mp-svg" viewBox="0 0 1660 600" width="1660" height="600">
+      <defs><linearGradient id="c0mp-g" x1="0" x2="1"><stop offset="0" stop-color="#67e8f9"/><stop offset=".3" stop-color="#5eead4"/><stop offset=".55" stop-color="#c4b5fd"/><stop offset=".8" stop-color="#93c5fd"/><stop offset="1" stop-color="#a5f3fc"/></linearGradient></defs>
+      <path id="c0mp-p" class="c0mp-route" d="M150 70 C 270 0, 370 140, 490 70 S 710 0, 830 70 S 1050 140, 1170 70 S 1390 0, 1510 70"/>
+      <path class="c0mp-flow" d="M150 70 C 270 0, 370 140, 490 70 S 710 0, 830 70 S 1050 140, 1170 70 S 1390 0, 1510 70"/>
+      <circle class="c0mp-comet" r="8"><animateMotion dur="8s" repeatCount="indefinite"><mpath href="#c0mp-p"/></animateMotion></circle>
+    </svg>
+    <div class="c0mp-cards"></div>
+  </div>
+  <div class="src">引言 · 全篇导览</div>
+</section>
+<style>
+.c0mp-stage{position:relative;height:640px;margin-top:4px}
+.c0mp-svg{position:absolute;left:0;top:0;overflow:visible}
+.c0mp-route{fill:none;stroke:url(#c0mp-g);stroke-width:4;stroke-linecap:round;opacity:.5;stroke-dasharray:1700;stroke-dashoffset:1700}
+.active .c0mp-route{animation:arcDraw 2.2s var(--ease) .3s forwards}
+.c0mp-flow{fill:none;stroke:#fff;stroke-width:2;stroke-dasharray:2 18;opacity:0;animation:flow 1.2s linear infinite}
+.active .c0mp-flow{opacity:.4;transition:opacity 1s 2.2s}
+.c0mp-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff);opacity:0}
+.active .c0mp-comet{opacity:1;transition:opacity 1s 2.4s}
+.c0mp-cards{position:absolute;inset:0}
+.c0mp-w{position:absolute;top:24px;width:300px}
+.c0mp-c{--c:var(--acc);position:relative;height:590px;padding:76px 24px 22px;border-radius:24px;cursor:pointer;text-align:center;display:flex;flex-direction:column;align-items:center;
+  background:linear-gradient(170deg,color-mix(in srgb,var(--c) 9%,rgba(12,18,40,.88)),rgba(12,18,40,.88) 55%);border:1px solid var(--line);transition:border-color .5s,box-shadow .5s,translate .5s var(--ease),opacity .5s}
+.c0mp-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 30px 60px -30px color-mix(in srgb,var(--c) 70%,transparent),0 0 0 1px color-mix(in srgb,var(--c) 30%,transparent);translate:0 -10px}
+.c0mp-c.dim{opacity:.6}
+.c0mp-o{position:absolute;left:50%;top:-24px;width:92px;height:92px;margin-left:-46px;border-radius:50%;display:grid;place-items:center;font:800 36px var(--num);color:var(--c);
+  background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid var(--c);box-shadow:0 0 0 7px color-mix(in srgb,var(--c) 12%,transparent),0 0 40px color-mix(in srgb,var(--c) 40%,transparent);transition:transform .5s var(--spring)}
+.c0mp-c.on .c0mp-o{transform:scale(1.12)}
+.c0mp-q{font-size:30px;font-weight:800;line-height:1.35;margin-top:6px}
+.c0mp-a{margin-top:22px;display:flex;flex-direction:column;gap:10px;width:100%}
+.c0mp-a span{padding:10px 12px;border-radius:12px;font-size:19px;line-height:1.45;color:var(--text2);background:rgba(255,255,255,.035);border:1px solid var(--line);transition:all .45s var(--ease)}
+.c0mp-c.on .c0mp-a span{color:var(--text);border-color:color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 9%,transparent)}
+.c0mp-go{margin-top:auto;display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:999px;font-size:17px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent)}
+.c0mp-c:hover .c0mp-go{color:#06101f;background:var(--c)}
+</style>
+<script>
+HOOKS['c00-map'] = {
+  Q: [
+    { p: 1, c: '#67e8f9', q: '这本书<br>从哪里来？', a: ['一门课的讲义与配套实验', 'whisper coding：与语音 Agent 口述协作', '行业重心转向 Agent 的系统化落地'], go: '成书缘起' },
+    { p: 2, c: '#5eead4', q: '书里的原则<br>从哪里来？', a: ['长流程、高风险的真实业务', '实践在前，命名在后', '更早识别问题的两个关键条件'], go: '实践在前，命名在后' },
+    { p: 3, c: '#c4b5fd', q: '原则<br>是什么？', a: ['Agent = LLM + 上下文 + 工具', '大脑 + 眼睛 + 手脚', '策略 · 观察空间 · 动作空间'], go: '核心公式' },
+    { p: 4, c: '#93c5fd', q: '十章<br>怎样组织？', a: ['如何构建 Agent（第一至六章）', '如何提升 Agent 能力（第七至十章）', '一张可点击的全书地图'], go: '全书结构' },
+    { p: 5, c: '#a5f3fc', q: '我该<br>怎样读？', a: ['按身份选择阅读路径', '动手跑配套实验', '对照前置知识自检'], go: '如何阅读本书' },
+  ],
+  init(s) {
+    s.querySelector('.c0mp-cards').innerHTML = this.Q.map((t, i) => `
+      <div class="c0mp-w fx fx-up" style="left:${i * 340}px;--d:${3 + i}"><div class="c0mp-c" data-i="${i}" style="--c:${t.c}">
+        <div class="c0mp-o">${i + 1}</div>
+        <div class="c0mp-q">${t.q}</div>
+        <div class="c0mp-a">${t.a.map((x) => `<span>${x}</span>`).join('')}</div>
+        <span class="c0mp-go">${t.go}<svg class="ic"><use href="#i-arrow"/></svg></span>
+      </div></div>`).join('');
+    s.querySelectorAll('.c0mp-c').forEach((c) => c.addEventListener('click', () => C00.jump(this.Q[+c.dataset.i].p)));
+    s.querySelectorAll('.c0mp-c').forEach((c) => c.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +c.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c0mp-c').forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.later(() => this.auto && this.show(s, 0), 1400);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.Q.length); }, 2800);
+  },
+  reset(s) { s.querySelectorAll('.c0mp-c').forEach((c) => c.classList.remove('on', 'dim')); },
+};
+</script>

@@ -1,0 +1,199 @@
+<!-- ================= 收束分隔页 ================= -->
+<section class="slide chapter" id="c07-d10" data-part="10" data-title="CLOSING · 收束" data-notes="「本章小结」。本章围绕一个核心问题展开：如何判断 Agent 变好了还是变差了。这一部分回顾四个环节构成的证据链、评估体系的完整闭环，然后是 9 道思考题与参考答案提纲。">
+  <div class="ch-k fx fx-up">CLOSING</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">收束</h1>
+  <div class="ch-s fx fx-up" style="--d:3">如何判断 Agent 变好了还是变差了</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">生产级 Agent 的评估不是偶尔做一次的考试，而是从真实问题案例中持续生成回归任务和边界任务的验证系统。</blockquote>
+  <div class="ch-loop" data-node="9" data-num="10"></div>
+</section>
+
+<!-- ================= 本章小结：四个环节 ================= -->
+<section class="slide" id="c07-sum" data-part="10" data-steps="3" data-trans="zoom" data-title="本章小结：四个环节，一条证据链" data-notes="本章围绕一个核心问题展开：<b>如何判断 Agent 变好了还是变差了</b>。这条链路由四个环节构成——先厘清<b>成功的定义</b>（Pass@k、Best@k 与 Pass consecutive@k 的口径差异），再确定<b>任务从何而来</b>（公开基准、自建业务集与生产轨迹回流三个来源），随后选定<b>验证方式</b>（从确定性验证器到检查项清单、Rubric 加 LLM 评判，直至配对比较），最后<b>把分数转化为决策</b>（统计显著性、失败归因、回归任务与模型选型）。每个环节都会影响结论的可信度。<br>就全书的结构而言，本章建的是第一章发现循环中的<b>证据</b>段：失败归因决定了后续的提案有没有可依之据。<br>轨迹前缀边界评估进一步说明，<b>获得一条信息和正确地将它用于当前决策是两种不同能力</b>：端到端回归保证基本任务不退化，trajectory prefix 边界集则直接检查作用域判断、当前指令覆盖、澄清和危险动作前确认。用户记忆只是这一通用方法的一个案例。生产级 Agent 的评估不是偶尔做一次的考试，而是从真实问题案例中持续生成回归任务和边界任务的验证系统。<br>核心方法论：<b>观察→假设→实验→验证→新认识→新假设</b>，使 Agent 工程从经验驱动的“炼金术”转向数据驱动的科学工程。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">四个环节，<em>一条证据链</em></h2></header>
+  <div class="c7sm-chain fx fx-up" style="--d:2">
+    <button class="c7sm-c" data-p="2"><em>01</em><b>成功的定义</b><span>Pass@k · Best@k · Pass consecutive@k 的口径差异</span></button>
+    <button class="c7sm-c" data-p="4"><em>02</em><b>任务从何而来</b><span>公开基准 · 自建业务集 · 生产轨迹回流</span></button>
+    <button class="c7sm-c" data-p="5"><em>03</em><b>验证方式</b><span>确定性验证器 → 检查项清单 → Rubric + LLM 评判 → 配对比较</span></button>
+    <button class="c7sm-c" data-p="8"><em>04</em><b>把分数转化为决策</b><span>统计显著性 · 失败归因 · 回归任务 · 模型选型</span></button>
+  </div>
+  <div class="c7sm-ev fx fx-up" data-step="1"><svg class="ic"><use href="#i-target"/></svg><p>在全书结构里，本章建的是第一章发现循环中的<b>证据</b>段：失败归因决定了后续的提案<b>有没有可依之据</b></p></div>
+  <div class="c7sm-two fx fx-up" data-step="2"><div><span class="lbl">获得一条信息</span><b>端到端回归</b><small>保证基本任务不退化</small></div><i>≠</i><div><span class="lbl">正确地用于当前决策</span><b>trajectory prefix 边界集</b><small>作用域判断 · 当前指令覆盖 · 澄清 · 危险动作前确认</small></div></div>
+  <div class="c7sm-m fx fx-up" data-step="3"><span>观察</span><i></i><span>假设</span><i></i><span>实验</span><i></i><span>验证</span><i></i><span>新认识</span><i></i><span>新假设</span><b>从“炼金术”到数据驱动的科学工程</b></div>
+  <div class="src">第七章 ·「本章小结」</div>
+</section>
+<style>
+.c7sm-chain{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.c7sm-c{display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.75);text-align:left;transition:border-color .3s,background .3s}
+.c7sm-c:hover{border-color:var(--acc)}
+.c7sm-c em{font:800 26px var(--num);font-style:normal;color:var(--acc)}
+.c7sm-c b{font-size:20px}
+.c7sm-c span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c7sm-ev{display:flex;align-items:center;gap:14px;margin-top:18px;padding:14px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.c7sm-ev .ic{width:30px;height:30px;color:var(--acc);flex:none}
+.c7sm-ev p{font-size:18px;color:var(--text2)}.c7sm-ev b{color:var(--text)}
+.c7sm-two{display:grid;grid-template-columns:1fr 50px 1fr;gap:10px;align-items:center;margin-top:16px}
+.c7sm-two div{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:16px;border:1px solid var(--line)}
+.c7sm-two b{font-size:19px}.c7sm-two small{font-size:15px;color:var(--text3)}
+.c7sm-two i{font-style:normal;font-size:36px;font-weight:800;text-align:center;color:var(--acc)}
+.c7sm-m{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:16px}
+.c7sm-m span{font-size:16px;padding:6px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.c7sm-m i{width:20px;height:2px;background:var(--acc)}
+.c7sm-m b{margin-left:12px;font-size:17px;color:var(--warn)}
+</style>
+<script>
+HOOKS['c07-sum'] = {
+  init(s) { s.querySelectorAll('.c7sm-c').forEach((b) => b.addEventListener('click', () => C7.goPart(b.dataset.p))); },
+};
+</script>
+
+<!-- ================= 完整闭环 ================= -->
+<section class="slide" id="c07-loop" data-part="10" data-trans="iris" data-dur="22000" data-title="评估体系的完整闭环" data-notes="本章介绍的评估体系形成一个完整闭环：<b>评估环境</b>提供自动化的测试基础设施 → <b>评估数据集</b>定义端到端任务和 trajectory prefix 边界 → <b>自动化评估方法</b>（确定性验证器、LLM-as-a-Judge 与 Rubric）对 Agent 表现打分并生成失败归因 → <b>Benchmark 与问题案例分析</b>揭示改进方向 → <b>系统改进</b>修复问题 → 更新评估环境和数据集，开始新一轮迭代。<br>本章建立的评估体系不仅服务于当前系统的优化，也为后续两章提供关键基础。<b>第八章把评估环境和数据转化为模型后训练的输入；第九章则把生产轨迹的多维评价转化为知识、指令、程序的更新。</b><br>环形图上的节点可以点击，跳回对应部分复习。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">评估体系的<em>完整闭环</em></h2></header>
+  <div class="c7lp-body">
+    <div class="c7lp-ring fx fx-scale" style="--d:2"></div>
+    <div class="c7lp-r fx fx-right" style="--d:3">
+      <div class="c7lp-d"><b class="c7lp-n">—</b><p class="c7lp-x"></p><button class="btn c7lp-go"><svg class="ic"><use href="#i-undo"/></svg><span>回看这一部分</span></button></div>
+      <div class="c7lp-next"><div><span class="lbl">第八章</span><b>评估环境和数据 → 模型后训练的输入</b></div><div><span class="lbl">第九章</span><b>生产轨迹的多维评价 → 知识、指令、程序的更新</b></div></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「本章小结」</div>
+</section>
+<style>
+.c7lp-body{display:grid;grid-template-columns:700px 1fr;gap:40px;flex:1;min-height:0;align-items:center}
+.c7lp-ring{width:680px;height:680px;justify-self:center}
+.c7lp-r{display:flex;flex-direction:column;gap:18px}
+.c7lp-d{display:flex;flex-direction:column;gap:10px;padding:22px 26px;border-radius:20px;border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 7%,rgba(12,18,40,.8));min-height:230px}
+.c7lp-n{font-size:28px}
+.c7lp-x{font-size:18px;line-height:1.6;color:var(--text2)}
+.c7lp-go{align-self:flex-start;margin-top:auto;font-size:16px}
+.c7lp-next{display:flex;flex-direction:column;gap:10px}
+.c7lp-next div{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:14px;border:1px solid var(--line)}
+.c7lp-next b{font-size:18px}
+</style>
+<script>
+HOOKS['c07-loop'] = {
+  N: [['评估环境', '提供自动化的测试基础设施', 3, '#34d399'], ['评估数据集', '定义端到端任务和 trajectory prefix 边界', 4, '#60a5fa'], ['自动化评估方法', '确定性验证器、LLM-as-a-Judge 与 Rubric 打分，并生成失败归因', 5, '#c084fc'], ['Benchmark 与问题案例分析', '揭示改进方向', 8, '#fb7185'], ['系统改进', '修复问题 → 更新评估环境和数据集，开始新一轮迭代', 8, '#2dd4bf']],
+  init(s) {
+    U.ring(s.querySelector('.c7lp-ring'), { size: 680, nodes: this.N.map(([l, , , c]) => ({ label: l, color: c })), active: 0, center: (c) => `<text x="${c}" y="${c + 10}" text-anchor="middle" style="fill:var(--text);font-size:32px;font-weight:800">评估闭环</text>`, cometDur: 6 });
+    s.querySelectorAll('.c7lp-ring .node').forEach((n) => n.addEventListener('click', () => { this.auto = false; this.pick(s, +n.dataset.i); }));
+    s.querySelector('.c7lp-go').addEventListener('click', () => { if (this.i != null) C7.goPart(this.N[this.i][2]); });
+  },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c7lp-ring .node,.c7lp-ring .lab').forEach((n) => { n.classList.toggle('on', +n.dataset.i === i); n.classList.toggle('dim', +n.dataset.i !== i); });
+    s.querySelector('.c7lp-n').textContent = this.N[i][0];
+    s.querySelector('.c7lp-x').textContent = this.N[i][1];
+  },
+  enter(s, ctx) { C7.auto(this, ctx, this.N.length, 3200, (i) => this.pick(s, i), 700); },
+  reset(s) { this.i = null; },
+};
+</script>
+
+<!-- ================= 思考题 ================= -->
+<section class="slide" id="c07-qa1" data-part="10" data-trans="flip" data-dur="17000" data-title="思考题（1–3）" data-notes="思考题 1–3：第 1 题是 LLM-as-a-Judge 的系统性盲区及其检测与校正，第 2 题是数据泄漏的“猫鼠游戏”有没有终局，第 3 题是怎样为“是否有帮助”“语气是否恰当”这类主观维度设计可靠的 Rubric。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>1–3</em> · 评判、泄漏与主观维度</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c07qa-list fx fx-up" style="--d:3" data-qs="0"></div>
+  <div class="src">第七章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c07-qa2" data-part="10" data-trans="zoom" data-dur="17000" data-title="思考题（4–6）" data-notes="思考题 4–6：第 4 题是怎样验证模拟用户本身的质量，第 5 题是人类偏好违反传递性时 Bradley-Terry 排名还可不可靠，第 6 题是单次成功率 60% 的 Agent 该报告 Pass@k 还是 Pass^k、k 取多大。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>4–6</em> · 模拟用户、排名与指标</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c07qa-list fx fx-up" style="--d:3" data-qs="3"></div>
+  <div class="src">第七章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c07-qa3" data-part="10" data-trans="rise" data-dur="17000" data-title="思考题（7–9）" data-notes="思考题 7–9：第 7 题是有限计算预算下怎样最大化评估的信息量，第 8 题是 AndroidWorld 元素树的自动裁剪规则，第 9 题是“渐进式信息透露”与真实用户差异较大时评估结论还可不可靠。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>7–9</em> · 预算、裁剪与模拟器</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c07qa-list fx fx-up" style="--d:3" data-qs="6"></div>
+  <div class="src">第七章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c07-qa1 .qa-q,#c07-qa2 .qa-q,#c07-qa3 .qa-q{font-size:20px;padding:16px 20px}
+#c07-qa1 .qa-a>div,#c07-qa2 .qa-a>div,#c07-qa3 .qa-a>div{font-size:18px;visibility:hidden;transition:visibility 0s linear .5s}
+#c07-qa1 .qa-it.open .qa-a>div,#c07-qa2 .qa-it.open .qa-a>div,#c07-qa3 .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+#c07-qa1 .c07qa-tag,#c07-qa2 .c07qa-tag,#c07-qa3 .c07qa-tag{display:inline-block;margin:2px 0 6px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+#c07-qa1 .c07qa-a p,#c07-qa2 .c07qa-a p,#c07-qa3 .c07qa-a p{margin-top:6px}
+#c07-qa1 .c07qa-go,#c07-qa2 .c07qa-go,#c07-qa3 .c07qa-go{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 14px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+</style>
+<script>
+HOOKS['c07-qa1'] = {
+  ALL: [
+    { st: '★★', go: ['c07-goodhart', '同源模型问题与多源评判'], q: 'LLM-as-a-Judge 使用语言模型评估语言模型的输出。这种“自我评估”是否存在系统性盲区——比如模型可能一致地给某种风格的回答打高分，而这种偏好与人类评判不一致？如何检测和校正这种偏差？', a: ['存在：长度偏差、回答风格偏差、同源模型被钻空子（古德哈特定律）。', '检测：建 100–200 例人工金标集，测评判与人类的 Cohen’s kappa；定期审计评分与回答长度的相关性；红队构造对抗案例。', '校正：Rubric 显式惩罚冗长、限长度；不同模型家族多源异构评判。'] },
+    { st: '★★★', go: ['c07-leak', '数据泄漏防范'], q: '评估数据集的“防泄漏”设计至关重要。但在开源生态中，benchmark 数据一旦公开，很快就会被纳入训练数据。这场“猫鼠游戏”有终局吗？设计一种从根本上抵抗数据泄漏的评估方法。', a: ['静态题库无终局，只能追赶。', '根本出路是<b>公开“生成机制”、私有化“具体实例”</b>：像 τ²-bench、AndroidWorld 那样参数化模板每次随机实例化，验证基于最终环境状态而非固定答案序列。'] },
+    { st: '★★', go: ['c07-criteria', 'Rubric 四准则'], q: 'Scale AI 的四准则（基于专家指导、全面覆盖、按重要性加权、评价标准自包含）旨在消除评估的主观性。但某些任务维度（如“回答是否有帮助”“语气是否恰当”）天然具有主观性。如何为这些主观维度设计可靠的 Rubric？', a: ['把抽象标准转化为可验证的行为。每一档都配上具体示例和边界案例。', 'Rubric 是迭代的产物——在试用中收集评价者的分歧，逐渐演化为判例集。', '再辅以多个评委的加权评分和一致性检查，将存在分歧的案例送交人工复核，并在金标集上校准一致率。'] },
+    { st: '★★', go: ['c07-sim', '用户模拟器'], q: 'τ-bench 通过模拟真实用户行为来评估 Agent。但模拟用户本身也是一个 LLM——它可能系统性地低估某些边缘场景（如情绪激动、表达不清的用户）。如何验证模拟用户本身的质量？', a: ['τ-bench 初版的教训是：模拟器过于机械、指令过于简单（Agent 能猜对答案）。', '验证手段：人工抽检模拟对话，检查模拟器是否遵守渐进式披露原则、是否编造脚本之外的信息；用小样本真实用户进行测试，观察其模型排名是否与模拟评估一致。'] },
+    { st: '★★', go: ['c07-elo', 'Elo 评分与配对比较'], q: '配对比较（Bradley-Terry 模型）假设偏好是传递的（如果 A > B 且 B > C，则 A > C）。但人类偏好经常违反传递性。在 Agent 评估中，非传递偏好可能出现在哪些场景？这如何影响排名的可靠性？', a: ['场景：多维权衡时（A 准确但慢、B 快但简略、C 详尽但贵），不同评判者 / 任务看重的维度不同。Chatbot Arena 的排名本就依赖用户提问分布。', '影响：BT 把实力压成单一分数，非传递时排名不稳定、随对局分布漂移。', '缓解：按能力维度分别排名、报告两两胜率矩阵。'] },
+    { st: '★★', go: ['c07-passk', '业务可靠性：Pass^k'], q: '本章区分了 Pass@k 的能力上限与 Pass consecutive@k 的业务可靠性。对于一个单次成功率只有 60% 的 Agent，怎样结合任务的失败成本、重试成本和副作用，决定应该报告哪个指标、取多大的 k？', a: ['先看失败是否可回滚。失败能自动重试、又不产生外部副作用时（检索、草稿生成、代码补全），应报告 Pass@k，k 取实际允许的重试次数；失败会留下不可逆后果时（付款、退款、对外发信、生产部署），应报告 Pass^k。单次成功率 0.6 时，<b>Pass@5 ≈ 99.0%、Pass^5 ≈ 7.8%</b>——只报前者会严重高估可靠性。', 'k 的取值应来自部署现实：Pass@k 的 k 取重试预算，Pass^k 的 k 取一次值班或一批任务中连续执行的次数。重试成本高时可以两段式验收——先用 Pass@1 粗筛方案，再对少数候选跑 Pass^k。', '无论报哪个指标，都必须写清 k 和采样口径；有副作用的操作应在沙盒或可回滚环境中采样，并把每一次失败都计入可靠性统计，而不是“重试到成功为止”。'] },
+    { st: '★★', go: ['c07-paired', '配对分析与多重比较'], q: '本章提出“观察→假设→实验→验证”的科学方法。但在实践中，Agent 的行为空间巨大，验证一个假设可能需要数百次评估运行。如何在有限计算预算下最大化评估的信息量？', a: ['先用失败聚类把范围缩到最有信息量的任务，再做低成本、单变量的配对试验，把小样本当作扩大测试的门槛，而不是部署证据。', '统计上，先用标准误做保守筛子；同批任务用 McNemar 一类的配对分析；预期分差小于噪声带宽时应扩充评估集。若并行筛选多个方案，还要校正多重比较，并对正向结果做独立复跑。'] },
+    { st: '★', go: ['c07-tab75', '表7-5 三轮实验'], q: 'AndroidWorld 小实验中，完整元素树把成功率从 25% 提高到 100%，却把 token 用量推到 2.498 倍；精简后成功率不变，token 降到对照组的 0.506 倍。怎样设计一套自动裁剪规则，既删掉无语义的 UI 节点，又不误删对可访问性、状态验证或后续操作有用的信息？', a: ['可采用“<b>默认删除、证据保留</b>”的分层规则：保留可见、有文本、可操作、可聚焦、可滚动、带状态值或无障碍标签的节点，同时保留这些节点到根的最短祖先链和必要的相邻标签；删除没有语义的布局容器，并对重复子树做摘要。', '裁剪前后要校验可操作元素 ID、状态和值是否守恒，还应保留截图作为视觉兜底。规则先在失败轨迹上回放，再用未参与调参的应用做回归；成功率、token 和延迟都作为护栏，任何可访问性任务退化都应阻止发布。'] },
+    { st: '★★', go: ['c07-sim', '渐进式信息透露'], q: 'τ-bench 的用户模拟采用了“渐进式信息透露”——不一次性提供所有信息，而是根据 Agent 的提问逐步透露。这种设计如何影响评估结果？如果模拟用户的信息透露策略与真实用户差异较大，评估结论还可靠吗？', a: ['影响：若透露策略失真，Agent 可能只是学会了“适配模拟器”（古德哈特），绝对分数不具备参考价值；模型之间的相对排序可能仍有参考价值。', '补救：用真实对话校准模拟器、人工抽检、明示结论适用边界。'] },
+  ],
+  build(s) {
+    const host = s.querySelector('.c07qa-list'), base = +host.dataset.qs, list = HOOKS['c07-qa1'].ALL.slice(base, base + 3);
+    this.n = list.length;
+    host.innerHTML = list.map((x, i) => `<div class="qa-it"><button class="qa-q"><em>${base + i + 1}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div class="c07qa-a"><span class="c07qa-tag">参考答案提纲 · 原书附录</span>${x.a.map((p) => `<p>${p}</p>`).join('')}<button class="c07qa-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    this.open = U.qa(host, { single: true });
+    host.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; }));
+    host.querySelectorAll('.c07qa-go').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === b.dataset.go);
+      if (idx >= 0) DECK.go(idx, 0);
+    }));
+  },
+  play(s, ctx) {
+    this.auto = true;
+    let n = 0;
+    ctx.later(() => this.open(0), 800);
+    ctx.every(() => { if (this.auto) { n = (n + 1) % this.n; this.open(n); } }, 5600);
+  },
+  init(s) { this.build(s); },
+  enter(s, ctx) { this.play(s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c07-qa2'] = {
+  init(s) { HOOKS['c07-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c07-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c07-qa3'] = {
+  init(s) { HOOKS['c07-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c07-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<!-- ================= 章末导航 ================= -->
+<section class="slide" id="c07-end" data-part="10" data-trans="iris" data-title="第七章 · 完" data-notes="第七章到这里结束。全书第二部分“如何提升 Agent 能力”从评估开始：有了可度量的反馈，后续的模型训练和系统进化才有可靠方向。<br>下一章是模型后训练：把本章的评估环境和数据转化为训练的输入——验证器变成奖励函数，评估环境演化为仿真环境。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">有了可度量的反馈，<em>提升才有方向</em></h2>
+  <p class="lead fx fx-up" style="--d:2">接下来，第八章把评估环境和数据转化为模型后训练的输入</p></header>
+  <div class="c7en-row">
+    <div class="chk c7en-c fx fx-up" style="--d:3"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>评估环境</b><p>工具调用型与人机交互型，五个组成要素</p></div></div>
+    <div class="chk c7en-c fx fx-up" style="--d:4"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>数据与评判</b><p>验证器、防泄漏、Rubric 与 LLM 评判、失败归因</p></div></div>
+    <div class="chk c7en-c fx fx-up" style="--d:5"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>从分数到决策</b><p>显著性、选型、可观测性、一轮只改一处</p></div></div>
+  </div>
+  <div class="c7en-nav fx fx-up" style="--d:7">
+    <div class="end-nav">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+  <div class="src">第七章 ·「本章小结」</div>
+</section>
+<style>
+#c07-end .c7en-row{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:40px}
+#c07-end .c7en-c{padding:26px 28px;border-radius:20px}
+#c07-end .c7en-c b{font-size:30px}
+#c07-end .c7en-c p{font-size:19px;line-height:1.6;color:var(--text2);margin-top:8px}
+#c07-end .c7en-nav{margin-top:70px}
+</style>
+<script>
+HOOKS['c07-end'] = {
+  init(s) { s.querySelectorAll('.c7en-c').forEach((c) => c.addEventListener('click', () => c.classList.toggle('done'))); },
+  enter(s, ctx) { s.querySelectorAll('.c7en-c').forEach((c, i) => ctx.later(() => c.classList.add('done'), 1000 + i * 600)); },
+  reset(s) { s.querySelectorAll('.c7en-c').forEach((c) => c.classList.remove('done')); },
+};
+</script>

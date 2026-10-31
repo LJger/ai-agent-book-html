@@ -1,0 +1,861 @@
+<!-- ================= PART 04 数据平面与控制平面（不共享上下文的多 Agent 协作） ================= -->
+<section class="slide chapter" id="c10-d4" data-part="4" data-title="PART 04 · 数据平面与控制平面" data-notes="「不共享上下文的多 Agent 协作」：<b>不共享上下文代表真正的多 Agent 协作。</b>在这种架构下，每个 Agent 都是独立的实体，拥有自己的上下文、轨迹和状态；彼此无法直接访问对方的“内心活动”，协作完全依赖本章开头介绍的三种通信机制（工具调用参数、共享文件系统、消息总线）。<br>本部分先沿“通信机制即进程间通信”的线索，看多 Agent 系统与操作系统的对应关系；再讲与拓扑无关的两套基础设施——共享文件系统构成的数据平面，通信与控制机制构成的控制平面。后面三个部分的对等协作、管理者模式、去中心化模式都建立在它们之上。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:88px">不共享上下文：<br>数据平面与控制平面</h1>
+  <div class="ch-s fx fx-up" style="--d:3">每个 Agent 都是独立实体，协作完全依赖显式通信</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">不共享上下文代表真正的多 Agent 协作：彼此无法直接访问对方的“内心活动”。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c10-os" data-part="4" data-trans="zoom" data-dur="14000" data-title="多 Agent 系统与操作系统" data-notes="沿着开头那条<b>“通信机制即进程间通信”</b>的线索再往前走一步，会发现多 Agent 系统与操作系统的对应关系相当完整（表10-2）：程序（可执行文件）对应静态前缀（系统提示词 + 工具定义）；进程的内存对应轨迹；CPU 对应 LLM；内核对应 Agent 运行时；系统调用对应工具调用；fork（创建子进程）对应 spawn_subagent；kill（发送信号）对应 cancel_subagent；ps（列出进程）对应 list_agents；退出码与 wait() 对应子 Agent 返回的结构化摘要；共享内存 / 消息传递对应共享文件系统 / 消息。<br>这套抽象并不新鲜：<b>私有状态、异步消息、可创建新成员</b>，正是 1970 年代 <b>Actor 模型</b>的基本设定，多 Agent 系统不妨看作它的 LLM 版本。因此操作系统与分布式系统的成熟经验大多可以直接借用。<br>表格逐行自动高亮，右侧示意图同步点亮对应部件；把鼠标移到某一行上可以手动查看。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">多 Agent 系统，像一台<em>操作系统</em></h2>
+  <p class="lead fx fx-up" style="--d:2">沿“通信机制即进程间通信”再走一步：对应关系相当完整</p></header>
+  <div class="os-body">
+    <div class="k10-tbl os-tb fx fx-left" style="--d:3;--cols:1fr 1.3fr"></div>
+    <div class="os-dia fx fx-right" style="--d:4">
+      <div class="os-k" data-r="3"><span class="os-tag"><i>内核</i>Agent 运行时</span></div>
+      <div class="os-ps" data-r="7"><i>ps</i>list_agents</div>
+      <div class="os-p" style="left:22px"><b>父 Agent</b>
+        <div class="os-b" data-r="0"><i>程序</i>静态前缀</div>
+        <div class="os-b os-mem" data-r="1"><i>进程的内存</i>轨迹<span class="os-ln"><u></u><u></u><u></u></span></div>
+        <div class="os-b" data-r="2"><i>CPU</i>LLM</div>
+      </div>
+      <div class="os-p os-ch" style="left:418px"><b>子 Agent</b>
+        <div class="os-b">静态前缀</div>
+        <div class="os-b os-mem">轨迹<span class="os-ln"><u></u><u></u></span></div>
+        <div class="os-b">LLM</div>
+      </div>
+      <div class="os-ar" data-r="5" style="top:118px"><i>fork</i><span>spawn_subagent</span></div>
+      <div class="os-ar" data-r="6" style="top:194px"><i>kill</i><span>cancel_subagent</span></div>
+      <div class="os-ar bk" data-r="8" style="top:270px"><i>退出码 · wait()</i><span>结构化摘要</span></div>
+      <div class="os-shm" data-r="9"><i>共享内存 / 消息传递</i>共享文件系统 / 消息</div>
+      <div class="os-sys" data-r="4"><i>系统调用</i>工具调用</div>
+    </div>
+  </div>
+  <div class="os-actor fx fx-up" style="--d:6"><b><svg class="ic"><use href="#i-history"/></svg>Actor 模型（1973）</b><span>私有状态</span><span>异步消息</span><span>可创建新成员</span><p>多 Agent 系统不妨看作它的 LLM 版本：操作系统与分布式系统的成熟经验大多可以直接借用</p></div>
+  <div class="src">第十章 ·「不共享上下文的多 Agent 协作」· 表10-2 · 脚注：Hewitt, Bishop, Steiger, A Universal Modular ACTOR Formalism for Artificial Intelligence, IJCAI 1973</div>
+</section>
+<style>
+.os-body{display:flex;gap:36px;align-items:flex-start}
+.os-tb{flex:1}
+.os-tb .k10-tr{padding:8px 22px;font-size:19px}
+.os-tb .k10-tr span:last-child{font-family:var(--mono);font-size:17px}
+.os-tb .k10-tr.on span:last-child{color:var(--acc)}
+.os-dia{position:relative;width:640px;height:478px;flex:none;margin-top:18px}
+.os-dia [data-r]{transition:border-color .4s,background .4s,box-shadow .4s,color .4s}
+.os-dia i{display:block;font-style:normal;font:500 15px var(--mono);color:var(--text3);transition:color .4s}
+.os-dia .on i{color:var(--text2)}
+.os-k{position:absolute;inset:0;border-radius:22px;border:2px dashed color-mix(in srgb,var(--har) 45%,transparent);background:rgba(96,165,250,.03)}
+.os-k.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 7%,transparent);box-shadow:inset 0 0 40px color-mix(in srgb,var(--acc) 18%,transparent)}
+.os-tag{position:absolute;left:24px;top:-17px;display:flex;align-items:center;gap:10px;padding:3px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--line2);font-size:17px;font-weight:700;white-space:nowrap}
+.os-tag i{display:inline}
+.os-k.on .os-tag{border-color:var(--acc);color:var(--acc)}
+.os-ps{position:absolute;right:20px;top:-17px;padding:3px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--line2);font:700 16px var(--mono);display:flex;gap:10px;align-items:center}
+.os-ps i{display:inline}
+.os-ps.on{border-color:var(--acc);color:var(--acc);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 40%,transparent)}
+.os-p{position:absolute;top:40px;width:200px;height:300px;padding:10px 12px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.92);display:flex;flex-direction:column;gap:8px}
+.os-p>b{font-size:18px;text-align:center;color:var(--text)}
+.os-ch{opacity:.85}
+.os-b{position:relative;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:18px;font-weight:700;color:var(--text2)}
+.os-mem{flex:1}
+.os-ln{display:flex;flex-direction:column;gap:5px;margin-top:6px}
+.os-ln u{display:block;height:6px;border-radius:4px;background:rgba(255,255,255,.1)}
+.os-ln u:nth-child(2){width:70%}.os-ln u:nth-child(3){width:85%}
+.os-b.on{color:var(--text);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent);box-shadow:0 0 20px color-mix(in srgb,var(--acc) 35%,transparent)}
+.os-b.on .os-ln u{background:color-mix(in srgb,var(--acc) 50%,transparent)}
+.os-ar{position:absolute;left:226px;width:188px;height:62px;text-align:center;font:600 15px var(--mono);color:var(--text3)}
+.os-ar i{font-size:15px}
+.os-ar::before{content:"";position:absolute;left:0;right:8px;top:33px;height:2px;background:rgba(255,255,255,.18)}
+.os-ar::after{content:"";position:absolute;right:0;top:28px;border:6px solid transparent;border-left:9px solid rgba(255,255,255,.3)}
+.os-ar.bk::before{left:8px;right:0}
+.os-ar.bk::after{right:auto;left:-6px;border-left-color:transparent;border-right:9px solid rgba(255,255,255,.3)}
+.os-ar span{position:absolute;left:0;right:0;top:40px;font-size:15px}
+.os-ar.on{color:var(--acc)}
+.os-ar.on::before{background:var(--acc);box-shadow:0 0 10px var(--acc)}
+.os-ar.on::after{border-left-color:var(--acc)}
+.os-ar.bk.on::after{border-left-color:transparent;border-right-color:var(--acc)}
+.os-ar.on i{color:var(--text2)}
+.os-shm{position:absolute;left:140px;right:140px;top:356px;padding:8px 14px;border-radius:12px;text-align:center;border:1px dashed var(--line2);background:rgba(12,18,40,.92);font-size:17px;font-weight:700;color:var(--text2)}
+.os-shm.on{border-color:var(--acc);border-style:solid;color:var(--text);background:color-mix(in srgb,var(--acc) 14%,rgba(12,18,40,.92))}
+.os-sys{position:absolute;left:22px;right:22px;bottom:14px;padding:8px 14px;border-radius:12px;text-align:center;border:1px solid var(--line);background:rgba(255,255,255,.03);font-size:17px;font-weight:700;color:var(--text2)}
+.os-sys i{display:inline;margin-right:10px}
+.os-sys.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.os-actor{display:flex;align-items:center;gap:14px;margin-top:22px;padding:14px 22px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.os-actor b{display:flex;align-items:center;gap:10px;font-size:20px;color:var(--acc);white-space:nowrap}
+.os-actor span{padding:5px 12px;border-radius:10px;font-size:17px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent);white-space:nowrap}
+.os-actor p{font-size:18px;color:var(--text2);line-height:1.5}
+</style>
+<script>
+HOOKS['c10-os'] = {
+  R: [['程序（可执行文件）', '静态前缀（系统提示词 + 工具定义）'], ['进程的内存', '轨迹'], ['CPU', 'LLM'], ['内核', 'Agent 运行时'], ['系统调用', '工具调用'], ['fork（创建子进程）', 'spawn_subagent'], ['kill（发送信号）', 'cancel_subagent'], ['ps（列出进程）', 'list_agents'], ['退出码与 wait()', '子 Agent 返回的结构化摘要'], ['共享内存 / 消息传递', '共享文件系统 / 消息']],
+  init(s) {
+    const tb = s.querySelector('.os-tb');
+    tb.innerHTML = '<div class="k10-tr k10-th"><span>操作系统</span><span>多 Agent 系统</span></div>' + this.R.map(([a, b], i) => `<div class="k10-tr" data-i="${i}"><span>${a}</span><span>${b}</span></div>`).join('');
+    tb.querySelectorAll('[data-i]').forEach((r) => r.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +r.dataset.i); }));
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.os-tb [data-i]').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+    s.querySelectorAll('.os-dia [data-r]').forEach((e) => e.classList.toggle('on', +e.dataset.r === i));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.R.length); }, 2400);
+  },
+  reset(s) { s.querySelectorAll('.os-body .on').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-planes" data-part="4" data-steps="2" data-trans="rise" data-dur="11000" data-title="进程式隔离：好处、代价与两个平面" data-notes="进程式的隔离带来了几个切实的工程好处：每个 Agent 可以<b>独立开发和测试</b>，<b>新增能力不需要改动现有代码</b>，某个 Agent 出了故障也<b>不会把错误状态传染</b>给其他 Agent，而且多个 Agent 可以<b>真正并发执行</b>——上下文完全独立，不存在资源竞争。<br>但不共享上下文也有代价。最明显的是信息同步问题：各 Agent 如何对任务状态保持一致的理解？信息在传递过程中会不会丢失或重复？调试也变得更加困难——出了问题需要翻看多个 Agent 的日志，才能拼出完整的执行过程。这些问题使得<b>接口规范、数据格式和通信协议的设计变得至关重要</b>。<br>不共享上下文的显式协作依赖两套与拓扑无关的基础设施。其一是<b>共享文件系统</b>，作为 Agent 间交换产物、与用户交换文件的持久媒介，构成协作的<b>数据平面</b>；其二是<b>通信与控制机制</b>，支持 Agent 间的消息传递、状态查询、执行终止与资源调度，构成协作的<b>控制平面</b>。<br>按 → 依次点亮数据平面和控制平面；左下角的开关可以给一个 Agent 注入故障，看错误会不会传染。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">进程式隔离：好处、代价与<em>两个平面</em></h2></header>
+  <div class="pl-body">
+    <div class="pl-l fx fx-left" style="--d:2">
+      <div class="pl-g ok"><b><svg class="ic"><use href="#i-check"/></svg>好处</b>
+        <ul><li>每个 Agent 可以独立开发和测试</li><li>新增能力不需要改动现有代码</li><li>出了故障也不会把错误状态传染给其他 Agent</li><li>真正并发执行：上下文完全独立，不存在资源竞争</li></ul></div>
+      <div class="pl-g bad"><b><svg class="ic"><use href="#i-alert"/></svg>代价</b>
+        <ul><li>信息同步：各 Agent 如何对任务状态保持一致的理解？</li><li>信息在传递中会不会丢失或重复？</li><li>调试更难：要翻多个 Agent 的日志才能拼出全过程</li></ul>
+        <p>→ 接口规范、数据格式和通信协议的设计变得至关重要</p></div>
+      <button class="tgl pl-fault" style="--tc:var(--bad)"><i></i>给 Agent B 注入故障</button>
+    </div>
+    <div class="pl-st fx fx-right" style="--d:3">
+      <div class="pl-pl pl-cp"><b>控制平面 · 通信与控制机制</b><div><span>消息传递</span><span>状态查询</span><span>执行终止</span><span>资源调度</span></div></div>
+      <div class="pl-ags"></div>
+      <div class="pl-pl pl-dp"><b>数据平面 · 共享文件系统</b><div><span>Agent 间交换产物</span><span>与用户交换文件</span><span>持久媒介</span></div></div>
+      <svg class="pl-svg" viewBox="0 0 860 560" width="860" height="560">
+        <path class="pl-v" id="pl-u0" d="M150 268V112"/><path class="pl-v" id="pl-u1" d="M430 268V112"/><path class="pl-v" id="pl-u2" d="M710 268V112"/>
+        <path class="pl-v" id="pl-d0" d="M150 330V450"/><path class="pl-v" id="pl-d1" d="M430 330V450"/><path class="pl-v" id="pl-d2" d="M710 330V450"/>
+        <path class="pl-v" id="pl-h" d="M150 92H710"/>
+        <circle class="pl-k" r="8" style="fill:#60a5fa"/><circle class="pl-k" r="8" style="fill:#2dd4bf"/><circle class="pl-k" r="8" style="fill:#fbbf24"/>
+      </svg>
+      <div class="pl-cap"></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「不共享上下文的多 Agent 协作」</div>
+</section>
+<style>
+.pl-body{display:grid;grid-template-columns:720px 1fr;gap:40px}
+.pl-l{display:flex;flex-direction:column;gap:16px}
+.pl-g{padding:18px 24px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.pl-g b{display:flex;align-items:center;gap:10px;font-size:23px}
+.pl-g.ok b{color:var(--ok)}.pl-g.bad b{color:var(--warn)}
+.pl-g ul{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.pl-g li{position:relative;padding-left:22px;font-size:19px;line-height:1.5}
+.pl-g li::before{content:"";position:absolute;left:3px;top:.6em;width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.6}
+.pl-g p{margin-top:10px;font-size:19px;color:var(--warn);font-weight:600}
+.pl-fault{align-self:flex-start}
+.pl-st{position:relative;height:600px}
+.pl-pl{position:absolute;left:0;right:0;height:96px;padding:12px 20px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.8);transition:all .5s var(--ease);opacity:.55}
+.pl-pl b{font-size:20px}
+.pl-pl div{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}
+.pl-pl span{padding:5px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.pl-cp{top:20px}.pl-dp{top:440px}
+.pl-st[data-k="1"] .pl-dp,.pl-st[data-k="2"] .pl-cp{opacity:1;border-color:var(--acc);box-shadow:0 0 40px -10px var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.85))}
+.pl-st[data-k="1"] .pl-dp b,.pl-st[data-k="2"] .pl-cp b{color:var(--acc)}
+.pl-ags{position:absolute;left:0;right:0;top:250px;height:110px}
+.pl-ags .k10-ag{position:absolute;top:0;width:180px;margin-left:-90px}
+.pl-svg{position:absolute;left:0;top:0;width:860px;height:560px;overflow:visible;pointer-events:none}
+.pl-v{fill:none;stroke:rgba(255,255,255,.14);stroke-width:2;stroke-dasharray:5 7;animation:flow 1.4s linear infinite}
+.pl-k{opacity:0;filter:drop-shadow(0 0 8px #fff)}
+.pl-cap{position:absolute;left:0;right:0;top:372px;text-align:center;font-size:18px;color:var(--text2);min-height:28px}
+.pl-cap.bad{color:var(--bad)}
+.pl-ags .k10-ag.bad::after{content:"";position:absolute;left:50%;top:32px;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px dashed var(--bad);animation:spin 6s linear infinite}
+</style>
+<script>
+HOOKS['c10-planes'] = {
+  init(s) {
+    const A = [['A', '#60a5fa', 150], ['B', '#fbbf24', 430], ['C', '#2dd4bf', 710]];
+    s.querySelector('.pl-ags').innerHTML = A.map(([n, c, x]) => `<div class="k10-ag" style="left:${x}px;--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>Agent ${n}</b><small>独立上下文</small></div>`).join('');
+    s.querySelector('.pl-fault').addEventListener('click', (e) => { this.fault(s, !e.currentTarget.classList.contains('on')); });
+  },
+  fault(s, on) {
+    s.querySelector('.pl-fault').classList.toggle('on', on);
+    const ags = s.querySelectorAll('.pl-ags .k10-ag');
+    ags[1].classList.toggle('bad', on);
+    ags[0].classList.toggle('ok', on); ags[2].classList.toggle('ok', on);
+    const cap = s.querySelector('.pl-cap');
+    cap.classList.toggle('bad', on);
+    cap.textContent = on ? 'Agent B 故障：错误状态留在它自己的上下文里，A 与 C 照常工作' : '';
+  },
+  // 数据包演示：第 1 步走数据平面，第 2 步走控制平面
+  async loop(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, $ = (q) => s.querySelector(q);
+    const ks = [...s.querySelectorAll('.pl-k')];
+    while (ctx.alive && tk === this.tk) {
+      const k = this.k;
+      if (k === 1) {
+        await Promise.all([U.fly(ks[0], $('#pl-d0'), 1100, { ctx }), U.fly(ks[1], $('#pl-d2'), 1100, { ctx, delay: 300 })]);
+        if (tk !== this.tk) return;
+        await U.fly(ks[2], $('#pl-d1'), 1100, { ctx, reverse: true });
+      } else if (k === 2) {
+        await U.fly(ks[0], $('#pl-u0'), 800, { ctx });
+        if (tk !== this.tk) return;
+        await U.fly(ks[2], $('#pl-h'), 1100, { ctx });
+        if (tk !== this.tk) return;
+        await U.fly(ks[1], $('#pl-u2'), 800, { ctx, reverse: true });
+      } else await U.wait(ctx, 600);
+      await U.wait(ctx, 500);
+    }
+  },
+  apply(s, k) {
+    this.k = k;
+    s.querySelector('.pl-st').dataset.k = k;
+    if (k === 0 && this.ctx) this.ctx.later(() => this.k === 0 && this.fault(s, true), 1600);
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, k); this.loop(s); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.fault(s, false); s.querySelector('.pl-st').dataset.k = 0; },
+};
+</script>
+
+<section class="slide" id="c10-vfs" data-part="4" data-trans="flip" data-dur="16000" data-title="Agent 眼中的文件系统" data-notes="在实际系统中，Agent 访问的并非单一存储，而是一个<b>虚拟文件系统</b>（virtual filesystem）：来源、生命周期与权限各异的存储被挂载（mount）到同一目录树下，Agent 通过统一的 read_file / write_file / list_dir 接口访问，底层则可能是本地临时盘、持久对象存储、第三方云盘的 API 或只读的系统资源包。明确这棵目录树的构成（每一区域的可见性与生命周期）是多 Agent 协作设计的前提：相当一部分并发冲突与信息泄露，源于将本应隔离的区域混置。这棵目录树相当于 Agent 的地址空间，四类区域就是权限各异的内存段：有的私有可写，有的多方共享，有的只读。<br><b>一、Agent 专属工作区（Scratchpad）</b>：每个 Agent 实例独享的私有目录，生命周期与实例绑定；既避免临时文件相互覆盖，又保持主 Agent 上下文精简——子 Agent 的试错过程留在自身工作区，只把最终产物提交到共享空间（第四章“子 Agent 返回结构化摘要而非全量轨迹”在存储层面的体现）。<br><b>二、多 Agent 共享空间（Shared Workspace）</b>：多个 Agent 共同读写、且<b>用户可见</b>的协作区域，是交换产物的主要媒介，需要持久化，也是并发冲突的高发处（乐观锁、worktree 均作用于此）；第四章以卷挂载 /workspace/shared 连接主 Agent、虚拟电脑与虚拟手机即为典型实现。<br><b>三、外部挂载资源（Mounted External Resources）</b>：经适配器映射为挂载点的第三方信息源，三项特性需显式处理：<b>访问受外部权限约束</b>、<b>延迟更高且一致性更弱</b>、<b>以按需只读为主</b>；统一接口掩盖了性能与安全差异，需在挂载层面管理只读 / 可写、超时与凭证边界。<br><b>四、系统内置资源（Built-in System Resources）</b>：对所有 Agent 只读共享，典型代表是 <b>Skills</b>，按渐进式披露取用；全局共享、只读、跨会话稳定，无需并发控制。<br>图10-2：Agent 通过统一接口访问整棵树，用户从共享空间上传与下载，外部数据源经适配器挂载，系统内置资源只读提供。点击任一区域查看详情；图中的文件名为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Agent 眼中的文件系统：<em>一棵挂载出来的目录树</em></h2></header>
+  <div class="vf-body">
+    <div class="vf-st fx fx-left" style="--d:2">
+      <div class="vf-ag" data-a="a"></div><div class="vf-ag" data-a="b"></div><div class="vf-ag" data-a="u"></div>
+      <div class="vf-fs"><span class="vf-root">虚拟文件系统 <b>/</b></span><span class="vf-api">统一接口：read_file · write_file · list_dir</span></div>
+      <div class="vf-zs"></div>
+      <div class="vf-ext"><svg class="ic"><use href="#i-cloud"/></svg><b>外部数据源</b><small>Google Drive · Notion</small></div>
+      <span class="vf-ad">适配器 adapter · 挂载 mount</span>
+      <svg class="vf-svg" viewBox="0 0 1060 600" width="1060" height="600">
+        <path id="vf-p0" class="vf-l" d="M150 96C150 160 128 190 128 262"/>
+        <path id="vf-p1" class="vf-l" d="M150 96C190 170 300 190 316 262"/>
+        <path id="vf-p2" class="vf-l" d="M380 96C380 170 330 200 322 262"/>
+        <path id="vf-p3" class="vf-l" d="M860 96C860 180 420 170 330 262"/>
+        <path id="vf-p4" class="vf-l" d="M380 96C420 170 680 180 692 262"/>
+        <path id="vf-p5" class="vf-l vf-slow" d="M900 420C820 420 600 330 506 300"/>
+        <circle class="vf-k" r="8" fill="#60a5fa"/><circle class="vf-k" r="8" fill="#fbbf24"/><circle class="vf-k" r="8" fill="#e9edf8"/>
+      </svg>
+      <div class="vf-op"><span class="k10-sim">示意</span><code></code></div>
+    </div>
+    <div class="vf-det panel fx fx-right" style="--d:3"><span class="vf-dp mono"></span><b class="vf-dt"></b><p class="vf-dd"></p><div class="vf-dk"></div><div class="runbar vf-bar"><i></i></div></div>
+  </div>
+  <div class="src">第十章 ·「Agent 眼中的文件系统」· 图10-2</div>
+</section>
+<style>
+.vf-body{display:grid;grid-template-columns:1060px 1fr;gap:30px}
+.vf-st{position:relative;width:1060px;height:640px}
+.vf-ag{position:absolute;top:0}
+.vf-ag .k10-ag{width:160px;margin-left:-80px}
+.vf-fs{position:absolute;left:16px;top:150px;width:770px;height:470px;border-radius:22px;border:2px solid color-mix(in srgb,var(--acc) 45%,transparent);background:rgba(10,16,36,.55)}
+.vf-root{position:absolute;left:18px;top:12px;font-size:20px;font-weight:700}
+.vf-root b{font-family:var(--mono);color:var(--acc);margin-left:6px}
+.vf-api{position:absolute;right:16px;top:12px;padding:3px 12px;border-radius:999px;font:15px var(--mono);color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.vf-zs{position:absolute;left:34px;top:262px;width:736px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.vf-z{--c:var(--acc);height:340px;padding:14px 14px;border-radius:16px;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.9));display:flex;flex-direction:column;gap:7px;transition:border-color .4s,box-shadow .4s,background .4s,translate .4s var(--ease)}
+.vf-z code{font:600 15px var(--mono);color:var(--c);word-break:break-all;line-height:1.35}
+.vf-z b{font-size:18px;line-height:1.35}
+.vf-z small{font:15px var(--num);color:var(--text3)}
+.vf-z span{font-size:15px;line-height:1.4;padding:3px 8px;border-radius:8px;color:var(--text2);background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.vf-z.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 16%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--c) 35%,transparent);translate:0 -6px}
+.vf-mini{display:flex;gap:6px}
+.vf-mini i{flex:1;font-style:normal;text-align:center;padding:3px 0;border-radius:6px;font:15px var(--mono);border:1px dashed color-mix(in srgb,var(--c) 55%,transparent);color:var(--c)}
+.vf-ext{position:absolute;left:820px;top:380px;width:220px;height:84px;padding:12px 16px 12px 60px;border-radius:16px;border:1px dashed var(--line2);background:rgba(12,18,40,.85)}
+.vf-ext .ic{position:absolute;left:16px;top:24px;font-size:32px;color:var(--text2)}
+.vf-ext b{display:block;font-size:18px}.vf-ext small{font-size:15px;color:var(--text3)}
+.vf-ad{position:absolute;left:800px;top:300px;font-size:15px;color:var(--text3);white-space:nowrap}
+.vf-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.vf-l{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2;stroke-dasharray:5 7}
+.vf-l.vf-slow{stroke-dasharray:2 9;stroke:rgba(251,146,60,.4)}
+.vf-k{opacity:0;filter:drop-shadow(0 0 8px #fff)}
+.vf-op{position:absolute;left:34px;top:208px;display:flex;align-items:center;gap:12px;font:16px var(--mono);color:var(--text2)}
+.vf-op code{white-space:nowrap}
+.vf-det{--c:var(--acc);position:relative;padding:24px 26px 20px;display:flex;flex-direction:column;gap:12px;height:640px;border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.vf-dp{font-size:16px;color:var(--c)}
+.vf-dt{font-size:24px;line-height:1.4;color:var(--text)}
+.vf-dd{font-size:18px;line-height:1.7;color:var(--text2)}
+.vf-dd b{color:var(--text)}
+.vf-dk{display:flex;flex-wrap:wrap;gap:8px}
+.vf-dk span{padding:5px 12px;border-radius:10px;font-size:16px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 10%,transparent)}
+.vf-bar{margin-top:auto}
+.vf-det.sw .vf-dt,.vf-det.sw .vf-dd,.vf-det.sw .vf-dk{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c10-vfs'] = {
+  Z: [
+    { c: '#60a5fa', p: '/scratch/&lt;id&gt;', n: 'Agent 专属工作区', e: 'Scratchpad', t: ['私有 · 仅该 Agent', '随实例销毁', '读写 · 无需并发控制'], mini: true,
+      h: '一、Agent 专属工作区（Scratchpad）', d: '每个 Agent 实例独享的私有目录，存放中间产物、临时文件、草稿与调试日志，生命周期与实例绑定，对其他 Agent 和用户不可见。隔离它有两重作用：<b>避免临时文件相互覆盖</b>；<b>保持主 Agent 上下文精简</b>——子 Agent 的试错过程留在自身工作区，只把最终产物提交到共享空间。这是第四章“子 Agent 返回结构化摘要而非全量轨迹”在存储层面的体现。', k: ['每个 Agent 各一份', '试错留在私有区'] },
+    { c: '#34d399', p: '/workspace/shared', n: '多 Agent 共享空间', e: 'Shared Workspace', t: ['用户可见 · 持久化', '读写 · 需并发控制', '乐观锁 · worktree'],
+      h: '二、多 Agent 共享空间（Shared Workspace）', d: '多个 Agent 共同读写、且<b>用户可见</b>的协作区域，是交换产物的主要媒介：Glossary Agent 写入术语表，Translation Agent 从中读取；用户也在这里上传原始文件、下载最终交付物。生命周期与整个任务绑定，需要持久化；多方并发读写，是<b>并发冲突的高发处</b>（失败模式一）。第四章以卷挂载 /workspace/shared 连接主 Agent、虚拟电脑与虚拟手机，即为典型实现。', k: ['交换产物的主要媒介', '用户上传 / 下载'] },
+    { c: '#fb923c', p: '/mnt/gdrive · /mnt/notion', n: '外部挂载资源', e: 'Mounted External Resources', t: ['经适配器 adapter', '受外部授权约束', '多为只读 · 写需谨慎', '延迟高 · 一致性弱'],
+      h: '三、外部挂载资源（Mounted External Resources）', d: '用户授权接入的 Google Drive、Notion、Dropbox、企业 Wiki 等，经适配器映射为挂载点；Agent 以读文件的方式访问，底层由适配器调用对方 API。三项特性：<b>访问受外部权限约束</b>；<b>延迟更高且一致性更弱</b>（每次读取一次网络往返，只能按最终一致性对待）；<b>以按需只读为主</b>（误写可能污染用户的真实数据）。统一接口掩盖了这些差异，需在挂载层显式管理只读 / 可写、超时与凭证边界。', k: ['无需为每个数据源定制工具', '显式管理超时与凭证'] },
+    { c: '#a78bfa', p: '/skills', n: '系统内置资源', e: 'Built-in System Resources', t: ['Skills · 模板 · 手册', '全局共享 · 只读', '跨会话稳定', '渐进式披露'],
+      h: '四、系统内置资源（Built-in System Resources）', d: '系统预置、对所有 Agent 只读共享的资源包，典型代表是第二章、第四章介绍的 <b>Skills</b>——以文件形式组织的知识文档与脚本，按渐进式披露（先索引、后按需展开）取用；此外还有参考手册、模板库与共享工具定义。全局共享、只读、跨会话稳定，可被所有 Agent 并发读取而<b>无需并发控制</b>。', k: ['先索引、后按需展开', '并发读取无需加锁'] },
+  ],
+  // [说明, 区域, 路径, 是否反向, 数据包]
+  OPS: [
+    ['Agent A · write_file /scratch/a/draft.md', 0, 'vf-p0', false, 0],
+    ['Agent A · write_file /workspace/shared/glossary.json', 1, 'vf-p1', false, 0],
+    ['Agent B · read_file /workspace/shared/glossary.json', 1, 'vf-p2', true, 1],
+    ['用户 · 上传原始文件到 /workspace/shared', 1, 'vf-p3', false, 2],
+    ['Agent B · read_file /skills/translate/SKILL.md', 3, 'vf-p4', true, 1],
+    ['适配器 · 按需读取 /mnt/notion 上的页面（网络往返，最终一致）', 2, 'vf-p5', false, 2],
+  ],
+  init(s) {
+    const ag = (c, ic, n, sm) => `<div class="k10-ag" style="--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-${ic}"/></svg></span><b>${n}</b><small>${sm}</small></div>`;
+    const A = s.querySelectorAll('.vf-ag');
+    A[0].style.left = '150px'; A[0].innerHTML = ag('#60a5fa', 'robot', 'Agent A', '子 Agent');
+    A[1].style.left = '380px'; A[1].innerHTML = ag('#fbbf24', 'robot', 'Agent B', '子 Agent');
+    A[2].style.left = '860px'; A[2].innerHTML = ag('#e9edf8', 'user', '用户', '上传 / 下载');
+    s.querySelector('.vf-zs').innerHTML = this.Z.map((z, i) => `<div class="vf-z" data-i="${i}" style="--c:${z.c}"><code>${z.p}</code><b>${z.n}</b><small>${z.e}</small>${z.mini ? '<div class="vf-mini"><i>a/</i><i>b/</i></div>' : ''}${z.t.map((t) => `<span>${t}</span>`).join('')}</div>`).join('');
+    s.querySelector('.vf-zs').addEventListener('click', (e) => { const z = e.target.closest('[data-i]'); if (z) { this.auto = false; this.show(s, +z.dataset.i); } });
+  },
+  show(s, i) {
+    const z = this.Z[i], d = s.querySelector('.vf-det');
+    this.i = i;
+    s.querySelectorAll('.vf-z').forEach((x) => x.classList.toggle('on', +x.dataset.i === i));
+    d.style.setProperty('--c', z.c);
+    d.querySelector('.vf-dp').innerHTML = z.p;
+    d.querySelector('.vf-dt').textContent = z.h;
+    d.querySelector('.vf-dd').innerHTML = z.d;
+    d.querySelector('.vf-dk').innerHTML = z.k.map((k) => `<span>${k}</span>`).join('');
+    U.restart(d, 'sw');
+    const bar = d.querySelector('.vf-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) { bar.style.setProperty('--dur', '6s'); bar.classList.add('run'); }
+  },
+  async ops(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ks = [...s.querySelectorAll('.vf-k')], op = s.querySelector('.vf-op code');
+    let n = 0;
+    while (ctx.alive && tk === this.tk) {
+      const [t, , p, rev, k] = this.OPS[n % this.OPS.length];
+      op.textContent = t;
+      await U.fly(ks[k], s.querySelector('#' + p), p === 'vf-p5' ? 2200 : 1200, { ctx, reverse: rev });
+      if (tk !== this.tk) return;
+      await U.wait(ctx, 500);
+      n++;
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 6000);
+    this.ops(s);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.vf-z').forEach((x) => x.classList.remove('on')); s.querySelector('.vf-op code').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c10-zones" data-part="4" data-trans="slide" data-dur="14000" data-title="四类区域检查表与“文件路径作为通用接口”" data-notes="表10-3 从<b>可见性、生命周期、读写权限与并发控制</b>四个维度对比这四类区域，可作为文件系统布局设计的检查表：Agent 专属工作区仅该 Agent 可见、随 Agent 实例销毁、读写、不需要并发控制（私有）；多 Agent 共享空间对所有协作 Agent + 用户可见、随任务持续且需持久化、读写、需要并发控制（乐观锁 / worktree）；外部挂载资源的可见性视外部授权而定、生命周期由外部源决定、多为只读且写需谨慎、并发控制由外部源负责；系统内置资源对所有 Agent 可见、跨会话稳定、只读、不需要并发控制。<br>将四类区域统一至同一目录树，正是<b>“文件路径作为通用接口”</b>这一设计的价值所在：Agent 间传递产物、主 Agent 向子 Agent 交接输入、乃至跨组织 A2A 协作交换产物，传递的均为<b>轻量的路径字符串</b>，而非将内容载入上下文窗口（第四章）。<br>点击表头可以按维度高亮一列，点击行可以高亮一个区域；下方演示对比“传内容”与“传路径”时接收方上下文的变化（计量为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">四类区域检查表：<em>文件路径作为通用接口</em></h2></header>
+  <div class="k10-tbl zn-tb fx fx-up" style="--d:2;--cols:250px 1fr 1fr 1fr 1.1fr"></div>
+  <div class="zn-demo fx fx-up" style="--d:4">
+    <div class="zn-ln" data-m="content"><b class="zn-h"><svg class="ic"><use href="#i-file"/></svg>把内容载入上下文</b>
+      <div class="zn-tr"><span class="zn-snd">发送方</span><i class="zn-pk big">glossary.json 全文</i><span class="zn-rcv">接收方上下文</span></div>
+      <div class="zn-m"><div class="meter"><i></i></div><em>上下文占用</em></div></div>
+    <div class="zn-ln" data-m="path"><b class="zn-h"><svg class="ic"><use href="#i-link"/></svg>传递轻量的路径字符串</b>
+      <div class="zn-tr"><span class="zn-snd">发送方</span><i class="zn-pk">/workspace/shared/glossary.json</i><span class="zn-rcv">接收方上下文</span></div>
+      <div class="zn-m"><div class="meter"><i></i></div><em>上下文占用 · 需要时再 read_file 按需读取</em></div></div>
+    <div class="zn-use"><span class="k10-sim">示意</span><span>Agent 间传递产物</span><span>主 Agent 向子 Agent 交接输入</span><span>跨组织 A2A 协作交换产物</span></div>
+  </div>
+  <div class="src">第十章 ·「Agent 眼中的文件系统」· 表10-3</div>
+</section>
+<style>
+.zn-tb .k10-tr{padding:11px 22px}
+.zn-tb .k10-th span{cursor:pointer;padding:4px 8px;margin:-4px -8px;border-radius:8px;transition:background .3s,color .3s}
+.zn-tb .k10-th span:first-child{cursor:default}
+.zn-tb .k10-th span.on{color:#06101f;background:var(--acc)}
+.zn-tb .k10-tr>span{transition:color .35s,opacity .35s}
+.zn-tb .k10-tr>span:first-child{font-weight:700;color:var(--text)}
+.zn-tb[data-col] .k10-tr:not(.k10-th)>span:not(:first-child){opacity:.35}
+.zn-tb[data-col="1"] .k10-tr:not(.k10-th)>span:nth-child(2),.zn-tb[data-col="2"] .k10-tr:not(.k10-th)>span:nth-child(3),.zn-tb[data-col="3"] .k10-tr:not(.k10-th)>span:nth-child(4),.zn-tb[data-col="4"] .k10-tr:not(.k10-th)>span:nth-child(5){opacity:1;color:var(--acc);font-weight:600}
+.zn-demo{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:24px}
+.zn-ln{padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line);transition:border-color .4s,box-shadow .4s}
+.zn-ln.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);box-shadow:0 0 30px -10px var(--acc)}
+.zn-h{display:flex;align-items:center;gap:10px;font-size:21px}
+.zn-tr{position:relative;display:flex;justify-content:space-between;align-items:center;height:64px;margin-top:12px;padding:0 4px}
+.zn-tr::before{content:"";position:absolute;left:90px;right:140px;top:50%;border-top:2px dashed rgba(255,255,255,.16)}
+.zn-snd,.zn-rcv{position:relative;z-index:1;padding:8px 14px;border-radius:12px;font-size:17px;background:rgba(5,9,22,.9);border:1px solid var(--line2)}
+.zn-pk{position:absolute;z-index:2;left:96px;top:50%;margin-top:-17px;padding:6px 12px;border-radius:10px;font:600 15px var(--mono);font-style:normal;white-space:nowrap;color:var(--acc);background:rgba(5,9,22,.95);border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);opacity:0}
+.zn-pk.big{padding:6px 34px;color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent)}
+.zn-ln.run .zn-pk{animation:znGo 2.2s var(--ease) forwards}
+@keyframes znGo{0%{opacity:0;translate:0 0}15%{opacity:1}85%{opacity:1;translate:140px 0}100%{opacity:0;translate:160px 0}}
+.zn-m{display:flex;align-items:center;gap:14px;margin-top:10px}
+.zn-m .meter{flex:none;width:300px}
+.zn-m em{font-style:normal;font-size:16px;color:var(--text3)}
+.zn-ln[data-m=content] .meter i{--c:var(--warn)}
+.zn-use{grid-column:1/-1;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.zn-use span:not(.k10-sim){padding:6px 14px;border-radius:999px;font-size:17px;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+</style>
+<script>
+HOOKS['c10-zones'] = {
+  H: ['区域', '可见性', '生命周期', '读写', '并发控制'],
+  R: [['Agent 专属工作区', '仅该 Agent', '随 Agent 实例销毁', '读写', '不需要（私有）'], ['多 Agent 共享空间', '所有协作 Agent + 用户', '随任务持续，需持久化', '读写', '需要（乐观锁 / worktree）'], ['外部挂载资源', '视外部授权而定', '由外部源决定', '多为只读，写需谨慎', '由外部源负责'], ['系统内置资源', '所有 Agent', '跨会话稳定', '只读', '不需要（只读）']],
+  init(s) {
+    const tb = s.querySelector('.zn-tb');
+    tb.innerHTML = `<div class="k10-tr k10-th">${this.H.map((h, j) => `<span data-c="${j}">${h}</span>`).join('')}</div>` + this.R.map((r, i) => `<div class="k10-tr" data-i="${i}">${r.map((c) => `<span>${c}</span>`).join('')}</div>`).join('');
+    tb.addEventListener('click', (e) => {
+      const h = e.target.closest('[data-c]'), r = e.target.closest('[data-i]');
+      if (h && +h.dataset.c > 0) { this.auto = false; this.col(s, +h.dataset.c); }
+      else if (r) { this.auto = false; this.row(s, +r.dataset.i); }
+    });
+  },
+  col(s, j) {
+    const tb = s.querySelector('.zn-tb');
+    tb.dataset.col = j;
+    tb.querySelectorAll('[data-c]').forEach((h) => h.classList.toggle('on', +h.dataset.c === j));
+    tb.querySelectorAll('[data-i]').forEach((r) => r.classList.remove('on'));
+  },
+  row(s, i) {
+    const tb = s.querySelector('.zn-tb');
+    delete tb.dataset.col;
+    tb.querySelectorAll('[data-c]').forEach((h) => h.classList.remove('on'));
+    tb.querySelectorAll('[data-i]').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+  },
+  send(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    const L = [...s.querySelectorAll('.zn-ln')];
+    L.forEach((l) => { l.classList.remove('run', 'on'); l.querySelector('.meter i').style.setProperty('--v', '0%'); });
+    if (!ctx) return;
+    L.forEach((l, j) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      l.classList.add('on'); void l.offsetWidth; l.classList.add('run');
+      ctx.later(() => tk === this.tk && l.querySelector('.meter i').style.setProperty('--v', j === 0 ? '88%' : '6%'), 1900);
+    }, 400 + j * 2600));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    let n = 0;
+    const tick = () => { if (!this.auto) return; if (n < 4) this.row(s, n); else this.col(s, n - 3); n = (n + 1) % 8; };
+    ctx.later(tick, 700);
+    ctx.every(tick, 2200);
+    this.send(s);
+    ctx.every(() => this.send(s), 7800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; const tb = s.querySelector('.zn-tb'); delete tb.dataset.col; tb.querySelectorAll('.on').forEach((x) => x.classList.remove('on')); s.querySelectorAll('.zn-ln').forEach((l) => l.classList.remove('run', 'on')); },
+};
+</script>
+
+<section class="slide" id="c10-msg" data-part="4" data-trans="zoom" data-dur="15000" data-title="控制平面之一：消息传递" data-notes="文件系统解决了 Agent 间<b>产物交换</b>的问题，协作还需要一条<b>控制平面</b>。这正是表10-2 中生命周期各行的用武之地：第四章给出的这组工具原语——创建（spawn_subagent）、发消息（send_message_to_subagent）、取消（cancel_subagent）、发现（list_agents）——对应进程世界的 fork、消息、kill 和 ps。<br><b>一、消息传递。</b>最简形态为点对点：Agent A 直接调用 send_message_to_agent_b(content)，适用于拓扑固定、Agent 数量少的场景（如实验 10-3 的电话 + 电脑双 Agent）。当 Agent 数量增多且需异步并行时，点对点连接数随 Agent 数呈平方增长，且要求收发双方同时在线；此时应改用<b>消息总线</b>：Agent 将消息发布至总线，由总线按订阅关系转发，发送方无需知晓消费者。<br>无论点对点还是经总线，消息通常应携带结构化的<b>信封</b>（envelope）：发送者 ID、目标（指定 Agent 或广播）、消息类型（如 task_assigned / status_update / result / terminate）及 JSON 负载。统一的信封格式保证接收方能够可靠地路由和解析消息，并使协作链路可追溯——这是多 Agent 系统调试的关键。<br>左侧拖动滑块改变 Agent 数量、切换连接方式；右侧的信封内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">控制平面之一：<em>消息传递</em></h2></header>
+  <div class="ms-prim fx fx-up" style="--d:2"><span class="ms-pl">工具原语 ↔ 进程世界</span><span><b>spawn_subagent</b>fork</span><span><b>send_message_to_subagent</b>消息</span><span><b>cancel_subagent</b>kill</span><span><b>list_agents</b>ps</span></div>
+  <div class="ms-body">
+    <div class="ms-l panel fx fx-left" style="--d:3">
+      <div class="ms-ctl"><div class="seg ms-seg"><i class="knob"></i><button data-v="p2p">点对点</button><button data-v="bus">消息总线</button></div>
+        <label class="ms-n">Agent 数 <b>6</b></label><input class="rng ms-rng" type="range" min="2" max="12" value="6"></div>
+      <svg class="ms-svg" viewBox="0 0 860 400" width="860" height="400"></svg>
+      <div class="ms-cnt"><b class="ms-c">15</b><span class="ms-f">条连接 = N(N−1)/2</span><em class="ms-note"></em></div>
+    </div>
+    <div class="ms-r fx fx-right" style="--d:4">
+      <div class="ms-env win"><div class="win-bar"><i></i><i></i><i></i><span>envelope · 消息信封</span><span class="k10-sim ms-sim">示意</span></div>
+        <div class="ms-fields"></div></div>
+      <p class="ms-why">统一的信封格式让接收方可靠地<b>路由和解析</b>消息，并使协作链路<b>可追溯</b>——这是多 Agent 系统调试的关键</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Agent 间的通信与控制」</div>
+</section>
+<style>
+.ms-prim{display:flex;align-items:center;gap:12px;margin-top:-8px}
+.ms-pl{font-size:17px;color:var(--text3);letter-spacing:.06em}
+.ms-prim span:not(.ms-pl){display:inline-flex;align-items:center;gap:10px;padding:7px 14px;border-radius:12px;font-size:16px;color:var(--text3);border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.ms-prim b{font:600 16px var(--mono);color:var(--acc)}
+.ms-body{display:grid;grid-template-columns:900px 1fr;gap:28px;margin-top:20px}
+.ms-l{padding:18px 20px;height:560px;position:relative}
+.ms-ctl{display:flex;align-items:center;gap:22px}
+.ms-n{font-size:18px;color:var(--text2);white-space:nowrap}
+.ms-n b{font:800 24px var(--num);color:var(--acc);margin-left:6px}
+.ms-rng{flex:1}
+.ms-svg{display:block;margin-top:8px;overflow:visible}
+.ms-e{stroke:rgba(255,255,255,.22);stroke-width:1.6}
+.ms-sp{stroke:var(--acc);stroke-width:2.2;opacity:.6}
+.ms-nd circle{fill:rgba(10,16,36,.95);stroke:var(--acc2);stroke-width:2.4}
+.ms-nd text{fill:var(--text2);font:600 15px var(--num);text-anchor:middle;dominant-baseline:central}
+.ms-hub{fill:color-mix(in srgb,var(--acc) 18%,#0a1024);stroke:var(--acc);stroke-width:3}
+.ms-ht{fill:var(--text);font-size:17px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.ms-cnt{position:absolute;left:20px;right:20px;bottom:16px;display:flex;align-items:baseline;gap:14px}
+.ms-c{font:800 44px var(--num);color:var(--acc)}
+.ms-f{font-size:19px;color:var(--text2)}
+.ms-note{font-style:normal;margin-left:auto;font-size:17px;color:var(--text3)}
+.ms-r{display:flex;flex-direction:column;gap:18px}
+.ms-sim{margin-left:auto}
+.ms-fields{padding:16px 20px;display:flex;flex-direction:column;gap:10px;min-height:330px}
+.ms-f2{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:start;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.03);animation:upIn .45s var(--spring) both}
+.ms-f2 em{font-style:normal;font:600 15px var(--mono);color:var(--text3);padding-top:2px}
+.ms-f2 code{font:16px/1.5 var(--mono);color:#cbd5f5;word-break:break-all}
+.ms-f2.ty code{color:#06101f;background:var(--acc);padding:2px 8px;border-radius:6px;justify-self:start;font-weight:700}
+.ms-why{font-size:19px;line-height:1.65;color:var(--text2);padding:14px 18px;border-radius:14px;border-left:4px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.ms-why b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-msg'] = {
+  M: [
+    { from: 'manager', to: 'agent_2', ty: 'task_assigned', p: '{"task": "检索第 3 章引用", "budget": 20}' },
+    { from: 'agent_2', to: 'manager', ty: 'status_update', p: '{"state": "执行中", "done": 4, "total": 9}' },
+    { from: 'agent_2', to: 'manager', ty: 'result', p: '{"artifact": "/workspace/shared/refs.json"}' },
+    { from: 'manager', to: 'broadcast', ty: 'terminate', p: '{"reason": "target_found_by_agent_3"}' },
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.ms-seg'), (v) => { this.auto = false; this.mode = v; this.draw(s); });
+    const r = s.querySelector('.ms-rng');
+    r.addEventListener('input', () => { this.auto = false; this.n = +r.value; this.draw(s); });
+  },
+  draw(s) {
+    const n = this.n, bus = this.mode === 'bus', cx = 430, cy = 200, R = 170, f = (x) => x.toFixed(1);
+    const P = Array.from({ length: n }, (_, i) => { const t = ((-90 + (i * 360) / n) * Math.PI) / 180; return [cx + R * Math.cos(t), cy + R * Math.sin(t)]; });
+    let h = '';
+    if (bus) P.forEach(([x, y]) => { h += `<line class="ms-e ms-sp" x1="${cx}" y1="${cy}" x2="${f(x)}" y2="${f(y)}"/>`; });
+    else for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) h += `<line class="ms-e" x1="${f(P[i][0])}" y1="${f(P[i][1])}" x2="${f(P[j][0])}" y2="${f(P[j][1])}"/>`;
+    if (bus) h += `<circle class="ms-hub" cx="${cx}" cy="${cy}" r="52"/><text class="ms-ht" x="${cx}" y="${cy}">消息总线</text>`;
+    P.forEach(([x, y], i) => { h += `<g class="ms-nd"><circle cx="${f(x)}" cy="${f(y)}" r="24"/><text x="${f(x)}" y="${f(y)}">A${i + 1}</text></g>`; });
+    s.querySelector('.ms-svg').innerHTML = h;
+    s.querySelector('.ms-n b').textContent = n;
+    const r = s.querySelector('.ms-rng');
+    r.value = n; r.style.setProperty('--p', ((n - 2) / 10) * 100 + '%');
+    s.querySelector('.ms-c').textContent = bus ? n : (n * (n - 1)) / 2;
+    s.querySelector('.ms-f').textContent = bus ? '条连接 = N（每个 Agent 只连总线）' : '条连接 = N(N−1)/2';
+    s.querySelector('.ms-note').textContent = bus ? '异步：发送方无需知晓消费者' : '随 Agent 数平方增长，且要求收发双方同时在线';
+    this.set(this.mode);
+  },
+  env(s, k) {
+    const m = this.M[k], box = s.querySelector('.ms-fields'), tk = (this.etk = (this.etk || 0) + 1), ctx = this.ctx;
+    box.innerHTML = '';
+    if (!ctx) return;
+    [['sender', m.from], ['target', m.to], ['type', m.ty], ['payload', m.p]].forEach(([a, b], j) => ctx.later(() => {
+      if (tk !== this.etk) return;
+      box.insertAdjacentHTML('beforeend', `<div class="ms-f2${a === 'type' ? ' ty' : ''}"><em>${a}</em><code></code></div>`);
+      box.lastElementChild.querySelector('code').textContent = b;
+    }, 200 + j * 450));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.n = 3;
+    this.mode = 'p2p';
+    this.draw(s);
+    ctx.every(() => {
+      if (!this.auto) return;
+      if (this.n < 12) this.n++;
+      else { this.n = 3; this.mode = this.mode === 'p2p' ? 'bus' : 'p2p'; }
+      this.draw(s);
+    }, 1100);
+    let k = 0;
+    this.env(s, 0);
+    ctx.every(() => { k = (k + 1) % this.M.length; this.env(s, k); }, 3600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.etk = (this.etk || 0) + 1; s.querySelector('.ms-fields').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-status" data-part="4" data-trans="rise" data-dur="21000" data-title="控制平面之二：状态查询" data-notes="<b>二、状态查询。</b>这是控制平面中最易被低估的一环。主 Agent 派出子 Agent 后，若无从获知其进展，则既无法判断是否继续等待，也无法在其阻塞时及时介入。直观的做法是定义一个 get_subagent_status(agent_id) 查询接口，返回“运行中 / 已完成 / 失败”等状态。但这种<b>拉取式接口并不实用</b>：子 Agent 一经创建就立即开始执行，直到完成或失败，子 Agent 完成时自然会通知主 Agent，并不需要主 Agent 显式查询。状态获取更自然的做法，是回到本章开头的两大通信范式。<br><b>用消息传递获取状态</b>：主 Agent 直接给子 Agent 发一条消息“进展如何？”，子 Agent 在合适的时机回复。一切都是异步的：发出消息不阻塞自己的执行，对方何时回复、是否回复是另一回事——正如经理通过即时消息询问下属进度，而不要求对方立即停下手头的工作。反过来，子 Agent 也可以在关键节点主动汇报；若已架设消息总线，这就是往总线上发布一条 status_update（实验 10-4 的“实时监控”）。消息中的状态宜采用统一的状态机词汇（执行中、需要输入、已完成、失败）——A2A 协议正是把任务生命周期标准化为这样一组状态。<br><b>用共享文件系统获取状态</b>：最彻底的形态是<b>轨迹持久化</b>——子 Agent 把自己的轨迹实时序列化为 JSON，追加写入日志文件（每个会话一个文件、每行一个事件，即 JSONL）。主 Agent 直接读这个文件就能看到子 Agent 的全部执行过程：正在调用哪个工具、最近一步在想什么、是否卡在反复失败的重试上——相当于直接读另一个进程的内存。但它不宜作为主要的信息传递方式：轨迹动辄数万 token，主 Agent 读完还得自行提炼。多数场景下更合理的是<b>约定进度文件</b>：启动时约定“把进度写到 progress.md”，子 Agent 每完成一项就更新这份清单——相当于在共享内存里划出一小块约定格式的状态区，暴露提炼后的进度而非全部内存。进度文件还可以用于<b>检测卡住状态</b>：progress.md（或轨迹文件）的最后修改时间超过 N 分钟没有变化，即可判定子 Agent 无活动、触发超时兜底。<br>三种做法自动轮播，也可以点击上方标签。图中的工具名、进度内容与时间均为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">控制平面之二：<em>状态查询</em></h2></div>
+    <div class="tabs st-tabs fx fx-up" style="--d:2"><button data-i="0">✗ 拉取式查询</button><button data-i="1">用消息传递获取状态</button><button data-i="2">用共享文件系统获取状态</button></div></header>
+  <div class="st-stage fx fx-up" style="--d:3">
+    <div class="st-mgr k10-ag" style="--c:#818cf8"><span class="k10-av"><svg class="ic"><use href="#i-crown"/></svg></span><b>主 Agent</b><small class="st-mw">处理自己的工作</small></div>
+    <div class="st-sub k10-ag" style="--c:#60a5fa"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>子 Agent</b><small>agent_7 · 执行中</small></div>
+    <div class="st-pane" data-t="0"><div class="st-polls"></div><p class="st-pn">子 Agent 一经创建就立即开始执行，直到完成或失败；完成时<b>自然会通知</b>主 Agent——轮询只是空转</p></div>
+    <div class="st-pane" data-t="1"><div class="st-chat"></div><div class="st-vocab"><span data-s="0">执行中</span><span data-s="1">需要输入</span><span data-s="2">已完成</span><span data-s="3">失败</span><em>统一的状态机词汇（A2A 把任务生命周期标准化为这样一组状态）</em></div></div>
+    <div class="st-pane" data-t="2">
+      <div class="st-file win"><div class="win-bar"><i></i><i></i><i></i><span>logs/agent_7.jsonl · 轨迹持久化</span></div><div class="st-jl"></div><p class="st-fn bad">读另一个进程的内存：动辄数万 token，还得自行提炼</p></div>
+      <div class="st-file win"><div class="win-bar"><i></i><i></i><i></i><span>progress.md · 约定进度文件</span></div><ul class="st-pg"><li>抓取学院教师名录</li><li>解析姓名与职位</li><li>核对研究方向</li><li>写入结果文件</li></ul>
+        <div class="st-mt"><svg class="ic"><use href="#i-clock"/></svg>最后修改：<b>0</b> 分钟前<span class="st-dead">超过 N 分钟无变化 → 判定卡住，触发超时兜底</span></div></div>
+    </div>
+    <span class="k10-sim st-sim">示意</span>
+  </div>
+  <div class="src">第十章 ·「Agent 间的通信与控制」</div>
+</section>
+<style>
+#c10-status .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.st-stage{position:relative;height:640px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+.st-mgr,.st-sub{position:absolute;top:40px;width:170px}
+.st-mgr{left:30px}.st-sub{right:30px}
+.st-mw{transition:color .3s}
+.st-pane{position:absolute;left:230px;right:230px;top:24px;bottom:24px;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+#c10-status[data-t="0"] .st-pane[data-t="0"],#c10-status[data-t="1"] .st-pane[data-t="1"],#c10-status[data-t="2"] .st-pane[data-t="2"]{opacity:1;visibility:visible}
+.st-polls{display:flex;flex-direction:column;gap:10px;height:470px;overflow:hidden}
+.st-poll{display:flex;align-items:center;gap:14px;animation:upIn .4s var(--spring) both}
+.st-poll code{flex:1;padding:8px 14px;border-radius:10px;font:16px var(--mono);color:#cbd5f5;border:1px solid var(--line2);background:rgba(255,255,255,.04)}
+.st-poll span{padding:6px 12px;border-radius:10px;font-size:16px;color:var(--text3);border:1px dashed var(--line2);white-space:nowrap}
+.st-poll.fin span{color:var(--ok);border-color:var(--ok)}
+.st-pn{position:absolute;left:0;right:0;bottom:0;font-size:20px;line-height:1.6;color:var(--text2);padding:14px 18px;border-radius:14px;border-left:4px solid var(--bad);background:rgba(251,113,133,.07)}
+.st-pn b{color:var(--text)}
+.st-chat{display:flex;flex-direction:column;gap:14px;height:440px}
+.st-b{max-width:640px;padding:12px 18px;border-radius:16px;font-size:19px;line-height:1.55;animation:upIn .45s var(--spring) both}
+.st-b.m{align-self:flex-start;background:rgba(129,140,248,.12);border:1px solid rgba(129,140,248,.4);border-top-left-radius:4px}
+.st-b.c{align-self:flex-end;background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.38);border-top-right-radius:4px}
+.st-b.bus{align-self:center;font:16px var(--mono);color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent);border:1px dashed color-mix(in srgb,var(--acc) 55%,transparent)}
+.st-b small{display:block;font-size:15px;color:var(--text3);margin-top:4px}
+.st-vocab{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.st-vocab span{padding:7px 16px;border-radius:999px;font-size:18px;border:1px solid var(--line2);color:var(--text2);transition:all .4s var(--ease)}
+.st-vocab span.on{color:#06101f;background:var(--acc);border-color:var(--acc);box-shadow:0 0 18px var(--acc)}
+.st-vocab em{font-style:normal;font-size:16px;color:var(--text3);width:100%}
+#c10-status .st-pane[data-t="2"]{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.st-file{display:flex;flex-direction:column;min-height:0}
+.st-jl{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.st-jl code{font:15px/1.5 var(--mono);color:#cbd5f5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:upIn .35s var(--spring) both}
+.st-fn{padding:10px 16px;font-size:17px;border-top:1px solid var(--line)}
+.st-fn.bad{color:var(--warn)}
+.st-pg{flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.st-pg li{display:flex;align-items:center;gap:12px;font-size:19px;color:var(--text2);transition:color .4s}
+.st-pg li::before{content:"";width:22px;height:22px;border-radius:6px;border:2px solid var(--line2);transition:all .4s}
+.st-pg li.on{color:var(--text)}
+.st-pg li.on::before{background:var(--ok);border-color:var(--ok);box-shadow:0 0 10px var(--ok)}
+.st-mt{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--line);font-size:18px;color:var(--text2)}
+.st-mt b{font:800 22px var(--num);color:var(--acc)}
+.st-dead{width:100%;font-size:17px;color:var(--bad);opacity:0;transition:opacity .4s}
+.st-mt.bad b{color:var(--bad)}
+.st-mt.bad .st-dead{opacity:1}
+.st-sim{position:absolute;left:30px;bottom:20px}
+</style>
+<script>
+HOOKS['c10-status'] = {
+  init(s) {
+    s.querySelector('.st-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, t) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.t = t;
+    s.dataset.t = t;
+    s.querySelectorAll('.st-tabs button').forEach((b) => b.classList.toggle('on', +b.dataset.i === t));
+    s.querySelector('.st-polls').innerHTML = '';
+    s.querySelector('.st-chat').innerHTML = '';
+    s.querySelector('.st-jl').innerHTML = '';
+    s.querySelectorAll('.st-pg li,.st-vocab span').forEach((x) => x.classList.remove('on'));
+    const mt = s.querySelector('.st-mt'); mt.classList.remove('bad'); mt.querySelector('b').textContent = 0;
+    s.querySelector('.st-mw').textContent = '处理自己的工作';
+    if (!ctx) return;
+    const at = (ms, fn) => ctx.later(() => tk === this.tk && fn(), ms);
+    if (t === 0) {
+      const box = s.querySelector('.st-polls');
+      for (let i = 0; i < 7; i++) at(300 + i * 800, () => {
+        const fin = i === 6;
+        box.insertAdjacentHTML('beforeend', `<div class="st-poll${fin ? ' fin' : ''}"><code>get_subagent_status("agent_7")</code><span>${fin ? '已完成' : '运行中'}</span></div>`);
+      });
+      at(300, () => (s.querySelector('.st-mw').textContent = '反复轮询，空转等待'));
+    } else if (t === 1) {
+      const box = s.querySelector('.st-chat'), v = (k) => s.querySelectorAll('.st-vocab span').forEach((x) => x.classList.toggle('on', +x.dataset.s === k));
+      const add = (cls, html) => box.insertAdjacentHTML('beforeend', `<div class="st-b ${cls}">${html}</div>`);
+      at(300, () => { v(0); add('m', '进展如何？<small>发出后不阻塞，主 Agent 继续自己的工作</small>'); s.querySelector('.st-mw').textContent = '发完消息，继续干活'; });
+      at(1900, () => add('c', '已完成 3 / 5 项，正在解析第 4 个页面<small>子 Agent 在合适的时机回复</small>'));
+      at(3500, () => { v(1); add('bus', 'status_update · {"state": "需要输入", "need": "目标教师的英文名"}'); });
+      at(5100, () => { v(0); add('m', '英文名是 Zhang Wei'); });
+      at(6300, () => { v(2); add('bus', 'status_update · {"state": "已完成", "result": "/workspace/shared/hit.json"}'); });
+    } else {
+      const jl = s.querySelector('.st-jl'), L = [
+        '{"role": "user", "content": "在名录中查找张伟"}', '{"type": "tool_call", "name": "browser.open", "args": {...}}', '{"type": "tool_result", "status": 200, "bytes": 48213}',
+        '{"role": "assistant", "thinking": "名录分页，需要翻页"}', '{"type": "tool_call", "name": "browser.click", "args": {...}}', '{"type": "tool_result", "error": "timeout"}',
+        '{"type": "tool_call", "name": "browser.click", "args": {...}}', '{"type": "tool_result", "error": "timeout"}', '{"role": "assistant", "thinking": "重试第 3 次……"}',
+      ];
+      L.forEach((l, i) => at(200 + i * 500, () => { jl.insertAdjacentHTML('beforeend', '<code></code>'); jl.lastElementChild.textContent = l; }));
+      const li = s.querySelectorAll('.st-pg li');
+      [0, 1].forEach((i) => at(600 + i * 1100, () => li[i].classList.add('on')));
+      for (let m = 1; m <= 12; m++) at(2600 + m * 330, () => { mt.querySelector('b').textContent = m; if (m >= 10) mt.classList.add('bad'); });
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.t + 1) % 3); }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.t = ''; s.querySelectorAll('.st-tabs button').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-term" data-part="4" data-trans="flip" data-dur="16000" data-title="控制平面之三：执行终止" data-notes="<b>三、执行终止。</b>并行协作中常出现“一个任务成功，其余任务便无需继续”的情形——多个 Agent 分头搜索，一个 Agent 命中目标后，其余 Agent 应立即停止（实验 10-4 的级联终止）。终止有两种强度，Unix 用户会认出这正是 SIGTERM 与 SIGKILL 的区别。<br><b>优雅终止</b>为首选：主 Agent 发出 terminate 信号，子 Agent 在当前步骤的安全点响应，先清理资源（关闭浏览器会话、写入未完成文件、释放锁），返回确认（ack）后退出。<b>强制终止</b>为兜底：直接终止进程，仅在子 Agent 对优雅信号无响应时使用，代价是可能遗留悬挂资源与未完成写入。<br>还剩一个问题：主 Agent 终止后，仍在运行的子 Agent 怎么办？工程上最简洁的做法借鉴 Go 的 context，终止沿创建关系向下级联：取消一个 Agent，它派生的所有子 Agent 随之取消，从根上杜绝无人认领的孤儿 Agent。上文“子 Agent 在安全点检查终止信号”，对应的正是 Go 中对 ctx.Done() 的轮询。反过来，若确实需要一个脱离主 Agent、长期运行的后台 Agent（类似 Unix 的 nohup），就让它从一棵新的生命周期树起步（对应 context.Background()），显式声明不随父级终止。<br>右侧切换终止方式，点击树上任一节点即可取消它及其所有后代；后台 Agent 不受影响。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">控制平面之三：<em>执行终止</em>沿创建关系级联</h2></header>
+  <div class="tm-body">
+    <div class="tm-st panel fx fx-left" style="--d:2">
+      <svg class="tm-svg" viewBox="0 0 1000 560" width="1000" height="560"></svg>
+      <div class="tm-nodes"></div>
+      <span class="tm-bgl">新的生命周期树 · context.Background()</span>
+    </div>
+    <div class="tm-side fx fx-right" style="--d:3">
+      <div class="seg tm-seg"><i class="knob"></i><button data-v="term">优雅终止 · SIGTERM</button><button data-v="kill">强制终止 · SIGKILL</button></div>
+      <div class="tm-card" data-v="term"><b>首选</b><ol><li>主 Agent 发出 <code>terminate</code></li><li>子 Agent 在当前步骤的<b>安全点</b>响应（Go：轮询 <code>ctx.Done()</code>）</li><li>清理资源：关闭浏览器会话、写入未完成文件、释放锁</li><li>返回确认（ack）后退出</li></ol></div>
+      <div class="tm-card bad" data-v="kill"><b>兜底</b><p>直接终止进程，仅在子 Agent 对优雅信号<b>无响应</b>时使用</p><p>代价：可能遗留<b>悬挂资源与未完成写入</b></p></div>
+      <p class="tm-note">取消一个 Agent，它派生的所有子 Agent 随之取消，<b>从根上杜绝无人认领的孤儿 Agent</b>；后台 Agent（类似 nohup）显式声明不随父级终止</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Agent 间的通信与控制」</div>
+</section>
+<style>
+.tm-body{display:grid;grid-template-columns:1000px 1fr;gap:30px}
+.tm-st{position:relative;height:600px;padding:0}
+.tm-svg{position:absolute;left:0;top:20px;overflow:visible}
+.tm-e{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2.4}
+.tm-e.bg{stroke-dasharray:4 8}
+.tm-nodes{position:absolute;left:0;top:20px;width:1000px;height:560px}
+.tm-n{--c:#60a5fa;position:absolute;width:150px;margin-left:-75px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer}
+.tm-n .k10-av{width:58px;height:58px;font-size:26px}
+.tm-n b{font-size:17px}
+.tm-n small{font-size:15px;color:var(--text3);min-height:22px;text-align:center;white-space:nowrap}
+.tm-n.stop .k10-av{border-color:var(--warn);color:var(--warn);box-shadow:0 0 22px color-mix(in srgb,var(--warn) 55%,transparent)}
+.tm-n.stop small{color:var(--warn)}
+.tm-n.done{opacity:.5}
+.tm-n.done .k10-av{border-color:var(--ok);color:var(--ok)}
+.tm-n.done small{color:var(--ok)}
+.tm-n.dead .k10-av{border-color:var(--bad);color:var(--bad);box-shadow:0 0 22px color-mix(in srgb,var(--bad) 50%,transparent)}
+.tm-n.dead small{color:var(--bad)}
+.tm-res{display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:180px}
+.tm-res i{font-style:normal;font-size:15px;padding:1px 6px;border-radius:6px;color:var(--bad);border:1px dashed var(--bad);animation:upIn .4s var(--spring) both}
+.tm-bgl{position:absolute;right:20px;bottom:16px;font:15px var(--mono);color:var(--text3)}
+.tm-side{display:flex;flex-direction:column;gap:16px}
+.tm-seg button{font-size:17px;padding:10px 16px}
+.tm-card{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);opacity:.45;transition:opacity .4s,border-color .4s}
+.tm-card.on{opacity:1;border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.tm-card.bad.on{border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+.tm-card>b{font-size:20px;color:var(--ok)}
+.tm-card.bad>b{color:var(--bad)}
+.tm-card ol{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-left:22px;list-style:decimal}
+.tm-card li,.tm-card p{font-size:17px;line-height:1.55;color:var(--text2)}
+.tm-card p{margin-top:6px}
+.tm-card code{font:15px var(--mono);color:var(--acc)}
+.tm-card li b,.tm-card p b{color:var(--text)}
+.tm-note{font-size:17px;line-height:1.6;color:var(--text2);padding:12px 16px;border-radius:14px;border-left:4px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.tm-note b{color:var(--text)}
+</style>
+<script>
+HOOKS['c10-term'] = {
+  // [id, 名称, x, y, 父节点]
+  N: [['r', '主 Agent', 430, 40, null], ['a', '子 Agent A', 220, 210, 'r'], ['b', '子 Agent B', 640, 210, 'r'], ['a1', 'A 派生 · A1', 110, 390, 'a'], ['a2', 'A 派生 · A2', 330, 390, 'a'], ['b1', 'B 派生 · B1', 640, 390, 'b'], ['bg', '后台 Agent', 880, 390, null]],
+  CLEAN: ['关闭浏览器会话', '写入未完成文件', '释放锁'],
+  init(s) {
+    const f = (id) => this.N.find((n) => n[0] === id);
+    let h = '';
+    this.N.forEach(([id, , x, y, p]) => { if (p) { const [, , px, py] = f(p); h += `<path class="tm-e" d="M${px} ${py + 60}C${px} ${py + 120} ${x} ${y - 60} ${x} ${y}"/>`; } });
+    h += '<path class="tm-e bg" d="M880 330V250"/>';
+    s.querySelector('.tm-svg').innerHTML = h;
+    s.querySelector('.tm-nodes').innerHTML = this.N.map(([id, n, x, y]) => `<div class="tm-n" data-id="${id}" style="left:${x}px;top:${y}px${id === 'bg' ? ';--c:#a78bfa' : id === 'r' ? ';--c:#818cf8' : ''}"><span class="k10-av"><svg class="ic"><use href="#i-${id === 'r' ? 'crown' : id === 'bg' ? 'moon' : 'robot'}"/></svg></span><b>${n}</b><small>${id === 'bg' ? 'nohup · 不随父级终止' : '运行中'}</small><div class="tm-res"></div></div>`).join('');
+    this.set = U.seg(s.querySelector('.tm-seg'), (v) => { this.auto = false; this.mode = v; this.cards(s); this.clear(s); });
+    s.querySelector('.tm-nodes').addEventListener('click', (e) => { const n = e.target.closest('[data-id]'); if (n) { this.auto = false; this.cancel(s, n.dataset.id); } });
+  },
+  cards(s) { this.set(this.mode); s.querySelectorAll('.tm-card').forEach((c) => c.classList.toggle('on', c.dataset.v === this.mode)); },
+  clear(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.tm-n').forEach((n) => { n.classList.remove('stop', 'done', 'dead'); n.querySelector('small').textContent = n.dataset.id === 'bg' ? 'nohup · 不随父级终止' : '运行中'; n.querySelector('.tm-res').innerHTML = ''; });
+  },
+  // 取消一个节点：沿创建关系向下级联（后台 Agent 在另一棵生命周期树上，不受影响）
+  cancel(s, id) {
+    this.clear(s);
+    const tk = this.tk, ctx = this.ctx;
+    if (!ctx) return;
+    const kids = (p) => this.N.filter((n) => n[4] === p).map((n) => n[0]);
+    const order = [];
+    const walk = (x, d) => { order.push([x, d]); kids(x).forEach((k) => walk(k, d + 1)); };
+    walk(id, 0);
+    order.forEach(([x, d]) => {
+      const el = s.querySelector(`.tm-n[data-id="${x}"]`), sm = el.querySelector('small');
+      ctx.later(() => {
+        if (tk !== this.tk) return;
+        if (this.mode === 'kill') {
+          el.classList.add('dead'); sm.textContent = '已强制终止';
+          el.querySelector('.tm-res').innerHTML = ['浏览器会话未关', '文件写了一半'].map((r) => `<i>${r}</i>`).join('');
+        } else {
+          el.classList.add('stop'); sm.textContent = '收到 terminate';
+          this.CLEAN.forEach((c, j) => ctx.later(() => tk === this.tk && (sm.textContent = '安全点 · ' + c), 500 + j * 450));
+          ctx.later(() => { if (tk !== this.tk) return; el.classList.remove('stop'); el.classList.add('done'); sm.textContent = 'ack · 已退出'; }, 2000);
+        }
+      }, 300 + d * 700);
+    });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode = 'term';
+    this.cards(s);
+    const plan = [['term', 'r'], ['kill', 'b'], ['term', 'a']];
+    let k = 0;
+    const run = () => { const [m, id] = plan[k % plan.length]; this.mode = m; this.cards(s); this.cancel(s, id); k++; };
+    ctx.later(run, 900);
+    ctx.every(() => { if (this.auto) run(); }, 5600);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.clear(s); },
+};
+</script>
+
+<section class="slide" id="c10-sched" data-part="4" data-trans="zoom" data-dur="16000" data-title="控制平面之四：资源与调度" data-notes="<b>四、资源与调度。</b>操作系统的一个重要职能是分配稀缺资源。进程世界稀缺的是 CPU 时间和内存，Agent 世界稀缺的是 <b>token 和并发额度</b>。这项职能通常落在管理者 Agent 或运行时身上：启动子 Agent 时设定步数或 token 预算，超限即止；困难任务交给强模型，机械任务交给低成本模型；并发数设置上限，避免几十个 Agent 同时耗尽 API 配额；当并发数达到上限，更紧急的任务到来时，打断执行中的子 Agent，这就是抢占。<br>与传统操作系统的调度器相比，管理者 Agent 的显著优势在于它<b>具备推理能力</b>。因此，管理者 Agent 可以启动多个子 Agent 并行探索一个问题，并根据它们的进展，决定给哪些 Agent 分配更多资源，或者终止哪些看起来误入歧途的 Agent，就像公司内部赛马一样。<br>资源和调度领域的实践还远不如操作系统调度成熟，但它<b>决定了多 Agent 系统的成本上限</b>，应当在架构设计阶段就予以考虑。<br>产物交换（数据平面）与消息传递、状态查询、执行终止、资源调度（控制平面）共同支撑起不共享上下文的多 Agent 系统。根据 Agent 之间的协作关系和控制流特征，不共享上下文的协作可以分为三种主要架构：对等协作模式、管理者模式、去中心化模式，分别适用于不同类型的任务——接下来三个部分逐一展开。<br>左侧赛马为示意动画：预算、模型分派、并发上限、抢占与“加注 / 叫停”依次发生，右侧卡片同步高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">控制平面之四：<em>资源与调度</em>，像公司内部赛马</h2></header>
+  <div class="sd-body">
+    <div class="sd-race panel fx fx-left" style="--d:2">
+      <div class="sd-top"><span class="sd-mg"><svg class="ic"><use href="#i-crown"/></svg>管理者 Agent · 运行时</span><span class="sd-cap">并发上限 <b>4</b></span><span class="sd-q">排队：<b>0</b></span><span class="k10-sim">示意</span></div>
+      <div class="sd-lanes"></div>
+      <div class="sd-log"></div>
+    </div>
+    <div class="sd-cards fx fx-right" style="--d:3">
+      <div class="sd-c" data-k="0"><b><svg class="ic"><use href="#i-gauge"/></svg>预算</b><p>启动时设定步数或 token 预算，超限即止</p></div>
+      <div class="sd-c" data-k="1"><b><svg class="ic"><use href="#i-cpu"/></svg>模型分派</b><p>困难任务交给强模型，机械任务交给低成本模型</p></div>
+      <div class="sd-c" data-k="2"><b><svg class="ic"><use href="#i-layers"/></svg>并发上限</b><p>避免几十个 Agent 同时耗尽 API 配额</p></div>
+      <div class="sd-c" data-k="3"><b><svg class="ic"><use href="#i-zap"/></svg>抢占</b><p>并发已满、更紧急的任务到来时，打断执行中的子 Agent</p></div>
+      <div class="sd-c" data-k="4"><b><svg class="ic"><use href="#i-brain"/></svg>推理能力：内部赛马</b><p>按进展给有希望的 Agent 加资源，终止误入歧途的</p></div>
+    </div>
+  </div>
+  <p class="tagline sd-tag fx fx-up" style="--d:5">实践还远不如操作系统调度成熟，但它<b>决定了多 Agent 系统的成本上限</b>，应在架构设计阶段就予以考虑</p>
+  <div class="src">第十章 ·「Agent 间的通信与控制」</div>
+</section>
+<style>
+.sd-body{display:grid;grid-template-columns:1060px 1fr;gap:28px}
+.sd-race{padding:18px 22px;height:560px;display:flex;flex-direction:column;gap:14px}
+.sd-top{display:flex;align-items:center;gap:18px;font-size:18px;color:var(--text2)}
+.sd-mg{display:flex;align-items:center;gap:8px;font-weight:700;color:var(--llm)}
+.sd-top b{font:800 22px var(--num);color:var(--acc)}
+.sd-top .k10-sim{margin-left:auto}
+.sd-lanes{display:flex;flex-direction:column;gap:12px}
+.sd-ln{--c:#60a5fa;display:grid;grid-template-columns:150px 110px 1fr 150px;gap:14px;align-items:center;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:opacity .4s,border-color .4s,background .4s}
+.sd-ln b{font-size:18px;color:var(--c)}
+.sd-ln .sd-m{font-size:15px;padding:3px 10px;border-radius:8px;text-align:center;border:1px solid var(--line2);color:var(--text2)}
+.sd-ln .sd-m.strong{color:var(--llm);border-color:color-mix(in srgb,var(--llm) 55%,transparent)}
+.sd-bars{display:flex;flex-direction:column;gap:6px}
+.sd-bars .meter{height:10px}
+.sd-bars .sd-bud i{--c:#fbbf24}
+.sd-st{font-size:16px;color:var(--text3);text-align:right}
+.sd-ln.hot{border-color:color-mix(in srgb,var(--ok) 55%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.sd-ln.hot .sd-st{color:var(--ok)}
+.sd-ln.killed{opacity:.45}
+.sd-ln.killed .sd-st{color:var(--bad)}
+.sd-ln.paused .sd-st{color:var(--warn)}
+.sd-ln.urgent{border-color:color-mix(in srgb,var(--bad) 55%,transparent)}
+.sd-log{margin-top:auto;display:flex;flex-direction:column;gap:6px;min-height:96px}
+.sd-log div{font-size:17px;color:var(--text2);animation:upIn .4s var(--spring) both}
+.sd-log div::before{content:"› ";color:var(--acc)}
+.sd-cards{display:flex;flex-direction:column;gap:12px}
+.sd-c{padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:all .4s var(--ease)}
+.sd-c b{display:flex;align-items:center;gap:10px;font-size:19px}
+.sd-c p{font-size:16px;line-height:1.5;color:var(--text2);margin-top:4px}
+.sd-c.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.8));box-shadow:0 0 24px -6px var(--acc)}
+.sd-c.on b{color:var(--acc)}
+.sd-tag{margin-top:20px;font-size:22px}
+</style>
+<script>
+HOOKS['c10-sched'] = {
+  L: [['探索者 1', '强模型', '#60a5fa'], ['探索者 2', '强模型', '#2dd4bf'], ['整理者 3', '低成本模型', '#fbbf24'], ['整理者 4', '低成本模型', '#f472b6']],
+  init(s) {
+    s.querySelector('.sd-lanes').innerHTML = this.L.map(([n, m, c], i) => `<div class="sd-ln" data-i="${i}" style="--c:${c}"><b>${n}</b><span class="sd-m${m === '强模型' ? ' strong' : ''}">${m}</span><div class="sd-bars"><div class="meter sd-pro"><i></i></div><div class="meter sd-bud"><i></i></div></div><span class="sd-st">待启动</span></div>`).join('');
+    s.querySelector('.sd-cards').addEventListener('click', (e) => { const c = e.target.closest('[data-k]'); if (c) { this.auto = false; this.hi(s, +c.dataset.k); } });
+  },
+  hi(s, k) { s.querySelectorAll('.sd-c').forEach((c) => c.classList.toggle('on', +c.dataset.k === k)); },
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ln = [...s.querySelectorAll('.sd-ln')], log = s.querySelector('.sd-log');
+    const P = (i, v) => ln[i].querySelector('.sd-pro i').style.setProperty('--v', v + '%');
+    const B = (i, v) => ln[i].querySelector('.sd-bud i').style.setProperty('--v', v + '%');
+    const st = (i, t, cls) => { ln[i].querySelector('.sd-st').textContent = t; if (cls) ln[i].classList.add(cls); };
+    const say = (t) => { log.insertAdjacentHTML('beforeend', `<div>${t}</div>`); while (log.children.length > 3) log.firstElementChild.remove(); };
+    const at = (ms, fn) => ctx.later(() => tk === this.tk && fn(), ms);
+    ln.forEach((l, i) => { l.className = 'sd-ln'; P(i, 0); B(i, 100); st(i, '待启动'); });
+    log.innerHTML = '';
+    s.querySelector('.sd-q b').textContent = 0;
+    at(300, () => { this.hi(s, 1); say('困难的探索交给强模型，机械的整理交给低成本模型'); ln.forEach((l, i) => st(i, '运行中')); });
+    at(1200, () => { this.hi(s, 0); say('每个子 Agent 启动时带上步数 / token 预算'); [40, 35, 30, 30].forEach((v, i) => { P(i, v); B(i, 100 - v); }); });
+    at(3000, () => { this.hi(s, 2); s.querySelector('.sd-q b').textContent = 2; say('并发已达上限 4：新来的 2 个任务排队等待'); [60, 45, 32, 55].forEach((v, i) => { P(i, v); B(i, 100 - v * 1.1); }); });
+    at(4800, () => { this.hi(s, 4); say('整理者 3 原地打转、看起来误入歧途 → 叫停，预算转给有希望的探索者 1'); st(2, '已终止', 'killed'); ln[0].classList.add('hot'); st(0, '加注资源'); B(0, 90); P(0, 72); });
+    at(6800, () => { this.hi(s, 3); say('更紧急的任务到来、并发仍满 → 抢占：暂停整理者 4'); st(3, '被抢占 · 暂停', 'paused'); ln[3].classList.add('urgent'); });
+    at(8600, () => { this.hi(s, 0); say('探索者 2 预算耗尽 → 超限即止'); P(1, 58); B(1, 0); st(1, '超限即止', 'killed'); });
+    at(10200, () => { this.hi(s, 4); say('探索者 1 率先得到结果'); P(0, 100); st(0, '完成'); });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.run(s);
+    ctx.every(() => { if (this.auto) this.run(s); }, 13000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.sd-c').forEach((c) => c.classList.remove('on')); s.querySelector('.sd-log').innerHTML = ''; },
+};
+</script>

@@ -1,0 +1,477 @@
+<!-- ================= 第 4 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d4" data-part="4" data-title="PART 04 · SFT 与数据合成" data-notes="「SFT（监督微调）」与「SFT 数据合成：从示范到可训练轨迹」。四阶段全景已经讲了 SFT 的本质（换了数据、只在回答上算损失的“预测下一个词”）。这一部分用四个实验看这套“把稳定映射与协议写进参数”的机制在不同任务上具体固化了什么：语音 SFT（实验 8-6）、多语言思考（实验 8-7）、Prompt 蒸馏（实验 8-8）、思维链蒸馏（实验 8-9）；先讲 SFT 数据从哪来，最后讲怎样把线上日志变成可训练的轨迹，以及同一套设施怎样同时服务 SFT、RL 与偏好数据。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">SFT 与数据合成</h1>
+  <div class="ch-s fx fx-up" style="--d:3">SFT 的核心价值不在注入新知识，而在固化输出格式</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">与其堆十万条脏数据，不如精修一万条干净数据。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<!-- ================= 图8-10 ================= -->
+<section class="slide" id="c08-fig810" data-part="4" data-trans="zoom" data-dur="24000" data-title="图8-10 监督微调（SFT）流水线" data-notes="SFT 的核心价值<b>不在于注入新知识，而在于固化输出格式</b>：把映射关系、交互格式、风格规范写入参数，使推理时无需冗长提示即可产出符合预期的输出。这种高效率可能以依赖训练分布为代价：在需要探索多种正确策略、或部署分布偏离示范数据的任务中，SFT 容易偏向复现示范模式，在新场景中性能下降。<br>图8-10：数据准备——输入-输出对 (x, y)，例如语音的参考音频→风格 token、蒸馏的教师输出→学生目标、多语言的思考模板示范；训练优化——L = −Σ log P(yᵢ|xᵢ)，最大化条件对数似然，数千到数万条样例，数小时收敛；效果评估——格式遵循 ✓、指令理解 ✓、风格一致 ✓、<b>分布外泛化 ✗</b>。SFT 固化的“协议”类型：语音 SFT——风格控制协议（音色 + 副语言标记）；多语言 SFT——思考组织模板（“分析→假设→验证→总结”）；Prompt 蒸馏——教师输出映射（长提示 → 无提示直接输出）；工具调用 SFT——接口格式协议（JSON schema + 错误处理）。<br>这四个实验有一个共同特征——<b>“把稳定的映射与协议写进参数”</b>。目标越明确、格式越清晰、评估标准越稳定，SFT 越能以很高的样本效率提升性能。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-10 SFT：把<em>稳定的映射与协议</em>写进参数</h2></header>
+  <div class="c8sf-pl fx fx-up" style="--d:2">
+    <div class="c8sf-s" data-i="0"><span class="lbl">数据准备</span><b>输入—输出对 (x, y)</b><small>参考音频 → 风格 token · 教师输出 → 学生目标 · 思考模板示范</small></div><i></i>
+    <div class="c8sf-s" data-i="1"><span class="lbl">训练优化</span><b class="c8-m"><i>L</i> = −Σ log <i>P</i>(<i>y<sub>i</sub></i> | <i>x<sub>i</sub></i>)</b><small>最大化条件对数似然 · 数千～数万条 · 数小时收敛</small></div><i></i>
+    <div class="c8sf-s" data-i="2"><span class="lbl">效果评估</span><div class="c8sf-ev"><span>格式遵循 ✓</span><span>指令理解 ✓</span><span>风格一致 ✓</span><span class="x">分布外泛化 ✗</span></div></div>
+  </div>
+  <div class="c8sf-pr fx fx-up" style="--d:3"></div>
+  <p class="c8sf-nt fx fx-up" style="--d:4">目标越明确、格式越清晰、评估标准越稳定，SFT 的样本效率越高；代价是<b>依赖训练分布</b>——部署分布偏离示范时，容易偏向复现示范模式</p>
+  <div class="src">第八章 ·「SFT（监督微调）」· 图8-10 监督微调（SFT）流水线</div>
+</section>
+<style>
+.c8sf-pl{display:flex;align-items:stretch;gap:10px}
+.c8sf-pl>i{width:40px;align-self:center;height:3px;background:var(--acc)}
+.c8sf-s{flex:1;display:flex;flex-direction:column;gap:6px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.8);transition:border-color .4s,box-shadow .4s}
+.c8sf-s.on{border-color:var(--acc);box-shadow:0 0 26px color-mix(in srgb,var(--acc) 30%,transparent)}
+.c8sf-s b{font-size:21px}.c8sf-s small{font-size:15px;color:var(--text3);line-height:1.45}
+.c8sf-ev{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.c8sf-ev span{font-size:16px;padding:5px 10px;border-radius:8px;background:rgba(52,211,153,.1);color:#6ee7b7}
+.c8sf-ev span.x{background:rgba(251,113,133,.12);color:#fda4af}
+.c8sf-pr{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:20px}
+.c8sf-p{display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s}
+.c8sf-p em{font-style:normal;font-size:15px;color:var(--text3)}
+.c8sf-p b{font-size:19px;color:var(--acc)}
+.c8sf-p span{font-size:15px;color:var(--text2)}
+.c8sf-p.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.85))}
+.c8sf-nt{margin-top:18px;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8sf-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-fig810'] = {
+  P: [['语音 SFT', '风格控制协议', '音色 + 副语言标记'], ['多语言 SFT', '思考组织模板', '“分析 → 假设 → 验证 → 总结”'], ['Prompt 蒸馏', '教师输出映射', '长提示 → 无提示直接输出'], ['工具调用 SFT', '接口格式协议', 'JSON schema + 错误处理']],
+  init(s) { s.querySelector('.c8sf-pr').innerHTML = this.P.map(([a, b, c]) => `<div class="c8sf-p"><em>${a}</em><b>${b}</b><span>${c}</span></div>`).join(''); },
+  enter(s, ctx) {
+    let k = 0; const ss = s.querySelectorAll('.c8sf-s'), ps = s.querySelectorAll('.c8sf-p');
+    ctx.every(() => { ss.forEach((x, j) => x.classList.toggle('on', j === k % 3)); ps.forEach((x, j) => x.classList.toggle('on', j === k % 4)); k++; }, 1800);
+  },
+  reset(s) { s.querySelectorAll('.c8sf-s,.c8sf-p').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= SFT 数据从哪来 ================= -->
+<section class="slide" id="c08-sftdata" data-part="4" data-trans="rise" data-dur="22000" data-title="SFT 数据从哪来？" data-notes="在动手做 SFT 之前，有一个绕不开的实操问题：<b>SFT 数据从哪来？</b>工业界的答案基本就三条路：<b>人工专家示范</b>——质量天花板最高，但贵且慢，适合用来定义格式与风格的“种子数据”；<b>教师模型生成</b>——即合成数据，让强模型批量产出“输入—输出”对，过滤后再蒸馏给学生，详见实验 8-8、8-9；<b>拒绝采样</b>——模型自己对同一问题采样多条候选，用验证器筛出正确样本再反过来训练自己，详见实验 8-9。<br>三条路经常组合使用。无论走哪条路，构造流程都大同小异：先定义任务分布与输出 schema，再批量生成候选，然后用规则校验、格式检查加人工抽检做质量过滤，最后去重、平衡配比、保证多样性。数据不必贪多，<b>数千到数万条高质量样本通常就足以固化输出格式</b>。与其堆十万条脏数据，不如精修一万条干净数据：<b>数据里的每一处噪声，SFT 都可能忠实地写进参数</b>。<br>右侧漏斗是示意：打开“跳过过滤”，噪声样本（红点）就会一并落进参数。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">三条路，一个漏斗：<em>每一处噪声都会写进参数</em></h2></div>
+    <button class="tgl c8sd-tg fx fx-up" style="--d:2"><i></i>跳过质量过滤</button></header>
+  <div class="c8sd-body">
+    <div class="c8sd-l fx fx-left" style="--d:3">
+      <div class="c8sd-w"><b>人工专家示范</b><span>质量天花板最高，贵且慢 → 定义格式与风格的<b>种子数据</b></span></div>
+      <div class="c8sd-w"><b>教师模型生成</b><span>合成数据：强模型批量产出，过滤后蒸馏给学生（实验 8-8、8-9）</span></div>
+      <div class="c8sd-w"><b>拒绝采样</b><span>对同一问题采样多条候选，验证器筛出正确样本再训练自己（实验 8-9）</span></div>
+      <p class="c8sd-nt">三条路经常组合使用；<b>数千到数万条高质量样本</b>通常就足以固化输出格式</p>
+    </div>
+    <div class="c8sd-r panel fx fx-right" style="--d:4"><span class="c8-sx">示意</span><canvas class="c8sd-cv"></canvas><div class="c8sd-st"><span>定义任务分布与 schema</span><span>批量生成候选</span><span class="f">规则校验 · 格式检查 · 人工抽检</span><span>去重 · 配比 · 多样性</span></div></div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」（SFT 数据从哪来）</div>
+</section>
+<style>
+.c8sd-tg{font-size:16px}
+.c8sd-body{display:grid;grid-template-columns:1fr 1.15fr;gap:22px;flex:1;min-height:0}
+.c8sd-l{display:flex;flex-direction:column;gap:12px}
+.c8sd-w{display:flex;flex-direction:column;gap:4px;padding:16px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8sd-w b{font-size:20px;color:var(--acc)}.c8sd-w span{font-size:16px;line-height:1.5;color:var(--text2)}.c8sd-w span b{font-size:16px;color:var(--text)}
+.c8sd-nt{margin-top:auto;font-size:17px;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8sd-nt b{color:var(--text)}
+.c8sd-r{position:relative;padding:14px;display:grid;grid-template-columns:1fr 210px;gap:12px}
+.c8sd-st{display:flex;flex-direction:column;justify-content:space-around;gap:8px}
+.c8sd-st span{font-size:15px;padding:8px 10px;border-radius:10px;border:1px solid var(--line2)}
+.c8sd-st span.f{border-color:#34d399;color:#6ee7b7;transition:opacity .3s}
+#c08-sftdata.skip .c8sd-st span.f{opacity:.25;text-decoration:line-through}
+</style>
+<script>
+HOOKS['c08-sftdata'] = {
+  init(s) {
+    this.g = C8.cv(s.querySelector('.c8sd-cv'), 470, 600);
+    s.querySelector('.c8sd-tg').addEventListener('click', (e) => { e.currentTarget.classList.toggle('on'); s.classList.toggle('skip', e.currentTarget.classList.contains('on')); });
+  },
+  enter(s, ctx) {
+    const r = U.rand(5), P = [];
+    let kept = 0, noise = 0;
+    ctx.raf(() => {
+      const g = this.g, skip = s.classList.contains('skip');
+      if (P.length < 70 && r() < 0.35) P.push({ x: 60 + r() * 350, y: -10, v: 1.6 + r() * 1.4, bad: r() < 0.28 });
+      g.clearRect(0, 0, 470, 600);
+      g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2;
+      g.beginPath(); g.moveTo(20, 40); g.lineTo(200, 300); g.lineTo(200, 470); g.moveTo(450, 40); g.lineTo(270, 300); g.lineTo(270, 470); g.stroke();
+      if (!skip) { g.fillStyle = 'rgba(52,211,153,.25)'; g.fillRect(150, 286, 170, 14); }
+      g.fillStyle = 'rgba(129,140,248,.2)'; g.fillRect(140, 480, 190, 90); g.fillStyle = '#c7d2fe'; g.font = '700 17px sans-serif'; g.fillText('模型参数', 198, 512);
+      g.font = '15px sans-serif'; g.fillStyle = '#6ee7b7'; g.fillText('干净样本 ' + kept, 160, 540); g.fillStyle = '#fda4af'; g.fillText('噪声 ' + noise, 260, 540);
+      for (let i = P.length - 1; i >= 0; i--) {
+        const p = P[i]; p.y += p.v;
+        const cx = 235 + (p.x - 235) * Math.max(0.18, 1 - Math.max(0, p.y - 40) / 260);
+        if (p.bad && !skip && p.y > 286 && p.y < 300) { p.dead = true; }
+        if (p.dead) { p.x += (p.x < 235 ? -5 : 5); g.fillStyle = 'rgba(251,113,133,.35)'; } else g.fillStyle = p.bad ? '#fb7185' : '#34d399';
+        g.beginPath(); g.arc(p.dead ? p.x : cx, p.y, 6, 0, 7); g.fill();
+        if (p.y > 500 || p.x < 0 || p.x > 470) { if (!p.dead && p.y > 500) { if (p.bad) noise++; else kept++; } P.splice(i, 1); }
+      }
+      if (kept + noise > 200) { kept = 0; noise = 0; }
+      return true;
+    });
+  },
+};
+</script>
+
+<!-- ================= 实验 8-6 ================= -->
+<section class="slide" id="c08-exp86" data-part="4" data-trans="flip" data-dur="22000" data-title="实验 8-6 ★★★：语音 SFT——从“声音复制”到“副语言建模”" data-notes="<b>实验 8-6 ★★★：语音 SFT——从“声音复制”到“副语言建模”</b>（扩展实验）。以 Orpheus（语境提示 voice cloning）与 Sesame（副语言标记建模）为对象，展示如何将“声音风格与表达习惯”写入参数。两者思路不同：<b>Orpheus</b> 把声音波形压缩为 token 序列，通过拼接同一说话者的参考音频，让模型学会“用这个人的声音说话”，实现跨句音色一致；<b>Sesame</b> 将笑声、叹气等副语言现象抽象为 &lt;laugh&gt;、&lt;sigh&gt; 等特殊标记，训练模型学会“看到标记就发出对应的声音”。<br>SFT 在表达型任务中固化的是<b>风格控制协议与结构化表达习惯，而非事实知识或复杂思考</b>。关键在于训练数据的多样性和标注质量。常见失败模式：训练数据中说话者过少导致所有人听起来一个腔调；标记过拟合（Overfitting）产生“机械笑”。<br>配套仓库在 RTX PRO 6000 上做了一次有界的真实运行：两个 LoRA adapter 各 60 次优化器更新。Orpheus 用 128 条训练 + 16 条留出语音，留出损失 5.2378 → 4.8658，但跨句音色代理指标（MFCC 统计余弦）没有改善（0.9886 → 0.9867）——这个假设不成立；Sesame 用 168 条训练 + 24 条留出，留出损失 128.23 → 124.34，带标记与中性语音的事件得分差从 +0.000131 升到 +0.001097，正向配对 3/6 → 4/6。执行完成与假设成立是分开记录的。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-6 <span class="c8-star">★★★</span>：语音 SFT 固化的是<em>风格控制协议</em></h2></div>
+    <div class="c8e6-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="o">Orpheus · 声音复制</button><button data-v="s">Sesame · 副语言建模</button></div></header>
+  <div class="c8e6-body">
+    <div class="c8e6-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><div class="c8e6-seq"></div><p class="c8e6-d"></p></div>
+    <div class="c8e6-r fx fx-right" style="--d:4">
+      <div class="c8-card c8e6-res"><b class="c8e6-k">配套仓库有界运行 · 各 60 次 LoRA 更新</b><div class="c8e6-rr"></div></div>
+      <div class="c8-card c8e6-fail"><b>常见失败模式</b><span>说话者过少 → 所有人一个腔调</span><span>标记过拟合 → “机械笑”</span></div>
+      <p class="c8-data">chapter8/speech-sft-experiment/validation/exp8-6-20260804-v1/REPORT.md；执行完成与假设成立分开记录</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」· 实验 8-6（扩展实验）</div>
+</section>
+<style>
+.c8e6-seg button{font-size:15px}
+.c8e6-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e6-l{position:relative;padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+.c8e6-seq{display:flex;flex-wrap:wrap;gap:6px;margin-top:20px}
+.c8e6-seq span{font-size:17px;padding:8px 12px;border-radius:10px;border:1px solid var(--line2);animation:c8e6In .35s var(--ease) both}
+.c8e6-seq span.ref{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.5)}
+.c8e6-seq span.tag{background:rgba(251,191,36,.16);border-color:rgba(251,191,36,.6);color:#fde68a}
+.c8e6-seq span.au{background:rgba(129,140,248,.2);border-color:rgba(129,140,248,.5);font-family:var(--num)}
+@keyframes c8e6In{from{opacity:0;scale:.7}}
+.c8e6-d{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2)}.c8e6-d b{color:var(--text)}
+.c8e6-r{display:flex;flex-direction:column;gap:12px}
+.c8e6-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c8e6-rr{display:flex;flex-direction:column;gap:6px}
+.c8e6-rr div{display:grid;grid-template-columns:1fr auto;gap:10px;font-size:15px;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.03)}
+.c8e6-rr b{font-family:var(--num)}.c8e6-rr .ok{color:#6ee7b7}.c8e6-rr .no{color:#fda4af}
+.c8e6-fail{display:flex;flex-direction:column;gap:6px}.c8e6-fail b{font-size:16px;color:#fda4af}.c8e6-fail span{font-size:15px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c08-exp86'] = {
+  D: {
+    o: { seq: [['ref', '参考音频 token'], ['ref', '…'], ['ref', '同一说话者'], ['', '新句子文本：“明天见。”'], ['au', 'a17'], ['au', 'a903'], ['au', 'a44'], ['au', '…']], d: '把声音波形压缩为 token 序列；拼接<b>同一说话者的参考音频</b>作为前缀，模型学会“用这个人的声音说话”，实现跨句音色一致', r: [['Orpheus 训练 / 留出语音', '128 / 16', ''], ['留出损失', '5.2378 → 4.8658', 'ok'], ['跨句音色代理（MFCC 余弦）', '0.9886 → 0.9867 · 未改善', 'no']] },
+    s: { seq: [['', '“那也太好笑了”'], ['tag', '<laugh>'], ['', '“好吧……”'], ['tag', '<sigh>'], ['au', 'a12'], ['au', 'a650'], ['au', '笑声'], ['au', '叹气']], d: '把笑声、叹气等副语言现象抽象为 <b>&lt;laugh&gt;、&lt;sigh&gt;</b> 等特殊标记，训练模型“看到标记就发出对应的声音”', r: [['Sesame 训练 / 留出语音', '168 / 24', ''], ['留出损失', '128.23 → 124.34', 'ok'], ['标记事件得分差', '+0.000131 → +0.001097', 'ok'], ['正向配对', '3/6 → 4/6', 'ok']] },
+  },
+  init(s) { this.seg = U.seg(s.querySelector('.c8e6-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    const d = this.D[v];
+    s.querySelector('.c8e6-seq').innerHTML = d.seq.map(([c, t], i) => `<span class="${c}" style="animation-delay:${i * 0.18}s">${t.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>`).join('');
+    s.querySelector('.c8e6-d').innerHTML = d.d;
+    s.querySelector('.c8e6-rr').innerHTML = d.r.map(([a, b, c]) => `<div><span>${a}</span><b class="${c}">${b}</b></div>`).join('');
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 2, 6000, (i) => { this.i = i; const v = i ? 's' : 'o'; this.seg(v); this.show(s, v); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 实验 8-7 ================= -->
+<section class="slide" id="c08-exp87" data-part="4" data-trans="iris" data-dur="22000" data-title="实验 8-7 ★★★：多语言思考——让模型用任意语言思考" data-notes="<b>实验 8-7 ★★★：多语言思考——让模型用任意语言思考</b>（扩展实验）。大多数思考模型只会用英语“思考”：不管你用什么语言提问，模型内部的思维链几乎都是英文的，因为训练数据中高质量的思考示范基本都是英语写的。本实验的目标很简单——让模型能够用指定的语言进行思考。<br>做法是对 gpt-oss-20b 进行 SFT：在系统指令中加一句 reasoning language: German（或其他语言），然后用英语、西班牙语、法语等几种语言的思考样例进行训练。<b>训练数据中完全没有中文</b>，但训练完成后，只要把 reasoning language 设为 Chinese，模型就能用中文进行完整的思维链思考——这种零样本的跨语言泛化是本实验最有意思的发现。需要注意，<b>这并非 SFT 本身的泛化能力</b>。多语言预训练已经在模型中建立了跨语言的共享表征空间，SFT 只是激活了这种预训练时已有的跨语言能力。<br>页面上的思考文本是示意，用来说明 reasoning language 选择器的作用；配套仓库 chapter8/MultilingualReasoning 使用 HuggingFaceH4/Multilingual-Thinking 数据集，其中不含中文。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-7 <span class="c8-star">★★★</span>：训练里<em>没有中文</em>，却能用中文思考</h2></div>
+    <div class="c8e7-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="en">English</button><button data-v="de">German</button><button data-v="fr">French</button><button data-v="zh">Chinese（零样本）</button></div></header>
+  <div class="c8e7-body">
+    <div class="c8e7-l panel fx fx-left" style="--d:3"><span class="c8-sx">思考文本示意</span>
+      <div class="c8e7-sys"><span class="lbl">system</span><code>reasoning language: <b class="c8e7-lang">English</b></code></div>
+      <div class="c8e7-u"><span class="lbl">user</span>一个数加上它的一半等于 18，这个数是多少？</div>
+      <div class="c8e7-th"><span class="lbl">thinking</span><p class="c8e7-tx"></p></div>
+      <div class="c8e7-tag"></div>
+    </div>
+    <div class="c8e7-r fx fx-right" style="--d:4">
+      <div class="c8e7-tr"><span class="lbl">SFT 训练数据中的思考语言</span><div><span>English</span><span>Spanish</span><span>French</span><span>German</span><span>…</span><span class="no">中文：0 条</span></div></div>
+      <div class="c8-card"><b class="c8e7-k">这不是 SFT 本身的泛化</b><p>多语言预训练已经建立了<b>跨语言的共享表征空间</b>；SFT 只是激活了预训练时已有的跨语言能力</p></div>
+      <p class="c8-data">基座 gpt-oss-20b；配套仓库 chapter8/MultilingualReasoning，数据集 HuggingFaceH4/Multilingual-Thinking（不含中文）</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」· 实验 8-7（扩展实验）</div>
+</section>
+<style>
+.c8e7-seg button{font-size:15px}
+.c8e7-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e7-l{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.c8e7-sys code{font:600 18px var(--num);margin-left:10px}.c8e7-sys b{color:var(--warn)}
+.c8e7-u{font-size:18px;padding:10px 14px;border-radius:12px;background:rgba(56,189,248,.08)}
+.c8e7-th{flex:1;padding:12px 16px;border-radius:12px;border:1px dashed color-mix(in srgb,var(--acc) 50%,transparent);background:rgba(129,140,248,.06)}
+.c8e7-tx{font-size:18px;line-height:1.7;color:var(--text2);margin-top:6px;min-height:150px}
+.c8e7-tag{font-size:16px;font-weight:700}
+.c8e7-r{display:flex;flex-direction:column;gap:14px}
+.c8e7-tr div{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.c8e7-tr div span{font-size:16px;padding:6px 12px;border-radius:9px;border:1px solid var(--line2)}
+.c8e7-tr div span.no{border-color:rgba(251,113,133,.6);color:#fda4af}
+.c8e7-k{display:block;font-size:17px;color:var(--acc)}
+.c8e7-r .c8-card p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:6px}.c8e7-r .c8-card p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp87'] = {
+  L: { en: ['English', 'Let the number be x. Then x + x/2 = 18, so 3x/2 = 18 and x = 12. Check: 12 + 6 = 18. ✓', '训练过的语言'], de: ['German', 'Sei die Zahl x. Dann gilt x + x/2 = 18, also 3x/2 = 18 und x = 12. Probe: 12 + 6 = 18. ✓', '训练过的语言'], fr: ['French', 'Soit x le nombre. Alors x + x/2 = 18, donc 3x/2 = 18 et x = 12. Vérification : 12 + 6 = 18. ✓', '训练过的语言'], zh: ['Chinese', '设这个数为 x。那么 x + x/2 = 18，即 3x/2 = 18，所以 x = 12。验算：12 + 6 = 18。✓', '零样本：训练数据里完全没有中文'] },
+  init(s) { this.seg = U.seg(s.querySelector('.c8e7-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    const [l, t, tag] = this.L[v], tx = s.querySelector('.c8e7-tx');
+    s.querySelector('.c8e7-lang').textContent = l;
+    tx.textContent = t; U.type(tx, { speed: 30 });
+    const tg = s.querySelector('.c8e7-tag'); tg.textContent = tag; tg.style.color = v === 'zh' ? 'var(--warn)' : 'var(--text3)';
+  },
+  enter(s, ctx) { const k = ['en', 'de', 'fr', 'zh']; C8.auto(this, ctx, 4, 4200, (i) => { this.i = i; this.seg(k[i]); this.show(s, k[i]); }, 300); },
+  reset() { this.i = null; },
+};
+</script>
+
+<!-- ================= 实验 8-8 ================= -->
+<section class="slide" id="c08-exp88" data-part="4" data-trans="rise" data-dur="24000" data-title="实验 8-8 ★★：Prompt 蒸馏——以更小开销复现可用能力" data-notes="<b>实验 8-8 ★★：Prompt 蒸馏——以更小开销复现可用能力。</b>在实际应用中，为了让模型完成复杂任务，常常需要设计冗长的系统提示（数千甚至上万 token），每次调用都会增加延迟与费用。使用思考型大模型时，内部思考 token 进一步放大成本。Prompt 蒸馏的思路是把“<b>长提示 + 思考型教师</b>”的行为压缩到“<b>短提示 / 无提示 + 非思考学生</b>”中。教师在完整提示与思考模式下生成高质量答案，训练数据只保留用户输入与最终结论，丢弃冗长提示与中间思考过程。学生学会“直接给出结论”，蒸馏后在相同输入上接近教师的输出质量，同时延迟与费用显著降低。<br>蒸馏可以在两个维度进行：“<b>大到小</b>”（用中小模型替代大模型，在成本和质量之间取得折中）和“<b>思考到非思考</b>”（同等规模下把显式 CoT 折叠为隐式参数化知识，获得 20–30 倍的响应速度提升）。两者在生产环境中经常同时使用。需要注意的是，<b>蒸馏会继承教师的边界</b>——若教师在长尾分布上有系统性错误，学生会进一步硬编码这些错误；若教师依赖工具来确保正确性，单纯的输出蒸馏会失去工具带来的鲁棒性。工程启示：当产品形态稳定、输入分布可预期、成本约束明显时，Prompt 蒸馏是很好的优化手段；而在探索期或任务尚未定型的阶段，保留显式思考与可编辑的提示工程仍是快速试错的核心。<br>配套仓库的真实运行（Kimi K3 作教师、SmolLM2 作学生，13 类语言分类任务）：留出 80 条，训练与测试零文本重叠；教师准确率 100%、未训练的学生基线 0%、蒸馏后学生 95%（与教师一致率 95%）；平均延迟 4.14 秒 → 0.021 秒，约 197 倍；输入 token 减少约 75%；本地推理不产生 API 费用（未计电费与硬件折旧）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-8 <span class="c8-star">★★</span>：丢掉长提示与思考，<em>只留结论</em></h2></header>
+  <div class="c8e8-flow fx fx-up" style="--d:2">
+    <div class="c8e8-t"><span class="lbl">教师 · 长提示 + 思考</span><div class="c8e8-tk"><i class="p" style="flex:6">系统提示（数千 token）</i><i class="q" style="flex:1">输入</i><i class="th" style="flex:4">思考</i><i class="a" style="flex:1">结论</i></div></div>
+    <div class="c8e8-mid"><svg class="ic"><use href="#i-funnel"/></svg><span>训练数据只保留<br><b>输入 + 结论</b></span></div>
+    <div class="c8e8-t"><span class="lbl">学生 · 无提示 + 非思考</span><div class="c8e8-tk s"><i class="q" style="flex:1">输入</i><i class="a" style="flex:1">结论</i></div></div>
+  </div>
+  <div class="c8e8-body">
+    <div class="c8e8-res panel fx fx-left" style="--d:3"><b class="c8e8-k">配套仓库 · Kimi K3 → SmolLM2 · 13 类语言分类 · 留出 80 条</b><div class="c8e8-bars"></div><div class="c8e8-n"><div><b data-count="197">0</b><span>× 延迟加速（4.14 s → 0.021 s）</span></div><div><b data-count="75">0</b><span>% 输入 token 减少</span></div></div></div>
+    <div class="c8e8-r fx fx-right" style="--d:4">
+      <div class="c8e8-dim"><span><b>大到小</b>中小模型替代大模型</span><span><b>思考到非思考</b>显式 CoT 折叠进参数，20–30 倍速度</span></div>
+      <div class="c8-card c8e8-warn"><b>蒸馏会继承教师的边界</b><p>教师在长尾上的系统性错误会被硬编码；教师依赖工具保证正确性时，输出蒸馏会丢掉工具的鲁棒性</p></div>
+      <p class="c8e8-nt">产品形态稳定、输入分布可预期、成本约束明显 → 适合蒸馏；探索期 → 保留显式思考与可编辑提示</p>
+      <p class="c8-data">chapter8/prompt-distillation/validation/exp8-8-kimi3-smollm2-20260730/comparison.json；本地推理无 API 费用，未计电费与硬件折旧</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」· 实验 8-8</div>
+</section>
+<style>
+.c8e8-flow{display:grid;grid-template-columns:1.4fr 200px 1fr;gap:14px;align-items:center}
+.c8e8-t{display:flex;flex-direction:column;gap:6px}
+.c8e8-tk{display:flex;gap:3px;height:52px}
+.c8e8-tk i{display:grid;place-items:center;font-style:normal;font-size:15px;border-radius:8px;white-space:nowrap;overflow:hidden}
+.c8e8-tk .p{background:rgba(148,163,184,.25)}.c8e8-tk .q{background:rgba(56,189,248,.35)}.c8e8-tk .th{background:rgba(167,139,250,.35)}.c8e8-tk .a{background:rgba(52,211,153,.45)}
+.c8e8-tk.s{width:50%}
+.c8e8-mid{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:15px;text-align:center;color:var(--text2)}
+.c8e8-mid .ic{width:36px;height:36px;color:var(--acc)}.c8e8-mid b{color:var(--text)}
+.c8e8-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0;margin-top:18px}
+.c8e8-res{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c8e8-k{font-size:17px;color:var(--acc)}
+.c8e8-bars{display:flex;flex-direction:column;gap:10px}
+.c8e8-bars div{display:grid;grid-template-columns:150px 1fr 70px;gap:12px;align-items:center;font-size:16px}
+.c8e8-bars i{height:28px;border-radius:7px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c8e8-bars i::after{content:"";position:absolute;inset:0;width:var(--v,0%);background:var(--c);transition:width 1.2s var(--ease)}
+.c8e8-bars b{font:700 18px var(--num);text-align:right}
+.c8e8-n{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:auto}
+.c8e8-n div{display:flex;flex-direction:column;padding:10px 14px;border-radius:12px;border:1px solid var(--line)}
+.c8e8-n b{font:800 36px var(--num);color:var(--acc)}.c8e8-n span{font-size:15px;color:var(--text3)}
+.c8e8-r{display:flex;flex-direction:column;gap:12px}
+.c8e8-dim{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8e8-dim span{display:flex;flex-direction:column;font-size:15px;color:var(--text2);padding:10px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.c8e8-dim b{font-size:17px;color:var(--text)}
+.c8e8-warn{border-color:rgba(251,191,36,.45)}.c8e8-warn>b{font-size:16px;color:var(--warn)}
+.c8e8-warn p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+.c8e8-nt{font-size:15px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c08-exp88'] = {
+  B: [['教师（Kimi K3）', 1, '#a78bfa'], ['学生基线（未训练）', 0, '#94a3b8'], ['蒸馏后学生', 0.95, '#34d399']],
+  init(s) { s.querySelector('.c8e8-bars').innerHTML = this.B.map(([n, v, c]) => `<div><span>${n}</span><i style="--c:${c}"></i><b>${Math.round(v * 100)}%</b></div>`).join(''); },
+  enter(s, ctx) {
+    ctx.later(() => s.querySelectorAll('.c8e8-bars i').forEach((x, j) => x.style.setProperty('--v', this.B[j][1] * 100 + '%')), 600);
+    s.querySelectorAll('.c8e8-n b').forEach((b, j) => U.count(b, +b.dataset.count, { dur: 1400, delay: 700 + j * 200, ctx }));
+  },
+  reset(s) { s.querySelectorAll('.c8e8-bars i').forEach((x) => x.style.setProperty('--v', '0%')); },
+};
+</script>
+
+<!-- ================= 实验 8-9 ================= -->
+<section class="slide" id="c08-exp89" data-part="4" data-trans="zoom" data-dur="26000" data-title="实验 8-9 ★★★：思维链蒸馏（拒绝采样与三步流程）" data-notes="<b>实验 8-9 ★★★：思维链（Chain of Thought, CoT）蒸馏。</b>Prompt 蒸馏丢弃思考过程，CoT 蒸馏则相反：把强教师模型的<b>完整思考轨迹</b>转移给学生模型。对能力较强的教师模型进行 CoT 蒸馏，在同等参数量下可恢复教师 70%–80% 的能力。对于不追求刷新前沿能力边界、但寻求自主可控模型的团队，这是最务实的跟随者策略。DeepSeek-R1 发布时同步开源的一系列蒸馏小模型（用 R1 的思考轨迹对 Qwen、Llama 系列做 SFT），正是这条路线的代表。<br><b>实验设计</b>：三步流程。第一步，<b>采集轨迹</b>：从目标任务分布（如数学、代码）采样问题，用开源教师模型生成完整的“思考 + 答案”轨迹，并用规则验证器过滤掉最终答案错误的轨迹——否则错误的思考过程会被学生一并模仿。这一步“生成候选—验证过滤—只留正确轨迹”的做法叫<b>拒绝采样（Rejection Sampling）</b>，用它构造的数据做 SFT，就是<b>拒绝采样微调（Rejection Sampling Fine-Tuning, RFT）</b>。它介于纯 SFT 与 RL 之间：不训奖励模型、不做策略梯度，只靠“从多条采样中拒绝错的、留下对的”来提升数据质量，是可验证任务上性价比极高的数据构造手段。第二步，<b>SFT 训练</b>：以“问题 → &lt;think&gt; 思考轨迹 &lt;/think&gt; + 最终答案”为训练对，对小模型（如 7B 量级）做标准 SFT。第三步，<b>对比评估</b>：在同一基准上对比蒸馏前后的学生模型与教师模型，衡量能力恢复比例。<br><b>验收标准</b>：蒸馏后的学生模型在数学 / 代码基准上相对蒸馏前显著提升，且思考轨迹中出现教师式的反思、回溯与验算行为。同时注意蒸馏的代价：学生会继承教师的系统性错误和冗长思考习惯（后者可结合实验 8-10 的 AdaptThink 思路做二次优化）。<br>配套仓库的结果是一个负结果：24 道 AIME 题，Kimi K3 生成 24 条完整轨迹，规则验证器接受 23 条；用 Qwen2.5-1.5B-Instruct + LoRA 训练（3 epochs，约 27 秒，最终 loss 2.17）。同题三臂对照：基线 1/24、学生 2/24、教师 23/24，配对检验 p = 1.0，不显著，能力恢复约 4.5%。仓库明确写道，下一轮应扩大已验证训练集重新训练，而不是把负结果改写成成功。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-9 <span class="c8-star">★★★</span>：生成候选 → 验证过滤 → <em>只留正确轨迹</em></h2></header>
+  <div class="c8e9-body">
+    <div class="c8e9-l panel fx fx-left" style="--d:2">
+      <div class="c8e9-h"><b>拒绝采样（RFT）</b><span>不训奖励模型、不做策略梯度</span></div>
+      <div class="c8e9-trs"></div>
+      <div class="c8e9-steps"><span><em>1</em>采集轨迹 + 规则验证器过滤</span><span><em>2</em>SFT：问题 → &lt;think&gt; 轨迹 &lt;/think&gt; + 答案</span><span><em>3</em>对比评估：能力恢复比例</span></div>
+    </div>
+    <div class="c8e9-r fx fx-right" style="--d:3">
+      <div class="c8-card"><b class="c8e9-k">原书预期</b><p>对强教师做 CoT 蒸馏，同等参数量可恢复教师 <b>70%–80%</b> 的能力；DeepSeek-R1 开源的蒸馏小模型是代表。代价：学生继承教师的系统性错误与冗长思考</p></div>
+      <div class="c8-card c8e9-neg"><b class="c8e9-k">配套仓库：负结果</b><div class="c8e9-bars"></div><p>24 道 AIME，验证器接受 Kimi K3 的 23 条轨迹；Qwen2.5-1.5B + LoRA 训练约 27 秒。配对检验 <b>p = 1.0</b>，能力恢复约 4.5%——下一轮应扩大已验证训练集，<b>而不是把负结果改写成成功</b></p></div>
+      <p class="c8-data">chapter8/cot-distillation/README.md 与 validation/experiment_8_9_complete_20260803_v2.json</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」· 实验 8-9</div>
+</section>
+<style>
+.c8e9-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e9-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c8e9-h{display:flex;justify-content:space-between;align-items:baseline}.c8e9-h b{font-size:19px;color:var(--acc)}.c8e9-h span{font-size:15px;color:var(--text3)}
+.c8e9-trs{display:flex;flex-direction:column;gap:8px;flex:1}
+.c8e9-tr{display:grid;grid-template-columns:1fr 70px 80px;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;border:1px solid var(--line);transition:opacity .5s,translate .5s,border-color .4s}
+.c8e9-tr i{height:12px;border-radius:4px;background:linear-gradient(90deg,rgba(167,139,250,.6),rgba(167,139,250,.15))}
+.c8e9-tr span{font:15px var(--num);color:var(--text2)}
+.c8e9-tr b{font-size:15px;text-align:center;padding:3px 0;border-radius:7px;opacity:0;transition:opacity .3s}
+.c8e9-tr.ok{border-color:rgba(52,211,153,.55)}.c8e9-tr.ok b{opacity:1;background:rgba(52,211,153,.18);color:#6ee7b7}
+.c8e9-tr.no{border-color:rgba(251,113,133,.5);opacity:.35;translate:30px 0}.c8e9-tr.no b{opacity:1;background:rgba(251,113,133,.15);color:#fda4af}
+.c8e9-steps{display:flex;flex-direction:column;gap:5px}
+.c8e9-steps span{font-size:15px;padding:6px 10px;border-radius:8px;background:rgba(255,255,255,.03)}
+.c8e9-steps em{font:800 16px var(--num);font-style:normal;color:var(--acc);margin-right:8px}
+.c8e9-r{display:flex;flex-direction:column;gap:12px}
+.c8e9-k{display:block;font-size:17px;color:var(--acc);margin-bottom:6px}
+.c8e9-r p{font-size:15px;line-height:1.55;color:var(--text2)}.c8e9-r p b{color:var(--text)}
+.c8e9-neg{border-color:rgba(251,113,133,.4)}
+.c8e9-bars{display:flex;flex-direction:column;gap:6px;margin-bottom:8px}
+.c8e9-bars div{display:grid;grid-template-columns:130px 1fr 60px;gap:10px;align-items:center;font-size:15px}
+.c8e9-bars i{height:20px;border-radius:5px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c8e9-bars i::after{content:"";position:absolute;inset:0;width:var(--v);background:var(--c)}
+.c8e9-bars b{font-family:var(--num);text-align:right}
+</style>
+<script>
+HOOKS['c08-exp89'] = {
+  init(s) {
+    s.querySelector('.c8e9-bars').innerHTML = [['基线 Qwen2.5-1.5B', 1, '#94a3b8'], ['蒸馏后学生', 2, '#a78bfa'], ['教师 Kimi K3', 23, '#34d399']].map(([n, v, c]) => `<div><span>${n}</span><i style="--v:${(v / 24) * 100}%;--c:${c}"></i><b>${v}/24</b></div>`).join('');
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, host = s.querySelector('.c8e9-trs');
+    while (ok()) {
+      const res = [1, 0, 1, 1, 0, 1];
+      host.innerHTML = res.map((_, i) => `<div class="c8e9-tr"><i style="width:${50 + ((i * 37) % 50)}%"></i><span>答案 ${[12, 7, 12, 12, 30, 12][i]}</span><b></b></div>`).join('');
+      const rs = host.querySelectorAll('.c8e9-tr');
+      for (let i = 0; i < rs.length; i++) { await U.wait(ctx, 800); if (!ok()) return; rs[i].classList.add(res[i] ? 'ok' : 'no'); rs[i].querySelector('b').textContent = res[i] ? '✓ 保留' : '✗ 拒绝'; }
+      await U.wait(ctx, 3500);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.c8e9-trs').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 实验 8-9 续：思维围墙 ================= -->
+<section class="slide" id="c08-wall" data-part="4" data-trans="flip" data-dur="24000" data-title="实验 8-9（续）：思维围墙与“不愿帮你蒸馏”" data-notes="<b>背景：“思维围墙”现象</b>。一些闭源思考模型（如 OpenAI o 系列、Gemini 系列）在思考时会生成内部思维链，但用户看到的并非原始思考过程——厂商出于防蒸馏、安全和产品体验等考虑，通常会在输出前对 CoT 进行改写或摘要，最有价值的原始思考过程被隐藏在 API 之后。这正是本实验选择开源思考模型作为教师的原因：DeepSeek V4、Kimi K3、GLM 5.2 等模型直接公开完整思维链，蒸馏在技术与许可上都可行（使用前仍应确认模型许可证对蒸馏产物的授权条款）。<br><b>实验现场：模型会写代码，不代表它愿意帮助你蒸馏模型。</b>在实现本实验时，作者最初使用由 GPT-5.6-Sol 驱动的 OpenAI Codex 编写实验代码，但当任务明确涉及模型蒸馏时，Codex 拒绝继续执行。随后，作者切换到由 Claude Opus 5 驱动的 Claude Code，也遇到了同样的拒绝。最终，作者使用 Kimi K3 完成了实验代码和后续运行。两次拒绝针对的都不是普通数学推理，也不是简单地要求模型公开内部思维链，而是实现一个使用强教师数据训练学生模型的完整蒸馏实验。模型蒸馏与正常的监督微调在技术上高度相似，但在厂商的安全与产品策略中，它也可能与模型提取、能力复制和知识产权保护联系起来，因此成为一个敏感类别。<br><b>对绝大多数做后训练的人来说，根本不需要去蒸馏闭源模型的思维链。</b>当前最先进的开源模型与 SOTA 闭源模型的差距并没有想象中大；教师模型只需要“明显高于学生”，不需要“全球第一”。如果你要后训练的是 200B 及以下规模的模型，用开源 SOTA 模型当教师已经完全够用。<br>配套仓库对三位教师在 24 道 AIME 题上做了实测：Claude Sonnet 4.5 验证通过 22/24，摘要近 1:1 保真；Claude Opus 4.8 通过 24/24，但摘要激进压缩（原始 / 可见 token 比 2.41），3 道题完全不给思维链；Kimi K3 通过 23/24，原始思维链直出（比值 1.007）。结论：<b>教师能力 ≠ 可蒸馏性</b>，选教师要同时看“会不会做”和“给不给看”；原始思维链也含元噪声，SFT 前值得清洗。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思维围墙：<em>教师能力 ≠ 可蒸馏性</em></h2></header>
+  <div class="c8wl-body">
+    <div class="c8wl-tb fx fx-left" style="--d:2">
+      <div class="c8wl-h"><span></span><span>Claude Sonnet 4.5</span><span>Claude Opus 4.8</span><span>Kimi K3</span></div>
+      <div class="c8wl-r"><b>验证通过</b><span>22/24</span><span class="g">24/24</span><span>23/24</span></div>
+      <div class="c8wl-r"><b>思维链性质</b><span>摘要，近 1:1 保真</span><span class="r">摘要，激进压缩</span><span class="g">原始思维链直出</span></div>
+      <div class="c8wl-r"><b>原始 / 可见 token 比</b><span>1.03–1.09</span><span class="r">2.41</span><span class="g">1.007</span></div>
+      <div class="c8wl-r"><b>无思维链的题</b><span>0</span><span class="r">3</span><span>0</span></div>
+      <div class="c8wl-wall"><span>可见部分</span><div class="c8wl-bars"><i style="--v:94%"></i><i style="--v:41%"></i><i style="--v:99%"></i></div></div>
+      <p class="c8-data">配套仓库 chapter8/cot-distillation 的 AIME 24 题实测；原始思维链也含元噪声（如在简单题上用 700+ token 纠结写 16 还是 16%），SFT 前值得清洗</p>
+    </div>
+    <div class="c8wl-r2 fx fx-right" style="--d:3">
+      <div class="c8wl-chat"><span class="lbl">实验现场</span><div class="m u">请帮我实现完整的蒸馏实验：用强教师数据训练学生模型</div><div class="m x"><b>Codex（GPT-5.6-Sol）</b>拒绝继续执行</div><div class="m x"><b>Claude Code（Claude Opus 5）</b>同样拒绝</div><div class="m ok"><b>Kimi K3</b>完成实验代码与后续运行</div></div>
+      <div class="c8-card"><b class="c8wl-k">根本不需要蒸馏闭源模型的思维链</b><p>教师只需<b>明显高于学生</b>，不需要全球第一；后训练 <b>200B 及以下</b>的模型，用开源 SOTA（DeepSeek V4、Kimi K3、GLM 5.2 等）当教师完全够用——仍应确认许可证对蒸馏产物的授权条款</p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT（监督微调）」· 实验 8-9（思维围墙）</div>
+</section>
+<style>
+.c8wl-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c8wl-tb{display:flex;flex-direction:column;gap:6px}
+.c8wl-h,.c8wl-r{display:grid;grid-template-columns:190px repeat(3,1fr);gap:8px;align-items:center}
+.c8wl-h span{font-size:15px;font-weight:700;color:var(--text3);text-align:center}
+.c8wl-r b{font-size:16px}
+.c8wl-r span{font-size:15px;text-align:center;padding:9px 6px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c8wl-r span.g{background:rgba(52,211,153,.12);color:#6ee7b7}.c8wl-r span.r{background:rgba(251,113,133,.12);color:#fda4af}
+.c8wl-wall{display:grid;grid-template-columns:190px 1fr;gap:8px;align-items:end;margin-top:8px}
+.c8wl-wall>span{font-size:15px;color:var(--text3)}
+.c8wl-bars{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;height:120px;align-items:end}
+.c8wl-bars i{height:var(--v);border-radius:8px 8px 0 0;background:linear-gradient(0deg,rgba(129,140,248,.3),rgba(129,140,248,.8));transition:height 1s}
+.c8wl-r2{display:flex;flex-direction:column;gap:12px}
+.c8wl-chat{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75)}
+.c8wl-chat .m{font-size:16px;padding:10px 14px;border-radius:12px;opacity:0;translate:0 10px;transition:opacity .4s,translate .4s}
+.c8wl-chat .m.on{opacity:1;translate:0 0}
+.c8wl-chat .m b{display:block;font-size:15px;margin-bottom:2px}
+.c8wl-chat .u{background:rgba(56,189,248,.1)}.c8wl-chat .x{background:rgba(251,113,133,.1);color:#fda4af}.c8wl-chat .ok{background:rgba(52,211,153,.1);color:#6ee7b7}
+.c8wl-k{display:block;font-size:17px;color:var(--acc)}
+.c8wl-r2 .c8-card p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c8wl-r2 .c8-card p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-wall'] = {
+  enter(s, ctx) { s.querySelectorAll('.c8wl-chat .m').forEach((m, i) => ctx.later(() => m.classList.add('on'), 600 + i * 1100)); },
+  reset(s) { s.querySelectorAll('.c8wl-chat .m').forEach((m) => m.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= SFT 数据合成 ================= -->
+<section class="slide" id="c08-synth" data-part="4" data-trans="rise" data-dur="24000" data-title="SFT 数据合成：从日志到可训练轨迹" data-notes="<b>SFT 的上限首先由数据决定。</b>实际项目很少能靠人工逐条写出足够多的示范，通常要把<b>少量人工种子、教师模型生成和验证器筛选</b>组合起来：人工示范定义格式与边界，教师模型放大规模，规则验证或人工抽检守住质量。模型自举时，可以对同一题采样多条候选，只保留验证通过的轨迹，这就是拒绝采样微调（RFT）。<br>合成数据的目标不是复述线上日志，而是从日志中提炼可复用的<b>任务结构</b>：用户意图、初始状态、可用工具、业务约束、常见失败方式和成功条件。去除身份信息后，为每种任务重新生成虚构人物、订单、文件和状态，放进可重置的隔离环境。这样既保留真实难点，也避免模型记住客户数据或内部凭据。<br>一条稳妥的流水线是：<b>线上数据 → 任务蓝图 → 合成任务 → 多次候选轨迹 → 任务验证与轨迹验证 → SFT 数据</b>。任务验证检查题目本身是否可完成、难度是否合适、参考结果是否正确；轨迹验证检查最终状态、工具调用和业务约束。<b>能写成单元测试、数据库断言或状态差异检查的条件，优先使用确定性代码</b>；开放式的沟通质量再由模型评价器补充，并用人工抽样校准。技能图、可执行环境和独立验证器可以进一步扩大任务覆盖并过滤无效轨迹。<br>数据合成的关键不是数量，而是<b>覆盖面、多样性和准确性</b>。训练集还应按任务模板、客户或时间段去重划分，评估集必须来自不重叠的任务类型；参考解法、隐藏测试和验证器反馈不能泄露给模型。<br>页面上的订单退款任务为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">提炼<em>任务结构</em>，而不是复述线上日志</h2></header>
+  <div class="c8sy-pl fx fx-up" style="--d:2"></div>
+  <div class="c8sy-body">
+    <div class="c8sy-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><b class="c8sy-k">任务蓝图</b><div class="c8sy-bp"></div></div>
+    <div class="c8sy-r fx fx-right" style="--d:4">
+      <div class="c8-card"><b class="c8sy-k">两层验证</b><div class="c8sy-v"><span><b>任务验证</b>题目可完成吗？难度合适吗？参考结果对吗？</span><span><b>轨迹验证</b>最终状态、工具调用、业务约束</span></div><p>能写成单元测试、数据库断言、状态差异检查的，<b>优先用确定性代码</b>；开放式的沟通质量再用模型评价器，并人工抽样校准</p></div>
+      <div class="c8-card"><b class="c8sy-k">关键：覆盖面、多样性、准确性</b><p>按任务模板、客户或时间段去重划分；评估集来自<b>不重叠的任务类型</b>；参考解法、隐藏测试、验证器反馈<b>不能泄露给模型</b></p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT 数据合成：从示范到可训练轨迹」</div>
+</section>
+<style>
+.c8sy-pl{display:flex;align-items:center;gap:6px}
+.c8sy-pl span{flex:1;text-align:center;font-size:16px;font-weight:700;padding:10px 6px;border-radius:12px;border:1px solid var(--line2);transition:border-color .3s,background .3s}
+.c8sy-pl span.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 15%,transparent)}
+.c8sy-pl i{width:20px;height:2px;background:var(--acc)}
+.c8sy-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0;margin-top:18px}
+.c8sy-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8sy-k{display:block;font-size:17px;color:var(--acc);margin-bottom:6px}
+.c8sy-bp{display:flex;flex-direction:column;gap:6px}
+.c8sy-bp div{display:grid;grid-template-columns:110px 1fr 1fr;gap:10px;align-items:center;font-size:15px;padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.03)}
+.c8sy-bp b{color:var(--text3);font-weight:600}
+.c8sy-bp s{color:#fda4af;text-decoration:line-through}
+.c8sy-bp em{font-style:normal;color:#6ee7b7}
+.c8sy-r{display:flex;flex-direction:column;gap:12px}
+.c8sy-v{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.c8sy-v span{display:flex;flex-direction:column;font-size:15px;line-height:1.4;color:var(--text2);padding:8px 10px;border-radius:10px;border:1px solid var(--line2)}
+.c8sy-v b{font-size:16px;color:var(--text)}
+.c8sy-r p{font-size:15px;line-height:1.55;color:var(--text2)}.c8sy-r p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-synth'] = {
+  P: ['线上数据', '任务蓝图', '合成任务', '多次候选轨迹', '任务验证 + 轨迹验证', 'SFT 数据'],
+  B: [['用户意图', '张先生要退订单 #88213', '要退一笔已签收订单'], ['初始状态', '真实订单、真实地址', '虚构订单、虚构人物'], ['可用工具', '查订单、查物流、退款', '同左'], ['业务约束', '签收 7 天内可退', '同左'], ['常见失败', '未核对签收时间就退款', '同左'], ['成功条件', '退款单生成且通知用户', '同左：数据库断言']],
+  init(s) {
+    s.querySelector('.c8sy-pl').innerHTML = this.P.map((p) => `<span>${p}</span>`).join('<i></i>');
+    s.querySelector('.c8sy-bp').innerHTML = '<div><b>字段</b><b>线上日志</b><b>去身份化后的蓝图</b></div>' + this.B.map(([a, b, c]) => `<div><b>${a}</b><s>${b}</s><em>${c}</em></div>`).join('');
+  },
+  enter(s, ctx) { let k = 0; const ps = s.querySelectorAll('.c8sy-pl span'); ctx.every(() => { ps.forEach((p, j) => p.classList.toggle('on', j === k % ps.length)); k++; }, 1300); },
+  reset(s) { s.querySelectorAll('.c8sy-pl span').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 同一套设施 ================= -->
+<section class="slide" id="c08-synth2" data-part="4" data-trans="zoom" data-dur="26000" data-title="同一套设施：SFT、RL 与偏好数据" data-notes="同一套任务和验证设施之后还可以转成 RL 环境，但两阶段的用法不同：<b>SFT 只保留验证通过的成功轨迹</b>，学习稳定的格式、流程和基本动作；<b>RL 让当前策略重新 rollout</b>，利用环境奖励探索示范之外的路径。<b>失败轨迹不应直接当作正确示范</b>，可以用来构造偏好对、发现任务覆盖缺口，或补上诊断与修复后再加入训练。<br>第七章的问题案例也可以在这里转成训练数据。以 Coding Agent “过早结束”为例，先把“准备宣称完成”的轨迹前缀截出来，再把当时的过早宣称作为 rejected，把“先运行测试、逐条核对验收条件，再下结论”作为 chosen。这类数据适合做 DPO 或决策边界示范，而不是直接当作正确的 SFT 轨迹；失败原因、适用条件和验证器应随样本保存，方便追溯和复查。实验 8-17 的 build_preference_data.py 提供了确定性模板和教师模型两条构造路径，训练数据与后面的评估集分开保存。这样，<b>问题案例不只是被“记住”，还可以用来定义模型需要改进的决策边界</b>。<br>本章新增的两个问题案例实验分别展示了两种不同的监督目标。中文弯引号案例先把反馈提炼成作用域敏感的文档 Skill，再用结构化合成数据做 SFT；特殊字符串案例则把 old_string mismatch 转成 byte-exact 复制任务，重点训练逐 token 的保真度。二者共享第七章的失败归因和训练 / 评估隔离协议，但采用不同的评分标准：前者测“<b>该改才改、该留则留</b>”，后者测“<b>必须逐字复制</b>”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一条轨迹，<em>三种去处</em></h2></header>
+  <div class="c8s2-st fx fx-up" style="--d:2">
+    <div class="c8s2-src"><b>候选轨迹</b><small>来自同一套任务与验证设施</small></div>
+    <svg class="c8s2-svg" viewBox="0 0 300 360"><path id="c8s2-a" d="M0 180 C150 180 150 50 300 50"/><path id="c8s2-b" d="M0 180 L300 180"/><path id="c8s2-c" d="M0 180 C150 180 150 310 300 310"/></svg>
+    <div class="c8s2-out">
+      <div class="o a"><b>验证通过 → SFT</b><span>学稳定的格式、流程与基本动作</span></div>
+      <div class="o b"><b>重新 rollout → RL</b><span>当前策略在环境奖励下探索示范之外的路径</span></div>
+      <div class="o c"><b>失败 → 偏好对 / 覆盖缺口</b><span>不直接当正确示范；补上诊断与修复后再加入</span></div>
+    </div>
+  </div>
+  <div class="c8s2-ft fx fx-up" style="--d:3">
+    <div class="c8-card c8s2-pr"><b>“过早结束”→ 偏好对（实验 8-17）</b><div><span class="lbl">前缀</span><p>……已修改 3 个文件，准备宣称完成</p></div><div class="rj"><span class="lbl">rejected</span><p>“已全部完成。”</p></div><div class="ch"><span class="lbl">chosen</span><p>先运行测试、逐条核对验收条件，再下结论</p></div></div>
+    <div class="c8-card c8s2-two"><b>两个新案例，两种评分标准</b><span><em>中文弯引号</em>作用域敏感的文档 Skill + 结构化合成 SFT：<b>该改才改、该留则留</b></span><span><em>特殊字符串</em>old_string mismatch → byte-exact 复制任务：<b>必须逐字复制</b></span></div>
+  </div>
+  <div class="src">第八章 ·「SFT 数据合成：从示范到可训练轨迹」</div>
+</section>
+<style>
+.c8s2-st{display:grid;grid-template-columns:260px 300px 1fr;gap:0;align-items:center;height:360px}
+.c8s2-src{display:flex;flex-direction:column;gap:4px;padding:22px;border-radius:18px;border:1px solid var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c8s2-src b{font-size:22px}.c8s2-src small{font-size:15px;color:var(--text3)}
+.c8s2-svg{width:300px;height:360px}.c8s2-svg path{fill:none;stroke:var(--line2);stroke-width:2.5}
+.c8s2-out{display:flex;flex-direction:column;justify-content:space-between;height:100%}
+.c8s2-out .o{display:flex;flex-direction:column;gap:2px;padding:14px 18px;border-radius:14px;border:1px solid var(--line);transition:border-color .3s,background .3s}
+.c8s2-out .o b{font-size:19px}.c8s2-out .o span{font-size:15px;color:var(--text2)}
+.c8s2-out .a.on{border-color:#34d399;background:rgba(52,211,153,.1)}.c8s2-out .b.on{border-color:#a78bfa;background:rgba(167,139,250,.1)}.c8s2-out .c.on{border-color:#fb7185;background:rgba(251,113,133,.1)}
+.c8s2-ft{display:grid;grid-template-columns:1.1fr 1fr;gap:16px;margin-top:16px}
+.c8s2-pr>b,.c8s2-two>b{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c8s2-pr div{display:grid;grid-template-columns:90px 1fr;gap:8px;align-items:center;padding:5px 10px;border-radius:9px;margin-top:4px}
+.c8s2-pr p{font-size:15px}
+.c8s2-pr .rj{background:rgba(251,113,133,.1)}.c8s2-pr .ch{background:rgba(52,211,153,.1)}
+.c8s2-two{display:flex;flex-direction:column;gap:8px}
+.c8s2-two span{font-size:15px;line-height:1.5;color:var(--text2)}.c8s2-two em{display:block;font-style:normal;font-weight:700;color:var(--text)}.c8s2-two b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-synth2'] = {
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, svg = s.querySelector('.c8s2-svg'), os = s.querySelectorAll('.c8s2-out .o');
+    const ps = ['#c8s2-a', '#c8s2-b', '#c8s2-c'].map((x) => svg.querySelector(x)), C = ['#34d399', '#a78bfa', '#fb7185'];
+    while (ok()) {
+      for (let i = 0; i < 3; i++) {
+        const d = C7S('circle', { r: 10, fill: C[i] }, svg);
+        await U.fly(d, ps[i], 900, { ctx, alive: ok }); d.remove(); if (!ok()) return;
+        os.forEach((o, j) => o.classList.toggle('on', j === i));
+        await U.wait(ctx, 1600); if (!ok()) return;
+      }
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c8s2-svg circle').forEach((c) => c.remove()); s.querySelectorAll('.c8s2-out .o').forEach((o) => o.classList.remove('on')); },
+};
+</script>

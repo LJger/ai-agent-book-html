@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#fbbf24", "acc2": "#fb923c" },
+    { "n": "工具的分类", "k": "PART 01", "short": "分类", "acc": "#fbbf24", "acc2": "#22d3ee" },
+    { "n": "能力的表达形式", "k": "PART 02", "short": "形态", "acc": "#fb923c", "acc2": "#fbbf24" },
+    { "n": "工具描述与参数保真", "k": "PART 03", "short": "描述", "acc": "#a3e635", "acc2": "#fbbf24" },
+    { "n": "工具生态：MCP 与 Skill Hub", "k": "PART 04", "short": "生态", "acc": "#38bdf8", "acc2": "#fbbf24" },
+    { "n": "工具太多怎么办", "k": "PART 05", "short": "规模", "acc": "#c084fc", "acc2": "#fbbf24" },
+    { "n": "感知工具", "k": "PART 06", "short": "感知", "acc": "#22d3ee", "acc2": "#34d399" },
+    { "n": "执行工具 · 安全审查", "k": "PART 07", "short": "安全审查", "acc": "#fb7185", "acc2": "#fb923c" },
+    { "n": "执行工具 · 工程保障", "k": "PART 08", "short": "执行保障", "acc": "#facc15", "acc2": "#fb923c" },
+    { "n": "协作工具", "k": "PART 09", "short": "协作", "acc": "#a78bfa", "acc2": "#f472b6" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#fbbf24", "acc2": "#fb923c" }
+  ]
+}

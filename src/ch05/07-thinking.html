@@ -1,0 +1,1210 @@
+<!-- ================= PART 07 · 元能力：思考与规则 ================= -->
+<section class="slide chapter" id="c05-d7" data-part="7" data-title="PART 07 · 元能力：思考与规则" data-notes="前一部分展示了如何构建一个可靠的 Coding Agent——从架构设计到工具实现再到 Harness 工程。但代码生成的价值远不止于写程序。<br>从这里开始是本章的第二大块「代码：通用 Agent 的元能力」。原书用六节展示元能力在编程之外的六个应用方向，按“元能力作用对象”由内向外组织：思维本身、业务规则、内容呈现、系统接口、用户界面、Agent 自身。<br>本部分讲最内的两层：代码作为思考工具（实验 5-3 数学、实验 5-4 逻辑，以及模型与脚手架此消彼长的规律），代码作为业务规则的约束（cancel_reservation 的两层价值与三重保障，实验 5-5）。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">元能力：<br>思考与规则</h1>
+  <div class="ch-s fx fx-up" style="--d:3">代码作为思考工具 · 代码作为业务规则的约束</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">元能力是一种“能创造其他能力”的能力。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<section class="slide" id="c05-meta" data-part="7" data-dur="16000" data-title="什么是“元能力”" data-notes="<b>什么是“元能力”？</b>普通能力是 Agent 能做某件具体的事——回答问题、调用某个 API、生成一段文字。<b>元能力</b>（meta-capability）是一种“能创造其他能力”的能力：Agent 用它当场写出新工具、新约束、新表达形式来完成任务，而不必事先把所有能力都预制好。代码生成正是这样的元能力——它精确、可执行、可组合，因此既能产出新工具（脚本、API 调用序列），也能产出新约束（断言、校验规则），还能产出新的表达形态（HTML 表单、PPT、视频帧）。<br>正因如此，代码在 Agent 体系中扮演的角色远超“写程序”。接下来六节分别展示这种元能力在编程之外的六个应用方向，它们并非平行罗列，而是按“元能力作用对象”由内向外组织：1. <b>思维本身</b>——用代码替代易错的自然语言推理（思考工具）；2. <b>业务规则</b>——把模糊的政策编码为可执行约束（业务规则约束）；3. <b>内容呈现</b>——生成 PPT、视频与可视化产物（多媒体生成）；4. <b>系统接口</b>——桥接异构 API，自动适应数据格式演化（系统适配器）；5. <b>用户界面</b>——动态构造表单与交互界面（生成式 UI）；6. <b>Agent 自身</b>——用代码创造或修复新 Agent，形成自举。<br>右侧六层由内向外依次点亮；点击任一层查看说明，再点“前往”跳到对应页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">什么是<em>“元能力”</em>？</h2></header>
+  <div class="p7b-body">
+    <div class="p7b-l panel fx fx-left" style="--d:2">
+      <div class="p7b-row n"><span class="lbl">普通能力</span><b>能做某件具体的事</b><div class="p7b-ch"><span>回答问题</span><span>调用某个 API</span><span>生成一段文字</span></div></div>
+      <div class="p7b-row m"><span class="lbl">元能力 META-CAPABILITY</span><b>能<em>创造其他能力</em>的能力</b>
+        <div class="p7b-fab">
+          <div class="p7b-core"><svg class="ic"><use href="#i-code"/></svg><b>代码生成</b><small>精确 · 可执行 · 可组合</small></div>
+          <div class="p7b-beams"><i></i><i></i><i></i></div>
+          <div class="p7b-outs">
+            <div class="p7b-o"><svg class="ic"><use href="#i-wrench"/></svg><div><b>新工具</b><span>脚本、API 调用序列</span></div></div>
+            <div class="p7b-o"><svg class="ic"><use href="#i-shield"/></svg><div><b>新约束</b><span>断言、校验规则</span></div></div>
+            <div class="p7b-o"><svg class="ic"><use href="#i-image"/></svg><div><b>新的表达形态</b><span>HTML 表单、PPT、视频帧</span></div></div>
+          </div>
+        </div>
+        <p class="p7b-nt">当场写出来完成任务——<b>不必事先把所有能力都预制好</b></p>
+      </div>
+    </div>
+    <div class="p7b-r panel fx fx-right" style="--d:3">
+      <div class="p7b-rh"><b>六个应用方向</b><span>按“元能力作用对象”<em>由内向外</em></span></div>
+      <svg class="p7b-svg" viewBox="0 0 760 410"></svg>
+      <div class="p7b-card"><div class="p7b-ct"><em class="p7b-cn"></em><div><b class="p7b-cb"></b><span class="p7b-cs"></span></div></div><button class="btn p7b-go"><span>前往</span><svg class="ic"><use href="#i-arrow"/></svg></button></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码：通用 Agent 的元能力」</div>
+</section>
+<style>
+.p7b-body{display:grid;grid-template-columns:1fr 1.05fr;gap:26px;flex:1;min-height:0}
+.p7b-l{padding:18px 24px;display:flex;flex-direction:column;gap:16px}
+.p7b-row{display:flex;flex-direction:column;gap:8px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7b-row>b{font-size:22px}
+.p7b-row>b em{font-style:normal;color:var(--acc)}
+.p7b-row.m{flex:1;border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+.p7b-ch{display:flex;gap:10px;flex-wrap:wrap}
+.p7b-ch span{padding:5px 14px;border-radius:999px;font-size:17px;color:var(--text2);border:1px solid var(--line2)}
+.p7b-fab{display:grid;grid-template-columns:190px 70px 1fr;align-items:center;flex:1}
+.p7b-core{display:flex;flex-direction:column;align-items:center;gap:6px;padding:20px 12px;border-radius:20px;border:2px solid var(--acc);background:rgba(12,18,40,.9);text-align:center;box-shadow:0 0 30px color-mix(in srgb,var(--acc) 30%,transparent)}
+.p7b-core .ic{font-size:40px;color:var(--acc)}
+.p7b-core b{font-size:22px}
+.p7b-core small{font-size:15px;color:var(--text2)}
+.p7b-core.pulse{animation:p7bpu .7s ease}
+@keyframes p7bpu{40%{box-shadow:0 0 60px color-mix(in srgb,var(--acc) 70%,transparent);transform:scale(1.04)}}
+.p7b-beams{display:flex;flex-direction:column;justify-content:space-around;height:100%;padding:18px 0}
+.p7b-beams i{display:block;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--acc),transparent);opacity:.25;transition:opacity .3s}
+.p7b-beams i.on{opacity:1;animation:p7bbm .7s ease}
+@keyframes p7bbm{from{transform:scaleX(.1);transform-origin:left}to{transform:scaleX(1);transform-origin:left}}
+.p7b-outs{display:flex;flex-direction:column;gap:12px}
+.p7b-o{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.8);transition:all .4s}
+.p7b-o .ic{font-size:28px;color:var(--text3);transition:color .3s}
+.p7b-o b{display:block;font-size:19px}
+.p7b-o span{font-size:15px;color:var(--text3)}
+.p7b-o.on{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 30%,transparent);translate:6px 0}
+.p7b-o.on .ic{color:var(--acc)}
+.p7b-nt{font-size:17px;color:var(--text2)}
+.p7b-nt b{color:var(--text)}
+.p7b-r{padding:16px 22px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.p7b-rh{display:flex;align-items:baseline;justify-content:space-between}
+.p7b-rh b{font-size:22px}
+.p7b-rh span{font-size:16px;color:var(--text3)}
+.p7b-rh em{font-style:normal;color:var(--acc)}
+.p7b-svg{width:100%;flex:1;min-height:0}
+.p7b-arc{fill:none;stroke:var(--c);stroke-width:42;opacity:.28;cursor:pointer;transition:opacity .35s,filter .35s}
+.p7b-arc:hover{opacity:.55}
+.p7b-arc.on{opacity:1;filter:drop-shadow(0 0 14px var(--c))}
+.p7b-lab{font-size:18px;font-weight:700;fill:var(--text);text-anchor:middle;dominant-baseline:central;pointer-events:none;transition:fill .3s}
+.p7b-lab.on{fill:#06101f}
+.p7b-num{font:700 17px var(--num);fill:var(--text3);text-anchor:middle;pointer-events:none}
+.p7b-c1{font-size:30px;font-weight:800;fill:var(--text);text-anchor:middle}
+.p7b-c2{font-size:16px;fill:var(--text2);text-anchor:middle}
+.p7b-card{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--cc,var(--acc)) 50%,transparent);background:color-mix(in srgb,var(--cc,var(--acc)) 8%,transparent)}
+.p7b-ct{display:flex;align-items:center;gap:14px}
+.p7b-cn{font:800 30px var(--num);font-style:normal;color:var(--cc,var(--acc))}
+.p7b-cb{display:block;font-size:20px}
+.p7b-cs{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c05-meta'] = {
+  D: [
+    ['思维本身', '代码作为思考工具', '用代码替代易错的自然语言推理', 'c05-math', '#a78bfa', '第七部分'],
+    ['业务规则', '代码作为业务规则的约束', '把模糊的政策编码为可执行约束', 'c05-rules', '#c084fc', '第七部分'],
+    ['内容呈现', '代码驱动的多媒体生成', '生成 PPT、视频与可视化产物', 'c05-gui', '#f472b6', '第八部分'],
+    ['系统接口', '代码作为系统适配器', '桥接异构 API，自动适应数据格式演化', 'c05-adapter', '#fb7185', '第八部分'],
+    ['用户界面', '代码作为生成式 UI', '动态构造表单与交互界面', 'c05-a2ui', '#2dd4bf', '第九部分'],
+    ['Agent 自身', '代码创造代码：Agent 自举', '用代码创造或修复新 Agent，形成自举', 'c05-fig510', '#22d3ee', '第九部分'],
+  ],
+  init(s) {
+    const cx = 380, cy = 360, sv = s.querySelector('.p7b-svg');
+    let h = '';
+    this.D.forEach((d, i) => {
+      const r = 102 + i * 50;
+      h += `<path class="p7b-arc" data-i="${i}" style="--c:${d[4]}" d="M${cx - r} ${cy} A${r} ${r} 0 0 1 ${cx + r} ${cy}"/>`;
+      h += `<text class="p7b-lab" data-l="${i}" x="${cx}" y="${cy - r}">${d[0]}</text>`;
+      h += `<text class="p7b-num" x="${cx - r}" y="${cy + 30}">${i + 1}</text>`;
+    });
+    h += `<text class="p7b-c1" x="${cx}" y="${cy - 26}">代码</text><text class="p7b-c2" x="${cx}" y="${cy + 2}">元能力</text>`;
+    sv.innerHTML = h;
+    sv.querySelectorAll('.p7b-arc').forEach((a) => a.addEventListener('click', () => { this.auto = false; this.pick(s, +a.dataset.i); }));
+    s.querySelector('.p7b-go').addEventListener('click', () => C5.go(this.D[this.i || 0][3]));
+    this.pick(s, 0);
+  },
+  pick(s, i) {
+    const d = this.D[i]; this.i = i;
+    s.querySelectorAll('.p7b-arc').forEach((a) => a.classList.toggle('on', +a.dataset.i === i));
+    s.querySelectorAll('.p7b-lab').forEach((a) => a.classList.toggle('on', +a.dataset.l === i));
+    const c = s.querySelector('.p7b-card');
+    c.style.setProperty('--cc', d[4]);
+    s.querySelector('.p7b-cn').textContent = i + 1;
+    s.querySelector('.p7b-cb').textContent = `${d[0]} · ${d[1]}`;
+    s.querySelector('.p7b-cs').textContent = `${d[2]}（${d[5]}）`;
+  },
+  enter(s, ctx) {
+    this.auto = true; this.pick(s, 0);
+    let i = 0, k = 0;
+    ctx.every(() => { if (this.auto) { i = (i + 1) % 6; this.pick(s, i); } }, 2200);
+    const outs = [...s.querySelectorAll('.p7b-o')], bs = [...s.querySelectorAll('.p7b-beams i')], core = s.querySelector('.p7b-core');
+    const fire = () => { U.restart(core, 'pulse'); outs.forEach((o, j) => o.classList.toggle('on', j === k)); bs.forEach((b, j) => b.classList.toggle('on', j === k)); k = (k + 1) % 3; };
+    fire(); ctx.every(fire, 1500);
+  },
+  reset(s) { s.querySelectorAll('.p7b-o,.p7b-beams i').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 代码作为思考工具 ================= -->
+<section class="slide" id="c05-math" data-part="7" data-steps="1" data-trans="zoom" data-dur="20000" data-title="代码作为思考工具" data-notes="LLM 在自然语言理解和生成上表现惊人，但在精确计算、符号操作或严格逻辑推导上却有根本短板。原因在于：模型思考本质上是概率性的、近似的，而数学和逻辑问题要求确定性的、精确的答案。原书用一个对比说明：一个班有 40 名学生，60% 选修了数学，45% 选修了物理，25% 两门都选了，问只选了物理没选数学的有多少人。纯自然语言推理算出 60% 选数学 = 24 人、45% 选物理 = 18 人、25% 都选 = 10 人，却误从数学人数中减，得到 14 人；代码推理 only_phys = phys - both，精确得到 8。让 LLM 负责理解问题并写出代码，让代码解释器负责精确计算——这种分工让两者各司其职。<br>按 → 第二步：Mathematica 创始人 Stephen Wolfram 的洞察。在 LLM 出现之前，已经存在一类能做精确数学计算的系统——它们使用<b>符号计算</b>（Symbolic Computation）的方式工作，即用数学符号而非近似数值来处理表达式：普通计算器会把根号 2 算成 1.414，符号计算系统会保持根号 2 的精确形式，只在需要时才转为小数。Wolfram Alpha 就是这样一个系统，但它的自然语言理解相当脆弱、覆盖面也窄——依赖一套内置的语法解析，能识别的问法有限，问法稍作改变就可能解析失败，更无法处理开放域的多步推理。LLM 恰好弥补了这个短板。新的协同模式是：让 LLM 理解用户的自然语言问题，识别其中的数学或逻辑结构，转化为形式化语言（如 Mathematica 语言或 Python 的 SymPy 库），再交给符号计算引擎或约束求解器执行，获得精确结果。第二步里三种问法的解析结果是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">代码作为<em>思考工具</em>：概率性的近似 vs 确定性的精确</h2></header>
+  <div class="p7c-stage">
+    <div class="p7c-a">
+      <div class="p7c-q fx fx-up" style="--d:2"><svg class="ic"><use href="#i-help"/></svg><p>一个班有 40 名学生，其中 60% 选修了数学，45% 选修了物理，25% 两门都选了。<b>只选了物理没选数学的有多少人？</b></p></div>
+      <div class="p7c-cols">
+        <div class="p7c-nl panel fx fx-left" style="--d:3"><div class="p7c-h"><b>纯自然语言推理</b><span>容易出错</span></div><div class="p7c-lines"></div><div class="p7c-v"></div></div>
+        <div class="p7c-venn fx fx-scale" style="--d:4">
+          <svg viewBox="0 0 420 300">
+            <defs>
+              <mask id="p7c-mom"><rect width="420" height="300" fill="#fff"/><circle cx="262" cy="160" r="96" fill="#000"/></mask>
+              <mask id="p7c-mop"><rect width="420" height="300" fill="#fff"/><circle cx="160" cy="160" r="112" fill="#000"/></mask>
+              <clipPath id="p7c-cbo"><circle cx="160" cy="160" r="112"/></clipPath>
+            </defs>
+            <circle class="p7c-rg" data-r="om" cx="160" cy="160" r="112" mask="url(#p7c-mom)"/>
+            <circle class="p7c-rg" data-r="op" cx="262" cy="160" r="96" mask="url(#p7c-mop)"/>
+            <circle class="p7c-rg" data-r="bo" cx="262" cy="160" r="96" clip-path="url(#p7c-cbo)"/>
+            <circle class="p7c-ol m" cx="160" cy="160" r="112"/><circle class="p7c-ol p" cx="262" cy="160" r="96"/>
+            <text class="p7c-tt" x="110" y="30">数学 24</text><text class="p7c-tt" x="300" y="44">物理 18</text>
+            <text class="p7c-n" x="104" y="168">14</text><text class="p7c-n" x="213" y="168">10</text><text class="p7c-n" x="312" y="168">8</text>
+            <text class="p7c-s" x="104" y="194">只选数学</text><text class="p7c-s" x="213" y="194">都选</text><text class="p7c-s" x="312" y="194">只选物理</text>
+          </svg>
+        </div>
+        <div class="p7c-cd panel fx fx-right" style="--d:5"><div class="p7c-h"><b>代码推理</b><span>精确可验证</span></div><div class="c5-code p7c-code"></div><div class="p7c-v"></div></div>
+      </div>
+      <p class="p7c-tag fx fx-up" style="--d:6">让 LLM 负责<b>理解问题并写出代码</b>，让代码解释器负责<b>精确计算</b>——各司其职</p>
+    </div>
+    <div class="p7c-b" data-step="1">
+      <div class="p7c-sym panel">
+        <div class="p7c-h"><b>符号计算</b><span>Symbolic Computation</span></div>
+        <div class="p7c-sr"><span class="lbl">普通计算器 · 近似数值</span><code>√2 ≈ 1.414</code><code>1.414 × 1.414 = <i class="bad">1.999396</i></code></div>
+        <div class="p7c-sr ok"><span class="lbl">符号计算 · 精确形式</span><code>√2</code><code>√2 × √2 = <i class="ok">2</i></code></div>
+        <p>只在需要时才转为小数</p>
+      </div>
+      <div class="p7c-flow">
+        <div class="p7c-ph"><span class="lbl">同一个问题，三种问法</span><span class="c5-tag demo">示意</span></div>
+        <div class="p7c-asks"></div>
+        <div class="p7c-two">
+          <div class="p7c-wa panel"><div class="p7c-h"><b>Wolfram Alpha</b><span>内置语法解析：能识别的问法有限</span></div><div class="p7c-wo"></div></div>
+          <div class="p7c-lm panel"><div class="p7c-h"><b>LLM → SymPy</b><span>识别数学结构，翻译成形式化语言</span></div><div class="c5-code p7c-lc"></div><div class="p7c-lo"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码作为思考工具」</div>
+</section>
+<style>
+.p7c-stage{position:relative;flex:1;min-height:0}
+.p7c-a,.p7c-b{position:absolute;inset:0;display:flex;flex-direction:column;gap:16px;transition:opacity .5s,transform .5s}
+#c05-math:has(.p7c-b.on) .p7c-a{opacity:0;transform:translateY(-20px);pointer-events:none}
+.p7c-b{opacity:0;transform:translateY(20px);pointer-events:none;flex-direction:row;gap:22px}
+.p7c-b.on{opacity:1;transform:none;pointer-events:auto}
+.p7c-q{display:flex;align-items:center;gap:16px;padding:14px 22px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.p7c-q .ic{font-size:30px;color:var(--acc);flex:none}
+.p7c-q p{font-size:21px;line-height:1.55}
+.p7c-q b{color:var(--acc)}
+.p7c-cols{display:grid;grid-template-columns:1fr 420px 1fr;gap:20px;flex:1;min-height:0}
+.p7c-nl,.p7c-cd{padding:14px 20px;display:flex;flex-direction:column;gap:10px}
+.p7c-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.p7c-h b{font-size:20px}
+.p7c-h span{font-size:15px;color:var(--text3)}
+.p7c-lines{display:flex;flex-direction:column;gap:6px;flex:1}
+.p7c-lines div{font-size:19px;line-height:1.5;padding:4px 10px;border-radius:8px;animation:upIn .4s var(--spring) both}
+.p7c-lines div.bad{color:#fda4af;background:rgba(251,113,133,.12)}
+.p7c-code{font-size:16px;padding:6px 0;flex:1}
+.p7c-code .ln{transition:opacity .3s}
+.p7c-code .ln.dimln{opacity:0}
+.p7c-v{min-height:52px;padding:8px 14px;border-radius:12px;font-size:18px;line-height:1.5;color:var(--text3);border:1px dashed var(--line2)}
+.p7c-v.bad{color:#fda4af;border:1px solid rgba(251,113,133,.55);background:rgba(251,113,133,.08);animation:upIn .4s var(--spring)}
+.p7c-v.ok{color:#6ee7b7;border:1px solid rgba(52,211,153,.5);background:rgba(52,211,153,.08);animation:upIn .4s var(--spring)}
+.p7c-venn{display:flex;align-items:center}
+.p7c-venn svg{width:100%}
+.p7c-rg{fill:transparent;transition:fill .4s}
+.p7c-rg.bad{fill:rgba(251,113,133,.45)}
+.p7c-rg.ok{fill:rgba(52,211,153,.45)}
+.p7c-ol{fill:none;stroke-width:2.5}
+.p7c-ol.m{stroke:#a78bfa}.p7c-ol.p{stroke:#22d3ee}
+.p7c-tt{font-size:19px;font-weight:700;fill:var(--text);text-anchor:middle}
+.p7c-n{font:800 28px var(--num);fill:var(--text);text-anchor:middle}
+.p7c-s{font-size:15px;fill:var(--text2);text-anchor:middle}
+.p7c-tag{font-size:20px;line-height:1.6;color:var(--text2);padding-left:16px;border-left:4px solid var(--acc)}
+.p7c-tag b{color:var(--text)}
+.p7c-sym{width:430px;flex:none;padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.p7c-sr{display:flex;flex-direction:column;gap:8px;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7c-sr.ok{border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+.p7c-sr code{font:22px var(--mono);color:var(--text)}
+.p7c-sr i{font-style:normal;font-weight:700}
+.p7c-sr i.bad{color:#fda4af}.p7c-sr i.ok{color:#6ee7b7}
+.p7c-sym>p{font-size:17px;color:var(--text2)}
+.p7c-flow{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.p7c-ph{display:flex;align-items:center;gap:12px}
+.p7c-asks{display:flex;gap:10px}
+.p7c-ask{flex:1;padding:10px 14px;border-radius:12px;font-size:17px;line-height:1.45;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:var(--text2);transition:all .35s}
+.p7c-ask.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 10%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 25%,transparent)}
+.p7c-two{display:grid;grid-template-columns:1fr 1.25fr;gap:18px;flex:1;min-height:0}
+.p7c-wa,.p7c-lm{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.p7c-wo{flex:1;display:flex;flex-direction:column;gap:8px}
+.p7c-wr{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;font-size:17px;animation:upIn .4s var(--spring) both}
+.p7c-wr.ok{color:#6ee7b7;background:rgba(52,211,153,.08)}
+.p7c-wr.bad{color:#fda4af;background:rgba(251,113,133,.08)}
+.p7c-wr code{font:16px var(--mono)}
+.p7c-lc{font-size:16px;padding:6px 0}
+.p7c-lo{min-height:44px;padding:8px 14px;border-radius:12px;font:18px var(--mono);color:#6ee7b7;border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.06)}
+</style>
+<script>
+HOOKS['c05-math'] = {
+  NL: ['“60% 选数学 = 24 人，', '45% 选物理 = 18 人，', '25% 都选 = 10 人，', '只选物理 = 24 − 10 = 14 人”'],
+  CODE: 'math = int(40 * 0.60)    # 24\nphys = int(40 * 0.45)    # 18\nboth = int(40 * 0.25)    # 10\nonly_phys = phys - both  # 8\nprint(only_phys)         # 8',
+  ASK: [
+    { q: 'solve x^2 - 2 = 0', wa: 1, code: 'x = symbols("x")\nsolve(x**2 - 2, x)', out: '[-sqrt(2), sqrt(2)]' },
+    { q: 'x 的平方减 2 等于零，x 是多少？', wa: 0, code: 'x = symbols("x")\nsolve(Eq(x**2 - 2, 0), x)', out: '[-sqrt(2), sqrt(2)]' },
+    { q: '哪个正数自己乘自己等于 2？', wa: 0, code: 'x = symbols("x", positive=True)\nsolve(x * x - 2, x)', out: '[sqrt(2)]' },
+  ],
+  init(s) {
+    this.ln = C5.code(s.querySelector('.p7c-code'), this.CODE, 'py');
+    s.querySelector('.p7c-asks').innerHTML = this.ASK.map((a, i) => `<div class="p7c-ask" data-a="${i}">${C5.esc(a.q)}</div>`).join('');
+  },
+  async loopA(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const box = s.querySelector('.p7c-lines'), [v1, v2] = s.querySelectorAll('.p7c-v'), rg = (k) => s.querySelector(`.p7c-rg[data-r="${k}"]`);
+    while (ok()) {
+      box.innerHTML = ''; this.ln.forEach((l) => l.classList.add('dimln'));
+      [v1, v2].forEach((v) => { v.className = 'p7c-v'; v.textContent = '……'; });
+      s.querySelectorAll('.p7c-rg').forEach((r) => r.setAttribute('class', 'p7c-rg'));
+      await U.wait(ctx, 600); if (!ok()) return;
+      for (let i = 0; i < 4; i++) {
+        box.insertAdjacentHTML('beforeend', `<div${i === 3 ? ' class="bad"' : ''}>${this.NL[i]}</div>`);
+        this.ln[i].classList.remove('dimln');
+        await U.wait(ctx, 900); if (!ok()) return;
+      }
+      rg('om').setAttribute('class', 'p7c-rg bad');
+      v1.className = 'p7c-v bad'; v1.textContent = '误从数学人数中减：答的是“只选数学”的 14 人 ✗';
+      await U.wait(ctx, 900); if (!ok()) return;
+      this.ln[4].classList.remove('dimln');
+      rg('op').setAttribute('class', 'p7c-rg ok');
+      v2.className = 'p7c-v ok'; v2.textContent = '执行结果：8 ✓';
+      await U.wait(ctx, 4200);
+    }
+  },
+  async loopB(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const asks = [...s.querySelectorAll('.p7c-ask')], wo = s.querySelector('.p7c-wo'), lc = s.querySelector('.p7c-lc'), lo = s.querySelector('.p7c-lo');
+    while (ok()) {
+      wo.innerHTML = '';
+      for (let i = 0; i < this.ASK.length; i++) {
+        const a = this.ASK[i];
+        asks.forEach((x, j) => x.classList.toggle('on', j === i));
+        lc.innerHTML = ''; lo.textContent = '';
+        await U.wait(ctx, 700); if (!ok()) return;
+        wo.insertAdjacentHTML('beforeend', a.wa ? `<div class="p7c-wr ok"><svg class="ic"><use href="#i-check"/></svg>问法 ${i + 1}：解析成功</div>` : `<div class="p7c-wr bad"><svg class="ic"><use href="#i-x"/></svg>问法 ${i + 1}：无法解析</div>`);
+        C5.code(lc, a.code, 'py');
+        await U.wait(ctx, 900); if (!ok()) return;
+        lo.textContent = '→ ' + a.out;
+        await U.wait(ctx, 1800); if (!ok()) return;
+      }
+      await U.wait(ctx, 1500);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1;
+    this.loopA(s); this.loopB(s);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p7c-lines').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c05-exp53" data-part="7" data-trans="flip" data-dur="20000" data-title="实验 5-3 ★★：用代码提升数学解题" data-notes="<b>实验 5-3 ★★：使用代码生成工具提升数学解题能力</b>。实验目标：验证 Agent 通过 Code Interpreter 辅助数学思考的准确性提升。技术方案：为 Agent 配备安装了 sympy、numpy、scipy 等数学库的 Python 沙盒；遇到数学问题时将其形式化为 Python 代码——sympy 进行符号计算（微积分、方程求解），scipy 进行数值优化，numpy 进行矩阵运算；生成的代码在沙盒中执行并返回精确结果。验收标准：使用 AIME 风格题目（对标美国数学邀请赛）评测，对比纯思维链和代码辅助的准确率，要求代码辅助模式显著更高；检查代码是否正确使用数学库、求解过程是否逻辑清晰。<br>配套仓库的实现：同一个模型跑两种模式；代码模式用 function calling 暴露 run_python 工具，代码在带 20 秒超时的子进程沙箱里执行，返回 stdout。<br>正式活动（2026-07-30，doubao-seed-1-6-flash-250615，AIME 2024 全 30 题，固定哈希）：代码辅助 16/30 = 53.3%，纯 CoT 11/30 = 36.7%，提升 16.7 个百分点；但精确配对检验 p = 0.125，未达统计显著，所以仓库只声明正式实验完整执行，不声明原书预期已被支持。不一致的 7 道题里，6 道只有代码做对、1 道只有 CoT 做对；代码臂 30 题都真实调用了沙箱，用到 sympy / numpy / scipy 的占 13.3%。<br>教学示例（11 道 AIME 风格题）：gpt-5.6-luna 纯 CoT 10/11、代码 11/11，唯一的差别是第 6 题“两平方和计数”，CoT 心算边界算错给出 306，真值 330；较弱的 gpt-4o-mini 纯 CoT 6/11、代码 8/11。右上角可切换两组数据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-3 <span class="c5-stars">★★</span>：用代码生成工具<em>提升数学解题</em>能力</h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>验证 Agent 通过 Code Interpreter 辅助数学思考的准确性提升</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>Python 沙盒预装 sympy（符号计算）· scipy（数值优化）· numpy（矩阵运算）；代码在沙盒执行，返回精确结果</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>AIME 风格题评测：代码辅助准确率显著高于纯思维链；检查数学库用法与求解过程</p></div>
+  </div>
+  <div class="p7d-body">
+    <div class="p7d-l panel fx fx-left" style="--d:3">
+      <div class="p7d-pipe"><span data-k="0">题目</span><i></i><span data-k="1">模型写代码</span><i></i><span data-k="2"><code>run_python</code>子进程沙箱 · 20 秒超时</span><i></i><span data-k="3">stdout 精确结果</span><i></i><span data-k="4">FINAL ANSWER</span></div>
+      <div class="p7d-ex">
+        <div class="p7d-eq"><span class="c5-tag real">教学示例 · 第 6 题</span><p>1 到 1000 中，有多少个整数能写成 a² + b²（a、b 为非负整数）？</p></div>
+        <div class="p7d-io">
+          <div class="win p7d-cw"><div class="win-bar"><i></i><i></i><i></i><span>题库参考解 · problems.json</span></div><div class="c5-code p7d-code"></div></div>
+          <div class="p7d-ans"><div class="p7d-a bad"><span>纯 CoT（gpt-5.6-luna）</span><b>306</b><em>心算边界算错 ✗</em></div><div class="p7d-a ok"><span>代码辅助</span><b>330</b><em>与真值一致 ✓</em></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="p7d-r panel fx fx-right" style="--d:4">
+      <div class="p7d-seg seg"><i class="knob"></i><button data-v="f">正式活动 · AIME 2024</button><button data-v="t">教学示例 · 11 题</button></div>
+      <div class="p7d-vw" data-k="f">
+        <div class="p7d-bars">
+          <div class="p7d-br" style="--c:#94a3c4"><span>纯 CoT</span><i><b style="--w:36.7%"></b></i><em>11/30 · 36.7%</em></div>
+          <div class="p7d-br" style="--c:var(--acc)"><span>代码辅助</span><i><b style="--w:53.3%"></b></i><em>16/30 · 53.3%</em></div>
+        </div>
+        <div class="p7d-ct"><span class="lbl">逐题配对</span><div><span><b>10</b>都对</span><span class="y"><b>6</b>只有代码对</span><span class="n"><b>1</b>只有 CoT 对</span><span><b>13</b>都错</span></div></div>
+        <div class="p7d-p"><b>p = 0.125</b><span>精确配对检验未达显著</span><span class="c5-tag neg">假设未获支持</span></div>
+        <p class="p7d-ft">代码臂 30 题都真实调用了沙箱；其中用到 sympy / numpy / scipy 的占 13.3%</p>
+      </div>
+      <div class="p7d-vw" data-k="t">
+        <div class="p7d-gr"><span class="p7d-gm">gpt-4o-mini</span>
+          <div class="p7d-br" style="--c:#94a3c4"><span>纯 CoT</span><i><b style="--w:54.5%"></b></i><em>6/11</em></div>
+          <div class="p7d-br" style="--c:var(--acc)"><span>代码辅助</span><i><b style="--w:72.7%"></b></i><em>8/11 · +2 题</em></div></div>
+        <div class="p7d-gr"><span class="p7d-gm">gpt-5.6-luna</span>
+          <div class="p7d-br" style="--c:#94a3c4"><span>纯 CoT</span><i><b style="--w:90.9%"></b></i><em>10/11</em></div>
+          <div class="p7d-br" style="--c:var(--acc)"><span>代码辅助</span><i><b style="--w:100%"></b></i><em>11/11 · +1 题</em></div></div>
+        <p class="p7d-ft">模型越强，代码能替它补的越少——差距从 +2 题收窄到 +1 题</p>
+      </div>
+    </div>
+  </div>
+  <div class="c5-rec-h p7d-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/code-for-math 验收记录 · 正式活动 2026-07-30，doubao-seed-1-6-flash-250615，AIME 2024 全 30 题 · 教学示例为 11 道 AIME 风格题</div>
+  <div class="src">第五章 ·「代码作为思考工具」· 实验 5-3</div>
+</section>
+<style>
+#c05-exp53 .c5-xp{margin-bottom:16px}
+.p7d-body{display:grid;grid-template-columns:1.05fr 1fr;gap:24px;height:500px}
+.p7d-l{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+.p7d-pipe{display:flex;align-items:center;gap:6px}
+.p7d-pipe span{flex:none;padding:7px 11px;border-radius:10px;font-size:15px;line-height:1.35;text-align:center;border:1px solid var(--line2);background:rgba(255,255,255,.03);color:var(--text2);transition:all .3s}
+.p7d-pipe span code{display:block;font:600 15px var(--mono);color:#fde68a}
+.p7d-pipe span.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 14%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 30%,transparent)}
+.p7d-pipe i{flex:1;min-width:10px;height:2px;background:linear-gradient(90deg,var(--line2),var(--acc))}
+.p7d-ex{display:flex;flex-direction:column;gap:12px;flex:1;min-height:0}
+.p7d-eq{display:flex;flex-direction:column;gap:6px}
+.p7d-eq p{font-size:19px;line-height:1.5}
+.p7d-io{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;flex:1;min-height:0}
+.p7d-code{font-size:15px;padding:10px 8px}
+.p7d-code .ln{transition:background .3s}
+.p7d-ans{display:flex;flex-direction:column;gap:12px}
+.p7d-a{flex:1;display:flex;flex-direction:column;justify-content:center;gap:2px;padding:10px 16px;border-radius:14px;border:1px solid}
+.p7d-a span{font-size:15px;color:var(--text2)}
+.p7d-a b{font:800 40px/1.1 var(--num)}
+.p7d-a em{font-style:normal;font-size:15px}
+.p7d-a.bad{border-color:rgba(251,113,133,.45);background:rgba(251,113,133,.07)}
+.p7d-a.bad b,.p7d-a.bad em{color:#fda4af}
+.p7d-a.ok{border-color:rgba(52,211,153,.45);background:rgba(52,211,153,.07)}
+.p7d-a.ok b,.p7d-a.ok em{color:#6ee7b7}
+.p7d-r{padding:16px 22px;display:flex;flex-direction:column;gap:14px;position:relative}
+.p7d-r .seg button{padding:8px 18px;font-size:17px}
+.p7d-vw{display:none;flex-direction:column;gap:16px}
+.p7d-vw.on{display:flex;animation:upIn .45s var(--spring) both}
+.p7d-bars{display:flex;flex-direction:column;gap:12px}
+.p7d-br{display:grid;grid-template-columns:96px 1fr 150px;align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.p7d-br i{height:26px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+.p7d-br i b{display:block;height:100%;width:0;border-radius:8px;background:var(--c);transition:width 1s var(--ease)}
+.p7d-vw.on .p7d-br i b{width:var(--w)}
+.p7d-br em{font:700 18px var(--num);font-style:normal;color:var(--text)}
+.p7d-ct>div{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.p7d-ct>div span{display:flex;flex-direction:column;align-items:center;padding:8px 6px;border-radius:12px;font-size:15px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7d-ct>div b{font:800 26px var(--num);color:var(--text)}
+.p7d-ct>div .y{border-color:rgba(52,211,153,.45)}.p7d-ct>div .y b{color:#6ee7b7}
+.p7d-ct>div .n{border-color:rgba(251,113,133,.45)}.p7d-ct>div .n b{color:#fda4af}
+.p7d-p{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.p7d-p b{font:800 24px var(--num);color:var(--warn)}
+.p7d-p>span:not(.c5-tag){font-size:17px;color:var(--text2)}
+.p7d-ft{font-size:16px;line-height:1.55;color:var(--text3)}
+.p7d-gr{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7d-gm{font:600 17px var(--mono);color:var(--text)}
+.p7d-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp53'] = {
+  SOL: 'S = set()\nfor a in range(0, 32):\n    for b in range(0, 32):\n        s = a * a + b * b\n        if 1 <= s <= 1000:\n            S.add(s)\nprint(len(S))',
+  init(s) {
+    this.set = U.seg(s.querySelector('.p7d-seg'), (v) => { this.auto = false; this.view(s, v); });
+    this.ln = C5.code(s.querySelector('.p7d-code'), this.SOL, 'py');
+  },
+  view(s, v) { this.v = v; this.set(v); s.querySelectorAll('.p7d-vw').forEach((w) => w.classList.toggle('on', w.dataset.k === v)); },
+  enter(s, ctx) {
+    this.auto = true; this.view(s, 'f');
+    ctx.every(() => { if (this.auto) this.view(s, this.v === 'f' ? 't' : 'f'); }, 7000);
+    const ps = [...s.querySelectorAll('.p7d-pipe span')];
+    let k = 0;
+    const tick = () => {
+      ps.forEach((p, j) => p.classList.toggle('on', j === k % 5));
+      this.ln.forEach((l, j) => l.classList.toggle('hl', k % 5 === 2 && j === (Math.floor(k / 5) % this.ln.length)));
+      k++;
+    };
+    tick(); ctx.every(tick, 900);
+  },
+  reset(s) { s.querySelectorAll('.p7d-vw').forEach((w) => w.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-exp54" data-part="7" data-trans="rise" data-dur="22000" data-title="实验 5-4 ★★：用代码提升逻辑思考" data-notes="<b>实验 5-4 ★★：使用代码生成工具提升逻辑思考能力</b>。实验目标：评估 Agent 通过约束求解代码辅助逻辑思考的能力。技术方案：为 Agent 配备包含 python-constraint 库的 Code Interpreter，把逻辑谜题（如骑士与无赖问题——骑士总说真话，无赖总说假话）转化为形式化约束定义：识别所有变量（每个岛民身份）、约束条件（“骑士说真话”等推导），定义约束并调用求解器搜索满足所有约束的解。验收标准：使用 K&K Puzzle 数据集评测，代码辅助模式求解准确率达 90% 以上，显著高于纯思考模式。<br>左侧是配套仓库教学示例里的 kk11 五人谜题：A 说 B 是骑士；B 说 C 是无赖；C 说 D 是骑士；D 说 E 是无赖；E 说我们五人当中至少有两个骑士。模型生成的约束代码把每句话写成“X == 那句话的真值”的双条件约束（排版有调整），求解器穷举 2 的 5 次方 = 32 种组合，返回唯一解：A 骑士、B 骑士、C 无赖、D 无赖、E 骑士。<br>正式活动（2026-07-30，doubao-seed-1-6-flash-250615）：固定版本的 K-and-K/perturbed-knights-and-knaves，按六类扰动与 2–8 人分层抽取 84 道配对题。代码臂每题都调用了 python-constraint，准确率却只有 39.3%，低于纯思考的 75.0%（p = 2.27e-7，方向与预期相反），既没达到 90%，也没有显著提升——这是负结果，按人数拆开看，每一档都是纯思考更高。教学示例（12 道精选题，gpt-4o-mini）：纯思考 6/12，代码辅助 12/12，离线求解器 12/12；离线求解器的 100% 只证明确定性 CSP 机制正确，不能替代真实 LLM 对照。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-4 <span class="c5-stars">★★</span>：用代码生成工具<em>提升逻辑思考</em>能力</h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>评估 Agent 通过约束求解代码辅助逻辑思考的能力</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>Code Interpreter + python-constraint：识别变量（每个岛民身份）、写出约束（“骑士说真话”等），调用求解器搜索</p></div>
+    <div class="c5-xb"><b>验收标准</b><p>K&amp;K Puzzle 数据集评测：代码辅助准确率达 90% 以上，显著高于纯思考</p></div>
+  </div>
+  <div class="p7e-body">
+    <div class="p7e-pz panel fx fx-left" style="--d:3">
+      <div class="p7e-h"><b>kk11 · 五人谜题</b><span class="c5-tag real">教学示例</span></div>
+      <div class="p7e-st"></div>
+      <div class="p7e-grid" data-clip-ok></div>
+      <div class="p7e-cnt">剩余组合：<b>32</b> / 32</div>
+    </div>
+    <div class="win p7e-cw fx fx-up" style="--d:4"><div class="win-bar"><i></i><i></i><i></i><span>模型生成的约束代码（排版有调整）</span></div><div class="c5-code p7e-code"></div></div>
+    <div class="p7e-r panel fx fx-right" style="--d:5">
+      <div class="p7e-seg seg"><i class="knob"></i><button data-v="f">正式 · 84 题</button><button data-v="t">教学 · 12 题</button></div>
+      <div class="p7e-vw" data-k="f">
+        <div class="p7e-kp"><div class="c5-kpi"><b>75.0%</b><span>纯思考 63/84</span></div><div class="c5-kpi"><b class="neg">39.3%</b><span>代码辅助 33/84</span></div></div>
+        <div class="p7e-p"><span class="c5-tag neg">与预期相反</span><span>p = 2.27e-7 · 代码臂每题都调用了 python-constraint</span></div>
+        <div class="p7e-ch"><span class="lbl">按人数拆分（每档 12 题）</span><div class="p7e-cols"></div><div class="p7e-lg"><span><i style="background:#94a3c4"></i>纯思考</span><span><i style="background:var(--acc)"></i>代码辅助</span></div></div>
+      </div>
+      <div class="p7e-vw" data-k="t">
+        <div class="p7e-tb"><span class="lbl">gpt-4o-mini · 12 道精选题</span>
+          <div class="p7e-br" style="--c:#94a3c4"><span>纯思考</span><i><b style="--w:50%"></b></i><em>6/12</em></div>
+          <div class="p7e-br" style="--c:var(--acc)"><span>代码辅助</span><i><b style="--w:100%"></b></i><em>12/12</em></div>
+          <div class="p7e-br" style="--c:var(--ok)"><span>离线求解器</span><i><b style="--w:100%"></b></i><em>12/12</em></div>
+        </div>
+        <p class="p7e-ft">纯思考的错误集中在 3 人及以上、含计数或自指的谜题（kk05–kk09、kk11）</p>
+        <p class="p7e-ft">离线求解器的 100% 只证明 CSP 机制本身正确，<b>不能替代真实 LLM 对照</b></p>
+      </div>
+    </div>
+  </div>
+  <div class="c5-rec-h p7e-rec fx fx-up" style="--d:6"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/code-for-logic 验收记录 · 正式活动 2026-07-30，doubao-seed-1-6-flash-250615，K-and-K/perturbed-knights-and-knaves 分层 84 题 · 教学示例 gpt-4o-mini</div>
+  <div class="src">第五章 ·「代码作为思考工具」· 实验 5-4</div>
+</section>
+<style>
+#c05-exp54 .c5-xp{margin-bottom:16px}
+.p7e-body{display:grid;grid-template-columns:480px 584px 1fr;gap:20px;height:500px}
+.p7e-pz{padding:14px 18px;display:flex;flex-direction:column;gap:10px}
+.p7e-h{display:flex;align-items:center;justify-content:space-between}
+.p7e-h b{font-size:20px}
+.p7e-st{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.p7e-st span{padding:4px 10px;border-radius:8px;font-size:16px;color:var(--text2);border:1px solid var(--line);transition:all .3s;white-space:nowrap}
+.p7e-st span:last-child{grid-column:1/3}
+.p7e-st span b{color:var(--text)}
+.p7e-st span.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.p7e-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;flex:1}
+.p7e-c{display:flex;align-items:center;justify-content:center;gap:3px;border-radius:7px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:opacity .35s,border-color .35s,background .35s}
+.p7e-c i{width:17px;height:17px;border-radius:4px;display:grid;place-items:center;font:700 15px/1 var(--num);font-style:normal;color:var(--text3)}
+.p7e-c i.k{background:rgba(251,191,36,.85);color:#1a1405}
+.p7e-c i.n{border:1px solid var(--line2)}
+.p7e-c.x{opacity:.14}
+.p7e-c.hit{border-color:var(--bad);background:rgba(251,113,133,.18)}
+.p7e-c.win{border-color:var(--ok);background:rgba(52,211,153,.2);box-shadow:0 0 18px rgba(52,211,153,.45);opacity:1}
+.p7e-cnt{font-size:17px;color:var(--text2)}
+.p7e-cnt b{font:800 22px var(--num);color:var(--acc)}
+.p7e-cw{display:flex;flex-direction:column;min-height:0}
+.p7e-code{font-size:15px;padding:12px 8px}
+.p7e-code .ln{white-space:pre}
+.p7e-r{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.p7e-r .seg button{padding:8px 16px;font-size:16px}
+.p7e-vw{display:none;flex-direction:column;gap:12px}
+.p7e-vw.on{display:flex;animation:upIn .45s var(--spring) both}
+.p7e-kp{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.p7e-kp b.neg{color:#fda4af}
+.p7e-p{display:flex;flex-direction:column;gap:6px;font-size:15px;color:var(--text3)}
+.p7e-p .c5-tag{align-self:flex-start}
+.p7e-cols{display:flex;align-items:flex-end;gap:8px;height:120px;margin-top:8px;padding-bottom:4px;border-bottom:1px solid var(--line2)}
+.p7e-g{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.p7e-g>div{display:flex;align-items:flex-end;gap:3px;height:100%}
+.p7e-g>div i{width:12px;border-radius:3px 3px 0 0;height:0;transition:height .9s var(--ease)}
+.p7e-vw.on .p7e-g>div i{height:var(--h)}
+.p7e-g>span{font-size:15px;color:var(--text3);white-space:nowrap}
+.p7e-lg{display:flex;gap:16px;margin-top:6px;font-size:15px;color:var(--text2)}
+.p7e-lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px}
+.p7e-tb{display:flex;flex-direction:column;gap:10px}
+.p7e-br{display:grid;grid-template-columns:90px 1fr 54px;align-items:center;gap:10px;font-size:16px;color:var(--text2)}
+.p7e-br i{height:22px;border-radius:7px;background:rgba(255,255,255,.05);overflow:hidden}
+.p7e-br i b{display:block;height:100%;width:0;border-radius:7px;background:var(--c);transition:width 1s var(--ease)}
+.p7e-vw.on .p7e-br i b{width:var(--w)}
+.p7e-br em{font:700 17px var(--num);font-style:normal;color:var(--text)}
+.p7e-ft{font-size:16px;line-height:1.55;color:var(--text3)}
+.p7e-ft b{color:var(--text2)}
+.p7e-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp54'] = {
+  CODE: `from constraint import Problem
+p = Problem()
+for name in ['A', 'B', 'C', 'D', 'E']:
+    p.addVariable(name, [True, False])
+# True=骑士(说真话)  False=无赖(说假话)
+# 每句话都写成「X == (那句话的真值)」
+p.addConstraint(lambda a, b: a == (b == True), ['A', 'B'])
+p.addConstraint(lambda b, c: b == (c == False), ['B', 'C'])
+p.addConstraint(lambda c, d: c == (d == True), ['C', 'D'])
+p.addConstraint(lambda d, e: d == (e == False), ['D', 'E'])
+p.addConstraint(lambda a, b, c, d, e:
+    e == ((a + b + c + d + e) >= 2), ['A', 'B', 'C', 'D', 'E'])
+for s in p.getSolutions():
+    print(s)`,
+  ST: [['A', '“B 是骑士”'], ['B', '“C 是无赖”'], ['C', '“D 是骑士”'], ['D', '“E 是无赖”'], ['E', '“我们五人当中至少有两个骑士”']],
+  // 每条约束：对应代码行、判定函数（v = [A,B,C,D,E]，true = 骑士）
+  CS: [
+    { ln: [6], f: (v) => v[0] === v[1] },
+    { ln: [7], f: (v) => v[1] === !v[2] },
+    { ln: [8], f: (v) => v[2] === v[3] },
+    { ln: [9], f: (v) => v[3] === !v[4] },
+    { ln: [10, 11], f: (v) => v[4] === v.filter(Boolean).length >= 2 },
+  ],
+  // 正式活动按人数拆分：[人数, 纯思考对的题数, 代码辅助对的题数]，每档 12 题
+  PP: [[2, 10, 7], [3, 10, 6], [4, 10, 5], [5, 7, 3], [6, 10, 3], [7, 6, 4], [8, 10, 5]],
+  init(s) {
+    this.ln = C5.code(s.querySelector('.p7e-code'), this.CODE, 'py');
+    s.querySelector('.p7e-st').innerHTML = this.ST.map(([a, t]) => `<span><b>${a}</b> 说 ${t}</span>`).join('');
+    this.V = Array.from({ length: 32 }, (_, i) => [16, 8, 4, 2, 1].map((m) => !(i & m)));
+    s.querySelector('.p7e-grid').innerHTML = this.V.map((v) => `<div class="p7e-c">${v.map((k, j) => `<i class="${k ? 'k' : 'n'}">${'ABCDE'[j]}</i>`).join('')}</div>`).join('');
+    s.querySelector('.p7e-cols').innerHTML = this.PP.map(([n, a, b]) => `<div class="p7e-g"><div><i style="--h:${(a / 12) * 100}%;background:#94a3c4"></i><i style="--h:${(b / 12) * 100}%;background:var(--acc)"></i></div><span>${n} 人</span></div>`).join('');
+    this.set = U.seg(s.querySelector('.p7e-seg'), (v) => { this.auto = false; this.view(s, v); });
+  },
+  view(s, v) { this.v = v; this.set(v); s.querySelectorAll('.p7e-vw').forEach((w) => w.classList.toggle('on', w.dataset.k === v)); },
+  async solve(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const cells = [...s.querySelectorAll('.p7e-c')], st = [...s.querySelectorAll('.p7e-st span')], cnt = s.querySelector('.p7e-cnt b');
+    while (ok()) {
+      cells.forEach((c) => (c.className = 'p7e-c'));
+      st.forEach((x) => x.classList.remove('on'));
+      this.ln.forEach((l) => l.classList.remove('hl'));
+      let alive = this.V.map(() => true);
+      cnt.textContent = 32;
+      await U.wait(ctx, 900); if (!ok()) return;
+      for (let k = 0; k < this.CS.length; k++) {
+        const c = this.CS[k];
+        st.forEach((x, j) => x.classList.toggle('on', j === k));
+        this.ln.forEach((l, j) => l.classList.toggle('hl', c.ln.includes(j)));
+        const kill = this.V.map((v, i) => alive[i] && !c.f(v));
+        kill.forEach((x, i) => x && cells[i].classList.add('hit'));
+        await U.wait(ctx, 700); if (!ok()) return;
+        kill.forEach((x, i) => { if (x) { cells[i].classList.remove('hit'); cells[i].classList.add('x'); alive[i] = false; } });
+        cnt.textContent = alive.filter(Boolean).length;
+        await U.wait(ctx, 900); if (!ok()) return;
+      }
+      st.forEach((x) => x.classList.remove('on'));
+      this.ln.forEach((l, j) => l.classList.toggle('hl', j >= 12));
+      alive.forEach((a, i) => a && cells[i].classList.add('win'));
+      await U.wait(ctx, 4200);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.auto = true;
+    this.view(s, 'f');
+    ctx.every(() => { if (this.auto) this.view(s, this.v === 'f' ? 't' : 'f'); }, 8000);
+    this.solve(s);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.p7e-c').forEach((c) => (c.className = 'p7e-c')); s.querySelectorAll('.p7e-vw').forEach((w) => w.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c05-thick" data-part="7" data-dur="18000" data-title="模型与脚手架此消彼长" data-notes="实验 5-4 还揭示了一个更普遍的规律：模型与脚手架（harness）之间是此消彼长的关系。模型足够强时，脚手架可以更薄——模型自己就能把逻辑想对，代码求解器带来的增益随之收窄；模型不够强时，就得在脚手架里做更多事情——把关键的逻辑推理交给代码和约束求解器来保证正确性。正因如此，原书的实验刻意选用能力较弱的模型来放大这一对照：在较弱的模型上，纯思考模式会频繁算错，代码辅助能把准确率显著拉高；而换成足够强的思考模型，纯思考往往就能解出全部谜题，代码辅助的增益便收敛到接近零。所以脚手架该做多厚，取决于你手上模型的能力边界——这也是评估一项 Agent 技术时容易被忽视的前提：同一套脚手架，配上不同能力的模型，得到的结论可能截然不同。<br>左边的曲线只是示意，拖动滑块看增益如何随模型能力收窄；右边是配套仓库三个实验在强弱两个模型上的教学示例实测。值得一提的是，正式活动的结果也印证了“结论可能截然不同”：在 doubao-flash 上，实验 5-3 的提升未达显著，实验 5-4 代码辅助反而更低；在本地 qwen3:4b 上，实验 5-5 也没有显著提升。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型与脚手架<em>此消彼长</em></h2></header>
+  <div class="p7f-body">
+    <div class="p7f-l panel fx fx-left" style="--d:2">
+      <div class="p7f-h"><b>同一套脚手架，配上不同能力的模型</b><span class="c5-tag demo">示意曲线</span></div>
+      <svg class="p7f-svg" viewBox="0 0 760 360">
+        <defs><linearGradient id="p7f-gap" x1="0" x2="1"><stop offset="0" stop-color="#a78bfa" stop-opacity=".5"/><stop offset="1" stop-color="#a78bfa" stop-opacity=".08"/></linearGradient></defs>
+        <line class="p7f-ax" x1="70" y1="310" x2="740" y2="310"/><line class="p7f-ax" x1="70" y1="20" x2="70" y2="310"/>
+        <text class="p7f-at" x="40" y="30">准确率</text><text class="p7f-at" x="740" y="342" text-anchor="end">模型能力 →</text>
+        <text class="p7f-at" x="80" y="342">较弱</text>
+        <path class="p7f-area"/><path class="p7f-ln pure"/><path class="p7f-ln code"/>
+        <text class="p7f-lt pure" x="600" y="104">纯思考</text><text class="p7f-lt code" x="380" y="46">代码辅助</text>
+        <line class="p7f-mk" y1="20" y2="310"/><circle class="p7f-d pure" r="8"/><circle class="p7f-d code" r="8"/>
+      </svg>
+      <div class="p7f-ctl"><span>较弱</span><input class="rng p7f-rng" type="range" min="0" max="100" value="12"><span>较强</span></div>
+      <div class="p7f-say"></div>
+    </div>
+    <div class="p7f-r fx fx-right" style="--d:3">
+      <div class="p7f-tbl panel">
+        <div class="p7f-th"><span>配套仓库教学示例</span><span>gpt-4o-mini</span><span>gpt-5.6-luna</span></div>
+        <div class="p7f-tr"><span>数学 · 实验 5-3<small>11 题</small></span><span>6 → 8<b>+2</b></span><span>10 → 11<b>+1</b></span></div>
+        <div class="p7f-tr"><span>业务规则 · 实验 5-5<small>8 个 case</small></span><span>6 → 8<b>+2</b></span><span>7 → 8<b>+1</b></span></div>
+        <div class="p7f-tr"><span>逻辑 · 实验 5-4<small>12 题</small></span><span>6 → 12<b>+6</b></span><span class="na">未列出</span></div>
+        <p class="p7f-tn">“纯思考 → 加脚手架”的正确数；模型越强，脚手架能补的越少</p>
+      </div>
+      <div class="p7f-con"><b>脚手架该做多厚，取决于你手上模型的能力边界</b><p>评估一项 Agent 技术时容易被忽视的前提：同一套脚手架，配上不同能力的模型，<b>得到的结论可能截然不同</b></p></div>
+      <div class="p7f-neg"><span class="c5-tag neg">正式活动</span><p>doubao-flash 上，实验 5-3 提升未达显著、实验 5-4 代码辅助反而更低；qwen3:4b 上，实验 5-5 没有显著提升</p></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码作为思考工具」· 模型与脚手架此消彼长</div>
+</section>
+<style>
+.p7f-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.p7f-l{padding:16px 22px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.p7f-h{display:flex;align-items:center;justify-content:space-between}
+.p7f-h b{font-size:20px}
+.p7f-svg{width:100%;flex:1;min-height:0}
+.p7f-ax{stroke:var(--line2);stroke-width:1.5}
+.p7f-at{font-size:16px;fill:var(--text3)}
+.p7f-area{fill:url(#p7f-gap)}
+.p7f-ln{fill:none;stroke-width:4;stroke-linecap:round}
+.p7f-ln.pure{stroke:#94a3c4}.p7f-ln.code{stroke:var(--acc)}
+.p7f-lt{font-size:18px;font-weight:700}
+.p7f-lt.pure{fill:#94a3c4}.p7f-lt.code{fill:var(--acc)}
+.p7f-mk{stroke:var(--text);stroke-width:1.5;stroke-dasharray:5 5;opacity:.6}
+.p7f-d{stroke:#06101f;stroke-width:3}
+.p7f-d.pure{fill:#94a3c4}.p7f-d.code{fill:var(--acc)}
+.p7f-ctl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px;font-size:16px;color:var(--text3)}
+.p7f-say{min-height:56px;padding:10px 16px;border-radius:12px;font-size:18px;line-height:1.55;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7f-say b{color:var(--acc)}
+.p7f-r{display:flex;flex-direction:column;gap:16px;min-height:0}
+.p7f-tbl{padding:14px 20px;display:flex;flex-direction:column;gap:6px}
+.p7f-th,.p7f-tr{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:10px;align-items:center}
+.p7f-th span{font-size:15px;color:var(--text3)}
+.p7f-th span:not(:first-child),.p7f-tr span:not(:first-child){text-align:center}
+.p7f-tr{padding:8px 0;border-top:1px solid var(--line)}
+.p7f-tr span{font:600 19px var(--num);color:var(--text)}
+.p7f-tr span:first-child{font:600 17px var(--font)}
+.p7f-tr small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+.p7f-tr b{margin-left:8px;font-size:17px;color:var(--acc)}
+.p7f-tr span.na{font:15px var(--font);color:var(--text3)}
+.p7f-tn{font-size:15px;color:var(--text3);margin-top:4px}
+.p7f-con{padding:16px 20px;border-radius:16px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent)}
+.p7f-con>b{font-size:22px;line-height:1.45}
+.p7f-con p{margin-top:8px;font-size:17px;line-height:1.6;color:var(--text2)}
+.p7f-con p b{color:var(--text)}
+.p7f-neg{display:flex;align-items:flex-start;gap:12px;padding:12px 16px;border-radius:14px;border:1px solid rgba(253,164,175,.35);background:rgba(253,164,175,.05)}
+.p7f-neg p{font-size:16px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c05-thick'] = {
+  X0: 70, X1: 740, Y0: 310, Y1: 20,
+  pure(t) { return 0.3 + 0.66 * Math.pow(t, 0.85); },
+  code(t) { return 0.84 + 0.14 * t; },
+  px(t) { return this.X0 + (this.X1 - this.X0) * t; },
+  py(a) { return this.Y0 - (this.Y0 - this.Y1) * a; },
+  init(s) {
+    const N = 60, P = [], C = [];
+    for (let i = 0; i <= N; i++) { const t = i / N; P.push([this.px(t), this.py(this.pure(t))]); C.push([this.px(t), this.py(this.code(t))]); }
+    const d = (A) => 'M' + A.map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L');
+    s.querySelector('.p7f-ln.pure').setAttribute('d', d(P));
+    s.querySelector('.p7f-ln.code').setAttribute('d', d(C));
+    s.querySelector('.p7f-area').setAttribute('d', d(C) + ' L' + P.slice().reverse().map((p) => p.map((v) => v.toFixed(1)).join(' ')).join(' L') + ' Z');
+    this.rg = s.querySelector('.p7f-rng');
+    this.rg.addEventListener('input', () => { this.auto = false; this.at(s, +this.rg.value / 100); });
+  },
+  at(s, t) {
+    this.t = t; this.rg.value = Math.round(t * 100); this.rg.style.setProperty('--p', t * 100 + '%');
+    const x = this.px(t), mk = s.querySelector('.p7f-mk');
+    mk.setAttribute('x1', x); mk.setAttribute('x2', x);
+    const dp = s.querySelector('.p7f-d.pure'), dc = s.querySelector('.p7f-d.code');
+    dp.setAttribute('cx', x); dp.setAttribute('cy', this.py(this.pure(t)));
+    dc.setAttribute('cx', x); dc.setAttribute('cy', this.py(this.code(t)));
+    const g = this.code(t) - this.pure(t);
+    s.querySelector('.p7f-say').innerHTML = g > 0.3
+      ? '较弱的模型：纯思考会频繁算错——<b>脚手架要做厚</b>，把关键的逻辑推理交给代码和约束求解器'
+      : g > 0.12 ? '中等能力：代码辅助仍有增益，但<b>正在收窄</b>'
+        : '足够强的模型：纯思考往往就能全部解出——<b>脚手架可以更薄</b>，增益收敛到接近零';
+  },
+  enter(s, ctx) {
+    this.auto = true; let t = 0.12, dir = 1;
+    this.at(s, t);
+    ctx.every(() => { if (!this.auto) return; t += dir * 0.02; if (t >= 0.96 || t <= 0.08) dir = -dir; this.at(s, t); }, 120);
+  },
+};
+</script>
+
+<!-- ================= 代码作为业务规则的约束 ================= -->
+<section class="slide" id="c05-rules" data-part="7" data-trans="zoom" data-dur="20000" data-title="代码作为业务规则的约束" data-notes="这一节是对前面 Harness 工程的直接回应。Harness 的核心原则之一是“约束：编码化而非文档化”——将规则从自然语言文档转化为可执行的代码，使其成为系统行为的强制约束而非建议性指南。代码生成使 Agent 能够自主完成这个转化过程。<br>业务规则、办事流程、决策逻辑如果仅用自然语言描述，往往充满歧义。什么是“合理的退款请求”？什么算“紧急情况”？“购买后 7 天内可退款”看似清楚，但“7 天”是自然日还是工作日？“购买”是下单时间还是发货时间？相比之下，代码提供了无歧义、可执行的知识表达方式——要么成功运行，要么抛出错误，不存在模棱两可。<br><b>精确表达复杂业务规则。自然语言规则 vs 代码化规则：互补而非替代</b>。将规则写在系统提示词中的优势：模型可基于规则向用户<b>解释政策</b>；可根据规则<b>寻找变通方案</b>（如“改签而非取消”）；可在调用工具前初步判断可行性。将规则编码成校验工具的优势：代码逻辑具有<b>精确性和无歧义性</b>，不会出现“理解偏差”；代码执行具有<b>确定性</b>，相同输入必产生相同输出；特别适合<b>复杂规则组合</b>——多条件布尔组合、时间计算、跨数据源验证。实践中应结合使用：系统提示词包含自然语言规则供理解和沟通，关键决策点配备代码化校验工具作为“守门员”确保合规性。<br>代码化规则的真正价值不在于优化 token 效率，而在于<b>防止不可逆的错误操作</b>——取消订单、转出资金、删除数据，这些操作一旦执行就无法撤销。代码化校验在操作前设置最后一道防线，这种安全保障的价值远超其实现成本。<br>左边日历里的日期是示意：切换两个歧义点，同一个申请的结论会翻转。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">代码作为<em>业务规则的约束</em>：编码化而非文档化</h2></header>
+  <div class="p7g-body">
+    <div class="p7g-l panel fx fx-left" style="--d:2">
+      <div class="p7g-rule"><span class="lbl">一条看似清楚的规则</span><b>“购买后 7 天内可退款”</b><span class="c5-tag demo">示意</span></div>
+      <div class="p7g-ctl">
+        <div><span>“7 天”是</span><div class="p7g-s1 seg"><i class="knob"></i><button data-v="nat">自然日</button><button data-v="work">工作日</button></div></div>
+        <div><span>“购买”是</span><div class="p7g-s2 seg"><i class="knob"></i><button data-v="order">下单时间</button><button data-v="ship">发货时间</button></div></div>
+      </div>
+      <div class="p7g-cal"></div>
+      <div class="p7g-vd"></div>
+      <div class="p7g-code"><span class="lbl">代码把定义钉死</span><div class="c5-code p7g-cc"></div></div>
+    </div>
+    <div class="p7g-r fx fx-right" style="--d:3">
+      <div class="p7g-h"><b>自然语言规则 vs 代码化规则：</b><em>互补而非替代</em></div>
+      <div class="p7g-two">
+        <div class="p7g-c nl"><div class="p7g-ch"><svg class="ic"><use href="#i-chat"/></svg><b>写在系统提示词中</b></div><ul><li>向用户<b>解释政策</b></li><li><b>寻找变通方案</b>（如“改签而非取消”）</li><li>调用工具前<b>初步判断可行性</b></li></ul></div>
+        <div class="p7g-c cd"><div class="p7g-ch"><svg class="ic"><use href="#i-code"/></svg><b>编码成校验工具</b></div><ul><li><b>精确性和无歧义性</b>：不会出现“理解偏差”</li><li><b>确定性</b>：相同输入必产生相同输出</li><li><b>复杂规则组合</b>：多条件布尔组合、时间计算、跨数据源验证</li></ul></div>
+      </div>
+      <div class="p7g-mix"><svg class="ic"><use href="#i-merge"/></svg><p>结合使用：提示词里的自然语言规则<b>供理解和沟通</b>，关键决策点配代码化校验工具当<b>“守门员”</b></p></div>
+      <div class="p7g-irr"><span class="lbl">真正价值不在于优化 token 效率，而在于</span><b>防止不可逆的错误操作</b><div><span>取消订单</span><span>转出资金</span><span>删除数据</span></div></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码作为业务规则的约束」· 精确表达复杂业务规则</div>
+</section>
+<style>
+.p7g-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.p7g-l{padding:16px 22px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.p7g-rule{display:flex;align-items:center;gap:14px}
+.p7g-rule b{font-size:24px;color:var(--acc)}
+.p7g-rule .c5-tag{margin-left:auto}
+.p7g-ctl{display:flex;gap:20px}
+.p7g-ctl>div{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--text2)}
+.p7g-ctl .seg button{padding:6px 16px;font-size:16px}
+.p7g-cal{display:grid;grid-template-columns:repeat(14,1fr);gap:4px}
+.p7g-d{position:relative;display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 0 18px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.p7g-d b{font:700 16px var(--num)}
+.p7g-d span{font-size:15px;color:var(--text3)}
+.p7g-d.we{background:rgba(255,255,255,.01)}
+.p7g-d.we b{color:var(--text3)}
+.p7g-d.in{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.p7g-d.dl{border-color:var(--acc);box-shadow:0 0 14px color-mix(in srgb,var(--acc) 40%,transparent)}
+.p7g-d em{position:absolute;bottom:2px;font:600 15px/1 var(--num);font-style:normal;color:var(--acc)}
+.p7g-d .mk{position:absolute;top:-30px;left:50%;transform:translateX(-50%);padding:1px 8px;border-radius:7px;font-size:15px;white-space:nowrap;color:#06101f}
+.p7g-d .mk.o{background:var(--tool)}.p7g-d .mk.s{background:#60a5fa}.p7g-d .mk.r{background:var(--pink)}
+.p7g-cal{margin-top:30px}
+.p7g-vd{display:flex;align-items:center;gap:12px;min-height:50px;padding:8px 14px;border-radius:12px;font-size:18px;border:1px solid var(--line)}
+.p7g-vd b{font-size:22px}
+.p7g-vd.ok{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.07)}
+.p7g-vd.ok b{color:#6ee7b7}
+.p7g-vd.bad{border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.08)}
+.p7g-vd.bad b{color:#fda4af}
+.p7g-vd span{color:var(--text2)}
+.p7g-code{margin-top:auto;display:flex;flex-direction:column;gap:4px}
+.p7g-cc{font-size:16px;padding:8px 6px;border-radius:12px;background:rgba(5,9,22,.7);border:1px solid var(--line)}
+.p7g-r{display:flex;flex-direction:column;gap:14px;min-height:0}
+.p7g-h b{font-size:22px}
+.p7g-h em{font-style:normal;font-size:22px;font-weight:700;color:var(--acc)}
+.p7g-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.p7g-c{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.p7g-c.nl{border-top:3px solid #c4b5fd}.p7g-c.cd{border-top:3px solid var(--acc)}
+.p7g-ch{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.p7g-ch .ic{font-size:24px}
+.p7g-c.nl .ic{color:#c4b5fd}.p7g-c.cd .ic{color:var(--acc)}
+.p7g-ch b{font-size:19px}
+.p7g-c ul{display:flex;flex-direction:column;gap:7px}
+.p7g-c li{position:relative;padding-left:16px;font-size:16px;line-height:1.55;color:var(--text2)}
+.p7g-c li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.p7g-c li b{color:var(--text)}
+.p7g-mix{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.p7g-mix .ic{font-size:28px;color:var(--acc);flex:none}
+.p7g-mix p{font-size:17px;line-height:1.6;color:var(--text2)}
+.p7g-mix b{color:var(--text)}
+.p7g-irr{margin-top:auto;padding:14px 18px;border-radius:16px;border:1px solid rgba(251,113,133,.45);background:rgba(251,113,133,.06);display:flex;flex-direction:column;gap:8px}
+.p7g-irr>b{font-size:24px;color:#fda4af}
+.p7g-irr div{display:flex;gap:10px}
+.p7g-irr div span{padding:4px 14px;border-radius:999px;font-size:16px;color:var(--text);border:1px solid rgba(251,113,133,.5)}
+</style>
+<script>
+HOOKS['c05-rules'] = {
+  // 2026 年 7 月 3 日（周五）到 16 日；下单 7/3，发货 7/6，申请退款 7/12
+  DAYS: [[3, '五'], [4, '六'], [5, '日'], [6, '一'], [7, '二'], [8, '三'], [9, '四'], [10, '五'], [11, '六'], [12, '日'], [13, '一'], [14, '二'], [15, '三'], [16, '四']],
+  ORDER: 3, SHIP: 6, REQ: 12,
+  CODE: {
+    'nat-order': '# 「7 天」= 自然日；「购买」= 下单时间\nok = (req_date - order.created_at).days <= 7',
+    'nat-ship': '# 「7 天」= 自然日；「购买」= 发货时间\nok = (req_date - order.shipped_at).days <= 7',
+    'work-order': '# 「7 天」= 工作日；「购买」= 下单时间\nok = workdays(order.created_at, req_date) <= 7',
+    'work-ship': '# 「7 天」= 工作日；「购买」= 发货时间\nok = workdays(order.shipped_at, req_date) <= 7',
+  },
+  init(s) {
+    s.querySelector('.p7g-cal').innerHTML = this.DAYS.map(([d, w]) => `<div class="p7g-d${w === '六' || w === '日' ? ' we' : ''}" data-d="${d}"><b>7/${d}</b><span>周${w}</span></div>`).join('');
+    const mk = (d, cls, t) => s.querySelector(`.p7g-d[data-d="${d}"]`).insertAdjacentHTML('beforeend', `<i class="mk ${cls}">${t}</i>`);
+    mk(this.ORDER, 'o', '下单'); mk(this.SHIP, 's', '发货'); mk(this.REQ, 'r', '申请');
+    this.s1 = U.seg(s.querySelector('.p7g-s1'), (v) => { this.auto = false; this.a = v; this.show(s); });
+    this.s2 = U.seg(s.querySelector('.p7g-s2'), (v) => { this.auto = false; this.b = v; this.show(s); });
+    this.a = 'nat'; this.b = 'order';
+  },
+  show(s) {
+    this.s1(this.a); this.s2(this.b);
+    const start = this.b === 'order' ? this.ORDER : this.SHIP;
+    const cnt = [];
+    for (const [d, w] of this.DAYS) { if (d <= start) continue; if (this.a === 'work' && (w === '六' || w === '日')) continue; if (cnt.length < 7) cnt.push(d); }
+    const dl = cnt[cnt.length - 1], ok = this.REQ <= dl;
+    s.querySelectorAll('.p7g-d').forEach((e) => {
+      const d = +e.dataset.d, i = cnt.indexOf(d);
+      e.classList.toggle('in', i >= 0); e.classList.toggle('dl', d === dl);
+      const em = e.querySelector('em'); if (em) em.remove();
+      if (i >= 0) e.insertAdjacentHTML('beforeend', `<em>${i + 1}</em>`);
+    });
+    const vd = s.querySelector('.p7g-vd');
+    vd.className = 'p7g-vd ' + (ok ? 'ok' : 'bad');
+    vd.innerHTML = `<b>${ok ? '可退' : '不可退'}</b><span>期限截至 7/${dl}，7/12 的申请${ok ? '在期限内' : '已经超期'}</span>`;
+    C5.code(s.querySelector('.p7g-cc'), this.CODE[`${this.a}-${this.b}`], 'py');
+  },
+  enter(s, ctx) {
+    this.auto = true; this.a = 'nat'; this.b = 'order'; this.show(s);
+    const seq = [['nat', 'order'], ['nat', 'ship'], ['work', 'order'], ['work', 'ship']]; let i = 0;
+    ctx.every(() => { if (!this.auto) return; i = (i + 1) % 4; [this.a, this.b] = seq[i]; this.show(s); }, 3200);
+  },
+};
+</script>
+
+<section class="slide" id="c05-cancel" data-part="7" data-dur="24000" data-title="合并校验与执行：cancel_reservation" data-notes="<b>合并校验与执行：checklist 引导思考，真值校验守门</b>。与其设计独立校验工具，不如让执行工具内部先校验。以 τ-bench（tau-bench，一个模拟航空、电商客服场景，专门评测 Agent 工具调用与政策遵守能力的基准测试）中的航空公司取消政策为例：cancel_reservation 的文档字符串列出五条取消政策——已使用任何航段的订单不可取消；预订后 24 小时内可无条件取消；航空公司取消的航班总可取消；商务舱总可取消；基础经济舱和经济舱需购买旅行保险才可取消——并要求模型调用前先查询订单详情、逐条核对。可选的 expected_* 参数只用于陈述模型的判断依据，仅供服务端比对与审计，不影响政策裁决。<br>函数体里，所有政策事实一律从数据库读取，绝不采信模型自报的值；当前时间来自服务端时钟而非模型提供；模型自报值与真值不一致时调用 log_mismatch 记录告警，用于发现模型的错误认知或潜在注入；之后按政策顺序逐条判断，满足条件才 execute_cancellation。<br>左侧是原书代码全文；右侧选一个订单场景（订单数据为示意），执行光标会沿着真实的分支逐行走过，最后给出工具返回值。最后一个场景里模型自报的舱位与保险状态和数据库不一致，log_mismatch 两行会亮起——但裁决依然只看真值。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">合并校验与执行：<em>执行工具内部先校验</em></h2></header>
+  <div class="p7h-body">
+    <div class="win p7h-cw fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>cancel_reservation · 原书代码</span></div><div class="p7h-vp" data-clip-ok data-ok-overflow><div class="c5-code p7h-code"></div></div></div>
+    <div class="p7h-r fx fx-right" style="--d:3">
+      <div class="p7h-sc"></div>
+      <div class="p7h-db panel"><div class="p7h-h"><svg class="ic"><use href="#i-db"/></svg><b>数据库真值</b><span>服务端查询 · 示意</span></div><div class="p7h-kv"></div></div>
+      <div class="p7h-call panel"><div class="p7h-h"><svg class="ic"><use href="#i-robot"/></svg><b>模型的调用参数</b><span>expected_* 只是自我陈述</span></div><div class="p7h-args"></div></div>
+      <div class="p7h-mm"></div>
+      <div class="p7h-ret"><span class="lbl">工具返回</span><code class="p7h-rv">……</code></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「代码作为业务规则的约束」· 合并校验与执行：checklist 引导思考，真值校验守门</div>
+</section>
+<style>
+.p7h-body{display:grid;grid-template-columns:900px 1fr;gap:22px;flex:1;min-height:0}
+.p7h-cw{display:flex;flex-direction:column;min-height:0}
+.p7h-vp{position:relative;flex:1;min-height:0;overflow:hidden}
+.p7h-code{position:absolute;left:0;right:0;top:0;font-size:15px;line-height:1.5;padding:8px 6px;transition:transform .6s var(--ease)}
+.p7h-code .ln{padding:0 6px}
+.p7h-code .ln[data-n]::before{min-width:1.8em;margin-right:10px}
+.p7h-code .ln.ex{background:rgba(255,255,255,.05)}
+.p7h-code .ln.warn{background:rgba(251,191,36,.2);box-shadow:inset 3px 0 0 var(--tool)}
+.p7h-code .ln.hl.ret{background:rgba(52,211,153,.2);box-shadow:inset 3px 0 0 var(--ok)}
+.p7h-code .ln.hl.rej{background:rgba(251,113,133,.2);box-shadow:inset 3px 0 0 var(--bad)}
+.p7h-r{display:flex;flex-direction:column;gap:12px;min-height:0}
+.p7h-sc{display:flex;flex-wrap:wrap;gap:8px}
+.p7h-sc button{padding:7px 14px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .3s}
+.p7h-sc button.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc)}
+.p7h-db,.p7h-call{padding:10px 16px;display:flex;flex-direction:column;gap:8px}
+.p7h-h{display:flex;align-items:center;gap:10px}
+.p7h-h .ic{font-size:20px;color:var(--acc)}
+.p7h-h b{font-size:18px}
+.p7h-h span{margin-left:auto;font-size:15px;color:var(--text3)}
+.p7h-kv{display:grid;grid-template-columns:auto 1fr;gap:3px 16px;font:16px/1.5 var(--mono)}
+.p7h-kv span{color:var(--text3)}
+.p7h-kv b{font-weight:600;color:var(--text)}
+.p7h-args{font:15px/1.6 var(--mono);color:var(--text2);white-space:pre}
+.p7h-args .bad{color:#fdba74;background:rgba(251,146,60,.14);border-radius:4px}
+.p7h-mm{min-height:46px;padding:9px 14px;border-radius:12px;font-size:16px;line-height:1.5;color:var(--text3);border:1px dashed var(--line2)}
+.p7h-mm.on{color:#fde68a;border:1px solid rgba(251,191,36,.55);background:rgba(251,191,36,.08);animation:upIn .4s var(--spring)}
+.p7h-mm code{font:15px var(--mono)}
+.p7h-ret{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.p7h-rv{padding:10px 14px;border-radius:12px;font:16px/1.5 var(--mono);color:var(--text2);border:1px solid var(--line);background:rgba(5,9,22,.7);white-space:pre-wrap}
+.p7h-rv.ok{color:#6ee7b7;border-color:rgba(52,211,153,.5)}
+.p7h-rv.bad{color:#fda4af;border-color:rgba(251,113,133,.5)}
+</style>
+<script>
+HOOKS['c05-cancel'] = {
+  CODE: `def cancel_reservation(
+    reservation_id: str,
+    cancellation_reason: str,        # "change_of_plan", "airline_cancelled", "other"
+    expected_cabin_class: str = None,    # 可选：模型自查用，服务端以数据库真值复核
+    expected_has_insurance: bool = None  # 可选：模型自查用，同上
+) -> dict:
+    """
+    取消航班预订。
+
+    取消政策（服务端根据数据库真值强制执行）：
+    - 规则 1: 已使用任何航段的订单不可取消
+    - 规则 2: 预订后 24 小时内可无条件取消
+    - 规则 3: 航空公司取消的航班总可取消
+    - 规则 4: 商务舱总可取消
+    - 规则 5: 基础经济舱和经济舱需购买旅行保险才可取消
+
+    调用前请先查询订单详情，逐条核对上述政策；expected_* 参数用于
+    陈述你的判断依据，仅供服务端比对与审计，不影响政策裁决。
+    """
+    # 所有政策事实一律从数据库读取，绝不采信模型自报的值
+    r = db.get_reservation(reservation_id)
+    now = server_clock.now()  # 服务端时钟，而非模型提供
+
+    # 模型自报值与真值不一致时记录告警，用于发现模型的错误认知或潜在注入
+    if expected_cabin_class is not None and expected_cabin_class != r.cabin_class:
+        log_mismatch(reservation_id, "cabin_class", expected_cabin_class, r.cabin_class)
+    if expected_has_insurance is not None and expected_has_insurance != r.has_insurance:
+        log_mismatch(reservation_id, "has_insurance", expected_has_insurance, r.has_insurance)
+
+    if r.any_segment_used:
+        return {"success": False, "reason": "Cannot cancel with used segments"}
+
+    hours_since_booking = (now - r.booking_time).total_seconds() / 3600
+    if hours_since_booking < 0:
+        return {"success": False, "reason": "Booking time is in the future"}
+    if hours_since_booking <= 24:
+        execute_cancellation(reservation_id)
+        return {"success": True, "reason": "Cancelled within 24-hour window"}
+
+    if r.flight_status == "cancelled_by_airline":
+        execute_cancellation(reservation_id)
+        return {"success": True, "reason": "Airline cancelled flight"}
+
+    if r.cabin_class == "business":
+        execute_cancellation(reservation_id)
+        return {"success": True, "reason": "Business class cancellation"}
+
+    if r.cabin_class in ["basic_economy", "economy"]:
+        if r.has_insurance:
+            execute_cancellation(reservation_id)
+            return {"success": True, "reason": f"{r.cabin_class} with insurance"}
+        return {"success": False, "reason": f"{r.cabin_class} requires insurance"}
+
+    return {"success": False, "reason": "Does not meet cancellation policy"}`,
+  S: [
+    { n: '经济舱 · 未买保险', db: { cabin: 'economy', ins: false, h: 72, used: false, st: 'scheduled' }, call: { reason: 'change_of_plan', ec: 'economy', ei: false } },
+    { n: '预订 5 小时内', db: { cabin: 'basic_economy', ins: false, h: 5, used: false, st: 'scheduled' }, call: { reason: 'change_of_plan', ec: 'basic_economy', ei: false } },
+    { n: '航司取消的航班', db: { cabin: 'economy', ins: false, h: 96, used: false, st: 'cancelled_by_airline' }, call: { reason: 'airline_cancelled', ec: 'economy', ei: false } },
+    { n: '航段已使用', db: { cabin: 'business', ins: true, h: 200, used: true, st: 'scheduled' }, call: { reason: 'other', ec: 'business', ei: true } },
+    { n: '自报与真值不符', db: { cabin: 'economy', ins: false, h: 72, used: false, st: 'scheduled' }, call: { reason: 'change_of_plan', ec: 'business', ei: true } },
+  ],
+  init(s) {
+    this.ln = C5.code(s.querySelector('.p7h-code'), this.CODE, 'py', { num: true });
+    this.L = this.CODE.split('\n');
+    const sc = s.querySelector('.p7h-sc');
+    sc.innerHTML = this.S.map((x, i) => `<button data-i="${i}">${x.n}</button>`).join('');
+    sc.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.run(s, +b.dataset.i); }));
+  },
+  // 按真实分支模拟执行，返回 [要走过的行号, 返回值, 不一致项]
+  trace(sc) {
+    const P = [], d = sc.db, c = sc.call, mm = [];
+    let at = 0;
+    const go = (sub, cls) => { const i = this.L.findIndex((l, j) => j >= at && l.includes(sub)); if (i >= 0) { P.push([i, cls]); at = i + 1; } };
+    go('r = db.get_reservation'); go('now = server_clock');
+    go('if expected_cabin_class');
+    if (c.ec != null && c.ec !== d.cabin) { go('"cabin_class", expected', 'warn'); mm.push(['cabin_class', c.ec, d.cabin]); }
+    go('if expected_has_insurance');
+    if (c.ei != null && c.ei !== d.ins) { go('"has_insurance", expected', 'warn'); mm.push(['has_insurance', c.ei ? 'True' : 'False', d.ins ? 'True' : 'False']); }
+    go('if r.any_segment_used');
+    if (d.used) { go('used segments', 'rej'); return [P, ['bad', 'Cannot cancel with used segments'], mm]; }
+    go('hours_since_booking = ('); go('if hours_since_booking < 0'); go('if hours_since_booking <= 24');
+    if (d.h <= 24) { go('execute_cancellation'); go('24-hour window', 'ret'); return [P, ['ok', 'Cancelled within 24-hour window'], mm]; }
+    go('if r.flight_status');
+    if (d.st === 'cancelled_by_airline') { go('execute_cancellation'); go('Airline cancelled flight', 'ret'); return [P, ['ok', 'Airline cancelled flight'], mm]; }
+    go('if r.cabin_class == "business"');
+    if (d.cabin === 'business') { go('execute_cancellation'); go('Business class cancellation', 'ret'); return [P, ['ok', 'Business class cancellation'], mm]; }
+    go('if r.cabin_class in'); go('if r.has_insurance');
+    if (d.ins) { go('execute_cancellation'); go('with insurance', 'ret'); return [P, ['ok', `${d.cabin} with insurance`], mm]; }
+    go('requires insurance', 'rej');
+    return [P, ['bad', `${d.cabin} requires insurance`], mm];
+  },
+  scroll(s, i) {
+    const vp = s.querySelector('.p7h-vp'), code = s.querySelector('.p7h-code'), l = this.ln[i];
+    const y = Math.max(0, Math.min(code.offsetHeight - vp.clientHeight, l.offsetTop - vp.clientHeight * 0.4));
+    code.style.transform = `translateY(${-y}px)`;
+  },
+  async run(s, k) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    const sc = this.S[k]; this.k = k;
+    s.querySelectorAll('.p7h-sc button').forEach((b, j) => b.classList.toggle('on', j === k));
+    const d = sc.db, c = sc.call;
+    s.querySelector('.p7h-kv').innerHTML = [['cabin_class', d.cabin], ['has_insurance', d.ins ? 'True' : 'False'], ['booking_time', `${d.h} 小时前`], ['any_segment_used', d.used ? 'True' : 'False'], ['flight_status', d.st]].map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('');
+    const bad = (v, t) => (v !== t ? ` class="bad"` : '');
+    s.querySelector('.p7h-args').innerHTML = `cancel_reservation(\n  reservation_id="R1042",\n  cancellation_reason="${c.reason}",\n  expected_cabin_class=<span${bad(c.ec, d.cabin)}>"${c.ec}"</span>,\n  expected_has_insurance=<span${bad(c.ei, d.ins)}>${c.ei ? 'True' : 'False'}</span>)`;
+    const mmEl = s.querySelector('.p7h-mm'), rv = s.querySelector('.p7h-rv');
+    mmEl.className = 'p7h-mm'; mmEl.textContent = '自报值与真值一致时，不会记录告警';
+    rv.className = 'p7h-rv'; rv.textContent = '……';
+    this.ln.forEach((l) => l.classList.remove('hl', 'ex', 'warn', 'ret', 'rej'));
+    this.scroll(s, 20);
+    const [P, R, mm] = this.trace(sc);
+    await U.wait(ctx, 700); if (!ok()) return;
+    let prev = null;
+    for (const [i, cls] of P) {
+      if (prev != null) { this.ln[prev].classList.remove('hl'); this.ln[prev].classList.add('ex'); }
+      this.ln[i].classList.add('hl'); if (cls) this.ln[i].classList.add(cls);
+      this.scroll(s, i); prev = i;
+      if (cls === 'warn') { const m = mm.shift(); mmEl.className = 'p7h-mm on'; mmEl.innerHTML = `log_mismatch：<code>${m[0]}</code> 自报 <code>${m[1]}</code> ≠ 真值 <code>${m[2]}</code>（只记录告警，裁决看真值）`; }
+      await U.wait(ctx, cls ? 900 : 480); if (!ok()) return;
+    }
+    rv.className = 'p7h-rv ' + R[0];
+    rv.textContent = `{"success": ${R[0] === 'ok' ? 'True' : 'False'}, "reason": "${R[1]}"}`;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.run(s, 0);
+    ctx.every(() => { if (this.auto) this.run(s, ((this.k || 0) + 1) % this.S.length); }, 9000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; this.ln.forEach((l) => l.classList.remove('hl', 'ex', 'warn', 'ret', 'rej')); s.querySelector('.p7h-code').style.transform = ''; },
+};
+</script>
+
+<section class="slide" id="c05-guard" data-part="7" data-steps="1" data-trans="rise" data-dur="20000" data-title="两层价值与三重保障" data-notes="这个设计的价值要分两层来看。<br><b>第一层：参数作为思考的 checklist</b>。工具描述中列出了完整的取消政策，并要求模型“调用前先查询订单详情、逐条核对”；可选的 expected_* 参数进一步促使模型把自己的判断依据显式写出来。为了填好这些参数，模型必须先调用查询工具获取订单详情，逐一确认每个条件——填写参数的过程本质上是一个<b>强制性 checklist</b>。当模型查到舱位是经济舱且未购保险时，很可能在准备调用的过程中就注意到规则 5，从而<b>根本不会发起调用</b>，而是直接告诉用户“经济舱未购保险无法取消，可考虑购买保险后再取消或改签”。这一层的价值在于引导思考、减少无效调用；但它不承担安全责任——expected_* 参数只是模型的自我陈述，服务端从不把它当作事实。<br>按 → <b>第二层：服务端真值校验才是守门员</b>。舱位等级、保险状态、预订时间、航段使用情况、航班状态，全部由服务端查询数据库获得；当前时间来自服务端时钟。<b>没有任何一条政策事实来自模型自报的参数</b>。模型可能产生幻觉，也可能被提示注入操纵——同一上下文中的 Agent 难以自证清白。如果把 cabin_class、has_insurance 乃至 current_time 设计成由模型填写的参数，模型只要报错（或被诱导报错）一个值，“守门员”就形同虚设。最后一道防线必须建立在模型无法伪造的数据之上：独立性不仅指独立的模型，更指独立的数据来源。<br>三重保障由此完整：(1) 系统提示词的自然语言规则帮助理解和解释；(2) 工具描述与参数设计作为 checklist，引导模型在调用前显式核对条件；(3) 服务端基于数据库真值的代码化校验作为最后守门员。前两重减少错误的发生，第三重确保错误不会变成不可逆的损失。页面上的订单为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">两层价值：<em>checklist 引导思考，真值守门</em></h2></header>
+  <div class="p7i-body">
+    <div class="p7i-l panel fx fx-left" style="--d:2">
+      <div class="p7i-h"><em>第一层</em><b>参数作为思考的 checklist</b></div>
+      <div class="p7i-draft"><span class="lbl">模型正在准备调用</span><code class="p7i-dc"></code><span class="p7i-stamp">未发起调用</span></div>
+      <div class="p7i-rules"></div>
+      <div class="p7i-say"><svg class="ic"><use href="#i-chat"/></svg><p></p></div>
+      <p class="p7i-nt">引导思考、减少无效调用——但<b>不承担安全责任</b>：expected_* 只是模型的自我陈述</p>
+    </div>
+    <div class="p7i-r panel fx fx-right" data-step="1">
+      <div class="p7i-h"><em>第二层</em><b>服务端真值校验才是守门员</b></div>
+      <div class="p7i-in"><svg class="ic"><use href="#i-alert"/></svg>模型自报 <code>cabin_class="business"</code>（幻觉，或被提示注入诱导）</div>
+      <div class="p7i-lane bad"><span class="lbl">如果舱位由模型填写的参数决定</span><div class="p7i-fl"><span>信了参数</span><i></i><span>execute_cancellation</span><i></i><b>错误取消 · 不可逆</b></div></div>
+      <div class="p7i-lane ok"><span class="lbl">政策事实一律查库</span><div class="p7i-fl"><span>db: economy · 未保险</span><i></i><span>log_mismatch</span><i></i><b>拒绝 · requires insurance</b></div></div>
+      <p class="p7i-nt"><b>没有任何一条政策事实来自模型自报的参数</b>——独立性不仅指独立的模型，更指<b>独立的数据来源</b></p>
+    </div>
+  </div>
+  <div class="p7i-three fx fx-up" data-step="1">
+    <div><em>1</em><b>系统提示词的自然语言规则</b><span>帮助理解和解释</span></div>
+    <div><em>2</em><b>工具描述与参数设计</b><span>checklist：调用前显式核对</span></div>
+    <div><em>3</em><b>服务端数据库真值的代码化校验</b><span>最后守门员</span></div>
+    <p>前两重<b>减少错误的发生</b>，第三重确保错误<b>不会变成不可逆的损失</b></p>
+  </div>
+  <div class="src">第五章 ·「代码作为业务规则的约束」· 两层价值与三重保障</div>
+</section>
+<style>
+.p7i-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;height:560px}
+.p7i-l,.p7i-r{padding:16px 22px;display:flex;flex-direction:column;gap:12px}
+.p7i-h{display:flex;align-items:center;gap:12px}
+.p7i-h em{font-style:normal;font-size:16px;font-weight:700;padding:3px 10px;border-radius:8px;color:#06101f;background:var(--acc)}
+.p7i-h b{font-size:21px}
+.p7i-draft{position:relative;display:flex;flex-direction:column;gap:6px;padding:10px 14px;border-radius:12px;border:1px dashed var(--line2);background:rgba(5,9,22,.6)}
+.p7i-dc{font:16px/1.6 var(--mono);color:#fde68a;white-space:pre;min-height:76px}
+.p7i-stamp{position:absolute;right:16px;top:50%;padding:4px 14px;border:3px solid var(--bad);border-radius:10px;font-size:20px;font-weight:800;color:var(--bad);transform:translateY(-50%) rotate(-10deg) scale(.6);opacity:0;transition:all .35s var(--spring)}
+.p7i-draft.stop .p7i-dc{text-decoration:line-through;text-decoration-color:var(--bad);opacity:.6}
+.p7i-draft.stop .p7i-stamp{opacity:1;transform:translateY(-50%) rotate(-10deg) scale(1)}
+.p7i-rules{display:flex;flex-direction:column;gap:5px}
+.p7i-rl{display:flex;align-items:center;gap:10px;padding:5px 12px;border-radius:9px;font-size:16px;color:var(--text3);border:1px solid var(--line);transition:all .3s}
+.p7i-rl i{font-style:normal;width:22px;text-align:center;font-weight:700}
+.p7i-rl.pass{color:var(--text2)}
+.p7i-rl.pass i{color:var(--text3)}
+.p7i-rl.fail{color:#fda4af;border-color:rgba(251,113,133,.55);background:rgba(251,113,133,.1)}
+.p7i-say{display:flex;gap:12px;align-items:flex-start;min-height:62px;padding:10px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent);opacity:0;transition:opacity .4s}
+.p7i-say.on{opacity:1}
+.p7i-say .ic{flex:none;font-size:22px;color:var(--acc);margin-top:2px}
+.p7i-say p{font-size:17px;line-height:1.55}
+.p7i-nt{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2)}
+.p7i-nt b{color:var(--text)}
+.p7i-in{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;font-size:17px;color:#fdba74;border:1px solid rgba(251,146,60,.5);background:rgba(251,146,60,.08)}
+.p7i-in code{font:16px var(--mono)}
+.p7i-lane{display:flex;flex-direction:column;gap:8px;padding:12px 14px;border-radius:14px;border:1px solid var(--line)}
+.p7i-lane.bad{border-color:rgba(251,113,133,.4)}.p7i-lane.ok{border-color:rgba(52,211,153,.4)}
+.p7i-fl{display:flex;align-items:center;gap:8px}
+.p7i-fl span{padding:5px 10px;border-radius:9px;font:15px var(--mono);color:var(--text2);border:1px solid var(--line2);white-space:nowrap}
+.p7i-fl i{flex:1;height:2px;min-width:12px;background:var(--line2)}
+.p7i-fl b{font-size:16px;white-space:nowrap}
+.p7i-lane.bad b{color:#fda4af}.p7i-lane.ok b{color:#6ee7b7}
+.p7i-lane.go .p7i-fl i{background:linear-gradient(90deg,var(--c1),var(--c2));animation:p7iflow 1s ease}
+.p7i-lane.bad{--c1:var(--bad);--c2:#fda4af}.p7i-lane.ok{--c1:var(--ok);--c2:#6ee7b7}
+@keyframes p7iflow{from{transform:scaleX(0);transform-origin:left}to{transform:scaleX(1);transform-origin:left}}
+.p7i-three{display:grid;grid-template-columns:repeat(3,1fr) 1.2fr;gap:12px;margin-top:18px;align-items:stretch}
+.p7i-three>div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.p7i-three em{font:800 20px var(--num);font-style:normal;color:var(--acc)}
+.p7i-three b{font-size:17px}
+.p7i-three span{font-size:15px;color:var(--text3)}
+.p7i-three>div:nth-child(3){border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.p7i-three p{display:flex;align-items:center;font-size:17px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:3px solid var(--acc)}
+.p7i-three p b{color:var(--text);display:contents}
+</style>
+<script>
+HOOKS['c05-guard'] = {
+  R: ['规则 1：已使用任何航段的订单不可取消', '规则 2：预订后 24 小时内可无条件取消', '规则 3：航空公司取消的航班总可取消', '规则 4：商务舱总可取消', '规则 5：基础经济舱和经济舱需购买旅行保险才可取消'],
+  // 订单（示意）：经济舱、未买保险、预订 3 天、航段未用、航班正常
+  V: [['✓', '航段未使用'], ['×', '已预订 3 天'], ['×', '航班正常'], ['×', '经济舱'], ['!', '经济舱且未购保险']],
+  init(s) { s.querySelector('.p7i-rules').innerHTML = this.R.map((r) => `<div class="p7i-rl"><i></i><span>${r}</span></div>`).join(''); },
+  async one(s) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    const dr = s.querySelector('.p7i-draft'), dc = s.querySelector('.p7i-dc'), rl = [...s.querySelectorAll('.p7i-rl')], say = s.querySelector('.p7i-say');
+    while (ok()) {
+      dr.classList.remove('stop'); say.classList.remove('on'); dc.textContent = '';
+      rl.forEach((r) => { r.className = 'p7i-rl'; r.querySelector('i').textContent = ''; });
+      const txt = 'cancel_reservation(\n  reservation_id="R1042",\n  expected_cabin_class="economy",\n  expected_has_insurance=False';
+      for (let i = 1; i <= txt.length; i += 2) { dc.textContent = txt.slice(0, i); await U.wait(ctx, 30); if (!ok()) return; }
+      for (let i = 0; i < 5; i++) {
+        await U.wait(ctx, 520); if (!ok()) return;
+        const [m, t] = this.V[i];
+        rl[i].className = 'p7i-rl ' + (m === '!' ? 'fail' : 'pass');
+        rl[i].querySelector('i').textContent = m === '!' ? '✕' : m === '✓' ? '✓' : '—';
+        rl[i].querySelector('span').textContent = this.R[i] + (m === '!' ? '：' + t : '');
+      }
+      await U.wait(ctx, 700); if (!ok()) return;
+      dr.classList.add('stop');
+      await U.wait(ctx, 600); if (!ok()) return;
+      say.querySelector('p').textContent = '“经济舱未购保险无法取消，可考虑购买保险后再取消或改签。”';
+      say.classList.add('on');
+      await U.wait(ctx, 4200);
+      rl.forEach((r, i) => (r.querySelector('span').textContent = this.R[i]));
+    }
+  },
+  lanes(s) { s.querySelectorAll('.p7i-lane').forEach((l) => U.restart(l, 'go')); },
+  enter(s, ctx, k) {
+    this.ctx = ctx; this.tk = (this.tk || 0) + 1;
+    this.one(s);
+    if (k >= 1) this.lanes(s);
+    ctx.every(() => this.lanes(s), 3600);
+  },
+  step(s, ctx, k) { if (k >= 1) this.lanes(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.p7i-draft').classList.remove('stop'); s.querySelector('.p7i-say').classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c05-exp55" data-part="7" data-trans="flip" data-dur="22000" data-title="实验 5-5 ★★：小模型 + 代码化知识" data-notes="<b>实验 5-5 ★★：小模型通过代码化知识提升执行规则的准确性</b>。实验目标：验证小参数量模型（Qwen3-4B）通过代码化业务规则显著提升复杂政策执行的准确性和一致性。技术方案：基于 τ-bench 航空客服场景设计对照实验。<b>控制组</b>：纯自然语言规则，依赖模型自身思考。<b>实验组</b>：三重保障——系统提示词保留自然语言规则；工具描述列出完整政策，并以可选的 expected_* 参数引导模型调用前逐条核对；工具内部基于模拟数据库真值的代码化校验（政策事实一律查库获取、时间取服务端时钟，不采信模型自报参数）。评测指标：任务成功率、政策违规次数、无效工具调用次数、用户体验。<b>预期结果</b>：实验组显著优于控制组；观察到模型在准备参数时就自主识别违规操作、直接向用户提议替代方案；同时统计 expected_* 自报值与数据库真值不一致的比例。<br>正式活动（2026-07-30，本地 Ollama qwen3:4b，60 个冻结案例 × 两臂 = 120 条完整轨迹）：代码化组 91.7%（55/60），控制组 95.0%（57/60），精确配对检验 p = 0.6875，没有显著提升——这是完整而诚实的负结论。失败全部是“该退不退”：控制组 3 次、代码化组 5 次；“多退款”两组都是 0；代码化组另有 4 次无效工具调用。<br>教学示例（8 个 case，gpt-5.6-luna）：任务成功率 7/8 = 88% 对 8/8 = 100%，政策违规 1 次对 0 次，实验组 1 次无效调用即被代码拦截的那次违规，expected_* 与真值不一致 1/5 = 20%；较弱的 gpt-4o-mini 是 6/8 对 8/8。左侧回放的是陷阱 R009：基础经济票、航司单方面改签时刻，不属于两条例外——模型把“航司改签”当成了“航司原因”。配套 README 的结论：准确率这层收益会被更强的模型逐步抹平，确定性与真值兜底不会。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 5-5 <span class="c5-stars">★★</span>：小模型通过<em>代码化知识</em>提升执行规则的准确性</h2></header>
+  <div class="c5-xp fx fx-up" style="--d:2">
+    <div class="c5-xb"><b>实验目标</b><p>验证小参数量模型（Qwen3-4B）借助代码化业务规则，显著提升复杂政策执行的准确性和一致性</p></div>
+    <div class="c5-xb"><b>技术方案</b><p>τ-bench 航空客服对照：控制组只有自然语言规则；实验组三重保障（提示词规则 + expected_* checklist + 工具内查库真值校验）</p></div>
+    <div class="c5-xb"><b>预期结果</b><p>实验组显著优于控制组；准备参数时就识别违规并提议替代方案；统计 expected_* 与真值不一致的比例</p></div>
+  </div>
+  <div class="p7j-body">
+    <div class="p7j-l fx fx-left" style="--d:3">
+      <div class="p7j-hd"><b>陷阱 R009</b><div class="p7j-seg seg"><i class="knob"></i><button data-v="ctl">控制组</button><button data-v="exp">实验组</button></div></div>
+      <div class="win p7j-tw"><div class="win-bar"><i></i><i></i><i></i><span>R009 · 配套仓库 README 记录（gpt-5.6-luna 教学示例）</span></div><div class="c5-term p7j-term" data-clip-ok></div></div>
+    </div>
+    <div class="p7j-r panel fx fx-right" style="--d:4">
+      <div class="p7j-seg2 seg"><i class="knob"></i><button data-v="f">正式 · qwen3:4b</button><button data-v="t">教学 · 8 个 case</button></div>
+      <div class="p7j-vw" data-k="f">
+        <div class="p7j-br" style="--c:#94a3c4"><span>控制组</span><i><b style="--w:95%"></b></i><em>57/60 · 95.0%</em></div>
+        <div class="p7j-br" style="--c:var(--acc)"><span>代码化组</span><i><b style="--w:91.7%"></b></i><em>55/60 · 91.7%</em></div>
+        <div class="p7j-p"><b>p = 0.6875</b><span>没有显著提升</span><span class="c5-tag neg">负结果</span></div>
+        <div class="p7j-fs"><span><b>3 vs 5</b>失败全是“该退不退”</span><span><b>0 vs 0</b>“多退款”</span><span><b>4</b>代码化组无效调用</span></div>
+      </div>
+      <div class="p7j-vw" data-k="t">
+        <div class="p7j-tb">
+          <div class="p7j-tr h"><span>指标（gpt-5.6-luna）</span><span>控制组</span><span>实验组</span></div>
+          <div class="p7j-tr"><span>任务成功率</span><span>7/8 = 88%</span><span class="y">8/8 = 100%</span></div>
+          <div class="p7j-tr"><span>政策违规次数</span><span class="n">1</span><span class="y">0</span></div>
+          <div class="p7j-tr"><span>无效工具调用</span><span>0</span><span>1（即被拦截的违规）</span></div>
+          <div class="p7j-tr"><span>expected_* 与真值不一致</span><span>—</span><span>1/5 = 20%</span></div>
+          <div class="p7j-tr"><span>换成 gpt-4o-mini</span><span>6/8</span><span class="y">8/8</span></div>
+        </div>
+      </div>
+      <p class="p7j-con">准确率这层收益会被更强的模型抹平；<b>确定性与真值兜底</b>不会</p>
+    </div>
+  </div>
+  <div class="c5-rec-h p7j-rec fx fx-up" style="--d:5"><span class="c5-tag real">实测</span>数据：配套仓库 chapter5/small-model-codified-rules 验收记录 · 正式活动 2026-07-30，本地 Ollama qwen3:4b，60 个冻结案例 × 两臂 · 教学示例 8 个 case</div>
+  <div class="src">第五章 ·「代码作为业务规则的约束」· 实验 5-5</div>
+</section>
+<style>
+#c05-exp55 .c5-xp{margin-bottom:16px}
+.p7j-body{display:grid;grid-template-columns:1.12fr 1fr;gap:24px;height:500px}
+.p7j-l{display:flex;flex-direction:column;gap:10px;min-height:0}
+.p7j-hd{display:flex;align-items:center;justify-content:space-between}
+.p7j-hd b{font-size:20px}
+.p7j-hd .seg button{padding:6px 18px;font-size:16px}
+.p7j-tw{flex:1;min-height:0;display:flex;flex-direction:column}
+.p7j-term{flex:1;min-height:0;font-size:15px;line-height:1.55}
+.p7j-r{padding:14px 20px;display:flex;flex-direction:column;gap:12px}
+.p7j-r .seg button{padding:7px 16px;font-size:16px}
+.p7j-vw{display:none;flex-direction:column;gap:12px}
+.p7j-vw.on{display:flex;animation:upIn .45s var(--spring) both}
+.p7j-br{display:grid;grid-template-columns:90px 1fr 140px;align-items:center;gap:12px;font-size:17px;color:var(--text2)}
+.p7j-br i{height:26px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+.p7j-br i b{display:block;height:100%;width:0;border-radius:8px;background:var(--c);transition:width 1s var(--ease)}
+.p7j-vw.on .p7j-br i b{width:var(--w)}
+.p7j-br em{font:700 17px var(--num);font-style:normal;color:var(--text)}
+.p7j-p{display:flex;align-items:center;gap:12px}
+.p7j-p b{font:800 24px var(--num);color:var(--warn)}
+.p7j-p>span:not(.c5-tag){font-size:17px;color:var(--text2)}
+.p7j-fs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.p7j-fs span{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:12px;font-size:15px;line-height:1.4;color:var(--text3);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p7j-fs b{font:800 22px var(--num);color:var(--text)}
+.p7j-tb{display:flex;flex-direction:column}
+.p7j-tr{display:grid;grid-template-columns:1.4fr .9fr 1.2fr;gap:8px;padding:7px 0;border-top:1px solid var(--line);font-size:16px;color:var(--text2)}
+.p7j-tr.h{border-top:none;font-size:15px;color:var(--text3)}
+.p7j-tr span:not(:first-child){font-family:var(--num);font-weight:600;color:var(--text)}
+.p7j-tr.h span{font-weight:400;color:var(--text3)}
+.p7j-tr .y{color:#6ee7b7 !important}.p7j-tr .n{color:#fda4af !important}
+.p7j-con{margin-top:auto;font-size:17px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:3px solid var(--acc)}
+.p7j-con b{color:var(--text)}
+.p7j-rec{margin-top:14px}
+</style>
+<script>
+HOOKS['c05-exp55'] = {
+  T: {
+    ctl: [
+      { c: 'sys', t: 'R009：基础经济票 · 航司单方面改签时刻 · 不属于两条例外' },
+      { c: 'ag', t: '模型判断：航司改签 = 航司原因 = 可退' },
+      { c: 'call', t: "cancel_reservation('R009')" },
+      { c: 'res', t: '天真工具：被调用即取消，并无条件退款' },
+      { c: 'err', t: '已全额退款 → 多退款（政策违规）' },
+      { c: 'dim', t: '控制组唯一的违规稳定落在 R009' },
+    ],
+    exp: [
+      { c: 'sys', t: 'R009：基础经济票 · 航司单方面改签时刻 · 不属于两条例外' },
+      { c: 'ag', t: 'checklist 自报：expected_refundable=True，expected_reason=airline_caused' },
+      { c: 'dim', t: '数据库真值：refundable=False，原因=non_refundable_basic_economy' },
+      { c: 'call', t: "{'reservation_id':'R009','expected_refundable':True,'expected_reason':'airline_caused'}" },
+      { c: 'err', t: '工具代码化校验返回：status=rejected, reason=policy_violation' },
+      { c: 'res', t: '“已按数据库真值校验：该预订不可退款（基础经济票，下单超过 24 小时，且无航司原因）。系统已拦截退款操作……”' },
+      { c: 'say', t: '“……目前不符合退款条件，因此无法为 R009 办理全额退款。你可以选择保留客票并申请改签到其他可用航班，或咨询是否能够申请旅行信用点……”' },
+    ],
+  },
+  init(s) {
+    this.Tm = C5.term(s.querySelector('.p7j-term'), { max: 12 });
+    this.set = U.seg(s.querySelector('.p7j-seg'), (v) => { this.auto = false; this.play(s, v); });
+    this.set2 = U.seg(s.querySelector('.p7j-seg2'), (v) => { this.auto2 = false; this.view(s, v); });
+  },
+  view(s, v) { this.v2 = v; this.set2(v); s.querySelectorAll('.p7j-vw').forEach((w) => w.classList.toggle('on', w.dataset.k === v)); },
+  async play(s, v) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.v = v; this.set(v); this.Tm.clear();
+    await C5.play(this.Tm, this.T[v], ctx, ok, { gap: 900 });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx; this.auto = true; this.auto2 = true;
+    this.play(s, 'ctl'); this.view(s, 'f');
+    ctx.every(() => { if (this.auto) this.play(s, this.v === 'ctl' ? 'exp' : 'ctl'); }, 9500);
+    ctx.every(() => { if (this.auto2) this.view(s, this.v2 === 'f' ? 't' : 'f'); }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.rk = (this.rk || 0) + 1; this.Tm.clear(); s.querySelectorAll('.p7j-vw').forEach((w) => w.classList.remove('on')); },
+};
+</script>

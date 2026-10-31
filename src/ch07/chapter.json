@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#a78bfa", "acc2": "#22d3ee" },
+    { "n": "一条任务的解剖", "k": "PART 01", "short": "解剖", "acc": "#22d3ee", "acc2": "#a78bfa" },
+    { "n": "成功的定义", "k": "PART 02", "short": "指标", "acc": "#f472b6", "acc2": "#a78bfa" },
+    { "n": "评估环境", "k": "PART 03", "short": "环境", "acc": "#34d399", "acc2": "#22d3ee" },
+    { "n": "评估数据集", "k": "PART 04", "short": "数据集", "acc": "#60a5fa", "acc2": "#a78bfa" },
+    { "n": "LLM 评判", "k": "PART 05", "short": "评判", "acc": "#c084fc", "acc2": "#f472b6" },
+    { "n": "归因、回归与排名", "k": "PART 06", "short": "归因", "acc": "#fb7185", "acc2": "#fb923c" },
+    { "n": "评估驱动选型", "k": "PART 07", "short": "选型", "acc": "#fbbf24", "acc2": "#fb923c" },
+    { "n": "从数据到改进", "k": "PART 08", "short": "改进", "acc": "#2dd4bf", "acc2": "#60a5fa" },
+    { "n": "内部评估与仿真", "k": "PART 09", "short": "仿真", "acc": "#818cf8", "acc2": "#22d3ee" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#a78bfa", "acc2": "#22d3ee" }
+  ]
+}

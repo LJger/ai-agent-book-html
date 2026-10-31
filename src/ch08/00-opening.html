@@ -1,0 +1,425 @@
+<!-- ================= 第八章共用件：类名统一 c8- 前缀，只在本章 HTML 内生效 ================= -->
+<style>
+/* “示意”角标：演示中的虚构数值、对话、界面都要带上 */
+.c8-sx{position:absolute;right:14px;top:12px;z-index:6;padding:3px 12px;border-radius:999px;font-size:15px;letter-spacing:.14em;color:var(--text3);border:1px solid var(--line2);background:rgba(5,9,22,.72);pointer-events:none}
+/* 配套仓库真实数据的出处 */
+.c8-data{display:flex;align-items:flex-start;gap:9px;font-size:15px;line-height:1.55;color:var(--text3)}
+.c8-data::before{content:"";flex:none;width:9px;height:9px;margin-top:.42em;border-radius:3px;background:var(--env);box-shadow:0 0 8px var(--env)}
+/* 数学排版：变量斜体衬线，上下标，分式 */
+.c8-m{font-family:"Cambria Math",Cambria,"STIX Two Math","Times New Roman",serif;font-style:normal;white-space:nowrap;letter-spacing:.01em}
+.c8-m i{font-style:italic}
+.c8-m sub,.c8-m sup{font-size:max(14px,.66em);line-height:0}
+.c8-frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 .14em;line-height:1.18;text-align:center}
+.c8-frac>span{padding:0 .28em}
+.c8-frac>span:first-child{border-bottom:2px solid currentColor;padding-bottom:.06em}
+/* 伪代码：比 .code 小一号，逐行高亮 */
+.c8-code{font:17px/1.72 var(--mono);color:#cbd5f5;padding:16px 22px;white-space:pre;border-radius:16px;background:rgba(5,9,22,.86);border:1px solid var(--line)}
+.c8-code .ln{display:block;border-radius:6px;padding:0 10px;margin:0 -10px;transition:background .35s,box-shadow .35s}
+.c8-code .ln.hl{background:color-mix(in srgb,var(--acc) 18%,transparent);box-shadow:inset 3px 0 0 var(--acc)}
+/* 交互表格：行用 grid，列宽由各页自己指定 */
+.c8-tb{display:flex;flex-direction:column;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.74);box-shadow:0 20px 50px -24px rgba(0,0,0,.7)}
+.c8-tr{--c:var(--acc);display:grid;align-items:center;gap:18px;padding:13px 22px;border-left:4px solid transparent;transition:background .4s,border-color .4s,opacity .4s}
+.c8-tr+.c8-tr{border-top:1px solid var(--line)}
+.c8-th{font-size:15px!important;letter-spacing:.12em;color:var(--text3);padding-top:11px;padding-bottom:11px}
+.c8-tr.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+.c8-tr.dim{opacity:.42}
+/* 小标签 */
+.c8-tag{display:inline-flex;align-items:center;gap:6px;padding:3px 11px;border-radius:999px;font-size:15px;color:var(--c,var(--acc));border:1px solid color-mix(in srgb,var(--c,var(--acc)) 45%,transparent);background:color-mix(in srgb,var(--c,var(--acc)) 10%,transparent);white-space:nowrap}
+</style>
+<script>
+/* 第八章共用的小工具 */
+window.C8 = {
+  // 2× 清晰度画布：返回 2d 上下文，绘图坐标按 CSS 像素
+  cv(c, w, h) {
+    c.width = w * 2; c.height = h * 2; c.style.width = w + 'px'; c.style.height = h + 'px';
+    const g = c.getContext('2d');
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    return g;
+  },
+  // 折线 path 字符串
+  path(pts) { return pts.map(([x, y], i) => (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)).join(''); },
+  // 补间：fn(t) 在 ms 内从 0 走到 1；返回 Promise
+  tween(ctx, ms, fn, ease) {
+    const e = ease || U.ease, t0 = performance.now();
+    return new Promise((res) => {
+      ctx.raf((now) => {
+        const t = Math.min(1, (now - t0) / ms);
+        fn(e(t));
+        if (t >= 1) { res(true); return false; }
+      });
+    });
+  },
+  clamp: (v, a, b) => Math.max(a, Math.min(b, v)),
+  // 进入部分的分隔页
+  goPart(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+};
+</script>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c08-cover" data-part="0" data-title="封面" data-notes="本书的核心公式是 Agent = LLM + 上下文 + 工具。本章聚焦于优化 LLM 这个“大脑”——先用 <b>Mid-training</b> 补齐目标领域的知识与基础能力，再用 <b>SFT / RL</b> 等后训练方法塑造模型利用上下文和工具的行为。第七章结尾指出，评估体系与仿真环境是后训练的两块基石：评估环境为训练提供练习场，评估指标为训练定义目标。本章就建立在这两块基石之上，讨论如何真正改动模型权重，<b>把能力沉淀进参数</b>。<br>本章面向完全没有强化学习或模型训练背景的读者：不预设你懂梯度、懂策略优化，而是从“一个模型是怎么被训练出来的”这件事本身讲起，把每一步的目的、原理和它解决的问题都讲清楚。读完这一章，你应该能回答：模型的能力在哪些阶段形成、每一步在做什么、这些阶段通常如何组合、在什么条件下顺序可以不同，以及在自己的项目里该在哪一步下功夫。<br>右侧轨道图：中心是 LLM，四颗卫星是能力开发的四个环节；外圈是贯穿全章的判断——数据、环境与奖励。">
+  <div class="c8cv-orbit fx fx-scale" style="--d:4"></div>
+  <div class="c8cv-text">
+    <div class="c8cv-tag fx fx-up"><i></i>深入理解 AI Agent · 第八章</div>
+    <h1 class="c8cv-title"><span class="split" data-grad="#818cf8,#a78bfa,#c084fc">模型后训练</span></h1>
+    <p class="c8cv-sub fx fx-up" style="--d:9">优化 Agent 的“大脑”：<b>把能力沉淀进参数</b><br>预训练 · Mid-training · SFT · RL · 奖励 · 蒸馏</p>
+    <div class="c8cv-meta fx fx-up" style="--d:12"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c8cv-hint fx fx-up" style="--d:16"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c08-cover{justify-content:center;padding-left:150px}
+.c8cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c8cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c8cv-title{margin-top:30px;font-size:150px;line-height:1.1;font-weight:800;letter-spacing:.02em}
+.c8cv-sub{margin-top:30px;font-size:31px;color:var(--text2);line-height:1.6}
+.c8cv-sub b{color:var(--text)}
+.c8cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c8cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c8cv-orbit{position:absolute;right:100px;top:50%;width:740px;height:740px;margin-top:-382px}
+.c8cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c8cv-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c08-cover'] = {
+  init(s) {
+    U.orbit(s.querySelector('.c8cv-orbit'), {
+      size: 740, core: 'LLM', coreColor: '#a5b4fc', outer: 'DATA · ENVIRONMENT · REWARD · 数据 · 环境 · 奖励',
+      sats: [
+        { label: '预训练', color: '#60a5fa', rx: 0.37, ry: 0.14, tilt: -22, dur: 13, phase: 0 },
+        { label: 'Mid-training', color: '#2dd4bf', rx: 0.31, ry: 0.12, tilt: 30, dur: 16, phase: 0.3 },
+        { label: 'SFT', color: '#a78bfa', rx: 0.27, ry: 0.19, tilt: 84, dur: 11, phase: 0.62 },
+        { label: 'RL', color: '#f472b6', rx: 0.4, ry: 0.2, tilt: 8, dur: 18, phase: 0.85 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c08-stages" data-part="0" data-dur="15000" data-title="四个环节：能力开发的地图" data-notes="<b>先建立一张最重要的地图：现代模型的能力开发通常可以拆成四个环节。</b>预训练打下通用基础，Mid-training 在目标分布上补充知识与基础能力，SFT 与 RL 再根据输出要求和任务目标塑造行为。<br>① <b>预训练（Pre-training）</b>：在海量互联网文本上做“预测下一个词”的训练，让模型学会语言规律、世界知识和基本推理——就像一个人读完了图书馆里的所有书，博学，但还不会好好回答问题。这是最贵的一步（动辄数千万美元），也是能力的地基。<br>② <b>Mid-training（中期训练/继续预训练）</b>：从一个已有基础模型出发，在目标语言、领域文档、代码、长上下文或经过设计的能力数据上继续做语言建模。它不是从头重建地基，而是补上通用预训练没有覆盖好的“教材章节”。相比全量预训练，数据与计算规模更小；相比 SFT，它更适合吸收大量知识和建立任务所需的基础表征。有些团队把它算作预训练的后半程，有些称为继续预训练（Continued Pre-training, CPT）、领域自适应预训练（DAPT）或任务自适应预训练（TAPT）。<br>③ <b>监督微调（SFT，Supervised Fine-Tuning，即用标注好的 “输入—输出” 对来训练模型，类似老师给出标准答案让学生照着学）</b>：用几千到几万条“问题—标准回答”的示范数据，教会模型该用什么格式、什么风格、什么流程来回答，把有知识、有能力的模型变成听得懂指令、输出规整的助手。它便宜、快、稳，是当前几乎所有部署模型都会经过的一步。<br>④ <b>强化学习（RL，Reinforcement Learning，即让模型反复尝试、根据结果好坏给奖惩来改进行为，类似做题后按得分复盘）</b>：不再直接模仿标准回答的 token，而是让模型自己去试，把做得好的行为的概率调高、做得差的调低。当基模已经能偶尔成功，且奖励、数据和环境设计得当时，这一步可以让模型在<b>没见过的情况</b>下做出更好的决策，也是本章篇幅最大、最需要工程功力的一步。<br>一个直觉类比：预训练是“接受通识教育”，Mid-training 是“集中研修专业教材”，SFT 是“老师示范答题与表达规范”，RL 是“自己下场做题、根据结果反复打磨”。光球每经过一站就多一层能力环；也可以点击任一张卡片。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先建立一张最重要的地图：<em>四个环节</em></h2>
+  <p class="lead fx fx-up" style="--d:2">预训练打下通用基础，Mid-training 在目标分布上补知识与基础能力，SFT 与 RL 再按输出要求和任务目标塑造行为</p></header>
+  <div class="st8-stage fx fx-up" style="--d:3">
+    <svg class="st8-svg" viewBox="0 0 1660 112" width="1660" height="112">
+      <defs><linearGradient id="st8g" x1="0" x2="1"><stop offset="0" stop-color="#60a5fa"/><stop offset=".36" stop-color="#2dd4bf"/><stop offset=".68" stop-color="#a78bfa"/><stop offset="1" stop-color="#f472b6"/></linearGradient></defs>
+      <path class="st8-track" d="M120 56 H1540"/>
+      <path class="st8-flow" d="M120 56 H1540"/>
+    </svg>
+    <div class="st8-orb"><i></i><i></i><i></i><i></i><b><svg class="ic"><use href="#i-brain"/></svg></b></div>
+    <div class="st8-cards"></div>
+  </div>
+  <div class="src">第八章 · 开篇（四个环节）</div>
+</section>
+<style>
+.st8-stage{position:relative;height:640px}
+.st8-svg{position:absolute;left:0;top:0;overflow:visible}
+.st8-track{fill:none;stroke:url(#st8g);stroke-width:4;stroke-linecap:round;opacity:.45}
+.st8-flow{fill:none;stroke:#fff;stroke-width:2;stroke-dasharray:2 16;opacity:.4;animation:flow 1.1s linear infinite}
+.st8-orb{position:absolute;top:22px;left:158px;width:68px;height:68px;border-radius:50%;transition:left 1.1s var(--eio);z-index:3}
+.st8-orb b{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;font-size:34px;color:#fff;background:radial-gradient(circle at 32% 28%,#c7d2fe,#6366f1 55%,#312e81);box-shadow:0 0 30px #818cf8}
+.st8-orb i{position:absolute;border-radius:50%;border:3px solid var(--c);opacity:0;scale:.6;transition:opacity .6s,scale .7s var(--spring)}
+.st8-orb i:nth-child(1){inset:-9px;--c:#60a5fa}.st8-orb i:nth-child(2){inset:-18px;--c:#2dd4bf}.st8-orb i:nth-child(3){inset:-27px;--c:#a78bfa}.st8-orb i:nth-child(4){inset:-36px;--c:#f472b6}
+.st8-orb i.on{opacity:.9;scale:1;box-shadow:0 0 14px var(--c)}
+.st8-cards{position:absolute;left:0;right:0;top:150px;display:grid;grid-template-columns:repeat(4,1fr);gap:40px}
+.st8-c{--c:var(--acc);position:relative;height:470px;padding:22px 24px 18px;border-radius:22px;cursor:pointer;display:flex;flex-direction:column;gap:12px;background:linear-gradient(165deg,color-mix(in srgb,var(--c) 9%,rgba(12,18,40,.92)),rgba(12,18,40,.9) 60%);border:1px solid color-mix(in srgb,var(--c) 28%,transparent);transition:border-color .5s,box-shadow .5s,opacity .5s,translate .5s var(--ease)}
+.st8-c::before{content:"";position:absolute;left:50%;top:-58px;width:2px;height:58px;background:linear-gradient(transparent,color-mix(in srgb,var(--c) 70%,transparent))}
+.st8-c.on{border-color:var(--c);box-shadow:0 26px 60px -26px color-mix(in srgb,var(--c) 70%,transparent),0 0 0 1px color-mix(in srgb,var(--c) 35%,transparent);translate:0 -6px}
+.st8-c.dim{opacity:.55}
+.st8-h{display:flex;align-items:center;gap:14px}
+.st8-h>.ic{font-size:40px;color:var(--c)}
+.st8-h b{display:block;font-size:30px;color:var(--c)}
+.st8-h small{display:block;font-size:16px;color:var(--text3);margin-top:2px}
+.st8-r{display:grid;grid-template-columns:52px 1fr;gap:10px;font-size:18px;line-height:1.55;color:var(--text2)}
+.st8-r span{font-size:15px;line-height:1.95;color:var(--c);letter-spacing:.08em}
+.st8-c.on .st8-r{color:var(--text)}
+.st8-an{margin-top:auto;padding:12px 14px;border-radius:14px;font:20px/1.5 var(--kai);color:var(--text);background:color-mix(in srgb,var(--c) 10%,transparent);border:1px dashed color-mix(in srgb,var(--c) 45%,transparent)}
+.st8-an em{font-style:normal;font-family:var(--font);font-size:15px;color:var(--text3);display:block;margin-bottom:2px}
+</style>
+<script>
+HOOKS['c08-stages'] = {
+  X: [192, 617, 1042, 1467],
+  S: [
+    { n: '预训练', en: 'Pre-training', ic: 'book', c: '#60a5fa', rows: [['数据', '海量原始互联网文本，做“预测下一个词”'], ['学到', '语言规律、世界知识、基本推理'], ['状态', '博学，但还不会好好回答问题'], ['代价', '最贵（动辄数千万美元），能力的地基']], an: '接受通识教育' },
+    { n: 'Mid-training', en: '中期训练 / 继续预训练', ic: 'layers', c: '#2dd4bf', rows: [['数据', '目标语言、领域文档、代码、长上下文、能力数据'], ['学到', '补上通用预训练没覆盖好的“教材章节”'], ['别名', 'CPT · DAPT · TAPT'], ['代价', '数据与计算规模小于全量预训练']], an: '集中研修专业教材' },
+    { n: 'SFT', en: '监督微调 · Supervised Fine-Tuning', ic: 'clipboard', c: '#a78bfa', rows: [['数据', '几千到几万条“问题—标准回答”示范'], ['学到', '该用什么格式、风格、流程来回答'], ['结果', '听得懂指令、输出规整的助手'], ['代价', '便宜、快、稳，几乎所有部署模型都会经过']], an: '老师示范答题与表达规范' },
+    { n: 'RL', en: '强化学习 · Reinforcement Learning', ic: 'dumbbell', c: '#f472b6', rows: [['数据', '任务、环境 + 奖励信号'], ['学到', '在没见过的情况下做出更好的决策'], ['前提', '基模已能偶尔成功；奖励、数据、环境设计得当'], ['代价', '本章篇幅最大、最需要工程功力']], an: '自己下场做题、根据结果反复打磨' },
+  ],
+  init(s) {
+    s.querySelector('.st8-cards').innerHTML = this.S.map((t, i) => `
+      <div class="st8-c" data-i="${i}" style="--c:${t.c}">
+        <div class="st8-h"><svg class="ic"><use href="#i-${t.ic}"/></svg><div><b>${t.n}</b><small>${t.en}</small></div></div>
+        ${t.rows.map(([k, v]) => `<div class="st8-r"><span>${k}</span><p>${v}</p></div>`).join('')}
+        <div class="st8-an"><em>直觉类比</em>${t.an}</div>
+      </div>`).join('');
+    this.cards = [...s.querySelectorAll('.st8-c')];
+    this.orb = s.querySelector('.st8-orb');
+    this.rings = [...this.orb.querySelectorAll('i')];
+    this.cards.forEach((c) => c.addEventListener('click', () => { this.auto = false; this.go(+c.dataset.i); }));
+  },
+  go(i) {
+    this.i = i;
+    this.orb.style.left = this.X[Math.max(0, i)] - 34 + 'px';
+    this.rings.forEach((r, k) => r.classList.toggle('on', k <= i));
+    this.cards.forEach((c, k) => { c.classList.toggle('on', k === i); c.classList.toggle('dim', i >= 0 && k !== i); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.go(-1);
+    ctx.later(() => { if (this.auto) this.go(0); }, 700);
+    ctx.every(() => { if (this.auto) this.go((this.i + 1) % 4); }, 3500);
+  },
+  reset() { this.go(-1); this.cards.forEach((c) => c.classList.remove('dim')); },
+};
+</script>
+
+<section class="slide" id="c08-lines" data-part="0" data-steps="1" data-dur="12000" data-title="两条贯穿始终的主线" data-notes="<b>本章有两条贯穿始终的主线：</b><br><b>主线一：在本章的对照实验中，SFT 更容易记住示范，而 RL 表现出更好的泛化。</b>在 GeneralPoints 和 V-IRL 的相同任务、模型和预算设置下，SFT 对训练答案过拟合，而 RL 在分布变化的测试中更容易学到可迁移策略。这是这些实验条件下测得的结果，<b>不是 SFT 与 RL 的普遍属性</b>：数据足够多样、正则化得当时 SFT 也能泛化，奖励或环境有偏时 RL 也会过拟合。本章用“SFT 记忆，RL 泛化”概括这些实验，并在“从预训练到 RL：四阶段全景”一节解释两种优化目标为什么可能产生这种差异。<br><b>主线二：数据和环境，比算法更重要。</b>这是工业界最反直觉、也最有价值的一条经验。掌握现成 RL 算法（PPO、GRPO 等）的基本用法即可，真正决定成败的是三件事：<b>Mid-training 语料</b>有没有补齐底座，<b>示范数据</b>有没有建立起行为协议，<b>仿真环境与奖励</b>能不能提供可靠的试错反馈。很多场景下，只要前两类数据质量到位，你甚至根本不需要做 RL。本章会不断把你的注意力从“调哪个算法”拉回到“数据和环境做对了没有”。<br>左侧卡牌是示意（实验 8-11 GeneralPoints 的简化版）：训练时 J 按 10 计，测试时 J 变成 11。按 → 或右上角开关切换两条主线。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">两条<em>贯穿始终</em>的主线</h2></div>
+    <div class="ln8-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">主线一 · 记忆与泛化</button><button data-v="1">主线二 · 数据和环境</button></div></header>
+  <div class="ln8-body">
+    <div class="ln8-p ln8-a panel fx fx-left" style="--d:3">
+      <div class="ln8-h"><em>01</em><b>SFT 更容易记住示范，RL 表现出更好的泛化</b></div>
+      <div class="ln8-mode"><span class="ln8-ml">训练分布：J / Q / K 都按 10 计</span></div>
+      <div class="ln8-cards"><span>7</span><span class="ln8-j">J<small>= 10</small></span><span>3</span><span>5</span><p>用四张牌各一次，凑出 <b>24</b></p></div>
+      <div class="ln8-row" data-r="sft"><span class="ln8-who">SFT<small>记住示范</small></span><code class="ln8-eq"></code><i class="ln8-v"></i></div>
+      <div class="ln8-row" data-r="rl"><span class="ln8-who">RL<small>学会重新计算</small></span><code class="ln8-eq"></code><i class="ln8-v"></i></div>
+      <p class="ln8-cav"><svg class="ic"><use href="#i-alert"/></svg>受控实验中测得的倾向，不是普遍属性：数据多样、正则化得当时 SFT 也能泛化；奖励或环境有偏时 RL 也会过拟合</p>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="ln8-p ln8-b panel fx fx-right" style="--d:4">
+      <div class="ln8-h"><em>02</em><b>数据和环境，比算法更重要</b></div>
+      <svg class="ln8-svg" viewBox="0 0 760 380" width="760" height="380">
+        <path class="ln8-post" d="M380 112 V330"/><rect class="ln8-base" x="290" y="328" width="180" height="16" rx="8"/>
+        <path class="ln8-tri" d="M362 128 L380 100 L398 128 Z"/>
+        <g class="ln8-beam"><rect x="120" y="106" width="520" height="12" rx="6"/></g>
+        <g class="ln8-pl" data-p="l"><path class="ln8-stem" d="M0 0 V-22"/><rect class="ln8-plate" x="-110" y="-30" width="220" height="10" rx="5"/>
+          <g class="ln8-alg"><rect x="-96" y="-82" width="88" height="40" rx="10"/><text x="-52" y="-56">PPO</text><rect x="4" y="-82" width="92" height="40" rx="10"/><text x="50" y="-56">GRPO</text><text class="ln8-lt" x="0" y="-100">调哪个算法</text></g></g>
+        <g class="ln8-pl" data-p="r"><path class="ln8-stem" d="M0 0 V-22"/><rect class="ln8-plate" x="-110" y="-30" width="220" height="10" rx="5"/>
+          <g class="ln8-w" data-w="0" style="--c:#2dd4bf"><rect x="-104" y="-76" width="208" height="44" rx="10"/><text x="0" y="-48">Mid-training 语料</text></g>
+          <g class="ln8-w" data-w="1" style="--c:#a78bfa"><rect x="-104" y="-124" width="208" height="44" rx="10"/><text x="0" y="-96">示范数据</text></g>
+          <g class="ln8-w" data-w="2" style="--c:#fbbf24"><rect x="-104" y="-172" width="208" height="44" rx="10"/><text x="0" y="-144">仿真环境与奖励</text></g></g>
+      </svg>
+      <div class="ln8-legend"><span style="--c:#2dd4bf">补齐底座</span><span style="--c:#a78bfa">建立行为协议</span><span style="--c:#fbbf24">可靠的试错反馈</span></div>
+      <p class="ln8-tag">很多场景下，只要前两类数据质量到位，<b>甚至根本不需要做 RL</b></p>
+    </div>
+  </div>
+  <div class="src">第八章 · 开篇（本章有两条贯穿始终的主线）</div>
+</section>
+<style>
+#c08-lines .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.ln8-body{display:grid;grid-template-columns:1fr 1fr;gap:30px;flex:1;min-height:0;margin-bottom:34px}
+.ln8-p{position:relative;padding:24px 28px;display:flex;flex-direction:column;gap:14px;transition:opacity .6s,filter .6s,border-color .6s,box-shadow .6s}
+#c08-lines[data-k="0"] .ln8-b,#c08-lines[data-k="1"] .ln8-a{opacity:.42;filter:saturate(.4)}
+#c08-lines[data-k="0"] .ln8-a,#c08-lines[data-k="1"] .ln8-b{border-color:color-mix(in srgb,var(--acc) 50%,transparent);box-shadow:0 0 60px -22px color-mix(in srgb,var(--acc) 70%,transparent)}
+.ln8-h{display:flex;align-items:center;gap:14px}
+.ln8-h em{font:800 34px var(--num);font-style:normal;color:var(--acc)}
+.ln8-h b{font-size:26px;line-height:1.35}
+.ln8-mode{height:36px}
+.ln8-ml{display:inline-flex;padding:6px 16px;border-radius:999px;font-size:18px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 10%,transparent);transition:all .4s}
+.ln8-ml.ood{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 50%,transparent);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.ln8-cards{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+.ln8-cards span{position:relative;width:74px;height:100px;border-radius:12px;display:grid;place-items:center;font:800 38px var(--num);color:#0b1020;background:linear-gradient(160deg,#f8fafc,#cbd5e1);box-shadow:0 10px 24px -10px rgba(0,0,0,.8)}
+.ln8-cards small{position:absolute;bottom:-26px;left:50%;translate:-50% 0;font:700 16px var(--num);color:var(--ok);white-space:nowrap;transition:color .4s}
+.ln8-j.ood small{color:var(--warn)}
+.ln8-cards p{margin-left:12px;font-size:19px;color:var(--text2)}
+.ln8-cards p b{color:var(--acc);font-family:var(--num)}
+.ln8-row{display:grid;grid-template-columns:150px 1fr 44px;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);margin-top:6px}
+.ln8-who{font-size:22px;font-weight:700}
+.ln8-who small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+.ln8-row[data-r=sft] .ln8-who{color:var(--violet)}.ln8-row[data-r=rl] .ln8-who{color:var(--pink)}
+.ln8-eq{font:19px/1.5 var(--mono);color:var(--text);min-height:58px;display:flex;flex-direction:column;justify-content:center}
+.ln8-eq s{color:var(--text3);text-decoration-color:var(--bad)}
+.ln8-v{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font:800 22px var(--num);font-style:normal}
+.ln8-v.ok{color:#04121a;background:var(--ok);box-shadow:0 0 16px var(--ok)}
+.ln8-v.bad{color:#fff;background:var(--bad);box-shadow:0 0 16px var(--bad)}
+.ln8-cav{margin-top:auto;display:flex;gap:10px;font-size:17px;line-height:1.6;color:var(--text2);padding:12px 14px;border-radius:12px;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.28)}
+.ln8-cav .ic{flex:none;color:var(--warn);font-size:20px;margin-top:3px}
+.ln8-svg{display:block;margin:0 auto;overflow:visible}
+.ln8-post{stroke:rgba(255,255,255,.25);stroke-width:6;stroke-linecap:round}
+.ln8-base{fill:rgba(255,255,255,.14)}
+.ln8-tri{fill:#818cf8;filter:drop-shadow(0 0 8px #818cf8)}
+.ln8-beam rect{fill:rgba(199,210,254,.85)}
+.ln8-stem{stroke:rgba(199,210,254,.7);stroke-width:4}
+.ln8-plate{fill:rgba(199,210,254,.75)}
+.ln8-alg rect{fill:rgba(167,139,250,.14);stroke:rgba(167,139,250,.6);stroke-width:1.5}
+.ln8-alg text{fill:var(--text2);font:700 18px var(--num);text-anchor:middle}
+.ln8-alg .ln8-lt{fill:var(--text3);font:500 17px var(--font)}
+.ln8-w{opacity:0;transition:opacity .5s}
+.ln8-w.on{opacity:1}
+.ln8-w rect{fill:color-mix(in srgb,var(--c) 22%,rgba(10,16,36,.95));stroke:var(--c);stroke-width:2}
+.ln8-w text{fill:var(--text);font:700 18px var(--font);text-anchor:middle}
+.ln8-legend{display:flex;justify-content:center;gap:12px}
+.ln8-legend span{padding:6px 14px;border-radius:999px;font-size:16px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 9%,transparent)}
+.ln8-tag{text-align:center;font-size:21px;color:var(--text2)}
+.ln8-tag b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c08-lines'] = {
+  init(s) {
+    this.set = U.seg(s.querySelector('.ln8-seg'), (v) => this.focus(s, +v));
+    this.q = (x) => s.querySelector(x);
+    this.beam = this.q('.ln8-beam');
+    this.pl = this.q('.ln8-pl[data-p=l]');
+    this.pr = this.q('.ln8-pl[data-p=r]');
+    this.ws = [...s.querySelectorAll('.ln8-w')];
+    this.tilt(-7);
+  },
+  // 杠杆：绕 (380,112) 转动，两端托盘保持水平
+  tilt(deg) {
+    this.th = deg;
+    const a = (deg * Math.PI) / 180, L = 250, cx = 380, cy = 112;
+    this.beam.setAttribute('transform', `rotate(${deg.toFixed(2)} ${cx} ${cy})`);
+    this.pl.setAttribute('transform', `translate(${(cx - L * Math.cos(a)).toFixed(1)} ${(cy - L * Math.sin(a)).toFixed(1)})`);
+    this.pr.setAttribute('transform', `translate(${(cx + L * Math.cos(a)).toFixed(1)} ${(cy + L * Math.sin(a)).toFixed(1)})`);
+  },
+  focus(s, k) { s.dataset.k = k; this.set(String(k)); },
+  // 主线一：训练分布 → 分布变化，两条路线的答案
+  async cards(ctx, tk) {
+    const ok = () => ctx.alive && tk === this.tk, q = this.q;
+    const ml = q('.ln8-ml'), j = q('.ln8-j'), js = j.querySelector('small');
+    const row = (r) => ({ eq: q(`.ln8-row[data-r=${r}] .ln8-eq`), v: q(`.ln8-row[data-r=${r}] .ln8-v`) });
+    const S = row('sft'), R = row('rl');
+    const put = (o, html, v) => { o.eq.innerHTML = html; o.v.className = 'ln8-v' + (v ? ' ' + v : ''); o.v.textContent = v === 'ok' ? '✓' : v === 'bad' ? '✗' : ''; };
+    while (ok()) {
+      ml.textContent = '训练分布：J / Q / K 都按 10 计'; ml.classList.remove('ood'); j.classList.remove('ood'); js.textContent = '= 10';
+      put(S, '', ''); put(R, '', '');
+      await U.wait(ctx, 700); if (!ok()) return;
+      put(S, '<span>(J−7)×(5+3) = 3×8 = 24</span>', 'ok');
+      await U.wait(ctx, 500); if (!ok()) return;
+      put(R, '<span>(J−7)×(5+3) = 3×8 = 24</span>', 'ok');
+      await U.wait(ctx, 2200); if (!ok()) return;
+      ml.textContent = '分布变化：测试时 J = 11'; ml.classList.add('ood'); j.classList.add('ood'); js.textContent = '= 11';
+      put(S, '', ''); put(R, '', '');
+      await U.wait(ctx, 800); if (!ok()) return;
+      put(S, '<span>仍按 10 套用：(J−7)×(5+3) = 24</span><span class="dim">实际 (11−7)×8 = 32</span>', 'bad');
+      await U.wait(ctx, 900); if (!ok()) return;
+      put(R, '<span><s>(11−7)×(5+3) = 32</s></span>', '');
+      await U.wait(ctx, 900); if (!ok()) return;
+      put(R, '<span><s>(11−7)×(5+3) = 32</s></span><span>重算：(7−3)×(11−5) = 24</span>', 'ok');
+      await U.wait(ctx, 2800);
+    }
+  },
+  // 主线二：三块“数据与环境”的砝码依次落下，天平倒向右侧
+  async scale(ctx, tk) {
+    const ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      this.ws.forEach((w) => w.classList.remove('on'));
+      const from = this.th;
+      await C8.tween(ctx, 700, (t) => this.tilt(from + (-7 - from) * t)); if (!ok()) return;
+      await U.wait(ctx, 1000); if (!ok()) return;
+      for (let i = 0; i < 3; i++) {
+        this.ws[i].classList.add('on');
+        const a0 = this.th, a1 = [-1, 5, 11][i];
+        await C8.tween(ctx, 650, (t) => this.tilt(a0 + (a1 - a0) * t), (t) => 1 + 2.70158 * Math.pow(t - 1, 3) + 1.70158 * Math.pow(t - 1, 2)); if (!ok()) return;
+        await U.wait(ctx, 700); if (!ok()) return;
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx, k) {
+    const tk = (this.tk = (this.tk || 0) + 1);
+    this.focus(s, k >= 1 ? 1 : 0);
+    this.cards(ctx, tk);
+    this.scale(ctx, tk);
+  },
+  step(s, ctx, k) { this.focus(s, k >= 1 ? 1 : 0); },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.k = 0;
+    this.ws.forEach((w) => w.classList.remove('on'));
+    this.tilt(-7);
+    s.querySelectorAll('.ln8-eq').forEach((e) => (e.innerHTML = ''));
+    s.querySelectorAll('.ln8-v').forEach((e) => { e.className = 'ln8-v'; e.textContent = ''; });
+  },
+};
+</script>
+
+<section class="slide" id="c08-map" data-part="0" data-dur="12000" data-title="本章导览：两条阅读路径" data-notes="<b>阅读指引</b>：本章内容按读者背景分为两条路径。<br><b>Agent 应用开发者</b>（不需要自己训练模型）：先读开篇的“从预训练到 RL：四阶段全景”建立全局认知，然后可以跳过经典 RL 与预训练背景两节（可选阅读），从独立的 Mid-training 一节继续。重点关注“何时选择 Mid-training、SFT、RL”的决策框架，以及“数据与环境比算法更重要”的判断——这些认知会影响你在 Harness 工程中的设计决策（什么时候靠 prompt 解决，什么时候值得训练）。<br><b>模型训练工程师</b>：从头顺序阅读，两节可选阅读提供强化学习和预训练的完整背景，后续实验提供可复现的训练方案。<br>动画版把全章分成九个部分：第 1 部分是全景地图；第 2 部分和第 3 部分前半是可选阅读的背景；第 3 部分后半到第 4 部分处理底座与协议（Mid-training、SFT）；第 5 部分给出选择准则并进入单轮 RL；第 6 至 8 部分依次是 RL 的算法、环境与奖励；第 9 部分讨论样本效率（蒸馏），并把第七章的问题案例落到训练上。<br>上方开关切换两条路径；点击任一部分卡片可直接跳转。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：<em>两条阅读路径</em></h2></div>
+    <div class="mp8-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="dev">Agent 应用开发者</button><button data-v="eng">模型训练工程师</button></div></header>
+  <div class="mp8-grid"></div>
+  <p class="mp8-note fx fx-up" style="--d:12"><span class="mp8-n0"></span></p>
+  <div class="src">第八章 · 开篇（阅读指引）</div>
+</section>
+<style>
+#c08-map .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:24px}
+.mp8-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.mp8-w{opacity:0;translate:0 26px;transition:opacity .7s var(--ease),translate .7s var(--ease);transition-delay:calc(var(--i)*70ms + 250ms)}
+.active .mp8-w{opacity:1;translate:0 0}
+.mp8-c{--c:var(--acc);position:relative;height:190px;padding:18px 22px;border-radius:20px;cursor:pointer;display:grid;grid-template-columns:76px 1fr;gap:4px 16px;align-content:start;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9)),rgba(12,18,40,.88) 60%);border:1px solid color-mix(in srgb,var(--c) 30%,transparent);transition:opacity .45s,border-color .45s,box-shadow .45s,filter .45s}
+.mp8-c:hover{border-color:var(--c)}
+.mp8-c em{grid-row:span 3;font:800 50px/1 var(--num);font-style:normal;color:transparent;-webkit-text-stroke:1.6px var(--c)}
+.mp8-c b{font-size:24px;color:var(--c);line-height:1.3}
+.mp8-c p{font-size:17px;line-height:1.55;color:var(--text2)}
+.mp8-c .mp8-t{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.mp8-c.skip{opacity:.35;filter:saturate(.3)}
+.mp8-c.cur{border-color:var(--c);box-shadow:0 0 0 1px color-mix(in srgb,var(--c) 40%,transparent),0 22px 50px -20px color-mix(in srgb,var(--c) 70%,transparent)}
+.mp8-c.cur em{color:var(--c);-webkit-text-stroke:0}
+.mp8-c.pass em{color:color-mix(in srgb,var(--c) 45%,transparent)}
+.mp8-st{position:absolute;right:16px;top:14px;font-size:15px;padding:3px 10px;border-radius:999px;color:var(--text3);border:1px solid var(--line2);opacity:0;transition:opacity .4s}
+.mp8-c.skip .mp8-st.s0,.mp8-c.key .mp8-st.s1{opacity:1}
+.mp8-c.key .mp8-st.s1{color:var(--tool);border-color:color-mix(in srgb,var(--tool) 50%,transparent)}
+.mp8-st.s1{right:16px}
+.mp8-note{margin-top:22px;font-size:21px;color:var(--text2);text-align:center;min-height:34px}
+.mp8-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c08-map'] = {
+  P: [
+    { n: '四阶段全景', c: '#818cf8', d: '每个环节的数据、优化目标与代价；SFT 与 RL 的本质区别', t: ['表8-1', '表8-2'] },
+    { n: '经典 RL 到现代 Agent', c: '#34d399', d: 'MDP、Q-learning、贝尔曼方程；先验的觉醒', t: ['可选阅读', '实验 8-1、8-2'] },
+    { n: '预训练基础与 Mid-training', c: '#60a5fa', d: '从头训练小模型（可选阅读）；在目标分布上补知识与基础能力', t: ['实验 8-3～8-5'] },
+    { n: 'SFT 与数据合成', c: '#38bdf8', d: '把稳定的映射与协议写进参数；合成数据流水线', t: ['实验 8-6～8-9'] },
+    { n: '选择决策与单轮 RL', c: '#a78bfa', d: '缺的是底座、协议还是策略；记忆与泛化的对照', t: ['表8-4', '实验 8-10、8-11'] },
+    { n: 'RL 算法与在轨训练', c: '#c084fc', d: '从 16 次 rollout 到一次参数更新；On-Policy 与数值一致性', t: ['GRPO', 'PPO'] },
+    { n: '环境、多轮与工具', c: '#2dd4bf', d: '仿真环境的保真度；信用分配；工具调用 RL', t: ['实验 8-12～8-15'] },
+    { n: '奖励设计', c: '#fbbf24', d: '来源、时机、信息量；奖励结果，惩罚路径', t: ['实验 8-16'] },
+    { n: '蒸馏与问题案例', c: '#f472b6', d: '在轨蒸馏提升样本效率；从生产问题案例到参数更新', t: ['表8-5', '实验 8-17～8-19'] },
+  ],
+  // 应用开发者：跳过第 2 部分（可选阅读）；第 3 部分只读 Mid-training 那一半；重点在选择准则与“数据和环境”
+  PATH: { dev: [0, 2, 3, 4, 5, 6, 7, 8], eng: [0, 1, 2, 3, 4, 5, 6, 7, 8] },
+  KEY: { dev: [0, 4, 6], eng: [] },
+  NOTE: {
+    dev: '先读<b>四阶段全景</b>，跳过两节可选阅读，从 <b>Mid-training</b> 继续；重点看<b>选择准则</b>与“<b>数据和环境比算法更重要</b>”',
+    eng: '<b>从头顺序阅读</b>：两节可选阅读补齐 RL 与预训练背景，后续实验给出可复现的训练方案',
+  },
+  init(s) {
+    s.querySelector('.mp8-grid').innerHTML = this.P.map((p, i) => `
+      <div class="mp8-w" style="--i:${i}"><div class="mp8-c" data-i="${i}" style="--c:${p.c}">
+        <em>${String(i + 1).padStart(2, '0')}</em><b>${p.n}</b><p>${p.d}</p>
+        <div class="mp8-t">${p.t.map((x) => `<span class="c8-tag" style="--c:${p.c}">${x}</span>`).join('')}</div>
+        <span class="mp8-st s0">可跳过</span><span class="mp8-st s1">重点</span>
+      </div></div>`).join('');
+    this.cs = [...s.querySelectorAll('.mp8-c')];
+    this.cs.forEach((c) => c.addEventListener('click', () => C8.goPart(+c.dataset.i + 1)));
+    this.set = U.seg(s.querySelector('.mp8-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    this.set(m);
+    const path = this.PATH[m];
+    s.querySelector('.mp8-n0').innerHTML = this.NOTE[m];
+    this.cs.forEach((c, i) => {
+      c.classList.toggle('skip', !path.includes(i));
+      c.classList.toggle('key', this.KEY[m].includes(i));
+      c.classList.remove('cur', 'pass');
+    });
+    if (!ctx) return;
+    // 阅读光标沿路径逐个经过
+    path.forEach((p, j) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      this.cs.forEach((c, i) => { c.classList.toggle('cur', i === p); if (path.indexOf(i) > -1 && path.indexOf(i) < j) c.classList.add('pass'); });
+    }, 600 + j * 650));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'dev');
+    ctx.every(() => { if (this.auto) this.mode(s, this.m === 'dev' ? 'eng' : 'dev'); }, 7600);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.cs.forEach((c) => c.classList.remove('cur', 'pass', 'skip', 'key')); },
+};
+</script>

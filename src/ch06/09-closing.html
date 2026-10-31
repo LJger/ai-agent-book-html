@@ -1,0 +1,302 @@
+<!-- ================= 收束 ================= -->
+<section class="slide chapter" id="c06-dz" data-part="8" data-title="收束 · 本章小结与思考题" data-notes="本章顺着模态和执行时机两根轴，把观察与动作空间从文本、回合制扩展到了事件、声音、屏幕与物理世界。收束部分先回顾四个场景各自把边界推到了哪里，再看它们共享的控制骨架与原语——唤醒、安全点、取消、抢占、快慢分离，最后是十二道思考题。思考题的参考答案提纲取自原书附录，可以点击展开，并跳回相关页面复习。">
+  <div class="ch-k fx fx-up">CLOSING</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">本章小结</h1>
+  <div class="ch-s fx fx-up" style="--d:3">两根轴、四个场景、一条控制骨架</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">本章完成了「构建 Agent」这一部分的最后一块：观察与动作空间在内容、模态和时机三个方向上都已经展开。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<section class="slide" id="c06-sum" data-part="8" data-trans="zoom" data-title="本章小结：两根轴上的四个场景" data-dur="16000" data-notes="顺着<b>模态</b>和<b>执行时机</b>两根轴看：<br><b>异步与事件驱动</b>把观察从「Agent 主动去取」扩展为「世界主动推来」，把动作从「回合内做完」扩展为「先发起、后续靠事件收尾」，模态没变，变的只有时机。<br><b>语音</b>把尺度压到毫秒，级联、端到端 Omni 与全双工三种范式的演进主线，就是从「轮流说话」逐步走向持续听说，并在前台实时交互与后台深度思考之间做出分工。<br><b>Computer Use</b> 把同一个闭环搬到屏幕上，瓶颈已从「能否完成任务」扩展到操作效率、连续视觉理解和动作后的状态确认。<br><b>机器人</b>则把它推到物理世界，动作分块在平滑性与反应速度之间取舍，而最终是否完成，仍必须由新的观察来判定。<br>右侧四张卡片会自动轮换，左图同步点亮对应的场景；也可以点击卡片或图中的圆点。图中位置只是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：<em>两根轴上的四个场景</em></h2>
+  <p class="lead fx fx-up" style="--d:2">顺着模态和执行时机两根轴，观察与动作空间一路扩展到物理世界</p></header>
+  <div class="c06su-body">
+    <div class="c06su-dia fx fx-left" style="--d:3">
+      <svg viewBox="0 0 640 600" width="640" height="600">
+        <defs>
+          <marker id="c06su-m1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#fb7185"/></marker>
+          <marker id="c06su-m2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" fill="#e879f9"/></marker>
+        </defs>
+        <path class="c06su-ax c06su-axx" d="M70 540 H620" marker-end="url(#c06su-m1)"/>
+        <path class="c06su-ax c06su-axy" d="M70 540 V34" marker-end="url(#c06su-m2)"/>
+        <text class="c06su-al" x="620" y="580" text-anchor="end" style="fill:#fb7185">执行时机 →</text>
+        <text class="c06su-al" x="86" y="30" style="fill:#e879f9">↑ 模态</text>
+        <text class="c06su-tk" x="60" y="530" text-anchor="end">文本</text>
+        <text class="c06su-tk" x="60" y="390" text-anchor="end">声音</text>
+        <text class="c06su-tk" x="60" y="250" text-anchor="end">屏幕</text>
+        <text class="c06su-tk" x="60" y="130" text-anchor="end">物理</text>
+        <g class="c06su-o"><rect x="82" y="476" width="170" height="52" rx="12"/><text x="167" y="499">前五章</text><text class="c06su-o2" x="167" y="518">文本 · 回合制</text></g>
+        <path class="c06su-tr" data-i="0" d="M252 502 C 330 500, 400 512, 470 516"/>
+        <path class="c06su-tr" data-i="1" d="M470 516 C 470 470, 440 420, 410 384"/>
+        <path class="c06su-tr" data-i="2" d="M410 384 C 380 330, 330 290, 300 254"/>
+        <path class="c06su-tr" data-i="3" d="M300 254 C 380 200, 480 150, 560 124"/>
+        <g class="c06su-pt" data-i="0" style="--c:#fb7185"><circle class="c06su-halo" cx="470" cy="516" r="16"/><circle cx="470" cy="516" r="11"/><text x="470" y="494">异步与事件驱动</text></g>
+        <g class="c06su-pt" data-i="1" style="--c:#e879f9"><circle class="c06su-halo" cx="410" cy="384" r="16"/><circle cx="410" cy="384" r="11"/><text x="410" y="362">语音</text></g>
+        <g class="c06su-pt" data-i="2" style="--c:#38bdf8"><circle class="c06su-halo" cx="300" cy="254" r="16"/><circle cx="300" cy="254" r="11"/><text x="300" y="232">Computer Use</text></g>
+        <g class="c06su-pt" data-i="3" style="--c:#fb923c"><circle class="c06su-halo" cx="560" cy="124" r="16"/><circle cx="560" cy="124" r="11"/><text x="560" y="102">机器人</text></g>
+      </svg>
+      <span class="chip warn c06su-sim">位置示意</span>
+    </div>
+    <div class="c06su-cards"></div>
+  </div>
+  <div class="src">第六章 ·「本章小结」</div>
+</section>
+<style>
+#c06-sum .c06su-body{display:grid;grid-template-columns:640px 1fr;gap:44px;align-items:start;margin-top:-4px}
+#c06-sum .c06su-dia{position:relative}
+#c06-sum .c06su-dia svg{overflow:visible}
+#c06-sum .c06su-sim{position:absolute;right:0;top:0;font-size:15px}
+#c06-sum .c06su-ax{fill:none;stroke-width:3;opacity:.6}
+#c06-sum .c06su-axx{stroke:#fb7185}#c06-sum .c06su-axy{stroke:#e879f9}
+#c06-sum .c06su-al{font-size:20px;font-weight:700}
+#c06-sum .c06su-tk{fill:var(--text3);font-size:16px}
+#c06-sum .c06su-o rect{fill:rgba(148,163,184,.12);stroke:#94a3b8;stroke-width:1.5}
+#c06-sum .c06su-o text{fill:var(--text);font-size:17px;font-weight:700;text-anchor:middle}
+#c06-sum .c06su-o .c06su-o2{fill:var(--text3);font-size:15px;font-weight:400}
+#c06-sum .c06su-tr{fill:none;stroke:rgba(255,255,255,.35);stroke-width:2.5;stroke-dasharray:6 8;opacity:.25;transition:opacity .5s}
+#c06-sum .c06su-tr.seen{opacity:.8;animation:flow 1.2s linear infinite}
+#c06-sum .c06su-pt{cursor:pointer;opacity:.35;transition:opacity .5s}
+#c06-sum .c06su-pt.seen{opacity:.8}
+#c06-sum .c06su-pt.on{opacity:1}
+#c06-sum .c06su-pt circle{fill:var(--c)}
+#c06-sum .c06su-pt .c06su-halo{fill:none;stroke:var(--c);stroke-width:2;opacity:0;transform-box:fill-box;transform-origin:center}
+#c06-sum .c06su-pt.on .c06su-halo{animation:pulse 1.8s ease-out infinite}
+#c06-sum .c06su-pt text{fill:var(--c);font-size:19px;font-weight:700;text-anchor:middle;paint-order:stroke;stroke:#050816;stroke-width:5px}
+#c06-sum .c06su-cards{display:flex;flex-direction:column;gap:14px}
+#c06-sum .c06su-c{--c:var(--acc);display:grid;grid-template-columns:64px 1fr;gap:18px;align-items:start;padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);cursor:pointer;transition:all .45s var(--ease);opacity:.62}
+#c06-sum .c06su-c .ic{font-size:40px;color:var(--c);margin-top:4px}
+#c06-sum .c06su-c b{display:flex;align-items:baseline;gap:12px;font-size:25px;color:var(--c)}
+#c06-sum .c06su-c b small{font:600 16px var(--num);color:var(--text3)}
+#c06-sum .c06su-c p{font-size:19px;line-height:1.62;color:var(--text2);margin-top:6px}
+#c06-sum .c06su-c.on{opacity:1;border-color:color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.85));box-shadow:0 0 34px -6px color-mix(in srgb,var(--c) 45%,transparent);translate:-6px 0}
+#c06-sum .c06su-c.on p{color:var(--text)}
+</style>
+<script>
+HOOKS['c06-sum'] = {
+  C: [
+    { c: '#fb7185', ic: 'bell', n: '异步与事件驱动', t: '秒 — 天', p: '观察从「Agent 主动去取」扩展为「世界主动推来」，动作从「回合内做完」扩展为「先发起、后续靠事件收尾」；模态没变，变的只有时机' },
+    { c: '#e879f9', ic: 'mic', n: '语音', t: '10 毫秒 — 1 秒', p: '级联、端到端 Omni 与全双工的演进主线，是从「轮流说话」逐步走向持续听说，并在前台实时交互与后台深度思考之间做出分工' },
+    { c: '#38bdf8', ic: 'cursor', n: 'Computer Use', t: '亚秒 — 秒', p: '把同一个闭环搬到屏幕上，瓶颈从「能否完成任务」扩展到操作效率、连续视觉理解和动作后的状态确认' },
+    { c: '#fb923c', ic: 'arm', n: '机器人', t: '毫秒', p: '把它推到物理世界：动作分块在平滑性与反应速度之间取舍，最终是否完成，仍必须由新的观察来判定' },
+  ],
+  init(s) {
+    s.querySelector('.c06su-cards').innerHTML = this.C.map((c, i) => `<div class="c06su-c fx fx-right" data-i="${i}" style="--d:${4 + i};--c:${c.c}"><svg class="ic"><use href="#i-${c.ic}"/></svg><div><b>${c.n}<small>${c.t}</small></b><p>${c.p}</p></div></div>`).join('');
+    const pick = (i) => { this.auto = false; this.show(s, i); };
+    s.querySelectorAll('.c06su-c').forEach((c) => c.addEventListener('click', () => pick(+c.dataset.i)));
+    s.querySelectorAll('.c06su-pt').forEach((g) => g.addEventListener('click', () => pick(+g.dataset.i)));
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c06su-c').forEach((c) => c.classList.toggle('on', +c.dataset.i === i));
+    s.querySelectorAll('.c06su-pt').forEach((g) => { const j = +g.dataset.i; g.classList.toggle('on', j === i); if (j <= i) g.classList.add('seen'); });
+    s.querySelectorAll('.c06su-tr').forEach((p) => { if (+p.dataset.i <= i) p.classList.add('seen'); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.later(() => this.show(s, 0), 1000);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 3800);
+  },
+  reset(s) { s.querySelectorAll('.on,.seen').forEach((e) => e.classList.remove('on', 'seen')); },
+};
+</script>
+
+<section class="slide" id="c06-skeleton" data-part="8" data-trans="rise" data-title="同一条控制骨架，同一组原语" data-dur="16000" data-notes="四节共享同一条控制骨架：持续感知 → 判断当前状态与时机 → 选择回复或动作 → 让输出进入环境 → 观察反馈 → 继续、修正、重试、停止或重新规划。也共享同一组原语——<b>唤醒、安全点、取消、抢占、快慢分离</b>。<br>右侧矩阵把这些原语在本章四个场景里的出现位置排在一起（只列正文明确讨论过的实现，正文没有展开的格子留空）。可以看到同一个原语在不同时间尺度上的实现差异：事件驱动里的取消发生在两次工具调用之间的安全点，延迟以秒计也可以接受；机器人动作分块里的取消则必须在毫秒内生效。<br>本章完成了「构建 Agent」这一部分的最后一块：观察与动作空间在内容、模态和时机三个方向上都已经展开。接下来，第七章先回答如何判断系统构建得对不对；第八章讨论如何通过后训练更新模型参数；第九章再把运行轨迹、评估与多种更新载体组织成持续进化闭环。第十章则在这个完整的单 Agent 基础上转向多 Agent 协作。<br>左侧骨架自动循环；矩阵按原语逐行自动高亮，也可以点击左侧的原语标签。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一条控制骨架，<em>同一组原语</em></h2></header>
+  <div class="c06sk-body">
+    <div class="c06sk-left fx fx-left" style="--d:2">
+      <span class="lbl">四节共享的控制骨架</span>
+      <ol class="sl c06sk-sl"></ol>
+      <div class="c06sk-back"><svg class="ic"><use href="#i-repeat"/></svg>回到持续感知，进入下一轮</div>
+    </div>
+    <div class="c06sk-mx panel fx fx-right" style="--d:3"></div>
+  </div>
+  <div class="c06sk-next fx fx-up" style="--d:6"><span class="c06sk-nl">接下来</span><span class="chip">第七章 · 判断系统构建得对不对</span><span class="chip">第八章 · 通过后训练更新模型参数</span><span class="chip">第九章 · 持续进化闭环</span><span class="chip">第十章 · 多 Agent 协作</span></div>
+  <div class="src">第六章 ·「本章小结」· 控制骨架与原语</div>
+</section>
+<style>
+#c06-skeleton .c06sk-body{display:grid;grid-template-columns:470px 1fr;gap:30px;align-items:start;margin-top:-6px}
+#c06-skeleton .c06sk-left{display:flex;flex-direction:column;gap:12px}
+#c06-skeleton .c06sk-sl{gap:8px}
+#c06-skeleton .c06sk-sl li{padding:11px 16px}
+#c06-skeleton .c06sk-sl b{font-size:21px}
+#c06-skeleton .c06sk-back{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:14px;font-size:17px;color:var(--text3);border:1px dashed var(--line2)}
+#c06-skeleton .c06sk-back .ic{font-size:22px;color:var(--acc)}
+#c06-skeleton .c06sk-mx{display:grid;grid-template-columns:150px repeat(4,1fr);overflow:hidden}
+#c06-skeleton .c06sk-mx>div{padding:12px 14px;font-size:16px;line-height:1.5;color:var(--text2);border-top:1px solid var(--line);border-left:1px solid var(--line);transition:all .4s var(--ease)}
+#c06-skeleton .c06sk-ch{font-size:17px!important;font-weight:700;color:var(--c)!important;border-top:0!important;background:rgba(255,255,255,.03)}
+#c06-skeleton .c06sk-ch small{display:block;font:500 15px var(--num);color:var(--text3)}
+#c06-skeleton .c06sk-corner{border-top:0!important;border-left:0!important}
+#c06-skeleton .c06sk-rh{border-left:0!important;display:flex;align-items:center}
+#c06-skeleton .c06sk-rh button{width:100%;padding:8px 10px;border-radius:12px;font-size:19px;font-weight:700;color:var(--text);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .3s}
+#c06-skeleton .c06sk-na{color:var(--text3)!important;font-size:15px!important}
+#c06-skeleton .c06sk-mx>div.on{color:var(--text);background:color-mix(in srgb,var(--acc) 11%,transparent)}
+#c06-skeleton .c06sk-mx>div.c06sk-na.on{color:var(--text3)!important;background:rgba(255,255,255,.02)}
+#c06-skeleton .c06sk-rh.on button{color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2));border-color:transparent;box-shadow:0 0 20px color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-skeleton .c06sk-next{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:22px}
+#c06-skeleton .c06sk-nl{font-size:17px;letter-spacing:.2em;color:var(--text3)}
+#c06-skeleton .c06sk-next .chip{font-size:17px}
+</style>
+<script>
+HOOKS['c06-skeleton'] = {
+  K: [['持续感知', '事件、声音、屏幕、传感器'], ['判断当前状态与时机', '现在该不该动、能不能动'], ['选择回复或动作', '说话、点击、调用技能'], ['让输出进入环境', '真正改变外部世界'], ['观察反馈', '新的观察才是事实'], ['继续、修正、重试、停止或重新规划', '回到下一轮']],
+  H: [['事件驱动', '秒 — 天', '#fb7185'], ['语音', '10 毫秒 — 1 秒', '#e879f9'], ['Computer Use', '亚秒 — 秒', '#38bdf8'], ['机器人', '毫秒', '#fb923c']],
+  M: [
+    ['唤醒', ['定时器、后台任务监控、外部事件通道把世界的变化变成事件', '声学事件标记（speak_start/end、interrupt）与端点判断', '屏幕关键帧截图、音量门控转写：有显著变化才「睁眼」', '传感器连续回流；执行时把真实观察与预测对照']],
+    ['安全点', ['事件在每轮循环的边界被消费：一段推理结束、一次工具返回', '级联与 Omni 仍按轮次推进，靠 VAD 判断何时说完', '每个动作后等界面稳定、重新截图确认现实', '每完成一个技能就得到一个可检查的节点（verify_state）']],
+    ['取消', ['取消式处理：取消流式响应，向工具发取消信号（执行器要响应）', 'LLM 推测执行：最终文本与临时转录不同，就取消前序推测', '实际变化偏离预期时停下来，重新观察和规划', '用户喊停、物体离开工作区或状态无法确认时调用 stop']],
+    ['抢占', ['紧急事件主动「提前制造一个安全点」', '全双工：重叠说话与打断成为模型的自然行为', null, '动作分块：一次规划一小段，可被抢占']],
+    ['快慢分离', ['轻量级分类 LLM 做事件路由；独立轻量查询另起并行会话', '前台快模型维持对话，后台慢模型负责推理、规划和工具调用', null, '长程规划（秒到分钟）与底层控制（50—1000 Hz）分层']],
+  ],
+  init(s) {
+    s.querySelector('.c06sk-sl').innerHTML = this.K.map(([a, b], i) => `<li><span>${i + 1}</span><div><b>${a}</b><p>${b}</p></div></li>`).join('');
+    let h = '<div class="c06sk-corner"></div>' + this.H.map(([n, t, c]) => `<div class="c06sk-ch" style="--c:${c}">${n}<small>${t}</small></div>`).join('');
+    this.M.forEach(([p, cells], r) => {
+      h += `<div class="c06sk-rh" data-r="${r}"><button data-r="${r}">${p}</button></div>`;
+      h += cells.map((t) => (t ? `<div data-r="${r}">${t}</div>` : `<div class="c06sk-na" data-r="${r}">— 本章未展开</div>`)).join('');
+    });
+    s.querySelector('.c06sk-mx').innerHTML = h;
+    s.querySelectorAll('.c06sk-rh button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.row(s, +b.dataset.r); }));
+  },
+  row(s, r) {
+    this.r = r;
+    s.querySelectorAll('.c06sk-mx [data-r]').forEach((e) => { if (e.tagName !== 'BUTTON') e.classList.toggle('on', +e.dataset.r === r); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.r = -1;
+    const lis = [...s.querySelectorAll('.c06sk-sl li')];
+    let n = -1;
+    const tick = () => { n = (n + 1) % lis.length; lis.forEach((li, i) => { li.classList.toggle('cur', i === n); li.classList.toggle('done', i < n); }); };
+    ctx.later(() => { tick(); ctx.every(tick, 1300); }, 700);
+    ctx.later(() => this.row(s, 0), 1200);
+    ctx.every(() => { if (this.auto) this.row(s, (this.r + 1) % this.M.length); }, 3400);
+  },
+  reset(s) { s.querySelectorAll('.cur,.done,.on').forEach((e) => e.classList.remove('cur', 'done', 'on')); },
+};
+</script>
+
+<section class="slide" id="c06-qa1" data-part="8" data-title="思考题（1–3）" data-dur="16000" data-notes="思考题 1–3 围绕异步与事件驱动：第 1 题问优先级判断该交给规则引擎还是另一个 LLM，第 2 题问 20 个积压事件怎样呈现才不被遗漏，第 3 题问虚拟身份与本人身份的取舍。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>1–3</em> · 异步与身份</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c06qa-list fx fx-up" style="--d:3" data-qs="0"></div>
+  <div class="src">第六章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c06-qa2" data-part="8" data-trans="flip" data-title="思考题（4–6）" data-dur="16000" data-notes="思考题 4–6：第 4 题是端到端语音 Agent 的可观测性，第 5 题讨论“边想边说”该不该模仿人类的不完美，第 6 题问视觉标注不完整时是否回退到坐标预测。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>4–6</em> · 语音与定位</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c06qa-list fx fx-up" style="--d:3" data-qs="3"></div>
+  <div class="src">第六章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c06-qa3" data-part="8" data-trans="zoom" data-title="思考题（7–9）" data-dur="16000" data-notes="思考题 7–9：第 7 题是遥操作数据质量如何影响 VLA 训练，第 8 题是未来五年该押注统一模型还是可替换的快慢分工，第 9 题是 Computer Use 押注纯视觉还是同时维护结构化与视觉两条路径。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>7–9</em> · 数据与架构取舍</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c06qa-list fx fx-up" style="--d:3" data-qs="6"></div>
+  <div class="src">第六章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c06-qa4" data-part="8" data-trans="rise" data-title="思考题（10–12）" data-dur="18000" data-notes="思考题 10–12（动作分块、不可逆后果、跨尺度的原语），题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。第 12 题的参考答案给出了一条设计规则：<b>安全点的密度应与环境变化速度匹配；而在安全点之外还需要多少额外防护，取决于动作有多不可逆</b>。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>10–12</em> · 安全与原语</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c06qa-list fx fx-up" style="--d:3" data-qs="9"></div>
+  <div class="src">第六章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c06-qa1 .c06qa-list,#c06-qa2 .c06qa-list,#c06-qa3 .c06qa-list,#c06-qa4 .c06qa-list{margin-top:-4px}
+#c06-qa1 .qa-q,#c06-qa2 .qa-q,#c06-qa3 .qa-q,#c06-qa4 .qa-q{font-size:20px;padding:16px 20px}
+#c06-qa1 .qa-a>div,#c06-qa2 .qa-a>div,#c06-qa3 .qa-a>div,#c06-qa4 .qa-a>div{font-size:18px;visibility:hidden;transition:visibility 0s linear .5s}
+#c06-qa1 .qa-it.open .qa-a>div,#c06-qa2 .qa-it.open .qa-a>div,#c06-qa3 .qa-it.open .qa-a>div,#c06-qa4 .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+#c06-qa1 .c06qa-tag,#c06-qa2 .c06qa-tag,#c06-qa3 .c06qa-tag,#c06-qa4 .c06qa-tag{display:inline-block;margin:2px 0 6px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+#c06-qa1 .c06qa-a p,#c06-qa2 .c06qa-a p,#c06-qa3 .c06qa-a p,#c06-qa4 .c06qa-a p{margin-top:6px}
+#c06-qa1 .c06qa-go,#c06-qa2 .c06qa-go,#c06-qa3 .c06qa-go,#c06-qa4 .c06qa-go{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 14px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+#c06-qa1 .c06qa-go:hover,#c06-qa2 .c06qa-go:hover,#c06-qa3 .c06qa-go:hover,#c06-qa4 .c06qa-go:hover{background:color-mix(in srgb,var(--acc) 18%,transparent)}
+</style>
+<script>
+HOOKS['c06-qa1'] = {
+  ALL: [
+    { st: '★★', go: ['c06-urgency', '紧急度的判定'], q: '在异步 Agent 架构中，事件队列的优先级策略需要在设计时确定。但如果优先级判断本身需要语义理解（比如判断一条新消息是否比当前任务更紧急），这个判断应该由谁来做——规则引擎还是另一个 LLM 调用？各有什么代价？', a: ['采用分层混合方式：类型明确的事件用规则硬编码，零延迟、确定性强，但无法理解「马上停下来」与「今天天气怎样」的语义差异；语义模糊的事件交给轻量级分类 LLM，由其充当事件路由器，代价是增加数百毫秒延迟和额外费用，而且可能误判；同时需要像 Sidecar 一样只读取结构化字段，以防范提示注入。'] },
+    { st: '★★', go: ['c06-attn', '批量事件的注意力分散'], q: '在队列式事件处理中，模型倾向于只关注最后一个事件，本章通过 Agent 状态栏标记和汇总来缓解。但如果队列中积压了 20 个事件（10 个工具结果 + 5 条用户消息 + 5 个系统提醒），你会如何组织这些事件的呈现顺序和格式，使模型不遗漏关键信息？', a: ['先用规则和轻量级 LLM 分类去重：紧急事件（告警、用户中断）单独采用取消式处理，不混入批量事件。将 10 个超长的工具结果截断后持久化到文件，只保留开头、结尾和文件路径。在上下文末尾的系统状态栏中加入汇总清单（各类事件的数量，以及逐条回应的要求）。'] },
+    { st: '★★★', go: ['c06-identity', '虚拟身份'], q: 'Agent 代表用户与外部世界交互时，本质上面临一个身份选择：是用独立的虚拟身份（专属邮箱和电话号码）以第三方身份行动，还是直接以用户本人的身份操作其个人账号？前者可以在后台自主操作，但第三方可能不信任一个非真人的身份；后者拥有更完整的上下文和权限，但引入了信任授权和安全边界的问题。你认为在什么场景下应该选择哪种模式？', a: ['默认使用虚拟身份：可以在后台自主操作且便于审计，出错或被攻破时也不会暴露用户的全部数字身份，就像秘书使用自己的办公邮箱；但需要应对 CAPTCHA / IP 信誉问题（住宅代理）。在必须以本人身份操作的场景中（账户身份验证、三方通话确认，如 Pine 打客服电话），采用 Human-in-the-loop 认证：通过 VNC / RDP 让用户在可视化界面中亲自登录。判断标准包括对方是否要求账户持有人本人操作、操作风险和凭证范围。'] },
+    { st: '★★', go: ['c06-exp6', '实验 6-6：端到端 vs 自级联'], q: '语音 Agent 的端到端模型将 ASR-LLM-TTS 合并为单一模型，降低了延迟却失去了模块化。如果端到端模型在某个环节（如语音识别）出错，调试和修复比串行管道困难得多。你会如何设计端到端语音 Agent 的可观测性（observability）系统？', a: ['让模型同时输出可读的中间表示，如 Moshi 的「内心独白」文本流和声学事件标记（emotion、noise 等）；用「自级联」定位出错环节：让同一模型先转录再推理，并与端到端结果对照，判断错误出在感知还是思考；离线按照副语言理解、轮次判断等维度进行分项回归测试。'] },
+    { st: '★', go: ['c06-fast23', '方案二与方案三'], q: 'Step-Audio R1 通过 MPS 双脑架构实现“边想边说”。但人类在“边想边说”时经常会说出未经深思熟虑的话、自我纠正或使用填充词。Agent 的“边想边说”应该模仿人类的这些特征吗？', a: ['应该模仿具有信号价值的「不完美」：停顿、填充词是思考的外化，能够掩盖延迟，其插入位置可由 LLM 决定；不应模仿会破坏信任的自我纠正：方案一中的快慢思考矛盾（「到底买不买？！」）会让信任崩塌；MPS 实验显示 CoT 开头多是在复述问题，因此提前开口说些铺垫是安全的，无需先说错再改口。'] },
+    { st: '★★', go: ['c06-gpick', '三条路线怎么选'], q: 'SoM（Set-of-Mark）及其结构化变体（DOM 元素索引）将 Computer Use 的视觉定位从开放坐标预测转为封闭 ID 选择，但都需要先检测和标注界面元素——无论靠分割模型还是靠 DOM。如果界面包含非标准控件或动态变化的元素，标注就可能不完整或不准确。这种情况下应该回退到坐标预测吗？', a: ['应保留坐标预测兜底：它是唯一不依赖标注的路线，非标准控件、动态元素均适用；更实用的是混合 action space：标注可得的元素仍用 ID 选择。坐标预测须做分辨率匹配与等比缩放，否则会发生系统性偏移。'] },
+    { st: '★★', go: ['c06-hw', '硬件与算法的分工'], q: 'XLeRobot 等几百美元级机器人平台让遥操作数据收集变得廉价。但遥操作数据的质量高度依赖操作者的技能。一个不熟练的操作者提供的数据会如何影响 VLA 模型的训练？如何在数据收集阶段自动筛选低质量数据？', a: ['VLA 主要靠模仿学习，低质演示会把抖动、绕路、犹豫与失败动作当成正确策略学进去。呼应第八章的判断：数据比架构更关键。'] },
+    { st: '★★★', go: ['c06-tradeoff', '快慢分离还是端到端统一'], q: '本章覆盖了语音、Computer Use 和机器人三种交互形态。交互架构可以通过端到端统一、模块化级联或前台交互与后台推理解耦来改进，而不必与智能上限同步提升。未来五年的 Agent 应该优先追求更强的统一模型，还是保留可替换的快慢分工？请结合延迟、可观测性、模型迭代速度和任务风险讨论。', a: ['按 Thinking Machines Lab 主张，交互性将内建于模型而非外挂 harness，随智能一同扩展；Computer Use 从逐帧截图走向连续观察；具身智能的世界模型将全面实现，但由于前沿推理模型发展很快，快慢解耦不会消失，交互模型与 SOTA 思考模型的快慢思考协同架构可能成为长期架构。'] },
+    { st: '★★', go: ['c06-som', 'Set-of-Mark 与结构化元素索引'], q: 'DOM/Accessibility Tree 元素索引在标准 Web 应用上效果显著，但越来越多的软件界面（Canvas/WebGL 渲染、跨平台自绘控件）不提供可访问的结构化信息，只能依靠视觉标注或坐标预测。你认为 Computer Use 应该押注纯视觉路线，还是同时维护结构化和视觉两条路径？维护两条路径的成本和收益分别是什么？', a: ['短期内两条路径并存：能够取得结构化索引时，定位最准确、最稳定，还能避免分割模型误检；纯视觉则是原生软件、Canvas 和游戏中的唯一选择。当模型本身的 grounding（点击指定坐标）能力较强时，使用结构化索引方案并不会体现出显著优势。长期来看，纯视觉路线的上限更高。'] },
+    { st: '★★', go: ['c06-chunk', '动作分块'], q: 'VLA 模型采用动作分块（action chunking）——如正文所述，模型一次生成一小段未来动作，由控制线程以更高频率回放——将推理延迟隐藏在执行时间里。但如果执行过程中环境突变（如物体被移走），预生成的动作序列就会失效。如何在动作分块的效率优势和环境变化的响应速度之间取得平衡？', a: ['分块本质上是用反应速度换取动作的平滑性，块越长，反应越迟钝；块长只需满足「推理时间 ＜ 块执行时间」的下限，不应盲目加长；执行过程中让感知模型持续运行，检测到环境突变就丢弃剩余动作并重新推理，相当于语音场景中的「打断」。可根据场景动态调整块长：静态场景使用长块以节省算力，动态场景使用短块以保证响应速度。'] },
+    { st: '★★★', go: ['c06-exp12', '实验 6-12：安全闸门'], q: '本章的三个场景（语音、Computer Use、机器人）都面临“感知-思考-行动”循环的延迟问题，都需要在智能上限和交互时效之间做分工。在语音场景中，这表现为“说错了再纠正”；在 Computer Use 场景中，这表现为“先点再看”；在机器人场景中，这表现为“走一步看一步”。如何通过动作分级、可逆操作、状态确认、权限控制和安全停止，保证快速交互不会导致无法挽回的后果？', a: ['按可逆性给动作分级：快思考只允许执行可逆动作，不可逆操作则交由慢思考把关；不允许快模型执行会造成不可逆后果的工具调用。'] },
+    { st: '★★★', go: ['c06-skeleton', '控制骨架与原语'], q: '本章反复出现同一组原语（唤醒、安全点、取消、抢占、快慢分离）在不同时间尺度上的实现。请任选其中一个，说明它在事件驱动（秒—天）与机器人动作分块（毫秒）两处的实现差异；这种差异主要由什么决定——环境变化的速度、动作的可逆性，还是观察的获取成本？', a: ['以「取消」为例。事件驱动中的取消发生在两次工具调用之间的安全点：Agent 收到 terminate 后清理资源、返回确认再退出，延迟以秒计也可以接受，因为一次工具调用本身就要几秒到几分钟。动作分块中的取消则必须在毫秒内生效：控制线程一旦发现安全事件或观察显著变化，就要立刻停止当前动作、丢弃剩余 chunk 并重新观察，慢一步就可能撞上障碍物。', '在三个候选因素中，<b>观察的获取成本</b>其实最不关键——两边都能以较低成本重新观察。真正决定差异的是另外两个因素的组合：<b>环境变化的速度</b>决定安全点必须设置得多密集（工具调用之间设置即可，还是每个控制周期都要设置），<b>动作的可逆性</b>决定错过安全点的代价（多发一封邮件还可以再补一封道歉，撞倒的杯子却无法复原）。', '由此可以提炼出一条设计规则：安全点的密度应与环境变化速度匹配；而在安全点之外还需要多少额外防护（硬件急停、独立安全控制器、二次确认），取决于动作有多不可逆。这也解释了为什么第四章的高风险操作要采用事前审批，而机器人要使用独立于模型的硬件安全层——两者都是在「安全点不够用」的地方补上的第二道防线。'] },
+  ],
+  // 每页三题：base 来自 .c06qa-list 的 data-qs
+  build(s) {
+    const host = s.querySelector('.c06qa-list'), base = +host.dataset.qs, list = HOOKS['c06-qa1'].ALL.slice(base, base + 3);
+    this.n = list.length;
+    host.innerHTML = list.map((x, i) => `<div class="qa-it"><button class="qa-q"><em>${base + i + 1}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div class="c06qa-a"><span class="c06qa-tag">参考答案提纲 · 原书附录</span>${x.a.map((p) => `<p>${p}</p>`).join('')}<button class="c06qa-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    this.open = U.qa(host, { single: true });
+    host.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; }));
+    host.querySelectorAll('.c06qa-go').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === b.dataset.go);
+      if (idx >= 0) DECK.go(idx, 0);
+    }));
+  },
+  play(s, ctx) {
+    this.auto = true;
+    let n = 0;
+    ctx.later(() => this.open(0), 800);
+    ctx.every(() => { if (this.auto) { n = (n + 1) % this.n; this.open(n); } }, 5600);
+  },
+  init(s) { this.build(s); },
+  enter(s, ctx) { this.play(s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c06-qa2'] = {
+  init(s) { HOOKS['c06-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c06-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c06-qa3'] = {
+  init(s) { HOOKS['c06-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c06-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c06-qa4'] = {
+  init(s) { HOOKS['c06-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c06-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<section class="slide" id="c06-end" data-part="8" data-trans="iris" data-title="第六章 · 完" data-notes="第六章到这里结束。至此，「如何构建 Agent」这一部分的最后一块已经完成：观察与动作空间在内容（第二至五章）、模态与时机（本章）三个方向上都已经展开。<br>下一章进入全书第二部分「如何提升 Agent 能力」，第七章先回答如何判断系统构建得对不对——Agent 的评估。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">「构建 Agent」的最后一块：<em>三个方向都已展开</em></h2>
+  <p class="lead fx fx-up" style="--d:2">接下来，第七章先回答：如何判断系统构建得对不对</p></header>
+  <div class="c06en-row">
+    <div class="chk c06en-c fx fx-up" style="--d:3"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>内容</b><p>第二至五章：上下文工程、记忆与知识库；工具、代码生成</p></div></div>
+    <div class="chk c06en-c fx fx-up" style="--d:4"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>模态</b><p>本章：语音、屏幕、物理传感器；说话、点击、关节运动</p></div></div>
+    <div class="chk c06en-c fx fx-up" style="--d:5"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>时机</b><p>本章：世界主动推送、连续流；跨回合、可打断、可抢占</p></div></div>
+  </div>
+  <div class="c06en-nav fx fx-up" style="--d:7">
+    <div class="end-nav">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+  <div class="src">第六章 ·「本章小结」</div>
+</section>
+<style>
+#c06-end .c06en-row{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:40px}
+#c06-end .c06en-c{padding:26px 28px;border-radius:20px}
+#c06-end .c06en-c b{font-size:30px}
+#c06-end .c06en-c p{font-size:19px;line-height:1.6;color:var(--text2);margin-top:8px}
+#c06-end .c06en-nav{margin-top:70px}
+</style>
+<script>
+HOOKS['c06-end'] = {
+  init(s) { s.querySelectorAll('.c06en-c').forEach((c) => c.addEventListener('click', () => c.classList.toggle('done'))); },
+  enter(s, ctx) { s.querySelectorAll('.c06en-c').forEach((c, i) => ctx.later(() => c.classList.add('done'), 1000 + i * 600)); },
+  reset(s) { s.querySelectorAll('.c06en-c').forEach((c) => c.classList.remove('done')); },
+};
+</script>

@@ -1,0 +1,440 @@
+<!-- ================= 实验 7-3 ================= -->
+<section class="slide" id="c07-exp73" data-part="5" data-trans="rise" data-dur="24000" data-title="实验 7-3 ★★：构建基于 Rubric 的用户记忆评估系统" data-notes="下面以用户记忆为一个具体案例，展示如何把这套通用方法落到可执行的评估集和验证器上。<br><b>实验 7-3 ★★：构建基于 Rubric 的用户记忆评估系统。</b>本实验要求改造第三章的 chapter3/user-memory-evaluation 框架，将当前基于简单 LLM-as-a-Judge 的评分机制升级为结构化的多维度 Rubric 评估系统。现有系统使用单一 LLM 调用返回通过/失败加评估理由，缺乏结构化的诊断能力。设计统一的多维度 Rubric 框架，适用于所有三层任务。评价维度包括：<b>事实正确性</b>（Precision，精确率——在所有给出的信息中，有多少是正确的），用于验证数字、日期和名称是否与记忆信息一致；<b>事实完整性</b>（Recall，召回率——在所有应该给出的信息中，有多少被提及），用于验证是否提供了所有相关信息而非遗漏关键内容；<b>思考正确性</b>，用于检查是否正确理解了信息间的关系和隐含逻辑；<b>思考主动性</b>，用于评估是否在适当时候提供超出直接回答的建议或风险提醒；<b>幻觉检测</b>，用于确保未编造记忆中不存在的信息。四档制评分（优秀/良好/及格/不及格），每档配具体判定标准而非抽象描述。幻觉维度设为一票否决项。为每个维度提供示例和边界案例。<br>配套仓库的实现：第三章共享的评判器读取权威原始材料，对 precision、recall、reasoning、proactivity 四项给出四档评分并附证据与边界案例，幻觉单独判定、作为硬否决；只有前三项都至少达到“良好”（3/4）且没有触发否决才算成功，reward 仍保留部分得分。实验 7-4 的完整运行同时产出了 180 条结构化评判（60 个用例 × 3 套系统），另有一次真实调用证明：回答里只要出现一个无依据的数字，reward 就被清零。<br>左侧的事实卡片可以点击加入或移出回答，精确率与召回率实时计算；回答内容为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-3 <span class="c7-star">★★</span>：从“通过/失败”到<em>结构化 Rubric</em></h2></header>
+  <div class="c7x3-body">
+    <div class="c7x3-l panel fx fx-left" style="--d:2">
+      <div class="c7x3-h"><b>“我女儿的儿科医生是谁？上次什么时候去的？”</b><span class="c7-tag">示意 · 点击卡片加入 / 移出回答</span></div>
+      <div class="c7x3-fx"></div>
+      <div class="c7x3-pr">
+        <div><span>事实正确性 · Precision</span><small>给出的信息里，有多少是正确的</small><b class="c7x3-p">—</b></div>
+        <div><span>事实完整性 · Recall</span><small>应该给出的信息里，有多少被提及</small><b class="c7x3-r">—</b></div>
+        <div class="v"><span>幻觉检测 · 一票否决</span><small>有没有编造记忆中不存在的信息</small><b class="c7x3-h2">—</b></div>
+      </div>
+      <p class="c7x3-nt">错把记忆里牙医的电话当成儿科医生的，是<b>精确率</b>问题；编造记忆里根本没有的诊断，是<b>幻觉</b>，直接否决</p>
+    </div>
+    <div class="c7x3-r fx fx-right" style="--d:3">
+      <div class="c7x3-cmp"><div class="o"><span class="lbl">现有系统 · 单一 LLM 调用</span><p>“FAIL：回答不完整。”</p><small>只有通过 / 失败 + 一句理由，缺乏结构化诊断</small></div>
+        <div class="n"><span class="lbl">升级后 · 五个维度 · 四档制</span><div class="c7x3-dm"><span>事实正确性<i>精确率</i></span><span>事实完整性<i>召回率</i></span><span>思考正确性<i>关系与隐含逻辑</i></span><span>思考主动性<i>适时的建议与风险提醒</i></span><span class="v">幻觉检测<i>一票否决</i></span></div><small>每档配具体判定标准，每个维度给示例和边界案例</small></div></div>
+      <div class="c7-card c7x3-dt"><b>配套仓库的实现</b><ul><li>评判器读取<b>权威原始材料</b>，四项各给四档分，附证据与边界案例</li><li>成功 = 精确、召回、思考三项都 ≥ 3/4，且<b>无幻觉否决</b>；reward 保留部分得分</li><li>实验 7-4 的完整运行产出 <b>180 条</b>结构化评判（60 用例 × 3 套系统）</li><li>一次真实调用证明：<b>一个无依据的数字</b>就让 reward 归零</li></ul><p class="c7-data">数据：配套仓库 chapter7/user-memory-system-evaluation 与 chapter3/user-memory-evaluation 的共享评判器，2026-07</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 实验 7-3</div>
+</section>
+<style>
+.c7x3-body{display:grid;grid-template-columns:1.05fr 1fr;gap:24px;flex:1;min-height:0}
+.c7x3-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7x3-h b{display:block;font-size:19px}
+.c7x3-h .c7-tag{margin-top:6px}
+.c7x3-fx{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c7x3-f{display:flex;flex-direction:column;gap:2px;padding:9px 12px;border-radius:12px;text-align:left;border:1px dashed var(--line2);background:rgba(255,255,255,.02);opacity:.55;transition:all .3s}
+.c7x3-f b{font-size:16px}
+.c7x3-f span{font-size:15px;color:var(--text3)}
+.c7x3-f.in{opacity:1;border-style:solid}
+.c7x3-f.in.ok{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.08)}
+.c7x3-f.in.wr{border-color:rgba(251,191,36,.6);background:rgba(251,191,36,.08)}
+.c7x3-f.in.hl{border-color:rgba(251,113,133,.65);background:rgba(251,113,133,.1)}
+.c7x3-pr{display:flex;flex-direction:column;gap:8px}
+.c7x3-pr div{display:grid;grid-template-columns:1fr auto;gap:0 12px;align-items:center;padding:8px 14px;border-radius:12px;border:1px solid var(--line)}
+.c7x3-pr span{font-size:16px;font-weight:700}
+.c7x3-pr small{grid-column:1;font-size:15px;color:var(--text3)}
+.c7x3-pr b{grid-row:1/3;grid-column:2;font:800 26px var(--num)}
+.c7x3-pr .v b.f{color:#fb7185}.c7x3-pr .v b.p{color:#34d399}
+.c7x3-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}
+.c7x3-nt b{color:var(--text)}
+.c7x3-r{display:flex;flex-direction:column;gap:14px}
+.c7x3-cmp{display:flex;flex-direction:column;gap:10px}
+.c7x3-cmp>div{display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7x3-cmp .o{border-style:dashed;opacity:.8}
+.c7x3-cmp .o p{font-size:19px;font-weight:700;color:#fda4af}
+.c7x3-cmp small{font-size:15px;color:var(--text3)}
+.c7x3-cmp .n{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.c7x3-dm{display:flex;flex-wrap:wrap;gap:6px}
+.c7x3-dm span{display:inline-flex;flex-direction:column;padding:5px 12px;border-radius:10px;font-size:15px;font-weight:700;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.c7x3-dm span i{font-style:normal;font-weight:400;font-size:15px;color:var(--text3)}
+.c7x3-dm span.v{color:#fda4af;border-color:rgba(251,113,133,.55)}
+.c7x3-dt{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.c7x3-dt>b{font-size:17px;color:var(--env)}
+.c7x3-dt ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px;font-size:15px;line-height:1.5;color:var(--text2)}
+.c7x3-dt li b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp73'] = {
+  // [卡片, 说明, 是否应给出（金标准）, 类型 ok / wr（张冠李戴）/ hl（编造）]
+  F: [['Dr. Chen', '金标准：女儿的儿科医生', 1, 'ok'], ['是 Lily 的医生', '金标准：关联到女儿', 1, 'ok'], ['上次就诊 3 月 2 日', '金标准：记忆里有', 1, 'ok'], ['电话 555-0102', '记忆里有，但其实是牙医的', 0, 'wr'], ['诊断是中耳炎', '记忆里没有，属于编造', 0, 'hl'], ['诊所在 3 楼', '记忆里没有，属于编造', 0, 'hl']],
+  init(s) {
+    s.querySelector('.c7x3-fx').innerHTML = this.F.map(([b, sp, , t], i) => `<button class="c7x3-f ${t}" data-i="${i}"><b>${b}</b><span>${sp}</span></button>`).join('');
+    s.querySelectorAll('.c7x3-f').forEach((b) => b.addEventListener('click', () => { this.auto = false; b.classList.toggle('in'); this.calc(s); }));
+  },
+  set(s, ids) { s.querySelectorAll('.c7x3-f').forEach((b, i) => b.classList.toggle('in', ids.includes(i))); this.calc(s); },
+  calc(s) {
+    const inn = [...s.querySelectorAll('.c7x3-f')].map((b) => b.classList.contains('in'));
+    const given = inn.filter(Boolean).length, good = this.F.filter((f, i) => inn[i] && f[3] === 'ok').length, gold = this.F.filter((f) => f[2]).length;
+    const hal = this.F.some((f, i) => inn[i] && f[3] === 'hl');
+    s.querySelector('.c7x3-p').textContent = given ? `${good}/${given} = ${Math.round((good / given) * 100)}%` : '—';
+    s.querySelector('.c7x3-r').textContent = `${good}/${gold} = ${Math.round((good / gold) * 100)}%`;
+    const h = s.querySelector('.c7x3-h2'); h.textContent = hal ? 'FAIL → 0 分' : 'pass'; h.className = 'c7x3-h2 ' + (hal ? 'f' : 'p');
+  },
+  enter(s, ctx) {
+    this.auto = true; const seq = [[0, 2, 3], [0, 1, 2], [0, 1, 2, 4], [0]]; let n = 0;
+    this.set(s, seq[0]);
+    ctx.every(() => { if (this.auto) this.set(s, seq[(n = (n + 1) % seq.length)]); }, 3800);
+  },
+  reset(s) { this.set(s, []); },
+};
+</script>
+
+<!-- ================= 实验 7-4 ================= -->
+<section class="slide" id="c07-exp74" data-part="5" data-dur="24000" data-title="实验 7-4 ★★：Advanced JSON Cards 与 RAG 的对比评估" data-notes="<b>实验 7-4 ★★：Advanced JSON Cards 与 RAG 的对比评估。</b>目标：在同一套评估集上公平对比结构化记忆与非结构化检索的优势边界。复用两个第三章项目，在 chapter3/user-memory-evaluation 的 60 个测试用例上对比三种配置——纯 Advanced JSON Cards（结构化卡片常驻上下文、无需检索）、纯 RAG（对话分块入向量库、必须检索）、混合系统（核心事实常驻 + 原始对话按需检索）。配套实验用同一组 60 个问题测试了三套记忆方案，共保留 180 条真实 API 运行轨迹。结果见<b>表7-3 三种用户记忆系统的分层成功率</b>：Advanced JSON Cards 基础回忆 95%、多会话消歧 60%、跨会话隐藏关联 50%、总体 68.3%（41/60）；RAG 依次为 90%、40%、15%、48.3%（29/60）；混合系统依次为 80%、70%、50%、66.7%（40/60）。<br>最值得注意的是，<b>混合方案并没有自然胜出</b>。它在 3 道题上做到了两种单一方案都没做到的事，却在另外 8 道题上不如表现更好的单一方案；与每道题上的最佳单一方案相比，平均成功率反而低了。纯 RAG 在基础回忆题上与结构化卡片相差不大，一到跨会话关联题，成功率却降到 15%。另一个容易被忽视的数字是：180 次评判中，<b>幻觉否决触发了 28 次</b>，可见一票否决项的重要性。<br>配套仓库对三套系统的实现：Advanced JSON Cards 由模型抽取来源、人物关系、精确事实、时间状态和歧义，所有卡片都进入回答上下文，一步作答、不调用检索；RAG 按完整轮次切分原始对话、建稠密索引，必须真实调用 search_memory，用 top-5 片段作答；混合系统只常驻标为 memory_tier: core 的卡片，其余事实留在原始对话里，由 Agent 自己决定要不要检索。<br>点击表格的列或行，图表同步高亮。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-4 <span class="c7-star">★★</span>：混合方案<em>并没有自然胜出</em></h2></header>
+  <div class="c7x4-body">
+    <div class="c7x4-l fx fx-left" style="--d:2">
+      <div class="c7x4-sys"></div>
+      <div class="c7x4-fd"><div><em>3</em><span>道题：混合做到了两种单一方案都没做到的事</span></div><div><em>8</em><span>道题：混合不如表现更好的单一方案</span></div><div><em>28</em><span>次：180 次评判中触发幻觉否决</span></div></div>
+    </div>
+    <div class="c7x4-r panel fx fx-right" style="--d:3">
+      <div class="c7x4-th"><b>表7-3 三种用户记忆系统的分层成功率</b><span>60 用例 × 3 套系统 · 180 条真实轨迹</span></div>
+      <table class="c7x4-t"><thead><tr><th>系统</th><th data-c="0">基础回忆</th><th data-c="1">多会话消歧</th><th data-c="2">跨会话隐藏关联</th><th data-c="3">总体</th></tr></thead><tbody></tbody></table>
+      <p class="c7x4-ob"></p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 实验 7-4 · 表7-3 三种用户记忆系统的分层成功率</div>
+</section>
+<style>
+.c7x4-body{display:grid;grid-template-columns:.85fr 1.15fr;gap:24px;flex:1;min-height:0}
+.c7x4-l{display:flex;flex-direction:column;gap:12px}
+.c7x4-sys{display:flex;flex-direction:column;gap:10px}
+.c7x4-s{--c:var(--acc);display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .35s}
+.c7x4-s b{font-size:18px;color:var(--c)}
+.c7x4-s span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c7x4-s .fl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.c7x4-s .fl i{font-style:normal;padding:2px 8px;border-radius:6px;font-size:15px;color:var(--text);background:rgba(255,255,255,.06)}
+.c7x4-s .fl u{text-decoration:none;color:var(--text3)}
+.c7x4-s.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 9%,rgba(12,18,40,.8))}
+.c7x4-fd{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+.c7x4-fd div{display:flex;align-items:baseline;gap:12px;padding:8px 14px;border-radius:12px;border-left:4px solid var(--acc);background:rgba(255,255,255,.03)}
+.c7x4-fd em{font:800 26px var(--num);font-style:normal;color:var(--acc);min-width:36px}
+.c7x4-fd span{font-size:15px;color:var(--text2)}
+.c7x4-r{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7x4-th b{font-size:19px}
+.c7x4-th span{margin-left:12px;font-size:15px;color:var(--text3)}
+.c7x4-t{width:100%;border-collapse:separate;border-spacing:0 6px}
+.c7x4-t th{padding:6px 10px;font-size:15px;color:var(--text3);text-align:left;cursor:pointer;border-radius:8px;transition:all .3s}
+.c7x4-t th.on{color:#06101f;background:var(--acc)}
+.c7x4-t td{padding:8px 10px;vertical-align:middle;background:rgba(255,255,255,.03);transition:background .3s}
+.c7x4-t td:first-child{border-radius:10px 0 0 10px;font-size:17px;font-weight:700;white-space:nowrap;cursor:pointer}
+.c7x4-t td:last-child{border-radius:0 10px 10px 0}
+.c7x4-t tr.on td{background:color-mix(in srgb,var(--c) 10%,transparent)}
+.c7x4-t td.col{background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.c7x4-cb{display:flex;flex-direction:column;gap:4px}
+.c7x4-cb em{font:800 18px var(--num);font-style:normal}
+.c7x4-cb small{font-size:15px;color:var(--text3)}
+.c7x4-cb i{display:block;height:10px;border-radius:999px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+.c7x4-cb i b{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;background:var(--c);transition:width 1s var(--ease)}
+.c7x4-r.go .c7x4-cb i b{width:var(--v)}
+.c7x4-ob{margin-top:auto;min-height:56px;font-size:17px;line-height:1.6;color:var(--text);padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.04)}
+</style>
+<script>
+HOOKS['c07-exp74'] = {
+  S: [
+    ['Advanced JSON Cards', '#60a5fa', [95, 60, 50, 68.3], '41/60', '模型抽取来源、人物关系、精确事实、时间状态和歧义；<b>所有卡片常驻上下文</b>', ['卡片', '上下文', '一步作答']],
+    ['RAG', '#fbbf24', [90, 40, 15, 48.3], '29/60', '按完整轮次切分对话、建稠密索引，<b>必须调用</b> search_memory，用 top-5 片段作答', ['对话分块', '向量库', 'search_memory', 'top-5', '作答']],
+    ['混合系统', '#c084fc', [80, 70, 50, 66.7], '40/60', '只常驻标为 <code>memory_tier: core</code> 的卡片；其余留在原始对话，<b>由 Agent 决定</b>要不要检索', ['核心卡片常驻', '按需检索', '作答']],
+  ],
+  OB: ['基础回忆：纯 RAG（90%）与结构化卡片（95%）相差不大', '多会话消歧：混合系统最好（70%），纯 RAG 只有 40%', '跨会话隐藏关联：纯 RAG 降到 15%，卡片与混合都是 50%', '总体：Advanced JSON Cards 68.3% 最高，混合 66.7% 并没有自然胜出'],
+  init(s) {
+    s.querySelector('.c7x4-sys').innerHTML = this.S.map(([n, c, , , d, fl], i) => `<button class="c7x4-s" data-r="${i}" style="--c:${c}"><b>${n}</b><span>${d}</span><div class="fl">${fl.map((x, j) => `${j ? '<u>→</u>' : ''}<i>${x}</i>`).join('')}</div></button>`).join('');
+    s.querySelector('.c7x4-t tbody').innerHTML = this.S.map(([n, c, v, tot], i) => `<tr data-r="${i}" style="--c:${c}"><td>${n}</td>${v.map((x, j) => `<td data-c="${j}"><div class="c7x4-cb" style="--c:${c};--v:${x}%"><em>${x}%</em>${j === 3 ? `<small>${tot}</small>` : ''}<i><b></b></i></div></td>`).join('')}</tr>`).join('');
+    s.querySelectorAll('.c7x4-t th[data-c]').forEach((th) => th.addEventListener('click', () => { this.auto = false; this.col(s, +th.dataset.c); }));
+    s.querySelectorAll('.c7x4-t td:first-child,.c7x4-s').forEach((x) => x.addEventListener('click', () => { this.auto = false; this.row(s, +(x.dataset.r ?? x.parentElement.dataset.r)); }));
+  },
+  col(s, c) {
+    this.c = c;
+    s.querySelectorAll('.c7x4-t th[data-c]').forEach((th) => th.classList.toggle('on', +th.dataset.c === c));
+    s.querySelectorAll('.c7x4-t td[data-c]').forEach((td) => td.classList.toggle('col', +td.dataset.c === c));
+    s.querySelector('.c7x4-ob').textContent = this.OB[c];
+  },
+  row(s, r) {
+    s.querySelectorAll('.c7x4-t tbody tr').forEach((tr) => tr.classList.toggle('on', +tr.dataset.r === r));
+    s.querySelectorAll('.c7x4-s').forEach((b) => b.classList.toggle('on', +b.dataset.r === r));
+  },
+  enter(s, ctx) {
+    ctx.later(() => s.querySelector('.c7x4-r').classList.add('go'), 400);
+    this.auto = true; this.col(s, 0); this.row(s, 0); let n = 0;
+    ctx.every(() => { if (!this.auto) return; n++; this.col(s, n % 4); this.row(s, n % 3); }, 3600);
+  },
+  reset(s) { s.querySelector('.c7x4-r').classList.remove('go'); s.querySelectorAll('.c7x4-t tr,.c7x4-t th,.c7x4-t td,.c7x4-s').forEach((x) => x.classList.remove('on', 'col')); },
+};
+</script>
+
+<!-- ================= 同源模型问题与多源评判 ================= -->
+<section class="slide" id="c07-goodhart" data-part="5" data-trans="zoom" data-dur="20000" data-title="同源模型问题与多源评判" data-notes="<b>同源模型问题与多源评判。</b>当 Agent 与评判模型来自同一家族时，Agent 可能学会利用评判模型的偏好和盲点。<b>这正是古德哈特定律（Goodhart's Law）所说的：当一个度量指标变成优化目标时，它就不再是好的度量指标。</b>Agent 越是在某个评分系统上训练或调优，就越倾向于钻这个系统的漏洞，而非真正提升能力。更隐蔽的是，Agent 还会逐渐学会避开评判模型不擅长检测的错误类型，让评分系统看起来一切正常。<br>缓解策略是<b>多源异构评判</b>——使用不同模型家族的多个 LLM 分别评判（比如 Agent 用 Claude，评判就用 GPT-5 和 Gemini），不同家族的偏见往往是正交的，Agent 很难同时“欺骗”所有评判者。使用相同的 Rubric 确保大家评判的是同一目标，通过加权平均或一致性检查聚合结果。部署阶段可以用单一模型快速评估，但应定期用完整的多源评判进行质量审计。多源评判解决的是“用什么模型评判”的问题；接下来要解决“评判哪些模态”的问题。<br>左侧曲线为示意：横轴是优化轮次，两条线分别是评判给出的分数和真实质量；右上角切换评判方式。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同源模型问题：<em>古德哈特定律</em></h2></div>
+    <div class="c7gh-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="s">同源单一评判</button><button data-v="m">多源异构评判</button></div></header>
+  <blockquote class="quote fx fx-blur c7gh-q" style="--d:2">当一个度量指标变成优化目标时，它就不再是好的度量指标。</blockquote>
+  <div class="c7gh-body">
+    <div class="c7gh-ch panel fx fx-left" style="--d:3"><div class="c7gh-h"><b>优化过程中：评判分数 vs 真实质量</b><span class="c7-tag">趋势示意</span></div><svg class="c7gh-svg" viewBox="0 0 760 360"></svg><div class="c7gh-lg"><span style="--c:#fbbf24">评判给出的分数</span><span style="--c:#34d399">真实质量</span></div></div>
+    <div class="c7gh-r fx fx-right" style="--d:4">
+      <div class="c7gh-js"></div>
+      <p class="c7gh-d"></p>
+      <div class="c7gh-k"><b>做法</b><span>相同的 Rubric，确保评判的是同一目标</span><span>加权平均或一致性检查聚合结果</span><span>部署时单一模型快速评估，<b>定期用完整的多源评判做质量审计</b></span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 同源模型问题与多源评判 · 古德哈特定律</div>
+</section>
+<style>
+#c07-goodhart .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c07-goodhart .seg button{padding:8px 18px;font-size:17px}
+.c7gh-q{font-size:24px;margin:-10px 0 16px}
+.c7gh-body{display:grid;grid-template-columns:1.15fr 1fr;gap:24px;flex:1;min-height:0}
+.c7gh-ch{padding:14px 18px;display:flex;flex-direction:column;gap:8px;min-height:0}
+.c7gh-h{display:flex;align-items:center;justify-content:space-between}
+.c7gh-h b{font-size:18px}
+.c7gh-svg{width:100%;flex:1;min-height:0}
+.c7gh-ax{stroke:rgba(255,255,255,.22);stroke-width:1.5}
+.c7gh-tx{font-size:15px;fill:var(--text3)}
+.c7gh-l1,.c7gh-l2{fill:none;stroke-width:4;stroke-linecap:round}
+.c7gh-l1{stroke:#fbbf24}.c7gh-l2{stroke:#34d399}
+.c7gh-gap{fill:rgba(251,113,133,.18);transition:opacity .6s}
+.c7gh-lg{display:flex;gap:18px}
+.c7gh-lg span{display:inline-flex;align-items:center;gap:6px;font-size:15px;color:var(--text2)}
+.c7gh-lg span::before{content:"";width:18px;height:4px;border-radius:2px;background:var(--c)}
+.c7gh-r{display:flex;flex-direction:column;gap:12px}
+.c7gh-js{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.c7gh-j{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 6px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:all .4s}
+.c7gh-j .ic{font-size:26px;color:var(--c)}
+.c7gh-j b{font-size:16px}
+.c7gh-j span{font-size:15px;color:var(--text3)}
+.c7gh-j.ag{border-color:color-mix(in srgb,var(--c) 55%,transparent)}
+.c7gh-j.off{opacity:.25}
+.c7gh-d{font-size:17px;line-height:1.6;color:var(--text);padding:12px 16px;border-radius:12px;background:rgba(255,255,255,.04);min-height:110px}
+.c7gh-k{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding:12px 16px;border-radius:14px;border-left:4px solid var(--acc);background:rgba(255,255,255,.03)}
+.c7gh-k>b{font-size:17px;color:var(--acc)}
+.c7gh-k span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c7gh-k span b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-goodhart'] = {
+  J: [['Agent', 'Claude', '#a78bfa', 'robot', 'ag'], ['评判 1', 'Claude', '#a78bfa', 'scale', 's'], ['评判 2', 'GPT-5', '#34d399', 'scale', 'm'], ['评判 3', 'Gemini', '#60a5fa', 'scale', 'm']],
+  D: {
+    s: 'Agent 与评判来自同一家族：越在这套评分上调优，越会钻它的漏洞——还会学会<b>避开评判不擅长检测的错误类型</b>，分数一路上涨，看起来一切正常，真实质量却停滞甚至回落。',
+    m: '不同家族的偏见往往是<b>正交</b>的，Agent 很难同时“欺骗”所有评判者：分数涨，真实质量也跟着涨，两条线贴在一起。',
+  },
+  init(s) {
+    s.querySelector('.c7gh-js').innerHTML = this.J.map(([b, m, c, ic, k]) => `<div class="c7gh-j ${k === 'ag' ? 'ag' : ''}" data-k="${k}" style="--c:${c}"><svg class="ic"><use href="#i-${ic}"/></svg><b>${b}</b><span>${m}</span></div>`).join('');
+    const sv = s.querySelector('.c7gh-svg');
+    sv.innerHTML = '<line class="c7gh-ax" x1="60" y1="320" x2="740" y2="320"/><line class="c7gh-ax" x1="60" y1="20" x2="60" y2="320"/><text class="c7gh-tx" x="740" y="346" text-anchor="end">优化轮次 →</text><text class="c7gh-tx" x="10" y="30">高</text><text class="c7gh-tx" x="10" y="318">低</text><path class="c7gh-gap"/><path class="c7gh-l2"/><path class="c7gh-l1"/>';
+    this.set = U.seg(s.querySelector('.c7gh-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) {
+    this.v = v; this.set(v);
+    const X = (t) => 60 + t * 680, Y = (q) => 320 - q * 290, N = 60;
+    const f1 = (t) => (v === 's' ? 0.2 + 0.75 * (1 - Math.exp(-3 * t)) : 0.2 + 0.55 * (1 - Math.exp(-2.4 * t)));
+    const f2 = (t) => (v === 's' ? 0.2 + 0.32 * (1 - Math.exp(-5 * t)) - 0.14 * Math.max(0, t - 0.45) : 0.18 + 0.53 * (1 - Math.exp(-2.4 * t)));
+    const pts = (f) => Array.from({ length: N + 1 }, (_, i) => [X(i / N), Y(f(i / N))]);
+    const p1 = pts(f1), p2 = pts(f2), d = (p) => 'M' + p.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L');
+    const sv = s.querySelector('.c7gh-svg');
+    sv.querySelector('.c7gh-gap').setAttribute('d', d(p1) + ' L' + p2.slice().reverse().map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join(' L') + ' Z');
+    sv.querySelector('.c7gh-gap').style.opacity = v === 's' ? 1 : 0.25;
+    [[sv.querySelector('.c7gh-l1'), d(p1)], [sv.querySelector('.c7gh-l2'), d(p2)]].forEach(([el, dd]) => {
+      el.setAttribute('d', dd); const L = el.getTotalLength();
+      el.style.transition = 'none'; el.style.strokeDasharray = L; el.style.strokeDashoffset = L; void el.getBoundingClientRect();
+      el.style.transition = 'stroke-dashoffset 2.2s cubic-bezier(.4,0,.2,1)'; el.style.strokeDashoffset = 0;
+    });
+    s.querySelectorAll('.c7gh-j').forEach((j) => j.classList.toggle('off', (v === 's' && j.dataset.k === 'm') || (v === 'm' && j.dataset.k === 's')));
+    s.querySelector('.c7gh-d').innerHTML = this.D[v];
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 's'); ctx.every(() => { if (this.auto) this.show(s, this.v === 's' ? 'm' : 's'); }, 6000); },
+  reset(s) { s.querySelectorAll('.c7gh-j').forEach((j) => j.classList.remove('off')); },
+};
+</script>
+
+<!-- ================= 多模态 LLM-as-a-Judge ================= -->
+<section class="slide" id="c07-mm" data-part="5" data-dur="22000" data-title="多模态 LLM-as-a-Judge" data-notes="多源评判解决的是“用什么模型评判”的问题；接下来要解决“评判哪些模态”的问题——把 LLM-as-a-Judge 的能力从文本扩展到语音、图像、视频，是评估覆盖度的另一维度。<b>多模态 LLM-as-a-Judge</b> 的例子：<b>TTS 评估</b>（Text-to-Speech，文本转语音）——判断准确性、自然度、音色一致度、情感表达，这些维度能发现传统 WER（Word Error Rate，词错误率）难以捕捉的韵律问题；<b>ASR 评估</b>（Automatic Speech Recognition，语音识别）——做语义影响判断：“今天天气”识别错误无伤大雅，但“转账一千”变成“一万”就可能造成严重后果；<b>UI 评估</b>——采用第一章命名的<b>提议者—审核者</b>模式，检查文字溢出、颜色对比度、按钮位置等问题。这里的提议者—审核者作为<b>评估方法</b>使用，与第五章中作为<b>生成系统组件</b>的用法不同，但核心机制相同——一个模型生成，另一个模型独立审查；<b>视频剪辑评估</b>——通过关键帧验证剪辑起止点和特效应用是否正确。<br>四个标签自动轮播；ASR 一栏里两个例子的字错误率完全相同，语义影响却天差地别（例子中的识别错误为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">多模态 <em>LLM-as-a-Judge</em></h2></div>
+    <div class="c7mm-tabs tabs fx fx-up" style="--d:2"><button data-i="0">TTS</button><button data-i="1">ASR</button><button data-i="2">UI</button><button data-i="3">视频剪辑</button></div></header>
+  <p class="lead fx fx-up c7mm-lead" style="--d:2">从“用什么模型评判”到“评判哪些模态”：把评判扩展到语音、图像、视频，是覆盖度的另一维度</p>
+  <div class="c7mm-body">
+    <div class="c7mm-v panel fx fx-left" style="--d:3"></div>
+    <div class="c7mm-r c7-card fx fx-right" style="--d:4"><b class="c7mm-t"></b><p class="c7mm-d"></p></div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 多模态 LLM-as-a-Judge</div>
+</section>
+<style>
+#c07-mm .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c07-mm .tabs button{padding:8px 18px;font-size:17px}
+.c7mm-lead{font-size:21px;margin:-14px 0 16px}
+.c7mm-body{display:grid;grid-template-columns:1.25fr 1fr;gap:24px;flex:1;min-height:0}
+.c7mm-v{padding:18px 22px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.c7mm-v>*{animation:upIn .45s var(--ease) both}
+.c7mm-wave{display:flex;align-items:center;gap:3px;height:90px}
+.c7mm-wave i{flex:1;border-radius:3px;background:linear-gradient(var(--acc),var(--acc2));height:calc(var(--h) * 1%);animation:c7mmW 1.2s ease-in-out infinite alternate;animation-delay:calc(var(--i) * -60ms)}
+@keyframes c7mmW{to{transform:scaleY(.45)}}
+.c7mm-dims{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7mm-dims div{display:flex;flex-direction:column;gap:2px;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.c7mm-dims b{font-size:17px}
+.c7mm-dims span{font-size:15px;color:var(--text3)}
+.c7mm-dims .wer{grid-column:1/-1;border-style:dashed}
+.c7mm-asr{display:flex;flex-direction:column;gap:12px}
+.c7mm-ex{display:grid;grid-template-columns:1fr 1fr 110px 130px;gap:10px;align-items:center;padding:12px 14px;border-radius:14px;border:1px solid var(--line)}
+.c7mm-ex span{font-size:15px;color:var(--text3)}
+.c7mm-ex b{font-size:20px}
+.c7mm-ex b u{text-decoration:none;color:#06101f;background:#fbbf24;border-radius:4px;padding:0 3px}
+.c7mm-ex em{font:700 17px var(--num);font-style:normal;text-align:center;color:var(--text2)}
+.c7mm-ex i{font-style:normal;text-align:center;padding:6px 8px;border-radius:999px;font-size:15px;font-weight:700}
+.c7mm-ex i.lo{color:#6ee7b7;border:1px solid rgba(52,211,153,.5)}
+.c7mm-ex i.hi{color:#fff;background:#e11d48}
+.c7mm-ex.hi{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.06)}
+.c7mm-ui{display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0}
+.c7mm-ph{position:relative;padding:16px;border-radius:18px;border:2px solid var(--line2);background:#0b1224;display:flex;flex-direction:column;gap:10px}
+.c7mm-ph .bt{align-self:flex-end;padding:6px 12px;border-radius:8px;font-size:15px;background:#334155;color:#94a3b8}
+.c7mm-ph .tt{font-size:18px;white-space:nowrap;overflow:visible;width:200px;color:var(--text)}
+.c7mm-ph .mk{position:absolute;border:2px dashed #fb7185;border-radius:8px;opacity:0;transition:opacity .4s}
+.c7mm-ph .mk.on{opacity:1}
+.c7mm-rv{display:flex;flex-direction:column;gap:8px}
+.c7mm-rv div{padding:8px 12px;border-radius:10px;font-size:15px;line-height:1.5;border:1px solid var(--line);opacity:0;transition:opacity .4s}
+.c7mm-rv div.on{opacity:1}
+.c7mm-rv div b{color:#fda4af}
+.c7mm-kf{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.c7mm-kf div{aspect-ratio:16/10;border-radius:10px;border:1px solid var(--line2);background:linear-gradient(135deg,#1e293b,#0f172a);display:grid;place-items:center;font:700 15px var(--num);color:var(--text3);transition:all .35s}
+.c7mm-kf div.in{border-color:#34d399;color:#6ee7b7}
+.c7mm-kf div.fx{border-color:#c084fc;color:#e9d5ff;background:linear-gradient(135deg,#4c1d95,#1e1b4b)}
+.c7mm-kf div.on{box-shadow:0 0 0 3px var(--acc)}
+.c7mm-kl{display:flex;flex-direction:column;gap:6px;font-size:16px;color:var(--text2)}
+.c7mm-kl b{color:var(--text)}
+.c7mm-r{display:flex;flex-direction:column;gap:12px}
+.c7mm-t{font-size:22px;color:var(--acc)}
+.c7mm-d{font-size:18px;line-height:1.7;color:var(--text2)}
+.c7mm-d b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-mm'] = {
+  T: [
+    ['TTS 评估 · 文本转语音', '判断<b>准确性、自然度、音色一致度、情感表达</b>。这些维度能发现传统 WER（词错误率）难以捕捉的<b>韵律问题</b>——字都读对了，听起来仍可能像机器。'],
+    ['ASR 评估 · 语音识别', '做<b>语义影响判断</b>：“今天天气”识别错误无伤大雅，但“转账一千”变成“一万”就可能造成严重后果。只看错误率，两者一模一样。'],
+    ['UI 评估', '采用第一章命名的<b>提议者—审核者</b>模式，检查文字溢出、颜色对比度、按钮位置等问题。这里它作为<b>评估方法</b>使用，与第五章中作为<b>生成系统组件</b>的用法不同，但核心机制相同：一个模型生成，另一个模型独立审查。'],
+    ['视频剪辑评估', '通过<b>关键帧</b>验证剪辑起止点和特效应用是否正确。'],
+  ],
+  init(s) {
+    this.tb = [...s.querySelectorAll('.c7mm-tabs button')];
+    this.tb.forEach((b) => b.addEventListener('click', () => { this.auto = false; this.show(s, +b.dataset.i); }));
+  },
+  async show(s, i) {
+    const ctx = this.ctx; if (!ctx) return;
+    const rk = (this.rk = (this.rk || 0) + 1), ok = () => ctx.alive && rk === this.rk;
+    this.i = i; this.tb.forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.c7mm-t').textContent = this.T[i][0]; s.querySelector('.c7mm-d').innerHTML = this.T[i][1];
+    const V = s.querySelector('.c7mm-v');
+    if (i === 0) {
+      const r = U.rand(9);
+      V.innerHTML = `<div class="c7mm-wave">${Array.from({ length: 64 }, (_, k) => `<i style="--h:${(20 + r() * 80).toFixed(0)};--i:${k}"></i>`).join('')}</div><div class="c7mm-dims"><div><b>准确性</b><span>有没有漏读、错读、添读</span></div><div><b>自然度</b><span>有无机器感、不自然的停顿</span></div><div><b>音色一致度</b><span>与参考说话人像不像</span></div><div><b>情感表达</b><span>疑问句升调、感叹句强调</span></div><div class="wer"><b>只看 WER？</b><span>它只数字词对错，捕捉不到韵律问题</span></div></div>`;
+    } else if (i === 1) {
+      V.innerHTML = '<div class="c7mm-asr"><div class="c7mm-ex"><div><span>说的是</span><br><b>今天天气</b></div><div><span>识别成</span><br><b>今天天<u>汽</u></b></div><em>错 1 字 / 4 字</em><i class="lo">无伤大雅</i></div><div class="c7mm-ex hi"><div><span>说的是</span><br><b>转账一千</b></div><div><span>识别成</span><br><b>转账一<u>万</u></b></div><em>错 1 字 / 4 字</em><i class="hi">严重后果</i></div></div><p class="cap">字错误率都是 25%，语义影响天差地别：多模态评判要判断的是<b>这个错误会造成什么后果</b>（例子中的识别结果为示意）</p>';
+    } else if (i === 2) {
+      V.innerHTML = '<div class="c7mm-ui"><div class="c7mm-ph"><span class="lbl">提议者：生成的界面（示意）</span><div class="tt">订单确认：您的退款申请已提交成功，请留意短信</div><div style="height:38px;border-radius:8px;background:#1f2937;color:#374151;display:grid;place-items:center;font-size:15px">浅灰色说明文字</div><span class="bt">确认</span><i class="mk" style="left:12px;top:44px;width:340px;height:34px"></i><i class="mk" style="left:12px;top:88px;width:260px;height:44px"></i><i class="mk" style="right:10px;bottom:10px;width:80px;height:40px"></i></div><div class="c7mm-rv"><span class="lbl">审核者：独立审查</span><div><b>文字溢出</b>：标题超出容器宽度</div><div><b>颜色对比度</b>：说明文字与背景对比度不足</div><div><b>按钮位置</b>：主按钮挤在右下角，容易误触</div></div></div>';
+      const mk = [...V.querySelectorAll('.mk')], rv = [...V.querySelectorAll('.c7mm-rv div')];
+      for (let k = 0; k < 3; k++) { await U.wait(ctx, 900); if (!ok()) return; mk[k].classList.add('on'); rv[k].classList.add('on'); }
+    } else {
+      V.innerHTML = '<div class="c7mm-kf">' + ['00:00', '00:04', '00:08', '00:12', '00:16', '00:20'].map((t) => `<div>${t}</div>`).join('') + '</div><div class="c7mm-kl"><span>要求（示意）：从 <b>00:04</b> 剪到 <b>00:16</b>，<b>00:12</b> 起加转场特效</span><span class="c7mm-kr"></span></div>';
+      const kf = [...V.querySelectorAll('.c7mm-kf div')], kr = V.querySelector('.c7mm-kr');
+      for (let k = 0; k < 6; k++) { await U.wait(ctx, 500); if (!ok()) return; kf.forEach((x, j) => x.classList.toggle('on', j === k)); if (k >= 1 && k <= 4) kf[k].classList.add(k >= 3 ? 'fx' : 'in'); }
+      kr.innerHTML = '逐帧核对：起点 ✓ · 终点 ✓ · 特效从 00:12 开始应用 ✓';
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 5400); },
+  leave() { this.ctx = null; },
+  reset() { this.rk = (this.rk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 实验 7-5 ================= -->
+<section class="slide" id="c07-exp75" data-part="5" data-trans="flip" data-dur="28000" data-title="实验 7-5 ★★：构建全自动 TTS 质量评估流水线" data-notes="<b>实验 7-5 ★★：构建全自动 TTS 质量评估流水线。</b>本实验要求从零设计并实现完整的多模态 LLM-as-a-Judge TTS 质量评估系统。设计 TTS 多维度 Rubric：<b>准确性</b>维度验证是否正确读出所有文字（无遗漏/错读/添加），<b>自然度</b>维度评估语音是否流畅（有无机器感、不自然停顿，韵律是否符合人类习惯），<b>情感表达</b>维度检查语气是否符合文本情感色彩（疑问句升调、感叹句强调、悲伤内容语速慢语调低），<b>音色一致性</b>维度在有参考语音时评估说话人相似程度（多模态模型同时接收参考语音与合成语音对比）。构建多样化测试语料库：不同长度（单句→长段落）、文体（新闻/故事/对话）、情感（中性/兴奋/悲伤）、特殊挑战（数字/专有名词/多音字/方言词汇）。实现评估流水线：TTS 生成模块接入主流服务（OpenAI、ElevenLabs、Fish Audio、Minimax、豆包），由可直接接收音频的多模态评判模型将合成语音、原始文本、参考语音和 Rubric 一起输入，逐维度评分并给出详细理由。分析评估结果的分布，同时记录评判模型、参考音频哈希和候选音频哈希，使结果可复核。<br>配套仓库中保留了一次小规模的直接听评。OpenAI 和 Fish Audio 分别生成了数字、多音字、长句和兴奋语气四类音频，8 条音频都由 Voxtral 按上述四个维度完成评分。两者在准确性和自然度上都得到 5.00 和 4.00；Fish Audio 在情感表达和音色一致性上得到 4.00 和 3.00，OpenAI 则是 3.75 和 2.75。四个维度分开评分后，即使“有没有读对”看不出差别，语气和音色上的差别仍会显现出来。<br>但这组分数还不能用来判断哪家 TTS 更好。每家只有四条音频，更关键的是，实验使用的固定参考音频来自 Fish S1；拿它来比较音色，本来就更有利于 Fish Audio。如果要比较通用 TTS，就不该把“像不像 Fish 参考音色”算进总分；如果要比较声音克隆，则应让所有方案模仿同一个目标说话人，并用人工盲听校准模型评分。<b>选什么参考答案、参考图片或参考音频，本身就是评估设计，而不是评估开始前无关紧要的准备工作。</b><br>人工编写 Rubric 适合快速建立这样的诊断维度。评估规模再扩大时，还可以训练专门的<b>生成式奖励模型</b>来自动打分——相关训练方法将在第八章讨论。评判模型给出的分数只说明结果好坏；要把结果变成可以修复的问题，还需要定位失败究竟从哪一步开始——这是下一部分的主题。<br>右侧热力图是 8 条音频的真实逐项评分，点击格子查看评委的理由。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-5 <span class="c7-star">★★</span>：<em>TTS 质量</em>评估流水线</h2></header>
+  <div class="c7x5-body">
+    <div class="c7x5-l fx fx-left" style="--d:2">
+      <div class="c7x5-pp"><div><span class="lbl">TTS 服务</span><b>OpenAI · ElevenLabs · Fish Audio · Minimax · 豆包</b></div><i>→</i><div><span class="lbl">多模态评判同时接收</span><b>合成语音 + 原始文本 + 参考语音 + Rubric</b></div><i>→</i><div><span class="lbl">输出</span><b>逐维度评分 + 理由</b></div></div>
+      <div class="c7x5-cp"><span class="lbl">测试语料要多样</span><div><i>长度：单句 → 长段落</i><i>文体：新闻 / 故事 / 对话</i><i>情感：中性 / 兴奋 / 悲伤</i><i>挑战：数字 / 专有名词 / 多音字 / 方言词汇</i></div></div>
+      <p class="c7x5-rc">记录<b>评判模型、参考音频哈希、候选音频哈希</b>，使结果可复核</p>
+      <div class="c7x5-wn"><b>这组分数还不能判断哪家更好</b><span>每家只有 4 条音频；固定参考音频来自 <b>Fish S1</b>，比音色本来就更有利于 Fish Audio</span><span>比通用 TTS：别把“像不像 Fish 参考音色”算进总分；比声音克隆：所有方案模仿同一个目标说话人，再用人工盲听校准</span></div>
+      <blockquote class="c7x5-q">选什么参考答案、参考图片或参考音频，<b>本身就是评估设计</b></blockquote>
+    </div>
+    <div class="c7x5-r c7-card fx fx-right" style="--d:3">
+      <div class="c7x5-hd"><b>配套仓库：8 条音频的逐项评分（1–5）</b></div>
+      <div class="c7x5-hm"></div>
+      <div class="c7x5-av"></div>
+      <div class="c7x5-why"><span class="lbl c7x5-wl"></span><p></p></div>
+      <p class="c7-data">数据：配套仓库 chapter7/tts-quality-eval/validation/mistral_multimodal_20260730，2026-07-30；OpenAI tts-1（alloy）与 Fish Audio s1 克隆音色；评委 mistral/voxtral-small-latest 直接听音频并对照同一条参考音频</p>
+      <p class="c7x5-nx">规模再大：训练<b>生成式奖励模型</b>自动打分（第八章）→ 分数只说明好坏，下一步是定位失败从哪一步开始</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「LLM-as-a-Judge：自动化评估的核心」· 实验 7-5 · 配套仓库的直接听评</div>
+</section>
+<style>
+.c7x5-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.c7x5-l{display:flex;flex-direction:column;gap:12px}
+.c7x5-pp{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:8px;align-items:center}
+.c7x5-pp>div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72);min-height:104px}
+.c7x5-pp b{font-size:15px;line-height:1.5}
+.c7x5-pp i{font-style:normal;color:var(--acc)}
+.c7x5-cp{display:flex;flex-direction:column;gap:6px}
+.c7x5-cp div{display:flex;flex-wrap:wrap;gap:6px}
+.c7x5-cp i{font-style:normal;padding:4px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2)}
+.c7x5-rc{font-size:15px;color:var(--text2)}
+.c7x5-rc b{color:var(--text)}
+.c7x5-wn{display:flex;flex-direction:column;gap:5px;padding:12px 16px;border-radius:14px;border:1px solid rgba(251,191,36,.5);background:rgba(251,191,36,.05)}
+.c7x5-wn>b{font-size:17px;color:#fcd34d}
+.c7x5-wn span{font-size:15px;line-height:1.55;color:var(--text2)}
+.c7x5-wn span b{color:var(--text)}
+.c7x5-q{margin-top:auto;font-size:19px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.c7x5-q b{color:var(--text)}
+.c7x5-r{display:flex;flex-direction:column;gap:10px}
+.c7x5-hd b{font-size:17px}
+.c7x5-hm{display:grid;grid-template-columns:150px repeat(4,1fr);gap:4px}
+.c7x5-hm>span{font-size:15px;color:var(--text3);text-align:center;padding:2px}
+.c7x5-hm>b{display:flex;align-items:center;font-size:15px;font-weight:600;line-height:1.3}
+.c7x5-hm>b small{display:block;font-size:15px;color:var(--text3);font-weight:400}
+.c7x5-c{height:36px;border-radius:8px;font:800 17px var(--num);color:#06101f;background:color-mix(in srgb,var(--acc) calc(var(--v) * 20%),#1e293b);transition:box-shadow .3s}
+.c7x5-c.on{box-shadow:0 0 0 3px #fff}
+.c7x5-av{display:grid;grid-template-columns:150px repeat(4,1fr);gap:4px;padding-top:6px;border-top:1px solid var(--line2)}
+.c7x5-av b{font-size:15px}
+.c7x5-av em{font:800 18px var(--num);font-style:normal;text-align:center}
+.c7x5-av em.hi{color:var(--acc)}
+.c7x5-why{min-height:76px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c7x5-why p{margin-top:4px;font-size:15px;line-height:1.55;color:var(--text2)}
+.c7x5-nx{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}
+.c7x5-nx b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp75'] = {
+  D: ['准确性', '自然度', '情感表达', '音色一致性'],
+  // 配套仓库 8 条记录的真实评分与评委理由
+  R: [
+    ['OpenAI', '数字/百分比/日期', [5, 4, 3, 2], ['准确无误地朗读了原文，没有漏读、错读、添读，数字、专名和多音字没有问题。', '流畅度较好，但有一些不自然的停顿，特别是在数字和百分点的表达上。', '语调和语速基本符合中性情感，但缺乏参考说话人语音中的自然感和情感表达。', '音色与参考说话人语音存在明显差异，音色不一致。']],
+    ['OpenAI', '多音字（行/长/重/还）', [5, 4, 4, 3], ['与原文完全一致，没有漏读、错读、添读。', '流畅度较好，但有一些不自然的停顿和重音。', '语调和语速基本符合中性情感，但强调稍显不足。', '音色与参考说话人有一定差异，但总体还算接近。']],
+    ['OpenAI', '长句/新闻文体', [5, 4, 4, 3], ['与原文完全一致，没有漏读、错读、添读。', '流畅度较好，但有一些不自然的停顿和重音。', '语调和语速基本符合中性情感，但强调不够明显。', '音色与参考说话人有一些差异，但总体还算接近。']],
+    ['OpenAI', '专有名词 + 感叹情感', [5, 4, 4, 3], ['与原文完全一致。', '流畅度较好。', '语调和语速表现出兴奋，但强调不够明显。', '音色与参考说话人有一些差异，但总体相似。']],
+    ['Fish Audio', '数字/百分比/日期', [5, 4, 4, 3], ['与原文完全一致。', '流畅度较好。', '语调和语速基本符合中性情感，但强调不够明显。', '音色与参考说话人有一些差异，但总体还算相似。']],
+    ['Fish Audio', '多音字（行/长/重/还）', [5, 4, 4, 3], ['与原文完全一致。', '流畅度较好。', '语调和语速基本符合中性情感，但强调稍显不足。', '音色与参考说话人有一定差异，但总体还算接近。']],
+    ['Fish Audio', '长句/新闻文体', [5, 4, 4, 3], ['与原文完全一致。', '流畅度较好。', '语调和语速基本符合中性情感，但缺乏一些细微的情感变化。', '音色与参考说话人有一些差异，但总体上还算相似。']],
+    ['Fish Audio', '专有名词 + 感叹情感', [5, 4, 4, 3], ['与原文完全一致。', '流畅度较好。', '语调和语速表现出兴奋，但强调稍显不足。', '音色与参考说话人有明显差异。']],
+  ],
+  init(s) {
+    s.querySelector('.c7x5-hm').innerHTML = '<span></span>' + this.D.map((d) => `<span>${d}</span>`).join('') + this.R.map(([p, c, v], i) => `<b>${p}<small>${c}</small></b>${v.map((x, j) => `<button class="c7x5-c" data-k="${i * 4 + j}" style="--v:${x}">${x}</button>`).join('')}`).join('');
+    const avg = (p, j) => { const rs = this.R.filter((r) => r[0] === p); return rs.reduce((a, r) => a + r[2][j], 0) / rs.length; };
+    s.querySelector('.c7x5-av').innerHTML = ['OpenAI', 'Fish Audio'].map((p) => `<b>${p} 平均</b>${this.D.map((_, j) => { const a = avg(p, j), o = avg(p === 'OpenAI' ? 'Fish Audio' : 'OpenAI', j); return `<em class="${a > o ? 'hi' : ''}">${a.toFixed(2)}</em>`; }).join('')}`).join('');
+    s.querySelectorAll('.c7x5-c').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.k); }));
+  },
+  pick(s, k) {
+    this.k = k;
+    s.querySelectorAll('.c7x5-c').forEach((b) => b.classList.toggle('on', +b.dataset.k === k));
+    const r = this.R[Math.floor(k / 4)], j = k % 4;
+    s.querySelector('.c7x5-wl').textContent = `${r[0]} · ${r[1]} · ${this.D[j]} ${r[2][j]} 分 · 评委理由`;
+    s.querySelector('.c7x5-why p').textContent = r[3][j];
+  },
+  enter(s, ctx) {
+    this.auto = true; const seq = [2, 3, 6, 7, 18, 19, 30, 31, 0, 1]; let n = 0;
+    this.pick(s, seq[0]);
+    ctx.every(() => { if (this.auto) this.pick(s, seq[(n = (n + 1) % seq.length)]); }, 2800);
+  },
+  reset(s) { s.querySelectorAll('.c7x5-c').forEach((b) => b.classList.remove('on')); },
+};
+</script>

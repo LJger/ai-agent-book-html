@@ -1,0 +1,407 @@
+<!-- ================= 第 7 部分分隔页 ================= -->
+<section class="slide chapter" id="c07-d7" data-part="7" data-title="PART 07 · 评估驱动选型" data-notes="「评估驱动的模型选型」。模型选择不是简单地“选最强的模型”，而是要根据应用场景和评估结果在多个维度之间作出权衡。这一部分先拆开选型的关键维度：吞吐量与延迟、成本、性能、速率限制与可靠性、预算—能力曲线与多模型协同；再看模型默认的行为策略（实验 7-9）；然后做 Agent 系统的成本分析（表7-4、实验 7-10）；最后用一个模型切换案例说明评估驱动的持续迭代（实验 7-11、7-12）。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">评估驱动选型</h1>
+  <div class="ch-s fx fx-up" style="--d:3">不是“哪个模型最强”，而是“在我的任务上，哪个更好、好多少、代价是什么”</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型选择不是简单地“选最强的模型”，而是要根据应用场景和评估结果在多个维度之间作出权衡。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<!-- ================= 吞吐量与延迟 ================= -->
+<section class="slide" id="c07-latency" data-part="7" data-trans="zoom" data-dur="24000" data-title="选型的关键维度：吞吐量与延迟" data-notes="<b>吞吐量</b>与<b>延迟</b>是两组容易混淆的指标，理清它们只需知道大模型推理分两个阶段。<b>Prefill（预填充）</b>一次性读入完整上下文，决定用户按下回车到第一个字出现的<b>首字延迟</b>（业内用 <b>TTFT</b>，Time To First Token 度量）——上下文越长 prefill 越慢、TTFT 越大。<b>Decode（解码）</b>随后逐 token 生成回答，决定后续出字速度（tokens/秒），也直接决定思考时长：一个 50 tokens/s 的模型生成 2000 个思考 token，光思考就要 40 秒。<br>围绕这两个阶段，主要指标有：<b>输入吞吐量 / 输出吞吐量</b>，分别对应 Prefill 和 Decode 的速度；<b>TTFT</b>，等于排队时间加上 Prefill 时间，是用户感知的“反应快慢”；<b>思考延迟</b>，不同模型生成的思考 token 数差异可达数倍，且思考长度与任务效果不一定正相关，应在自己的工作负载上实测各模型的思考 token 用量和对应收益，而非仅凭公开榜单推断；<b>p95 尾部延迟</b>，95% 的请求都不会超过的延迟，它比平均值更能反映真实用户体验——均值会被大量快速请求拉低，掩盖少数用户遭遇的严重卡顿。<br>左侧滑块调节上下文长度、解码速度和思考 token 数，请求时间线按“排队 + Prefill → 思考 → 回答”实时计算；Prefill 速率、排队时间与延迟分布均为示意值，50 tokens/s × 2000 思考 token = 40 秒是原书的例子。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Prefill 决定<em>首字多快</em>，Decode 决定<em>出字多快</em></h2></header>
+  <div class="c7lt-body">
+    <div class="c7lt-l panel fx fx-left" style="--d:2">
+      <div class="c7lt-sl">
+        <label><span>上下文长度</span><input type="range" class="rng c7lt-ctx" min="1" max="128" step="1" value="32"><b class="c7lt-vctx">32K</b></label>
+        <label><span>解码速度</span><input type="range" class="rng c7lt-dec" min="20" max="200" step="10" value="50"><b class="c7lt-vdec">50 tok/s</b></label>
+        <label><span>思考 token</span><input type="range" class="rng c7lt-th" min="0" max="8000" step="250" value="2000"><b class="c7lt-vth">2000</b></label>
+      </div>
+      <div class="c7lt-tl"><i class="q"></i><i class="p"></i><i class="t"></i><i class="a"></i></div>
+      <div class="c7lt-lg"><span class="q"><i></i>排队</span><span class="p"><i></i>Prefill</span><span class="t"><i></i>思考（Decode）</span><span class="a"><i></i>回答 500 tok（Decode）</span></div>
+      <div class="c7lt-nums"><div><span>TTFT = 排队 + Prefill</span><b class="c7lt-ttft">—</b></div><div><span>思考延迟</span><b class="c7lt-tt">—</b></div><div><span>端到端</span><b class="c7lt-e2e">—</b></div></div>
+      <p class="c7lt-nt"><span class="c7-tag">示意速率</span> Prefill 按 8K tok/s、排队 0.3 s 计；原书例子：<b>50 tok/s 生成 2000 个思考 token，光思考就要 40 秒</b></p>
+    </div>
+    <div class="c7lt-r fx fx-right" style="--d:3">
+      <div class="c7-card c7lt-p95"><div class="c7lt-ph"><b>p95 尾部延迟</b><span class="c7-tag">示意分布</span></div><canvas class="c7lt-cv" width="700" height="210"></canvas><div class="c7lt-pv"><span>均值 <b class="c7lt-mean">—</b></span><span>p95 <b class="c7lt-p">—</b></span></div><p>均值会被大量快速请求拉低，<b>掩盖少数用户遭遇的严重卡顿</b></p></div>
+      <div class="c7lt-defs"><span><b>输入 / 输出吞吐量</b>Prefill / Decode 的速度</span><span><b>思考延迟</b>思考 token 数差异可达数倍，长度与效果不一定正相关——在自己的负载上实测</span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「评估驱动的模型选型」「选型的关键维度」</div>
+</section>
+<style>
+.c7lt-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7lt-l{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.c7lt-sl{display:flex;flex-direction:column;gap:10px}
+.c7lt-sl label{display:grid;grid-template-columns:110px 1fr 100px;gap:14px;align-items:center;font-size:16px;color:var(--text2)}
+.c7lt-sl b{font:700 17px var(--num);text-align:right;color:var(--text)}
+.c7lt-tl{display:flex;height:48px;border-radius:10px;overflow:hidden;background:rgba(255,255,255,.05)}
+.c7lt-tl i{height:100%;transition:width .5s var(--ease)}
+.c7lt-tl .q,.c7lt-lg .q i{background:#64748b}
+.c7lt-tl .p,.c7lt-lg .p i{background:#22d3ee}
+.c7lt-tl .t,.c7lt-lg .t i{background:#a78bfa}
+.c7lt-tl .a,.c7lt-lg .a i{background:#fbbf24}
+.c7lt-lg{display:flex;gap:14px;flex-wrap:wrap}
+.c7lt-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7lt-lg i{width:14px;height:14px;border-radius:3px}
+.c7lt-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c7lt-nums div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.c7lt-nums span{font-size:15px;color:var(--text3)}
+.c7lt-nums b{font:800 28px var(--num)}
+.c7lt-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}.c7lt-nt b{color:var(--text)}
+.c7lt-r{display:flex;flex-direction:column;gap:12px}
+.c7lt-ph{display:flex;align-items:center;gap:12px;margin-bottom:6px}.c7lt-ph b{font-size:17px;color:var(--acc)}
+.c7lt-cv{width:100%;height:210px}
+.c7lt-pv{display:flex;gap:18px;font-size:16px;color:var(--text2)}
+.c7lt-pv b{font-family:var(--num);color:var(--text)}
+.c7lt-p95 p{font-size:15px;color:var(--text2);margin-top:6px}.c7lt-p95 p b{color:var(--text)}
+.c7lt-defs{display:flex;flex-direction:column;gap:8px}
+.c7lt-defs span{display:flex;flex-direction:column;gap:2px;font-size:15px;line-height:1.5;color:var(--text2);padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03)}
+.c7lt-defs b{font-size:16px;color:var(--text)}
+</style>
+<script>
+HOOKS['c07-latency'] = {
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.q = q;
+    ['ctx', 'dec', 'th'].forEach((k) => q('.c7lt-' + k).addEventListener('input', () => { this.manual = true; this.calc(); }));
+    // 示意延迟分布：多数请求快，少数长尾
+    const r = U.rand(7);
+    this.lat = Array.from({ length: 400 }, () => { const u = r(); return u < 0.9 ? 1.5 + r() * 2.5 + r() * 1.5 : 6 + r() * 14; }).sort((a, b) => a - b);
+  },
+  calc() {
+    const q = this.q, c = +q('.c7lt-ctx').value, d = +q('.c7lt-dec').value, t = +q('.c7lt-th').value;
+    const qu = 0.3, pf = (c * 1000) / 8000, tt = t / d, an = 500 / d, tot = qu + pf + tt + an;
+    q('.c7lt-vctx').textContent = c + 'K'; q('.c7lt-vdec').textContent = d + ' tok/s'; q('.c7lt-vth').textContent = t;
+    const [a, b, e, f] = q('.c7lt-tl').children;
+    a.style.width = (qu / tot) * 100 + '%'; b.style.width = (pf / tot) * 100 + '%'; e.style.width = (tt / tot) * 100 + '%'; f.style.width = (an / tot) * 100 + '%';
+    q('.c7lt-ttft').textContent = (qu + pf).toFixed(1) + ' s';
+    q('.c7lt-tt').textContent = tt.toFixed(1) + ' s';
+    q('.c7lt-e2e').textContent = tot.toFixed(1) + ' s';
+  },
+  hist() {
+    const cv = this.q('.c7lt-cv'), g = cv.getContext('2d'), W = cv.width, H = cv.height, bins = 40, mx = 20, h = new Array(bins).fill(0);
+    this.lat.forEach((v) => h[Math.min(bins - 1, Math.floor((v / mx) * bins))]++);
+    const top = Math.max(...h), mean = this.lat.reduce((a, b) => a + b, 0) / this.lat.length, p95 = this.lat[Math.floor(this.lat.length * 0.95)];
+    g.clearRect(0, 0, W, H);
+    const bw = W / bins, k = this.prog;
+    h.forEach((v, i) => { g.fillStyle = (i + 0.5) * (mx / bins) > p95 ? 'rgba(251,113,133,.8)' : 'rgba(34,211,238,.6)'; const bh = (v / top) * (H - 30) * k; g.fillRect(i * bw + 1, H - 20 - bh, bw - 2, bh); });
+    const line = (x, c, l) => { const px = (x / mx) * W; g.strokeStyle = c; g.setLineDash([6, 5]); g.beginPath(); g.moveTo(px, 0); g.lineTo(px, H - 20); g.stroke(); g.setLineDash([]); g.fillStyle = c; g.font = '600 15px sans-serif'; g.fillText(l, px + 6, 16); };
+    if (k > 0.98) { line(mean, '#a7f3d0', '均值'); line(p95, '#fb7185', 'p95'); }
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.font = '15px sans-serif'; g.fillText('0 s', 0, H - 2); g.fillText('20 s', W - 32, H - 2);
+    this.q('.c7lt-mean').textContent = mean.toFixed(1) + ' s'; this.q('.c7lt-p').textContent = p95.toFixed(1) + ' s';
+  },
+  enter(s, ctx) {
+    this.manual = false; this.calc();
+    const t0 = performance.now();
+    ctx.raf((now) => { this.prog = Math.min(1, (now - t0) / 1200); this.hist(); return this.prog < 1; });
+    const demo = [[8, 50, 2000], [128, 50, 2000], [32, 150, 2000], [32, 50, 6000], [32, 50, 2000]]; let n = 0;
+    ctx.every(() => { if (this.manual) return; const [c, d, t] = demo[n++ % demo.length]; this.q('.c7lt-ctx').value = c; this.q('.c7lt-dec').value = d; this.q('.c7lt-th').value = t; this.calc(); }, 3200);
+  },
+  reset() { const q = this.q; q('.c7lt-ctx').value = 32; q('.c7lt-dec').value = 50; q('.c7lt-th').value = 2000; },
+};
+</script>
+
+<!-- ================= 成本、性能、可靠性 ================= -->
+<section class="slide" id="c07-dims" data-part="7" data-trans="flip" data-dur="22000" data-title="成本、性能、速率限制与可靠性" data-notes="<b>成本</b>：输入/输出/缓存 token 的定价。<b>一个便宜但成功率低的模型，因为需要频繁重试，实际花费可能反而更高。</b>需要计算每个任务的平均成本和成本-性能比。<br><b>性能</b>：Pass@1、Pass@k、Pass^k、Best@k 等指标的精确定义见前文“评估指标：成功的定义”（Pass@1 即 k=1 的 Pass@k，单次平均成功率）。日常场景看最常用的 Pass@1；关键操作场景优先 Pass^k，盯的是“每次都别出错”的稳定性；探索性任务优先 Pass@k 或 Best@k，看的是给足机会后的能力上限。<br><b>速率限制与可靠性</b>：RPM（每分钟请求数）/ TPM（每分钟 token 数）限制会影响并发能力，某些 API 在高峰期还会动态调整限额。鲁棒性方面需关注分布外数据、对抗性输入、长时运行稳定性（是否出现模式崩溃、注意力分散等问题）。<br>左侧计算器：每次成功的期望成本 = 单次成本 ÷ 成功率（失败就重试，直到成功）。两个模型的单价与成功率为示意值，可拖动滑块观察“便宜模型反而更贵”的交叉点。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">便宜的模型，<em>每次成功</em>未必便宜</h2></header>
+  <div class="c7dm-body">
+    <div class="c7dm-calc panel fx fx-left" style="--d:2">
+      <div class="c7dm-h"><b>每次成功的期望成本 = 单次成本 ÷ 成功率</b><span class="c7-tag">示意数值</span></div>
+      <div class="c7dm-m" data-m="0"><div class="c7dm-n"><b>轻量模型</b><span>单次 $<em class="c7dm-c0">0.010</em></span></div><label><span>成功率</span><input type="range" class="rng c7dm-p0" min="5" max="100" step="1" value="30"><b class="c7dm-v0">30%</b></label><div class="c7dm-bar"><i class="c7dm-b0"></i><span class="c7dm-r0"></span></div></div>
+      <div class="c7dm-m" data-m="1"><div class="c7dm-n"><b>强模型</b><span>单次 $<em class="c7dm-c1">0.025</em></span></div><label><span>成功率</span><input type="range" class="rng c7dm-p1" min="5" max="100" step="1" value="90"><b class="c7dm-v1">90%</b></label><div class="c7dm-bar"><i class="c7dm-b1"></i><span class="c7dm-r1"></span></div></div>
+      <p class="c7dm-out"></p>
+    </div>
+    <div class="c7dm-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7dm-k">性能：按场景选指标</b><div class="c7dm-pf"><span><em>日常场景</em><b>Pass@1</b>单次平均成功率</span><span><em>关键操作</em><b>Pass^k</b>每次都别出错</span><span><em>探索性任务</em><b>Pass@k / Best@k</b>给足机会后的上限</span></div></div>
+      <div class="c7-card"><b class="c7dm-k">速率限制与可靠性</b><div class="c7dm-rl"><span><b>RPM / TPM</b>限制并发能力；有的 API 高峰期动态调整限额</span><span><b>鲁棒性</b>分布外数据、对抗性输入</span><span><b>长时运行稳定性</b>模式崩溃、注意力分散</span></div></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「选型的关键维度」</div>
+</section>
+<style>
+.c7dm-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7dm-calc{padding:18px 22px;display:flex;flex-direction:column;gap:16px}
+.c7dm-h{display:flex;align-items:center;gap:12px}.c7dm-h b{font-size:18px}
+.c7dm-m{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:14px;border:1px solid var(--line)}
+.c7dm-n{display:flex;justify-content:space-between;font-size:17px}
+.c7dm-n span{color:var(--text2)}.c7dm-n em{font-style:normal;font-family:var(--num);color:var(--text)}
+.c7dm-m label{display:grid;grid-template-columns:70px 1fr 64px;gap:12px;align-items:center;font-size:15px;color:var(--text3)}
+.c7dm-m label b{font:700 17px var(--num);color:var(--text);text-align:right}
+.c7dm-bar{position:relative;height:36px;border-radius:8px;background:rgba(255,255,255,.05)}
+.c7dm-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;transition:width .5s var(--ease)}
+.c7dm-b0{background:rgba(34,211,238,.55)}.c7dm-b1{background:rgba(167,139,250,.6)}
+.c7dm-bar span{position:absolute;left:12px;top:50%;translate:0 -50%;font:700 16px var(--num)}
+.c7dm-m.win{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.06)}
+.c7dm-out{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.c7dm-out b{color:var(--text)}
+.c7dm-r{display:flex;flex-direction:column;gap:14px}
+.c7dm-k{display:block;font-size:17px;color:var(--acc);margin-bottom:10px}
+.c7dm-pf{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.c7dm-pf span{display:flex;flex-direction:column;gap:3px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03);font-size:15px;color:var(--text3)}
+.c7dm-pf em{font-style:normal;color:var(--text2)}
+.c7dm-pf b{font-size:19px;color:var(--text)}
+.c7dm-rl{display:flex;flex-direction:column;gap:8px}
+.c7dm-rl span{font-size:15px;line-height:1.5;color:var(--text2)}
+.c7dm-rl b{display:inline-block;min-width:150px;color:var(--text);font-size:16px}
+</style>
+<script>
+HOOKS['c07-dims'] = {
+  C: [0.01, 0.025],
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.q = q;
+    ['.c7dm-p0', '.c7dm-p1'].forEach((k) => q(k).addEventListener('input', () => { this.manual = true; this.calc(); }));
+  },
+  calc() {
+    const q = this.q, p = [+q('.c7dm-p0').value / 100, +q('.c7dm-p1').value / 100], e = p.map((x, i) => this.C[i] / x), mx = Math.max(...e, 0.05);
+    p.forEach((x, i) => { q('.c7dm-v' + i).textContent = Math.round(x * 100) + '%'; q('.c7dm-b' + i).style.width = (e[i] / mx) * 100 + '%'; q('.c7dm-r' + i).textContent = '$' + e[i].toFixed(4) + ' / 次成功 · 平均尝试 ' + (1 / x).toFixed(1) + ' 次'; });
+    const w = e[0] <= e[1] ? 0 : 1;
+    q('[data-m="0"]').classList.toggle('win', w === 0); q('[data-m="1"]').classList.toggle('win', w === 1);
+    q('.c7dm-out').innerHTML = w === 1 ? `轻量模型单价只有 40%，但成功率低、频繁重试，<b>每次成功反而贵 ${((e[0] / e[1] - 1) * 100).toFixed(0)}%</b>` : `此时轻量模型每次成功更便宜——<b>交叉点在成功率之比 = 单价之比</b>，要用自己的评估集实测`;
+  },
+  enter(s, ctx) {
+    this.manual = false; this.calc();
+    const demo = [30, 45, 60, 36, 30]; let n = 0;
+    ctx.every(() => { if (this.manual) return; this.q('.c7dm-p0').value = demo[n++ % demo.length]; this.calc(); }, 2600);
+  },
+  reset() { this.q('.c7dm-p0').value = 30; this.q('.c7dm-p1').value = 90; },
+};
+</script>
+
+<!-- ================= 预算—能力曲线 ================= -->
+<section class="slide" id="c07-budget" data-part="7" data-trans="rise" data-dur="22000" data-title="预算—能力曲线与多模型协同" data-notes="<b>预算—能力曲线</b>：固定预算下的单点成绩不足以判断 Agent 能否胜任长程任务。除了成功率，还应报告性能随墙钟时间、token、工具调用次数或算力预算变化的曲线。RE-Bench 的人机对照很能说明问题：在每个环境 2 小时的总预算下，最佳 Agent 得分约为人类专家的 4 倍；但人类从增加时间预算中获得的收益更大，8 小时时已略微超过最佳 Agent，在跨多次尝试合计 32 小时时得分约为其 2 倍。因此，<b>短预算领先不能直接外推成长时间运行能力</b>，选型时必须在接近真实任务时长的多个预算点上比较。<br>实践中可以采用多模型协同的策略：用轻量模型处理简单请求以降低成本，用强大模型处理复杂任务以保证质量；或者使用专门的模型处理特定的子任务（如图像理解、代码生成），通过子 Agent 机制进行协作。这种<b>异构的模型组合需要通过评估来验证，确认整体效益是否超过了所增加的系统复杂度，以及是否会在一些场景下出现性能回退</b>（例如，把“9.9 跟 9.11 哪个大”“要洗车，家离洗车店 50 米，是走路去还是开车去”等问题视为简单问题交给轻量模型，导致决策错误）。<br>曲线只按原书给出的三个比例（2 小时约 4 倍、8 小时略超、32 小时约 2 倍）画出，纵轴为相对得分，形状为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">短预算领先，<em>不能外推</em>成长时间能力</h2></header>
+  <div class="c7bg-body">
+    <div class="c7bg-ch panel fx fx-left" style="--d:2">
+      <div class="c7bg-h"><b>RE-Bench：人类专家 vs 最佳 Agent</b><span class="c7-tag">按原书比例的示意曲线</span></div>
+      <svg class="c7bg-svg" viewBox="0 0 860 470"></svg>
+      <div class="c7bg-pts"><button data-i="0"><b>2 小时</b>Agent ≈ 人类的 4 倍</button><button data-i="1"><b>8 小时</b>人类略微超过</button><button data-i="2"><b>32 小时（多次尝试合计）</b>人类 ≈ Agent 的 2 倍</button></div>
+    </div>
+    <div class="c7bg-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7bg-k">报告曲线，而不是单点</b><p>性能随<b>墙钟时间、token、工具调用次数、算力预算</b>变化的曲线；在接近真实任务时长的多个预算点上比较</p></div>
+      <div class="c7-card c7bg-rt"><b class="c7bg-k">多模型协同：先用评估验证</b>
+        <div class="c7bg-route"><span class="in">请求</span><i></i><span class="rt">路由</span><i></i><div><span class="lt">轻量模型 · 简单请求</span><span class="hv">强模型 · 复杂任务</span></div></div>
+        <div class="c7bg-q"></div>
+        <p>整体效益是否超过<b>新增的系统复杂度</b>？会不会在某些场景<b>性能回退</b>？</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「选型的关键维度」· 预算—能力曲线（RE-Bench）</div>
+</section>
+<style>
+.c7bg-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c7bg-ch{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.c7bg-h{display:flex;align-items:center;gap:12px}.c7bg-h b{font-size:18px}
+.c7bg-svg{width:100%;height:470px}
+.c7bg-svg .ax{stroke:var(--line2);stroke-width:1.5}
+.c7bg-svg text{fill:var(--text3);font-size:15px}
+.c7bg-svg .cv{fill:none;stroke-width:4;stroke-linecap:round}
+.c7bg-svg .hu{stroke:#34d399}.c7bg-svg .ag{stroke:#a78bfa}
+.c7bg-svg .vl{stroke:var(--warn);stroke-dasharray:6 5;stroke-width:2;opacity:0;transition:opacity .3s}
+.c7bg-svg .vl.on{opacity:1}
+.c7bg-svg .lb{font-size:17px;font-weight:700}
+.c7bg-pts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.c7bg-pts button{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);font-size:15px;color:var(--text2);text-align:left;transition:all .3s}
+.c7bg-pts b{font-size:16px;color:var(--text)}
+.c7bg-pts button.on{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.c7bg-r{display:flex;flex-direction:column;gap:14px}
+.c7bg-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7bg-r p{font-size:16px;line-height:1.55;color:var(--text2)}.c7bg-r p b{color:var(--text)}
+.c7bg-route{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.c7bg-route>span,.c7bg-route div span{font-size:15px;padding:6px 10px;border-radius:10px;border:1px solid var(--line2);white-space:nowrap}
+.c7bg-route i{flex:1;height:2px;background:var(--line2)}
+.c7bg-route div{display:flex;flex-direction:column;gap:6px}
+.c7bg-route .lt{border-color:rgba(34,211,238,.5)}.c7bg-route .hv{border-color:rgba(167,139,250,.5)}
+.c7bg-q{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.c7bg-q div{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;background:rgba(251,113,133,.08);border:1px solid rgba(251,113,133,.35);font-size:15px;opacity:0;translate:0 8px;transition:opacity .4s,translate .4s}
+.c7bg-q div.on{opacity:1;translate:0 0}
+.c7bg-q b{color:#fda4af;font-size:15px}
+</style>
+<script>
+HOOKS['c07-budget'] = {
+  init(s) {
+    const svg = s.querySelector('.c7bg-svg'), S = C7.S, X0 = 70, X1 = 820, Y0 = 410, Y1 = 30;
+    // 横轴对数刻度：1h…32h
+    const x = (h) => X0 + (Math.log2(h) / 5) * (X1 - X0), y = (v) => Y0 - (v / 2.2) * (Y0 - Y1);
+    this.x = x;
+    S('line', { x1: X0, y1: Y0, x2: X1, y2: Y0, class: 'ax' }, svg); S('line', { x1: X0, y1: Y0, x2: X0, y2: Y1, class: 'ax' }, svg);
+    [1, 2, 4, 8, 16, 32].forEach((h) => { const t = S('text', { x: x(h) - 12, y: Y0 + 26 }, svg); t.textContent = h + 'h'; });
+    const ty = S('text', { x: 6, y: Y1 + 4 }, svg); ty.textContent = '相对得分';
+    // 示意：Agent 早期快、后期平；人类早期低、后期持续增长。满足 2h 时 A≈4H、8h 时 H 略高、32h 时 H≈2A
+    const pts = (f) => { const a = []; for (let i = 0; i <= 50; i++) { const h = Math.pow(2, (i / 50) * 5); a.push(`${x(h).toFixed(1)},${y(Math.min(2.15, f(h))).toFixed(1)}`); } return 'M' + a.join(' L'); };
+    const humanF = (h) => (h <= 2 ? 0.23 * h / 2 : h <= 8 ? 0.23 + (1.04 - 0.23) * (Math.log2(h) - 1) / 2 : 1.04 + (2.0 - 1.04) * (Math.log2(h) - 3) / 2);
+    const agentF = (h) => (h <= 2 ? 0.5 + 0.42 * Math.log2(Math.max(1, h)) : 0.92 + 0.02 * (Math.log2(h) - 1));
+    this.pa = S('path', { d: pts(agentF), class: 'cv ag' }, svg);
+    this.ph = S('path', { d: pts(humanF), class: 'cv hu' }, svg);
+    const la = S('text', { x: x(32) - 120, y: y(agentF(32)) + 28, class: 'lb', fill: '#c4b5fd' }, svg); la.textContent = '最佳 Agent';
+    const lh = S('text', { x: x(32) - 120, y: y(humanF(32)) - 12, class: 'lb', fill: '#6ee7b7' }, svg); lh.textContent = '人类专家';
+    this.vls = [2, 8, 32].map((h) => S('line', { x1: x(h), y1: Y1, x2: x(h), y2: Y0, class: 'vl' }, svg));
+    [this.pa, this.ph].forEach((p) => { p.style.strokeDasharray = 1400; p.style.strokeDashoffset = 1400; });
+    s.querySelectorAll('.c7bg-pts button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+    s.querySelector('.c7bg-q').innerHTML = ['“9.9 跟 9.11 哪个大？”', '“要洗车，家离洗车店 50 米，走路去还是开车去？”'].map((t) => `<div><span>${t}</span><b>被当成简单问题 → 轻量模型答错</b></div>`).join('');
+  },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c7bg-pts button').forEach((b, j) => b.classList.toggle('on', j === i));
+    this.vls.forEach((l, j) => l.classList.toggle('on', j === i));
+  },
+  enter(s, ctx) {
+    [this.pa, this.ph].forEach((p, j) => { p.style.transition = `stroke-dashoffset 1.8s ${0.3 + j * 0.4}s var(--ease)`; requestAnimationFrame(() => (p.style.strokeDashoffset = 0)); });
+    s.querySelectorAll('.c7bg-q div').forEach((d, j) => ctx.later(() => d.classList.add('on'), 2200 + j * 900));
+    C7.auto(this, ctx, 3, 3000, (i) => this.pick(s, i), 2600);
+  },
+  reset(s) {
+    [this.pa, this.ph].forEach((p) => { p.style.transition = 'none'; p.style.strokeDashoffset = 1400; });
+    this.pick(s, null); s.querySelectorAll('.c7bg-q div').forEach((d) => d.classList.remove('on'));
+  },
+};
+</script>
+
+<!-- ================= 行为策略 ================= -->
+<section class="slide" id="c07-behavior" data-part="7" data-trans="iris" data-dur="22000" data-title="模型的行为策略" data-notes="模型选型不只是在比较“能不能做成”，还要比较模型默认会怎样做。Coding Agent 中一个很容易观察到的差异是行动阈值：<b>面对同一个代码任务，有的模型会先广泛探索仓库再修改；有的模型则凭较少的局部证据快速定位，先改再用测试反馈补齐认识</b>。前者把过早修改的风险估得更高，后者把“再读一个文件”的机会成本估得更高。<br>Agent 的这种倾向有两个来源：一是 Harness 中的系统提示词，二是模型的行为策略。<b>后训练是模型行为策略的关键来源</b>：SFT 轨迹会示范“先读到什么程度再动手”，过程奖励会奖励或惩罚某种工具路径，结果奖励又会强化最终成功的整套策略。久而久之，模型学到的不只是如何写代码，也包括工程习惯。<br>页面上两条示意轨迹同时播放：同一个任务，一个先探索、一个先修改。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">同一个任务，<em>先读够</em>还是<em>先动手</em></h2></header>
+  <div class="c7bh-body">
+    <div class="c7bh-lanes panel fx fx-left" style="--d:2">
+      <div class="c7bh-h"><b>行动阈值：第一次修改之前读了多少</b><span class="c7-tag">示意轨迹</span></div>
+      <div class="c7bh-ln" data-l="0"><span class="c7bh-nm"><b>先探索型</b><small>把过早修改的风险估得更高</small></span><div class="c7bh-tr"></div></div>
+      <div class="c7bh-ln" data-l="1"><span class="c7bh-nm"><b>先修改型</b><small>把“再读一个文件”的机会成本估得更高</small></span><div class="c7bh-tr"></div></div>
+      <div class="c7bh-lg"><span class="r"><i></i>读文件 / 搜索</span><span class="e"><i></i>修改</span><span class="t"><i></i>跑测试</span></div>
+    </div>
+    <div class="c7bh-src fx fx-right" style="--d:3">
+      <b class="c7bh-k">倾向从哪里来</b>
+      <div class="c7bh-two"><div><svg class="ic"><use href="#i-file"/></svg><b>Harness 的系统提示词</b></div><div><svg class="ic"><use href="#i-brain"/></svg><b>模型的行为策略</b></div></div>
+      <b class="c7bh-k">后训练：行为策略的关键来源</b>
+      <div class="c7bh-pt"><span><em>SFT 轨迹</em>示范“先读到什么程度再动手”</span><span><em>过程奖励</em>奖励或惩罚某种工具路径</span><span><em>结果奖励</em>强化最终成功的整套策略</span></div>
+      <p>久而久之，模型学到的不只是如何写代码，<b>也包括工程习惯</b></p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「模型的行为策略」</div>
+</section>
+<style>
+.c7bh-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c7bh-lanes{padding:16px 22px;display:flex;flex-direction:column;gap:18px}
+.c7bh-h{display:flex;align-items:center;gap:12px}.c7bh-h b{font-size:18px}
+.c7bh-ln{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:center}
+.c7bh-nm{display:flex;flex-direction:column;gap:2px}
+.c7bh-nm b{font-size:18px}.c7bh-nm small{font-size:15px;color:var(--text3);line-height:1.4}
+.c7bh-tr{display:flex;gap:6px;min-height:56px;align-items:center;flex-wrap:wrap}
+.c7bh-tr i{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-style:normal;font-size:15px;font-weight:700;animation:c7bhIn .35s var(--ease)}
+.c7bh-tr i.r{background:rgba(34,211,238,.18);color:#67e8f9;border:1px solid rgba(34,211,238,.45)}
+.c7bh-tr i.e{background:rgba(251,191,36,.2);color:#fde68a;border:1px solid rgba(251,191,36,.55)}
+.c7bh-tr i.t{background:rgba(52,211,153,.18);color:#6ee7b7;border:1px solid rgba(52,211,153,.45)}
+@keyframes c7bhIn{from{opacity:0;scale:.6}}
+.c7bh-lg{margin-top:auto;display:flex;gap:16px}
+.c7bh-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c7bh-lg i{width:14px;height:14px;border-radius:3px}
+.c7bh-lg .r i{background:#22d3ee}.c7bh-lg .e i{background:#fbbf24}.c7bh-lg .t i{background:#34d399}
+.c7bh-src{display:flex;flex-direction:column;gap:12px;padding:18px 22px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.c7bh-k{font-size:17px;color:var(--acc)}
+.c7bh-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7bh-two div{display:flex;align-items:center;gap:10px;padding:12px;border-radius:12px;border:1px solid var(--line2);font-size:16px}
+.c7bh-two .ic{width:24px;height:24px;color:var(--acc2)}
+.c7bh-pt{display:flex;flex-direction:column;gap:6px}
+.c7bh-pt span{font-size:15px;color:var(--text2);padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.03)}
+.c7bh-pt em{font-style:normal;font-weight:700;color:var(--text);margin-right:10px}
+.c7bh-src p{margin-top:auto;font-size:16px;color:var(--text2)}.c7bh-src p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-behavior'] = {
+  T: ['rrrrrrettt', 'rrretetett'],
+  L: { r: '读', e: '改', t: '测' },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const trs = [...s.querySelectorAll('.c7bh-tr')];
+    while (ok()) {
+      trs.forEach((t) => (t.innerHTML = ''));
+      for (let i = 0; i < 10; i++) {
+        await U.wait(ctx, 520); if (!ok()) return;
+        trs.forEach((t, j) => { const c = this.T[j][i]; t.insertAdjacentHTML('beforeend', `<i class="${c}">${this.L[c]}</i>`); });
+      }
+      await U.wait(ctx, 3500);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.c7bh-tr').forEach((t) => (t.innerHTML = '')); },
+};
+</script>
+
+<!-- ================= 实验 7-9 ================= -->
+<section class="slide" id="c07-exp79" data-part="7" data-trans="zoom" data-dur="24000" data-title="实验 7-9 ★★：在固定 Coding Harness 中测量模型的行动阈值" data-notes="<b>实验 7-9 ★★：在固定 Coding Harness 中测量模型的行动阈值。</b>实验目标：隔离模型因素，量化不同 Coding 模型在“继续收集信息”与“开始修改代码”之间的默认取舍，并把路径效率与最终质量联合起来评价。<br>技术方案：默认通过同一个 OpenRouter OpenAI-compatible 端点调用 GPT-5.6-sol 与 Claude Sonnet 5，固定系统提示、工具 Schema、任务仓库、测试命令和最大轮次；中性提示既不要求读够若干文件，也不要求尽快编辑。三个小型代码库分别覆盖局部 bug、跨模块身份规范化和公共契约敏感的缓存修复，每个模型对每题独立运行三次，共 18 条轨迹。<br>因果判断：中性实验回答“同一 Harness 下，行为是否随模型变化”。如需测 Harness 的调节作用，再用 --policy explore-first 单独跑一组；不要把两种 policy 混在同一模型比较里。<b>若更换模型时行为改变、而同一模型跨 Harness 保持倾向，则证据更支持模型效应；反之则更支持 Harness 效应。</b><br>实验发现：GPT-5.6-sol 在第一次修改前平均调用工具 6.89 次、读取 4.67 个文件；Claude Sonnet 5 分别为 4.56 次和 3.56 个文件。差距在局部任务中最明显，而在明确跨模块的任务中几乎收敛（7.00 对 6.67 个文件）。两者的首个受测补丁和最终测试均为 100% 通过，因此这个小实验支持的是<b>“行动策略随模型而变”，而不是“多读或早改必然更好”</b>。时间到首次修改也几乎相同（15.01 秒对 14.48 秒），提醒我们工具步数、并行调用和模型延迟必须分开看。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-9 <span class="c7-star">★★</span>：行动策略<em>随模型而变</em></h2></div>
+    <div class="c7e9-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="all">全部 18 条</button><button data-v="loc">局部 bug</button><button data-v="cache">缓存契约</button><button data-v="cross">跨模块</button></div></header>
+  <div class="c7e9-body">
+    <div class="c7e9-ch panel fx fx-left" style="--d:3">
+      <div class="c7e9-lg"><span class="g"><i></i>GPT-5.6-sol</span><span class="c"><i></i>Claude Sonnet 5</span></div>
+      <div class="c7e9-bars"></div>
+      <p class="c7e9-nt"></p>
+    </div>
+    <div class="c7e9-r fx fx-right" style="--d:4">
+      <div class="c7-card c7e9-fx"><b class="c7e9-k">固定不变的 Harness</b><div><span>同一 OpenRouter 端点</span><span>系统提示</span><span>工具 Schema</span><span>任务仓库</span><span>测试命令</span><span>最大轮次</span><span>中性提示</span></div><p>3 个代码库 × 2 个模型 × 3 次 = <b>18 条轨迹</b></p></div>
+      <div class="c7-card c7e9-cz"><b class="c7e9-k">因果判断</b><div class="c7e9-mx"><span></span><span>换模型</span><span>换 Harness</span><span class="h">模型效应</span><span class="y">行为变</span><span class="n">倾向保持</span><span class="h">Harness 效应</span><span class="n">行为不变</span><span class="y">行为变</span></div><p>测 Harness 的调节作用要用 <code>--policy explore-first</code> <b>单独跑一组</b>，不要混进同一模型比较</p></div>
+      <p class="c7-data">数据：配套仓库 chapter7/model-action-threshold/results/exp7-8-action-threshold-20260731-v1/summary.json（仓库目录沿用旧编号 7-8）</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「模型的行为策略」· 实验 7-9</div>
+</section>
+<style>
+.c7e9-seg button{font-size:15px}
+.c7e9-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c7e9-ch{padding:16px 22px;display:flex;flex-direction:column;gap:14px}
+.c7e9-lg{display:flex;gap:18px}
+.c7e9-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text2)}
+.c7e9-lg i{width:14px;height:14px;border-radius:3px}
+.c7e9-lg .g i{background:#34d399}.c7e9-lg .c i{background:#fb923c}
+.c7e9-bars{display:flex;flex-direction:column;gap:14px}
+.c7e9-row{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center}
+.c7e9-row>span{font-size:16px;color:var(--text2);line-height:1.35}
+.c7e9-row>div{display:flex;flex-direction:column;gap:5px}
+.c7e9-b{position:relative;height:30px;border-radius:7px;background:rgba(255,255,255,.04)}
+.c7e9-b i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;transition:width .7s var(--ease)}
+.c7e9-b.g i{background:rgba(52,211,153,.6)}.c7e9-b.c i{background:rgba(251,146,60,.6)}
+.c7e9-b b{position:absolute;left:10px;top:50%;translate:0 -50%;font:700 16px var(--num)}
+.c7e9-row.na{opacity:.3}
+.c7e9-nt{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.c7e9-nt b{color:var(--text)}
+.c7e9-r{display:flex;flex-direction:column;gap:12px}
+.c7e9-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7e9-fx div{display:flex;flex-wrap:wrap;gap:6px}
+.c7e9-fx div span{font-size:15px;padding:3px 10px;border-radius:8px;border:1px solid var(--line2)}
+.c7e9-fx p,.c7e9-cz p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:8px}
+.c7e9-fx p b,.c7e9-cz p b{color:var(--text)}
+.c7e9-mx{display:grid;grid-template-columns:130px 1fr 1fr;gap:6px}
+.c7e9-mx span{font-size:15px;padding:5px 10px;border-radius:8px;text-align:center}
+.c7e9-mx span:nth-child(-n+3){color:var(--text3);font-weight:700}
+.c7e9-mx .h{text-align:left;font-weight:700}
+.c7e9-mx .y{background:rgba(251,191,36,.12);color:#fde68a}
+.c7e9-mx .n{background:rgba(255,255,255,.04);color:var(--text2)}
+</style>
+<script>
+HOOKS['c07-exp79'] = {
+  // [指标, gpt, claude, 最大值, 单位]
+  ALL: [['首次修改前的工具调用', 6.8889, 4.5556, 8, '次'], ['首次修改前读取的文件', 4.6667, 3.5556, 8, '个'], ['到首次修改的时间', 15.0052, 14.4762, 20, '秒'], ['首个补丁 / 最终测试通过率', 100, 100, 100, '%']],
+  TASK: { loc: ['局部 bug（localized_timeout）', 3, 2], cache: ['公共契约敏感的缓存修复（cache_contract）', 4, 2], cross: ['跨模块身份规范化（crosscutting_identity）', 7, 6.6667] },
+  NT: {
+    all: '两者首个受测补丁和最终测试<b>均 100% 通过</b>：支持的是“行动策略随模型而变”，<b>不是“多读或早改必然更好”</b>；到首次修改的时间几乎相同，工具步数、并行调用和模型延迟要分开看',
+    loc: '局部任务里差距最明显：GPT-5.6-sol 平均读 <b>3.00</b> 个文件才动手，Claude Sonnet 5 读 <b>2.00</b> 个',
+    cache: '缓存契约任务：<b>4.00</b> 对 <b>2.00</b> 个文件，两者最终都通过',
+    cross: '明确跨模块的任务里几乎收敛：<b>7.00</b> 对 <b>6.67</b> 个文件——任务本身要求读得多时，策略差异被抹平',
+  },
+  init(s) {
+    this.seg = U.seg(s.querySelector('.c7e9-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) {
+    this.v = v;
+    const host = s.querySelector('.c7e9-bars');
+    const rows = v === 'all' ? this.ALL : [['首次修改前读取的文件 · ' + this.TASK[v][0], this.TASK[v][1], this.TASK[v][2], 8, '个']];
+    host.innerHTML = rows.map(([n, g, c, mx, u]) => `<div class="c7e9-row"><span>${n}</span><div><div class="c7e9-b g"><i style="width:0"></i><b>${u === '%' ? g + '%' : g.toFixed(2) + ' ' + u}</b></div><div class="c7e9-b c"><i style="width:0"></i><b>${u === '%' ? c + '%' : c.toFixed(2) + ' ' + u}</b></div></div></div>`).join('');
+    requestAnimationFrame(() => requestAnimationFrame(() => host.querySelectorAll('.c7e9-row').forEach((r, i) => { const [, g, c, mx] = rows[i]; const bs = r.querySelectorAll('.c7e9-b i'); bs[0].style.width = (g / mx) * 100 + '%'; bs[1].style.width = (c / mx) * 100 + '%'; })));
+    s.querySelector('.c7e9-nt').innerHTML = this.NT[v];
+  },
+  enter(s, ctx) {
+    this.auto = true; const seq = ['all', 'loc', 'cache', 'cross']; let n = 0;
+    this.seg('all'); this.show(s, 'all');
+    ctx.every(() => { if (!this.auto) return; n = (n + 1) % seq.length; this.seg(seq[n]); this.show(s, seq[n]); }, 4200);
+  },
+  reset(s) { s.querySelector('.c7e9-bars').innerHTML = ''; },
+};
+</script>

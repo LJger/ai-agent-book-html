@@ -1,0 +1,152 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c03-summary" data-part="11" data-steps="3" data-trans="zoom" data-dur="14000" data-title="本章小结" data-notes="本章把持久化知识分成两个尺度：面向个人的用户记忆，以及面向所有用户的共享知识库。前者遵循“读取相关记忆 → 后台提取候选 → 来源与策略核验 → 更新”的生命周期，并可在 Simple Notes、JSON Cards 或可执行状态之间按需求取舍。<br>就全书的结构而言，本章建的是第一章发现循环中的<b>提案</b>段：把一条证据变成一次最小、可审查、可回滚的修改，而不负责判断系统整体是否变好。<br>按 → 知识库的主流水线是“分块 → 稠密/稀疏检索 → 融合 → 重排序 → 生成”，用 recall@k 等指标验收。RAPTOR、GraphRAG、OpenViking、上下文感知检索和智能体化 RAG 分别改变知识的组织、分块或检索控制方式；实践中可以让结构化概览常驻上下文，把原始细节按需召回。<br>按 → 写入不能跳过来源、时间、冲突和隐私检查。增量更新吸收新证据，定期整理则回到原始数据去重、合并并重建索引，待验证的 diff 通过独立审核后才发布。<br>按 → 上一章管理单次任务内的上下文，本章管理跨任务的陈述性知识；第九章会把同一基础设施用于“在什么条件下应该怎样做”的行为经验。右侧部分列表可以点击跳回。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：让 Agent <em>记住用户，也记住知识</em></h2></header>
+  <div class="wba-body">
+    <div class="wba-l">
+      <div class="wba-r fx fx-up" style="--d:2"><em>两个尺度</em><div><b>用户记忆（个人）与共享知识库（所有用户）</b><div class="wba-flow" data-f="a"><span>读取相关记忆</span><i>→</i><span>后台提取候选</span><i>→</i><span>来源与策略核验</span><i>→</i><span>更新</span></div><p>表示上在 Simple Notes、JSON Cards 或可执行状态之间按需求取舍</p></div></div>
+      <div class="wba-r hot fx fx-up" style="--d:3"><em>定位</em><div><b>第一章发现循环中的“提案”段</b><p>把一条证据变成一次<b>最小、可审查、可回滚</b>的修改，而不负责判断系统整体是否变好</p></div></div>
+      <div class="wba-r fx fx-up" data-step="1"><em>知识库</em><div><b>主流水线，用 recall@k 等指标验收</b><div class="wba-flow" data-f="b"><span>分块</span><i>→</i><span>稠密 / 稀疏检索</span><i>→</i><span>融合</span><i>→</i><span>重排序</span><i>→</i><span>生成</span></div><p>RAPTOR、GraphRAG、OpenViking、上下文感知检索、智能体化 RAG 分别改变组织、分块或检索控制；结构化概览常驻上下文，原始细节按需召回</p></div></div>
+      <div class="wba-r fx fx-up" data-step="2"><em>写入</em><div><b>不能跳过来源、时间、冲突和隐私检查</b><p>增量更新吸收新证据；定期整理回到原始数据去重、合并并重建索引；待验证的 diff 通过独立审核后才发布</p></div></div>
+      <div class="wba-r fx fx-up" data-step="3"><em>分工</em><div><b>第二章 · 第三章 · 第九章</b><p>上一章管单次任务内的上下文；本章管<b>跨任务的陈述性知识</b>；第九章把同一基础设施用于“在什么条件下应该怎样做”的行为经验</p></div></div>
+    </div>
+    <div class="wba-nav fx fx-right" style="--d:4"></div>
+  </div>
+  <div class="src">第三章 ·「本章小结」</div>
+</section>
+<style>
+.wba-body{display:grid;grid-template-columns:1fr 420px;gap:26px;flex:1;min-height:0}
+.wba-l{display:flex;flex-direction:column;gap:10px}
+.wba-r{display:grid;grid-template-columns:100px 1fr;gap:16px;align-items:center;padding:12px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.wba-r>em{font-style:normal;font-size:21px;font-weight:800;color:var(--acc);text-align:center}
+.wba-r b{font-size:19px}
+.wba-r p{margin-top:5px;font-size:15px;line-height:1.6;color:var(--text2)}
+.wba-r p b{font-size:15px;color:var(--text)}
+.wba-r.hot{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8));box-shadow:0 0 26px color-mix(in srgb,var(--acc) 18%,transparent)}
+.wba-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.wba-flow span{padding:3px 10px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2);animation:wbaLit 6s infinite;animation-delay:calc(var(--i) * .9s)}
+.wba-flow i{font-style:normal;font-size:15px;color:var(--text3)}
+@keyframes wbaLit{0%,4%{color:var(--text2);background:transparent;border-color:var(--line2)}8%,18%{color:#06101f;background:var(--acc);border-color:var(--acc)}24%,100%{color:var(--text2);background:transparent;border-color:var(--line2)}}
+.wba-nav{display:flex;flex-direction:column;gap:6px}
+.wba-p{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:center;padding:8px 14px;border-radius:12px;text-align:left;font-size:16px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .3s}
+.wba-p em{font:700 15px var(--num);font-style:normal;color:var(--acc)}
+.wba-p:hover,.wba-p.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+</style>
+<script>
+HOOKS['c03-summary'] = {
+  P: ['记忆的评估与层次', '记忆的表示', '记忆框架与治理', 'RAG 与稠密嵌入', '稀疏与混合检索', '结构化索引', '文件系统与知识更新', '智能体化 RAG', '上下文感知检索', '知识发现与多模态'],
+  init(s) {
+    s.querySelectorAll('.wba-flow').forEach((f) => f.querySelectorAll('span').forEach((x, i) => x.style.setProperty('--i', i)));
+    const host = s.querySelector('.wba-nav');
+    host.innerHTML = '<span class="lbl">回看各部分</span>' + this.P.map((t, i) => `<button class="wba-p" data-i="${i}"><em>${String(i + 1).padStart(2, '0')}</em><span>${t}</span></button>`).join('');
+    host.querySelectorAll('.wba-p').forEach((b) => b.addEventListener('click', () => C3.jump(+b.dataset.i + 1)));
+  },
+  enter(s, ctx) {
+    const ps = [...s.querySelectorAll('.wba-p')]; let k = 0;
+    const tick = () => { ps.forEach((p, j) => p.classList.toggle('on', j === k % ps.length)); k++; };
+    tick(); ctx.every(tick, 1300);
+  },
+  reset(s) { s.querySelectorAll('.wba-p').forEach((p) => p.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-qa" data-part="11" data-trans="flip" data-dur="30000" data-title="思考题" data-notes="第三章共 9 道思考题：第 1 题（★★）问同一用户在不同会话里给出矛盾信息（如两个家庭住址）时记忆系统怎样处理冲突；第 2 题（★★）问原始文档本身混乱或矛盾时，上下文感知检索会不会传播错误、怎样在检索阶段引入“信息质量”信号；第 3 题（★★）问把图表转成文本描述时会丢失哪些空间关系、怎样保留；第 4 题（★★★）问本章的整套知识系统是否也是一种“手工设计”，会不会被“全量输入”取代；第 5 题（★★★）问模型足够强以后领域知识库还重不重要；第 6 题（★）问 RAPTOR 与 GraphRAG 各自擅长什么查询；第 7 题（★★）问文件系统范式相比向量数据库 RAG 在什么场景更有优势；第 8 题（★★★）问数据驱动地发现“裁判因素”和“因素重要性层级”能否达到专家手写规则的质量；第 9 题（★★★）要求为 Markdown 用户记忆库设计增量更新与定期整理流程，并分析 Reviewer 与 Proposer 同源、只看挑选片段时还会合入哪些错误。左侧点击题目，右侧显示参考答案提纲（取自原书附录）；不点击时会自动依次切换；“回看”按钮跳到相关页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目查看参考答案提纲（原书附录）</p></header>
+  <div class="wbb-body">
+    <div class="wbb-list fx fx-left" style="--d:3"></div>
+    <div class="wbb-ans panel fx fx-right" style="--d:4"><div class="wbb-ah"><em class="wbb-no"></em><span class="wbb-st"></span><span class="wbb-tag">参考答案提纲 · 原书附录</span></div><div class="wbb-at"></div><button class="btn wbb-go"><svg class="ic"><use href="#i-undo"/></svg><span></span></button></div>
+  </div>
+  <div class="src">第三章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c03-qa .sh{margin-bottom:18px}
+#c03-qa .lead{font-size:21px;margin-top:8px}
+.wbb-body{display:grid;grid-template-columns:.95fr 1.05fr;gap:22px;flex:1;min-height:0}
+.wbb-list{display:flex;flex-direction:column;gap:5px}
+.wbb-q{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:7px 12px;border-radius:12px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .3s,background .3s}
+.wbb-q em{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:700 15px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.wbb-q span{font-size:15px;line-height:1.5;color:var(--text2)}
+.wbb-q span i{font-style:normal;color:var(--tool);margin-right:6px;letter-spacing:-.05em}
+.wbb-q.on{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.wbb-q.on em{color:#06101f;background:var(--acc)}
+.wbb-q.on span{color:var(--text)}
+.wbb-ans{padding:16px 22px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.wbb-ah{display:flex;align-items:center;gap:12px}
+.wbb-no{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 20px var(--num);font-style:normal;color:#06101f;background:var(--acc)}
+.wbb-st{font-size:18px;color:var(--tool);letter-spacing:-.05em}
+.wbb-tag{margin-left:auto;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.wbb-at{display:flex;flex-direction:column;gap:10px;animation:upIn .45s var(--ease) both}
+.wbb-at p{font-size:16px;line-height:1.7;color:var(--text2)}
+.wbb-at p b{color:var(--text)}
+.wbb-go{align-self:flex-start;margin-top:auto;font-size:16px;padding:8px 14px}
+</style>
+<script>
+HOOKS['c03-qa'] = {
+  Q: [
+    { st: '★★', go: ['c03-mem0', 'Mem0 的写入时消歧'], q: '在用户记忆系统中，当同一用户在不同会话中提供了矛盾信息（比如两次提到不同的家庭住址），记忆系统应该如何处理这种冲突？', a: ['采用 Mem0 式“提取—对比—决策”流水线：先通过向量检索找出相近的旧记忆，再由 LLM 判定 ADD/UPDATE/DELETE/NOOP，如“搬到上海”应通过 UPDATE 覆盖“住在北京”；同时进行版本化管理，地址类信息只保留最新版并标记时间戳，工作经历类信息则保留完整历史；检索时可借助上下文前缀（人物、时间、意图，如电汇信息三次修改的案例）判断哪条信息最终有效。'] },
+    { st: '★★', go: ['c03-expire', '失效下线与权限隔离'], q: '上下文感知检索将原始文档的上下文附加到每个分块。但如果原始文档本身结构混乱或存在矛盾信息，这种方法可能传播甚至放大错误。你会如何在检索阶段引入“信息质量”信号？', a: ['可以借鉴“知识库时效与治理”的思路：给分块附加版本号、生效/失效时间、来源等元数据，检索时过滤已失效内容，或在前缀中显式标注“此条已于某日废止”；重排序阶段把来源权威性和时效性纳入评分，而非只看语义相关性；在索引阶段，让生成前缀的 LLM 同时检测并标记分块间的矛盾，类似记忆系统中的版本化冲突检测。'] },
+    { st: '★★', go: ['c03-mm', '前沿探索：多模态记忆'], q: '第四章介绍的多模态信息提取，会先把图表转为文本描述再进行检索。这个“翻译”过程可能丢失视觉信息中的空间关系。举一个具体例子，说明纯文本描述无法完整传达的图表信息，并设计一种保留该信息的方案。', a: ['例：系统架构图中的逻辑关系，折线图中两条曲线的交叉点位置，或 PDF 表格中单元格与表头的行列对应。', '方案一：原生多模态处理；方案二：提供多模态图片分析工具。'] },
+    { st: '★★★', go: ['c03-cats', '案例一：黑猫白猫的计数问题'], q: 'Rich Sutton 的“苦涩的教训”认为通用方法（搜索和学习）最终会胜过手工设计的特征。本章构建的整个知识系统（分块策略、索引结构、检索管道）是否本身就是一种“手工设计”？如果模型能力足够强，这些设计是否会被简单的“全量输入”所替代？', a: ['确实是手工设计，部分环节（分块、融合调参）可能随长上下文而弱化；但黑猫白猫案例表明“全量输入”也不够：注意力是软检索，跨文档聚合统计仍需索引期预提炼；知识过期更新、权限/租户隔离、可审查性、成本这些工程约束与模型能力无关；且检索与索引期 LLM 提炼本身就是“搜索 + 学习”的通用方法，并非与苦涩教训对立。'] },
+    { st: '★★★', go: ['c03-expire', '失效下线与权限隔离'], q: '随着模型能力的提升，你认为领域知识库还重要吗？未来强大的基座模型是否有可能包含领域知识库中所有的信息，从而不再需要领域知识库？', a: ['仍然重要：训练数据有截止日期，知识库可随时更新；企业内部流程、私有判例等根本不在公开语料中；多用户共享需要进行权限过滤与租户隔离，参数中的知识无法按调用者裁剪；外部存储可审查、可进行版本控制，也可以使失效内容下线，这些都很难通过参数记忆做到；即使采用参数化路线（后训练 / User as Engram），也面临“记住容易，用来做多跳推理却很难”的问题。'] },
+    { st: '★', go: ['c03-exp37', '实验 3-7 RAPTOR 与 GraphRAG'], q: 'RAPTOR 通过自底向上的层次摘要构建树形索引，GraphRAG 通过实体关系构建图结构索引。这两种结构化索引分别擅长回答什么类型的查询？', a: ['RAPTOR：从宏观概念逐步钻取细节的“跨层穿梭”式查询，如先定位“SIMD 指令集”摘要再下钻到 SSE 细节，兼顾总览与细节两种粒度。', 'GraphRAG：多跳关系推理（“我的医生所在医院的地址”沿关系链遍历）与实体消歧（两个“张医生”是不同节点）等“A 和 B 有什么关系”类查询，社区摘要还提供主题聚类。'] },
+    { st: '★★', go: ['c03-mdlinks', 'Markdown 纯文本与链接索引'], q: '文件系统范式将知识组织为类似文件系统的层次结构。这种方式和传统的向量数据库 RAG 相比，在什么场景下更有优势？', a: ['纯文本可被用户直接阅读、编辑、修正，可用 Git 版本控制与回滚，适合需要人机共同维护、审查知识的场景；Agent 有 write_file 能力即可自主记录经验，形成记忆自进化循环（外部化学习）；L0/L1/L2 渐进披露使多数查询到 L1 即可决策，省 token；前提是像 Wikipedia 一样建立交叉链接和索引页，否则孤立文件越多越难检索。'] },
+    { st: '★★★', go: ['c03-exp312b', '实验 3-12 的验收记录'], q: '从结构化数据（如司法判决数据库）中自动发现“裁判因素”和“因素重要性层级”，本质上是让 Agent 从数据中归纳规则。这种数据驱动的知识提取是否能达到人类专家手工编写规则的质量？', a: ['优势：如 CAIL2018 实验所示，“自下而上”的因子发现更贴合数据，而非人类先验，能捕捉散落在成千上万份判例中、专家难以显式写出的隐性权衡经验，而且可以量化。', '局限：LLM 提取出错会造成知识污染，数据本身的偏差也会被继承，聚类原型只能反映相关性，无法说明因果关系。折中方案：采用数据驱动建模，由专家审核 Schema 与结果；由模型提出问题，用统计结果支撑解释。'] },
+    { st: '★★★', go: ['c03-agents', 'Proposer 与 Reviewer'], q: '请为一个 Markdown 用户记忆库同时设计增量更新与定期整理流程。如果 Reviewer 与 Proposer 使用同一模型，且只能看到 Proposer 挑选的对话片段，系统仍可能合入哪些错误？请从模型独立性、证据覆盖和工具权限三方面说明你的改进。', a: ['<b>增量更新</b>：把记忆库当代码库，每条变更走一次 PR。Proposer 先检索相关旧知识，再提出尽可能小而完整的 diff，同步维护链接、索引、时间元数据与证据引用；Reviewer 拿变更前的知识、diff 和原始证据独立审核，退回时给出指向具体证据和行号的可执行意见；迭代设最大次数或成本上限，超限转人工而不是默认放行。合入后先由 CI 检查格式、链接、元数据与权限标签，再从已合入版本增量重建受影响的分块与向量索引。<b>定期整理</b>：按时间或按新增条目数触发全量扫描，去重、合并、拆分过大文件并重建入口页；关键是回到原始对话逐段核对，检查旧摘要有没有丢掉否定词、时间条件或限定语；矛盾说法不按“保留最新”收敛，而是追溯来源、写清适用场景，证据不足时保留冲突与待确认状态。重组同样以 PR 提交，可按目录拆成多个 PR，全部通过后除重建索引外还要回放典型检索用例。', '同源模型、只看片段会漏掉三类错误。<b>模型独立性</b>：同源模型共享训练先验与盲点，Reviewer 容易顺着 Proposer 的结论复述——应改用能力相近但来自不同家族的模型互审。<b>证据覆盖</b>：只看挑选的片段，断章取义、被丢弃的否定词与前置条件以及与其他文件的冲突都无从暴露——Reviewer 必须能在授权范围内自主检索完整的知识库与原始证据库。<b>工具权限</b>：若 Proposer 能直接写主分支或线上索引，审核就形同虚设——Proposer 只写工作分支，Reviewer 只读证据并提交结论，只有合并流程可以更新主分支与线上索引，验证器与发布门槛本身不在可修改范围内。'] },
+  ],
+  init(s) {
+    const host = s.querySelector('.wbb-list');
+    host.innerHTML = this.Q.map((x, i) => `<button class="wbb-q" data-i="${i}"><em>${i + 1}</em><span><i>${x.st}</i>${x.q}</span></button>`).join('');
+    host.querySelectorAll('.wbb-q').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.open(s, +b.dataset.i); }));
+    s.querySelector('.wbb-go').addEventListener('click', () => C3.jumpId(this.Q[this.i || 0].go[0]));
+  },
+  open(s, i) {
+    this.i = i; const x = this.Q[i];
+    s.querySelectorAll('.wbb-q').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.wbb-no').textContent = i + 1;
+    s.querySelector('.wbb-st').textContent = x.st;
+    const at = s.querySelector('.wbb-at'); at.innerHTML = x.a.map((p) => `<p>${p}</p>`).join(''); U.restart(at, 'wbb-at');
+    s.querySelector('.wbb-go span').textContent = '回看：' + x.go[1];
+  },
+  enter(s, ctx) { this.auto = true; this.open(s, 0); ctx.every(() => { if (this.auto) this.open(s, (this.i + 1) % this.Q.length); }, 6500); },
+  reset(s) { s.querySelectorAll('.wbb-q').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c03-end" data-part="11" data-trans="iris" data-title="第三章 · 完" data-notes="第三章到这里结束。本章把持久化知识分成两个尺度：面向个人的用户记忆，与面向所有用户的共享知识库；讲了记忆的评估、表示与治理，RAG 的检索技术栈（分块、稠密与稀疏嵌入、混合检索与重排序），超越扁平文本的结构化索引、文件系统范式与知识更新，智能体化 RAG 与上下文感知检索，以及两条线索汇合而成的双层记忆架构；最后看了从结构化数据中发现知识与多模态记忆的前沿。下一章《工具》讨论 Agent 的另一半能力：MCP、五类工具、多模态感知与执行安全。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <div class="wbc-orbit fx fx-scale" style="--d:3"></div>
+  <div class="wbc-text">
+    <div class="wbc-tag fx fx-up"><i></i>第三章 · 完</div>
+    <h1 class="wbc-title"><span class="split" data-grad="#ccfbf1,#2dd4bf,#60a5fa">概览常驻，细节按需</span></h1>
+    <p class="wbc-sub fx fx-up" style="--d:10">下一章：<b>工具</b>——MCP · 五类工具 · 多模态感知 · 执行安全</p>
+    <div class="end-nav fx fx-up" style="--d:12">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+</section>
+<style>
+#c03-end{justify-content:center;padding-left:150px}
+#c03-end .wbc-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c03-end .wbc-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c03-end .wbc-title{margin-top:26px;font-size:84px;line-height:1.15;font-weight:800;max-width:980px}
+#c03-end .wbc-sub{margin-top:26px;font-size:26px;line-height:1.5;color:var(--text2)}
+#c03-end .wbc-sub b{color:var(--acc)}
+#c03-end .end-nav{margin-top:40px}
+#c03-end .wbc-orbit{position:absolute;right:110px;top:50%;width:600px;height:600px;margin-top:-310px}
+</style>
+<script>
+HOOKS['c03-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.wbc-orbit'), {
+      size: 600, core: 'Agent', coreColor: '#2dd4bf', outer: '用户记忆 · 知识库 · 检索 · MEMORY · KNOWLEDGE · RETRIEVAL',
+      sats: [
+        { label: '用户记忆', color: '#2dd4bf', rx: 0.36, ry: 0.15, tilt: -24, dur: 13, phase: 0 },
+        { label: '知识库', color: '#a78bfa', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.3 },
+        { label: '检索', color: '#60a5fa', rx: 0.3, ry: 0.2, tilt: 88, dur: 11, phase: 0.62 },
+        { label: '更新', color: '#fbbf24', rx: 0.38, ry: 0.11, tilt: 8, dur: 18, phase: 0.85 },
+      ],
+    });
+  },
+};
+</script>

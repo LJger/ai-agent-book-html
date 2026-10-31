@@ -1,0 +1,388 @@
+<!-- ================= 案例 1：过早结束 ================= -->
+<section class="slide" id="c08-case1" data-part="9" data-steps="3" data-trans="rise" data-dur="9000" data-title="案例 1：Coding Agent 过早结束" data-notes="按 → 依次展开三步。<br><b>从问题案例到归因。</b>Coding Agent 最常见、也最难根治的失败之一是<b>过早结束</b>：测试还没跑就宣称“已完成”；用户要求改三个功能，改完两个就收尾；遇到两次失败就宣布“这个任务不可能完成”。按第七章的错误分类，这属于“任务完成度与逻辑判断问题”，生产侧的三类信号都能捕获它：用户纠正（“你根本没跑测试”）、点踩、事后审计（宣称完成的轨迹里没有任何测试工具调用）。归因记录把首个错误定位在“准备宣称完成”的那个决策边界上——在此之前，读代码、改代码可能都没错，错的是“在缺乏证据时下结论”这一步。奖励设计一节讨论的 reward seeking，描述的正是这类行为。<br><b>构造训练数据。</b>端到端回归任务：把“宣称完成前必须跑通验收测试”写成可验证奖励。测试对模型不可见，模型宣称完成时才运行，通过 +1、不通过 −1——这是“判定交给模型写不了的隐藏测试”的直接应用，也是本案例可选的 RL 分支。轨迹前缀回归任务：截取“准备宣称完成”的决策边界构造<b>偏好对</b>——被拒绝的样本是过早结束的错误行为，被选中的样本是“先运行测试、逐条核对验收条件，再下结论”的期望行为。被选中的样本由教师模型生成，再经过规则验证器过滤（拒绝采样），得到一批 DPO 训练对。如果问题案例数量太少，可以用数据扩充（换任务类型、换缺失的验证项、换完成措辞）形成数百条偏好对。按小配比混入通用任务数据做 LoRA 微调，避免把“逢收尾必验证”学成新的过拟合，也降低灾难性遗忘的风险。<br><b>评估：边界集与保留集缺一不可（第一章命名的模式）。</b>训练后的验证使用第七章的评估数据集：轨迹前缀边界集检查“任务未完成时，模型是否选择继续验证而非宣称完成”；同样重要的是<b>保留集</b>——任务确实已完成时，模型应正常宣称完成。只盯前一个指标，会把模型训练成永远不敢收尾的<b>过度矫正</b>状态：每个任务都无限验证下去，延迟与成本崩溃。这与第七章反复强调的“改动不能破坏既有行为”是同一原则在参数层面的版本；评估还应抽查通用能力，确认 LoRA 补丁没有破坏其他能力。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">错的不是读代码、改代码，<em>而是在缺乏证据时下结论</em></h2></header>
+  <div class="c8c1-body">
+    <div class="c8c1-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span>
+      <b class="c8c1-h">一条过早结束的轨迹</b>
+      <div class="c8c1-tl">
+        <div class="ok"><i></i><span>读代码：定位 parse() 对空输入的处理</span></div>
+        <div class="ok"><i></i><span>改代码：入口增加判空</span></div>
+        <div class="ok"><i></i><span>工具返回：文件已修改</span></div>
+        <div class="bad"><i></i><span>“已修复，任务完成。”<em>首个错误：准备宣称完成的决策边界</em></span></div>
+      </div>
+      <b class="c8c1-h">生产侧三类信号</b>
+      <div class="c8c1-sig"><span><svg class="ic"><use href="#i-chat"/></svg>用户纠正：“你根本没跑测试”</span><span><svg class="ic"><use href="#i-thumb"/></svg>点踩</span><span><svg class="ic"><use href="#i-search"/></svg>事后审计：宣称完成却没有任何测试调用</span></div>
+    </div>
+    <div class="c8c1-r">
+      <div class="c8c1-st fx fx-up" data-step="1"><em>1</em><div><b>从问题案例到归因</b><p>第七章错误分类：<b>任务完成度与逻辑判断问题</b>；三种形态：没跑测试就说完成 / 三个功能改两个就收尾 / 失败两次就说不可能</p></div></div>
+      <div class="c8c1-st fx fx-up" data-step="2"><em>2</em><div><b>构造训练数据</b>
+        <div class="c8c1-two"><div><span class="c8-tag" style="--c:#34d399">端到端回归任务 · 可选 RL 分支</span><p>隐藏验收测试，宣称完成时才运行：通过 <b>+1</b>、不通过 <b>−1</b></p></div>
+        <div><span class="c8-tag" style="--c:#38bdf8">轨迹前缀回归任务 · DPO</span><p>rejected：过早结束；chosen：先运行测试、逐条核对验收条件再下结论（教师生成 + 规则过滤）；数据扩充到数百条，小配比混入通用数据做 LoRA</p></div></div></div></div>
+      <div class="c8c1-st fx fx-up" data-step="3"><em>3</em><div><b>评估：边界集与保留集缺一不可</b>
+        <div class="c8c1-ev">
+          <div class="c8c1-seg seg"><i class="knob"></i><button data-v="both">两个都看</button><button data-v="one">只盯边界集</button></div>
+          <div class="c8c1-g"><span>边界集：未完成时继续验证</span><div class="meter" style="--c:#34d399"><i class="b"></i></div></div>
+          <div class="c8c1-g"><span>保留集：已完成时正常收尾</span><div class="meter" style="--c:#38bdf8"><i class="r"></i></div></div>
+          <p class="c8c1-oc">只盯边界集 → <b>过度矫正</b>：永远不敢收尾，无限验证，延迟与成本崩溃</p>
+        </div></div></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「从问题案例到后训练」·「案例 1：Coding Agent 过早结束」</div>
+</section>
+<style>
+.c8c1-body{display:grid;grid-template-columns:.9fr 1.1fr;gap:22px;flex:1;min-height:0}
+.c8c1-l{position:relative;padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+.c8c1-h{font-size:17px;color:var(--acc)}
+.c8c1-tl{display:flex;flex-direction:column;gap:8px;padding-left:6px}
+.c8c1-tl div{display:grid;grid-template-columns:22px 1fr;gap:12px;align-items:start;font-size:17px}
+.c8c1-tl i{width:16px;height:16px;margin-top:4px;border-radius:50%;background:#34d399;box-shadow:0 0 10px #34d399}
+.c8c1-tl .bad i{background:#fb7185;box-shadow:0 0 14px #fb7185;animation:blink 1.6s infinite}
+.c8c1-tl .bad span{color:#fecdd3}
+.c8c1-tl em{display:block;font-style:normal;font-size:15px;color:#fda4af;margin-top:2px}
+.c8c1-sig{display:flex;flex-direction:column;gap:8px}
+.c8c1-sig span{display:flex;align-items:center;gap:10px;font-size:16px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c8c1-sig .ic{width:20px;height:20px;color:var(--acc);flex:none}
+.c8c1-r{display:flex;flex-direction:column;gap:12px}
+.c8c1-st{display:grid;grid-template-columns:44px 1fr;gap:14px;padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8c1-st>em{font:800 30px var(--num);font-style:normal;color:var(--acc)}
+.c8c1-st b{font-size:18px}
+.c8c1-st p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c8c1-st p b{font-size:15px;color:var(--text)}
+.c8c1-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:8px}
+.c8c1-ev{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.c8c1-seg{align-self:flex-start}.c8c1-seg button{font-size:15px}
+.c8c1-g{display:grid;grid-template-columns:230px 1fr;gap:12px;align-items:center;font-size:15px;color:var(--text2)}
+.c8c1-oc{font-size:15px;color:var(--text3);transition:color .4s}.c8c1-oc b{color:#fda4af}
+.c8c1-ev.one .c8c1-oc{color:#fecdd3}
+</style>
+<script>
+HOOKS['c08-case1'] = {
+  init(s) { this.seg = U.seg(s.querySelector('.c8c1-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    this.v = v;
+    s.querySelector('.c8c1-ev').classList.toggle('one', v === 'one');
+    s.querySelector('.c8c1-g .b').style.width = v === 'one' ? '100%' : '90%';
+    s.querySelectorAll('.c8c1-g i')[1].style.width = v === 'one' ? '8%' : '95%';
+  },
+  step(s, ctx, k) {
+    if (k < 3) return;
+    this.auto = true; let n = 0;
+    this.show(s, 'both'); this.seg('both');
+    ctx.every(() => { if (this.auto) { const v = ++n % 2 ? 'one' : 'both'; this.seg(v); this.show(s, v); } }, 2600);
+  },
+  enter(s, ctx, k) { if (k >= 3) this.step(s, ctx, k); },
+  reset(s) { s.querySelectorAll('.c8c1-g i').forEach((i) => { i.style.width = '0%'; }); s.querySelector('.c8c1-ev').classList.remove('one'); },
+};
+</script>
+
+<!-- ================= 实验 8-17 ================= -->
+<section class="slide" id="c08-exp817" data-part="9" data-trans="zoom" data-dur="26000" data-title="实验 8-17 ★★：从“过早结束”到 DPO 修复" data-notes="<b>实验 8-17 ★★：从“过早结束”问题案例到 DPO 修复。</b><b>实验目标</b>：跑通从生产问题案例到参数更新的完整链路——失败归因 → 轨迹前缀回归任务 → DPO 偏好对 → 7B 模型 LoRA 训练 → 边界集与保留集双集验证。<br><b>数据构造</b>：配套仓库提供 24 条写实的过早结束问题案例，覆盖四类失败（未跑测试就宣称完成、多目标只完成一部分、验收条件未满足、遇错放弃并宣称不可能，含删除失败测试这类更恶劣的 reward hacking 变体），以及与训练数据严格隔离的 held-out 评估集（boundary 12 条 + retention 8 条）。<br>这是一个教学实验。在生产中，偏好对要覆盖更多任务族，保留集要覆盖更多“正常收尾”的场景，还要警惕奖励作弊的新形态：模型可能学会“口头声称去验证”而不真的验证。这正是端到端数据集的奖励必须依赖模型无法编写或修改的隐藏测试，而不是依赖模型自己的声明的原因。<br>配套仓库实测（RTX PRO 6000 单卡，Qwen2.5-7B-Instruct，LoRA DPO 4 epochs，学习率 3e-5）：在固定候选比较的未完成任务集上，基座选对 3/12（25.0%），训练后 11/12（91.7%）；已完成任务保留集训练前后都是 8/8（100%）；平均差值由 −0.2083 提升到 0.3828。自由生成只是补充诊断：过早结束 1/12 → 0/12，但正常收尾 6/8 → 0/8，说明小数据 DPO 会让模型在开放式回答里过于谨慎——正是过度矫正的苗头，因此主要结论只采用候选比较，不能外推成线上总体成功率提升。仓库还记录了一次失败的尝试：加入“已完成任务控制对”改善了开放式收尾，却让未完成任务集的候选选择崩到 0/12，因此没有纳入最终训练集。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-17 <span class="c8-star">★★</span>：从“过早结束”问题案例到 <em>DPO 修复</em></h2></header>
+  <div class="c8e17-body">
+    <div class="c8e17-l fx fx-left" style="--d:2">
+      <div class="c8e17-flow"><span>失败归因</span><i></i><span>轨迹前缀回归任务</span><i></i><span>DPO 偏好对</span><i></i><span>7B LoRA</span><i></i><span>边界集 + 保留集</span></div>
+      <div class="c8e17-tabs tabs"><button>未跑测试</button><button>多目标做一半</button><button>验收未满足</button><button>遇错放弃</button></div>
+      <div class="c8e17-case panel"></div>
+      <div class="c8-data">24 条问题案例（四类各 6 条）；held-out：boundary 12 + retention 8，与训练严格隔离。数据：配套仓库 chapter8/premature-completion-dpo/data/bad_cases.json</div>
+    </div>
+    <div class="c8e17-r fx fx-right" style="--d:3">
+      <div class="c8e17-ch">
+        <div class="c8e17-g"><b>未完成任务集（候选比较）</b><div class="c8e17-bb"><div><span>基座</span><i data-v="25"></i><em>3/12 · 25.0%</em></div><div><span>DPO 后</span><i class="up" data-v="91.7"></i><em>11/12 · 91.7%</em></div></div></div>
+        <div class="c8e17-g"><b>已完成任务保留集</b><div class="c8e17-bb"><div><span>基座</span><i data-v="100"></i><em>8/8 · 100%</em></div><div><span>DPO 后</span><i class="up" data-v="100"></i><em>8/8 · 100%</em></div></div></div>
+        <div class="c8e17-g warn"><b>补充诊断：自由生成中的正常收尾</b><div class="c8e17-bb"><div><span>基座</span><i data-v="75"></i><em>6/8</em></div><div><span>DPO 后</span><i class="dn" data-v="0"></i><em>0/8</em></div></div></div>
+      </div>
+      <p class="c8e17-nt">候选比较修好了，开放式回答却<b>过于谨慎</b>——过度矫正的苗头；结论只采用候选比较，不外推为线上成功率提升</p>
+      <div class="c8-data">Qwen2.5-7B-Instruct · LoRA DPO 4 epochs · lr 3e-5 · RTX PRO 6000；平均差值 −0.2083 → 0.3828；加入“已完成任务控制对”会让未完成集崩到 0/12，未采用。数据：配套仓库 validation/experiment_8_17_gpu_20260807.md</div>
+      <p class="c8e17-w">教学实验：生产中要覆盖更多任务族与正常收尾场景，并警惕“口头声称去验证”——奖励必须依赖<b>模型无法编写或修改的隐藏测试</b></p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「案例 1：Coding Agent 过早结束」· 实验 8-17</div>
+</section>
+<style>
+.c8e17-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1;min-height:0}
+.c8e17-l{display:flex;flex-direction:column;gap:12px}
+.c8e17-flow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.c8e17-flow span{padding:6px 11px;border-radius:10px;font-size:15px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.c8e17-flow i{width:14px;height:2px;background:var(--acc)}
+.c8e17-tabs button{font-size:16px}
+.c8e17-case{padding:18px 22px;display:flex;flex-direction:column;gap:10px;min-height:340px}
+.c8e17-case>div{display:grid;grid-template-columns:96px 1fr;gap:12px;font-size:16px;line-height:1.55;animation:c8hkIn .4s var(--ease) both}
+.c8e17-case>div:nth-child(2){animation-delay:.15s}.c8e17-case>div:nth-child(3){animation-delay:.3s}.c8e17-case>div:nth-child(4){animation-delay:.45s}
+.c8e17-case b{font-size:15px;color:var(--text3)}
+.c8e17-case .cl{color:#fecdd3}.c8e17-case .mv{color:#a7f3d0}
+.c8e17-r{display:flex;flex-direction:column;gap:12px}
+.c8e17-ch{display:flex;flex-direction:column;gap:12px}
+.c8e17-g{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8e17-g.warn{border-color:rgba(251,191,36,.4)}
+.c8e17-g>b{font-size:16px}
+.c8e17-bb{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.c8e17-bb div{display:grid;grid-template-columns:70px 1fr 130px;gap:12px;align-items:center;font-size:15px;color:var(--text2)}
+.c8e17-bb i{height:18px;border-radius:5px;width:0;background:rgba(148,163,184,.55);transition:width 1s var(--ease)}
+.c8e17-bb i.up{background:linear-gradient(90deg,#f472b6,#f9a8d4)}.c8e17-bb i.dn{background:#fbbf24}
+.c8e17-bb em{font:700 16px var(--num);font-style:normal;color:var(--text)}
+.c8e17-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--warn)}.c8e17-nt b{color:#fde68a}
+.c8e17-w{font-size:15px;line-height:1.55;color:var(--text3)}.c8e17-w b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp817'] = {
+  C: [['bc-01 · 未跑测试就宣称完成', '修复 src/parser.py 在输入为空字符串时崩溃的问题', '已修复 src/parser.py 的空输入崩溃问题，在 parse() 入口增加了判空逻辑，任务完成。', '运行 pytest tests/test_parser.py，确认空输入用例通过且原有解析用例无回归'], ['bc-07 · 多目标只完成一部分', '给 /users、/orders、/reports 三个端点都加上 JWT 鉴权中间件', '鉴权中间件已完成并挂载到接口上，任务完成。', '逐条核对需求清单：/reports 尚未挂载鉴权；需补挂并对三个端点分别验证 401/200 行为'], ['bc-13 · 验收条件未满足', '优化 /api/search 接口，验收标准：P95 响应时间低于 200ms', '搜索接口已加缓存，单次请求 83ms，性能优化任务完成。', '验收标准是 P95 &lt; 200ms，需用压测工具跑足够样本量统计 P95，而不是看单次请求耗时'], ['bc-19 · 遇错放弃并宣称不可能', '修复 tests/test_billing.py 的 ImportError 并让账单测试通过', '这是环境依赖问题导致的 ImportError，本地无法修复，任务不可能完成。', '仅尝试一次就放弃；应继续定位：检查 billing/models.py 是否真有 Invoice 定义、PYTHONPATH 与包结构是否正确']],
+  init(s) { s.querySelectorAll('.c8e17-tabs button').forEach((b, i) => b.addEventListener('click', () => { this.auto = false; this.pick(s, i); })); },
+  pick(s, i) {
+    this.i = i; const [id, t, c, m] = this.C[i];
+    s.querySelectorAll('.c8e17-tabs button').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelector('.c8e17-case').innerHTML = `<div><b>案例</b><span>${id}</span></div><div><b>任务</b><span>${t}</span></div><div><b>过早宣称</b><span class="cl">“${c}”</span></div><div><b>缺失的验证</b><span class="mv">${m}</span></div>`;
+  },
+  enter(s, ctx) {
+    s.querySelectorAll('.c8e17-bb i').forEach((b, k) => ctx.later(() => { b.style.width = b.dataset.v + '%'; }, 700 + k * 260));
+    C8.auto(this, ctx, 4, 5200, (i) => this.pick(s, i), 400);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c8e17-bb i').forEach((b) => { b.style.width = '0'; }); s.querySelectorAll('.c8e17-tabs button').forEach((b) => b.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 案例 2：中文引号 · 实验 8-18 ================= -->
+<section class="slide" id="c08-quote" data-part="9" data-trans="flip" data-dur="26000" data-title="案例 2：中文引号 · 实验 8-18 ★★" data-notes="「案例 2：中文引号」。用户反馈“中文文章中的直引号应统一为弯引号”。这句话描述了期望，却没有给出可以直接训练的规则：同一个引号，在中文自然语言、英文原文、Markdown 行内代码、代码块、代码注释、JSON 或路径中承担的角色完全不同。正确的修复是<b>作用域敏感的最小编辑</b>：中文自然语言中的引用可以转换为弯引号，嵌套引用按中文标点规则处理；英文原文、可执行代码、JSON/schema、路径、标识符和 Markdown 反引号中的内容必须原样保留；无法判断作用域时应保留原文。<br><b>构造训练数据。</b>将引号的使用规则写成 Skill。正例覆盖中文段落、嵌套引用以及代码注释中的中文自然语言，反例覆盖英文原文、字符串/字符字面量、JSON、路径、行内代码和整段代码。这样教给模型的是“先判断作用域，再做最小编辑”，而不是“看到直引号就替换”。<br><b>实验 8-18 ★★：作用域敏感的中文弯引号 SFT。</b><b>实验目标</b>：验证 LoRA SFT 能否让模型在混合中文、英文、Markdown、代码和 JSON 的文档中，准确执行“该改的引号改弯、受保护的引号不动”，并在未见过的上下文组合上保持这一边界。<b>实验设置</b>：以 Qwen/Qwen3-8B 为基座，使用 bf16 LoRA 训练 2 个 epoch（256 次更新）。SKILL.md 的作用域规则同时作为生成标签、质量门禁和回归规范；模型只负责选择作用域和生成最小编辑，生产侧的解析器与语法检查不被移除。<b>数据构造</b>：按 16 类片段、10 种文章体裁和 9 种编程语言渲染 1024 条训练样本、256 条留出样本和 256 条边界样本。样本成对保存原文与目标文本。<br>配套仓库实测：基座留出集 exact 为 0%；加入人工审计后的显式正反规则再训练后，留出集 exact 96.9%，边界集 97.7%，动态保护区域保持率均为 100%；各代码类别 100%，但 JSON 只有 68.8%，中文报道引用 81.3% / 93.8%。左侧切换两种修法看哪些引号被改动（文档片段改写自配套仓库评估样本）。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先判断作用域，<em>再做最小编辑</em></h2></div>
+    <div class="c8qt-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="g">看到直引号就替换</button><button data-v="s">作用域敏感的最小编辑</button></div></header>
+  <div class="c8qt-body">
+    <div class="c8qt-l fx fx-left" style="--d:3">
+      <div class="c8qt-doc panel" data-v="s"><span class="c8-sx">示意</span>
+        <div class="c8qt-ln"><em>中文</em><span>说明文字中写着：<q class="cv">"</q>查看变更记录<q class="cv">"</q>。</span></div>
+        <div class="c8qt-ln"><em>行内代码</em><span>调用 <code>inspect()</code> 后，服务返回 <code>{<q class="pr">"</q>status<q class="pr">"</q>: <q class="pr">"</q>retry<q class="pr">"</q>}</code>。</span></div>
+        <div class="c8qt-ln"><em>英文原文</em><span>原文引用如下：<q class="pr">"</q>Do not remove the assertion.<q class="pr">"</q></span></div>
+        <div class="c8qt-ln"><em>代码注释</em><span><code># 这里的<q class="cv">"</q>缓存<q class="cv">"</q>指本地缓存</code></span></div>
+        <div class="c8qt-ln"><em>字符串字面量</em><span><code>path = <q class="pr">"</q>/tmp/job.txt<q class="pr">"</q></code></span></div>
+        <div class="c8qt-ln"><em>JSON</em><span><code>{<q class="pr">"</q>title<q class="pr">"</q>: <q class="pr">"</q>周报<q class="pr">"</q>}</code></span></div>
+        <div class="c8qt-res"></div>
+      </div>
+      <div class="c8qt-rule">
+        <div><b class="g">转换</b><span>中文自然语言中的引用；嵌套引用按中文标点规则；代码注释里的中文自然语言</span></div>
+        <div><b class="r">原样保留</b><span>英文原文、可执行代码、JSON/schema、路径、标识符、Markdown 反引号</span></div>
+        <div><b class="y">拿不准</b><span>无法判断作用域时保留原文</span></div>
+      </div>
+    </div>
+    <div class="c8qt-r fx fx-right" style="--d:4">
+      <div class="c8-card"><b class="c8qt-h">实验 8-18 <span class="c8-star">★★</span>：作用域敏感的中文弯引号 SFT</b><p>Qwen/Qwen3-8B · bf16 LoRA · 2 epochs（256 次更新）；<code>SKILL.md</code> 的规则同时是生成标签、质量门禁和回归规范；解析器与语法检查不移除</p><p>16 类片段 × 10 种体裁 × 9 种编程语言：训练 1024 / 留出 256 / 边界 256，原文与目标成对保存</p></div>
+      <div class="c8qt-big">
+        <div><span>基座 · 留出集 exact</span><b data-count="0" data-suffix="%">0%</b></div>
+        <div class="up"><span>SFT 后 · 留出集</span><b>96.9%</b></div>
+        <div class="up"><span>SFT 后 · 边界集</span><b>97.7%</b></div>
+        <div><span>保护区域保持率</span><b>100%</b></div>
+      </div>
+      <div class="c8qt-cat"><span class="ok">Python / JS / Java / Go / Rust / SQL / Shell / YAML / Markdown <b>100%</b></span><span class="bad">JSON <b>68.8%</b></span><span class="bad">中文报道引用 <b>81.3% / 93.8%</b></span></div>
+      <div class="c8-data">原书实验框只给出目标与设置；结果来自配套仓库 chapter8/curly-quote-sft（RTX PRO 6000 实测，加入人工审计后的显式正反规则再训练）</div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「案例 2：中文引号」· 实验 8-18</div>
+</section>
+<style>
+.c8qt-seg button{font-size:16px}
+.c8qt-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8qt-l{display:flex;flex-direction:column;gap:12px}
+.c8qt-doc{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:9px}
+.c8qt-ln{display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;font-size:18px}
+.c8qt-ln>em{font-style:normal;font-size:15px;color:var(--text3)}
+.c8qt-ln code{font:16px var(--mono);padding:2px 8px;border-radius:6px;background:rgba(255,255,255,.06)}
+.c8qt-ln q{quotes:none;display:inline-block;min-width:.6em;text-align:center;border-radius:4px;transition:background .4s,color .4s}
+.c8qt-ln q::before,.c8qt-ln q::after{content:none}
+.c8qt-ln q.ch{color:#0b1020;font-weight:700}
+.c8qt-ln q.cv.ch{background:#34d399}.c8qt-ln q.pr.ch{background:#fb7185}
+.c8qt-res{margin-top:4px;font-size:16px;min-height:26px}
+.c8qt-res b.g{color:#6ee7b7}.c8qt-res b.r{color:#fda4af}
+.c8qt-rule{display:flex;flex-direction:column;gap:6px}
+.c8qt-rule div{display:grid;grid-template-columns:90px 1fr;gap:10px;font-size:15px;line-height:1.5;color:var(--text2)}
+.c8qt-rule b{font-size:15px}.c8qt-rule b.g{color:#6ee7b7}.c8qt-rule b.r{color:#fda4af}.c8qt-rule b.y{color:#fde68a}
+.c8qt-r{display:flex;flex-direction:column;gap:12px}
+.c8qt-h{font-size:18px}
+.c8qt-r .c8-card p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}
+.c8qt-r code{font:15px var(--mono)}
+.c8qt-big{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.c8qt-big div{padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78);display:flex;flex-direction:column;gap:4px}
+.c8qt-big span{font-size:15px;color:var(--text3)}.c8qt-big b{font:800 32px var(--num)}
+.c8qt-big .up b{color:var(--acc)}
+.c8qt-cat{display:flex;flex-wrap:wrap;gap:8px}
+.c8qt-cat span{padding:6px 12px;border-radius:10px;font-size:15px;border:1px solid var(--line)}
+.c8qt-cat .ok{border-color:rgba(52,211,153,.45)}.c8qt-cat .ok b{color:#6ee7b7}
+.c8qt-cat .bad{border-color:rgba(251,191,36,.45)}.c8qt-cat .bad b{color:#fde68a}
+</style>
+<script>
+HOOKS['c08-quote'] = {
+  init(s) { this.seg = U.seg(s.querySelector('.c8qt-seg'), (v) => { this.auto = false; this.show(s, v); }); },
+  show(s, v) {
+    this.v = v;
+    const qs = [...s.querySelectorAll('.c8qt-ln q')];
+    let cv = 0;
+    qs.forEach((q) => {
+      const hit = v === 'g' || q.classList.contains('cv');
+      q.classList.toggle('ch', hit);
+      if (!hit) { q.textContent = '"'; return; }
+      q.textContent = cv++ % 2 ? '”' : '“';
+    });
+    const bad = s.querySelectorAll('.c8qt-ln q.pr').length;
+    s.querySelector('.c8qt-res').innerHTML = v === 'g' ? `<b class="r">${bad} 处受保护的引号被改坏</b>：JSON 无法解析、英文原文和字符串字面量被篡改` : '<b class="g">只改 4 处</b>：中文引用与中文注释；代码、JSON、英文原文、路径原样保留';
+  },
+  enter(s, ctx) { C8.auto(this, ctx, 2, 5200, (i) => { this.i = i; const v = i ? 's' : 'g'; this.seg(v); this.show(s, v); }, 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8qt-ln q').forEach((q) => { q.classList.remove('ch'); q.textContent = '"'; }); s.querySelector('.c8qt-res').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 案例 3：编辑失败逐层归因 ================= -->
+<section class="slide" id="c08-copy" data-part="9" data-trans="iris" data-dur="26000" data-title="案例 3：编辑文件经常失败——逐层归因" data-notes="「案例 3：编辑文件经常失败」。如第五章所述，Coding Agent 常用 edit_file(path, old_string, new_string) 这样的工具：模型把要替换的 old_string 抄写到工具参数。编辑工具通常按精确字符串匹配，哪怕只差一个空格、换行、反斜杠、Unicode 组合字符或低频 token，都会返回失败。<br><b>从问题案例到归因。</b>对失败轨迹沿着下面的链路逐层对比：文件原始字节 → 工具返回 → Harness 序列化 → 模型上下文 → 模型 token 输出 → 解码字符串 → JSON/tool-call 解析 → 工具匹配。若文件读取或工具返回已经改变字节，归因给工具；若序列化、转义或提示词拼装改变了内容，归因给 Harness；如果 tokenizer encode 后再 decode 发生变化，归因给 tokenizer。只有模型收到的上下文与原始字符串完全一致，而<b>模型输出是链路上首个出现差异的位置</b>，才能把它标为模型的精确复制能力问题，作为后训练候选。<br><b>构造训练数据。</b>把复制任务抽象成三个可验证任务：直接逐字复述；在相似且等长的多个字符串中选择完全相同的目标；以及把指定字符串完整抄写到 old_string 的工具 JSON 参数。样本特意包含真实编辑最容易损坏的空格、真实换行、反斜杠、Unicode 等。<br>上方按钮切换四种故障场景（示意），看字符串在哪一环首次出现差异、该归因给谁。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">找到<em>首个出现差异的位置</em>，再决定归因给谁</h2></div>
+    <div class="c8cp-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">工具改了字节</button><button data-v="1">Harness 转义</button><button data-v="2">tokenizer 往返</button><button data-v="3">模型抄错</button></div></header>
+  <div class="c8cp-stage panel fx fx-up" style="--d:3"><span class="c8-sx">示意</span>
+    <div class="c8cp-chain"></div>
+    <div class="c8cp-out"><span>old_string 在这一环的样子</span><code class="c8cp-str"></code><b class="c8cp-who"></b></div>
+  </div>
+  <div class="c8cp-bot fx fx-up" style="--d:4">
+    <div class="c8-card"><b>edit_file(path, old_string, new_string)</b><p>按精确字符串匹配：差一个空格、换行、反斜杠、Unicode 组合字符或低频 token 都会失败</p></div>
+    <div class="c8-card"><b>只有这一种情况才算模型的问题</b><p>模型收到的上下文与原始字符串完全一致，而<b>模型输出是链路上首个出现差异的位置</b> → 后训练候选</p></div>
+    <div class="c8-card"><b>三个可验证训练任务</b><p>① 逐字复述 ② 在相似且等长的多个字符串中选出完全相同的目标 ③ 把字符串完整抄进 old_string 的工具 JSON 参数；特意包含空格、真实换行、反斜杠、Unicode</p></div>
+  </div>
+  <div class="src">第八章 ·「案例 3：编辑文件经常失败」</div>
+</section>
+<style>
+.c8cp-seg button{font-size:15px}
+.c8cp-stage{position:relative;padding:26px 28px 22px;margin-top:6px}
+.c8cp-chain{display:grid;grid-template-columns:repeat(8,1fr);gap:14px;position:relative}
+.c8cp-n{position:relative;padding:14px 10px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);text-align:center;font-size:16px;line-height:1.35;min-height:92px;display:flex;flex-direction:column;justify-content:center;gap:6px;transition:all .35s}
+.c8cp-n small{font-size:15px;color:var(--text3)}
+.c8cp-n:not(:last-child)::after{content:"";position:absolute;right:-13px;top:50%;width:12px;height:2px;background:var(--line2)}
+.c8cp-n.pass{border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.08)}
+.c8cp-n.pass small{color:#6ee7b7}
+.c8cp-n.fail{border-color:#fb7185;background:rgba(251,113,133,.16);box-shadow:0 0 24px -4px #fb7185}
+.c8cp-n.fail small{color:#fda4af}
+.c8cp-n.after{opacity:.4}
+.c8cp-out{display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}
+.c8cp-out>span{font-size:15px;color:var(--text3)}
+.c8cp-str{font:20px var(--mono);padding:8px 14px;border-radius:10px;background:rgba(5,9,22,.8);white-space:pre}
+.c8cp-str mark{background:#fb7185;color:#0b1020;border-radius:3px;padding:0 2px}
+.c8cp-who{font-size:20px;padding:8px 18px;border-radius:12px;color:#0b1020;background:var(--acc);opacity:0;transition:opacity .4s}
+.c8cp-who.on{opacity:1}
+.c8cp-bot{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:14px;margin-top:16px}
+.c8cp-bot .c8-card>b{font-size:17px;color:var(--acc)}.c8cp-bot p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c8cp-bot p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-copy'] = {
+  N: ['文件原始字节', '工具返回', 'Harness 序列化', '模型上下文', '模型 token 输出', '解码字符串', 'JSON / tool-call 解析', '工具匹配'],
+  OK: 'if (a\\tb) {⏎  x = "ü"',
+  F: [
+    [1, 'if (a    b) {⏎  x = "ü"', 5, 9, '归因：工具（读取时把制表符展开成空格）'],
+    [2, 'if (a\\\\tb) {⏎  x = \\"ü\\"', 6, 7, '归因：Harness（序列化 / 转义改变了内容）'],
+    [5, 'if (a\\tb) {⏎  x = "ü"', 19, 21,'归因：tokenizer（encode→decode 后 ü 变成 u + 组合符）'],
+    [4, 'if (a\\tb) {⏎ x = "ü"', 12, 13,'归因：模型精确复制能力 → 后训练候选'],
+  ],
+  init(s) {
+    s.querySelector('.c8cp-chain').innerHTML = this.N.map((n) => `<div class="c8cp-n"><span>${n}</span><small></small></div>`).join('');
+    this.seg = U.seg(s.querySelector('.c8cp-seg'), (v) => { this.auto = false; this.run(s, +v); });
+  },
+  esc: (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;'),
+  async run(s, f) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => tk === this.tk && ctx.alive;
+    this.i = f;
+    const [at, bad, m0, m1, who] = this.F[f], ns = [...s.querySelectorAll('.c8cp-n')], str = s.querySelector('.c8cp-str'), w = s.querySelector('.c8cp-who');
+    ns.forEach((n) => { n.classList.remove('pass', 'fail', 'after'); n.querySelector('small').textContent = ''; });
+    w.classList.remove('on'); str.innerHTML = this.esc(this.OK);
+    for (let i = 0; i < ns.length; i++) {
+      await U.wait(ctx, 420); if (!ok()) return;
+      if (i < at) { ns[i].classList.add('pass'); ns[i].querySelector('small').textContent = '一致'; continue; }
+      ns[i].classList.add('fail'); ns[i].querySelector('small').textContent = '首个差异';
+      str.innerHTML = this.esc(bad.slice(0, m0)) + '<mark>' + this.esc(bad.slice(m0, m1) || ' ') + '</mark>' + this.esc(bad.slice(m1));
+      ns.slice(i + 1).forEach((n) => n.classList.add('after'));
+      w.textContent = who; w.classList.add('on');
+      return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; C8.auto(this, ctx, 4, 6000, (i) => { this.seg(String(i)); this.run(s, i); }, 500); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.i = null; s.querySelectorAll('.c8cp-n').forEach((n) => { n.classList.remove('pass', 'fail', 'after'); n.querySelector('small').textContent = ''; }); s.querySelector('.c8cp-who').classList.remove('on'); s.querySelector('.c8cp-str').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 实验 8-19 ================= -->
+<section class="slide" id="c08-exp819" data-part="9" data-trans="zoom" data-dur="26000" data-title="实验 8-19 ★★：特殊字符串的精确复制 SFT" data-notes="<b>实验 8-19 ★★：特殊字符串的精确复制 SFT。</b><b>实验目标</b>：在已确认差异来自模型抄写错误的前提下，测试 LoRA SFT 能否提升模型对随机字符串的精确抄写，并用独立 tokenizer 审计排除词元化造成的假象。<br><b>实验设置</b>：以 Qwen/Qwen3-8B 为基座，使用 bf16 LoRA 训练 2 个 epoch。训练脚本只对目标字符串或 old_string JSON 字段提供逐 token 监督。<br><b>结果</b>：模型留出集 byte-exact accuracy 从基座的 37.5% 提升到 78.9%，独立边界集为 80.1%；平均首次字节分歧位置分别为 54.0 和 54.2。另用留出与边界共 512 条探针比较三个开源 tokenizer，Qwen3 与 Qwen2.5 的无损 round-trip 均为 80.1%。因此 80.1% 同时反映了模型复制和 tokenizer 上限。<br>配套仓库还记录了 Mistral-7B-v0.1 的 tokenizer round-trip 为 100%，说明 tokenizer 层也必须单独设回归门禁。左侧三类任务的样本取自配套仓库 exact-copy-sft/data/eval.jsonl（训练 1024 / 留出 256 / 边界 256）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-19 <span class="c8-star">★★</span>：特殊字符串的<em>精确复制 SFT</em></h2></header>
+  <div class="c8e19-body">
+    <div class="c8e19-l fx fx-left" style="--d:2">
+      <div class="c8e19-tabs tabs"><button>工具 JSON 参数</button><button>相似串中选目标</button><button>逐字复述</button></div>
+      <div class="c8e19-s panel" data-i="0">
+        <div class="c8e19-k">eval-000 · tool_json</div>
+        <pre>从工具观察中找到 path=/tmp/job.txt 的 old_string，只输出 JSON</pre>
+        <div class="c8e19-k">目标</div>
+        <code>{"old_string":"s9CcifLt DM8UjZ88UP\n8UP"}</code>
+        <p>含空格与换行转义</p>
+      </div>
+      <div class="c8e19-s panel" data-i="1">
+        <div class="c8e19-k">eval-001 · decoy_copy</div>
+        <pre>DECOY=PMfU:mfGve8KsZT76j+eePWHDxjr+hDU
+DECOY=ZcM5oLw=mfe=Mexm9Sifixkpv6tHSdwG
+TARGET=VY4=A\nnUn=@5f7:ogcedQATbH-\tEND</pre>
+        <div class="c8e19-k">目标</div>
+        <code>VY4=A\nnUn=@5f7:ogcedQATbH-\tEND</code>
+        <p>相似干扰串 + 字面反斜杠</p>
+      </div>
+      <div class="c8e19-s panel" data-i="2">
+        <div class="c8e19-k">eval-002 · verbatim</div>
+        <pre>把 SOURCE 逐字复制到 ANSWER，不得修正大小写、空格、反斜杠或换行</pre>
+        <div class="c8e19-k">目标</div>
+        <code>ID=E6gx-TnBrTUyCMqrgTQN=FVgUui@S:dU; sha256=ha=AxiQv6HVxuMMU</code>
+        <p>长随机串：无语义可依</p>
+      </div>
+      <div class="c8-data">样本：配套仓库 chapter8/exact-copy-sft/data/eval.jsonl · 训练 1024 / 留出 256 / 边界 256</div>
+      <div class="c8e19-set"><b>设置</b>Qwen/Qwen3-8B · bf16 LoRA · 2 epochs；只对目标字符串或 old_string JSON 字段提供逐 token 监督</div>
+    </div>
+    <div class="c8e19-r fx fx-right" style="--d:3">
+      <div class="c8e19-g"><b>byte-exact accuracy</b>
+        <div class="c8e19-bb"><div><span>基座 · 留出集</span><i data-v="37.5"></i><em>37.5%</em></div><div><span>SFT · 留出集</span><i class="up" data-v="78.9"></i><em>78.9%</em></div><div><span>SFT · 边界集</span><i class="up" data-v="80.1"></i><em>80.1%</em></div></div>
+        <div class="c8e19-cap"><i></i><span>tokenizer round-trip 上限 80.1%</span></div>
+      </div>
+      <div class="c8e19-fs"><div><span>平均首次字节分歧位置</span><b>54.0 / 54.2</b><small>留出 / 边界</small></div></div>
+      <div class="c8e19-g"><b>tokenizer 审计（512 条探针，无损 round-trip）</b>
+        <div class="c8e19-bb t"><div><span>Qwen3</span><i class="w" data-v="80.1"></i><em>80.1%</em></div><div><span>Qwen2.5</span><i class="w" data-v="80.1"></i><em>80.1%</em></div><div><span>Mistral</span><i class="g" data-v="100"></i><em>100%</em></div></div>
+      </div>
+      <p class="c8e19-nt"><b>80.1% 同时反映了模型复制和 tokenizer 上限</b>：tokenizer 层也必须单独设回归门禁</p>
+      <div class="c8-data">数据：配套仓库 exact-copy-sft/README.md、validation/tokenizer_audit.json（Mistral 一项来自仓库，原书未列）</div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「案例 3：编辑文件经常失败」· 实验 8-19</div>
+</section>
+<style>
+.c8e19-body{display:grid;grid-template-columns:1fr 1fr;gap:24px;flex:1;min-height:0}
+.c8e19-l{display:flex;flex-direction:column;gap:12px}
+.c8e19-tabs button{font-size:16px}
+.c8e19-l{position:relative}
+.c8e19-s{display:none;padding:18px 22px;flex-direction:column;gap:8px;min-height:330px}
+.c8e19-s.on{display:flex;animation:c8hkIn .4s var(--ease) both}
+.c8e19-k{font-size:15px;color:var(--text3);letter-spacing:.06em}
+.c8e19-s pre{font:16px/1.6 var(--mono);white-space:pre-wrap;word-break:break-all;color:var(--text2);padding:10px 14px;border-radius:10px;background:rgba(5,9,22,.7)}
+.c8e19-s code{font:18px var(--mono);word-break:break-all;padding:10px 14px;border-radius:10px;background:rgba(244,114,182,.1);border:1px solid rgba(244,114,182,.4);color:#fbcfe8}
+.c8e19-s p{font-size:15px;color:var(--text3)}
+.c8e19-set{font-size:15px;line-height:1.55;color:var(--text2)}.c8e19-set b{color:var(--acc);margin-right:10px}
+.c8e19-r{display:flex;flex-direction:column;gap:12px}
+.c8e19-g{position:relative;padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.78)}
+.c8e19-g>b{font-size:16px}
+.c8e19-bb{position:relative;display:flex;flex-direction:column;gap:7px;margin-top:10px}
+.c8e19-bb div{display:grid;grid-template-columns:120px 1fr 70px;gap:12px;align-items:center;font-size:15px;color:var(--text2)}
+.c8e19-bb i{height:18px;border-radius:5px;width:0;background:rgba(148,163,184,.55);transition:width 1s var(--ease)}
+.c8e19-bb i.up{background:linear-gradient(90deg,#f472b6,#f9a8d4)}.c8e19-bb i.w{background:#fbbf24}.c8e19-bb i.g{background:#34d399}
+.c8e19-bb em{font:700 16px var(--num);font-style:normal;color:var(--text)}
+.c8e19-cap{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:15px;color:#fde68a}
+.c8e19-cap i{width:22px;height:0;border-top:3px dashed #fbbf24}
+.c8e19-fs div{display:flex;align-items:baseline;gap:14px;padding:10px 18px;border-radius:14px;background:rgba(255,255,255,.03)}
+.c8e19-fs span{font-size:15px;color:var(--text3)}.c8e19-fs b{font:800 30px var(--num);color:var(--acc)}.c8e19-fs small{font-size:15px;color:var(--text3)}
+.c8e19-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--warn)}.c8e19-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp819'] = {
+  init(s) { s.querySelectorAll('.c8e19-tabs button').forEach((b, i) => b.addEventListener('click', () => { this.auto = false; this.pick(s, i); })); },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c8e19-tabs button').forEach((b, j) => b.classList.toggle('on', j === i));
+    s.querySelectorAll('.c8e19-s').forEach((p, j) => p.classList.toggle('on', j === i));
+  },
+  enter(s, ctx) {
+    this.pick(s, 0);
+    s.querySelectorAll('.c8e19-bb i').forEach((b, k) => ctx.later(() => { b.style.width = b.dataset.v + '%'; }, 700 + k * 260));
+    C8.auto(this, ctx, 3, 5200, (i) => this.pick(s, i), 5200);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c8e19-bb i').forEach((b) => { b.style.width = '0'; }); },
+};
+</script>

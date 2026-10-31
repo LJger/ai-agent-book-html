@@ -1,0 +1,862 @@
+<!-- ================= PART 05 对等协作 ================= -->
+<section class="slide chapter" id="c10-d5" data-part="5" data-title="PART 05 · 对等协作" data-notes="「对等协作模式：相互制衡与迭代改进」：对等协作通常涉及 <b>2–3 个平等身份的 Agent</b>，通过多轮迭代互相提供反馈。它的潜在价值在于引入独立视角和认知多样性，但“多个实例”不等于“多种思路”。相比管理者和去中心化模式，对等协作的实现复杂度更低。<br>本部分依次讲：多个实例为什么不等于多种思路；Loop 工程——对等协作最经典的用途是解决“过早终止”，以及 LoopX、LongHorizon-Harness 两个具体框架；验证最有效的组织方式——提议者-审核者范式；最后是辩论、头脑风暴和专家小组三种模式。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:92px">对等协作：<br>相互制衡与迭代改进</h1>
+  <div class="ch-s fx fx-up" style="--d:3">2–3 个平等身份的 Agent，通过多轮迭代互相提供反馈</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">“多个实例”不等于“多种思路”。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c10-peer" data-part="5" data-trans="zoom" data-dur="13000" data-title="“多个实例”不等于“多种思路”" data-notes="对等协作通常涉及 2-3 个平等身份的 Agent，通过多轮迭代互相提供反馈。它的潜在价值在于引入<b>独立视角和认知多样性</b>，但“多个实例”不等于“多种思路”。当模型、上下文和脚手架高度相似时，不同 Agent 往往会做出相同选择，使<b>局部错误演变为系统性故障</b>。要获得真正的多样性，需要主动<b>区分模型、上下文、工具、可见证据或职责</b>，并让各 Agent <b>先独立判断、再汇总结果</b>（Anthropic, Patterns and Problems in Emerging Multiagent Systems, 2026）。<br>相比管理者和去中心化模式，对等协作的实现复杂度更低：只需定义好两个 Agent 的<b>角色、通信机制和迭代终止条件</b>，就可以跑起来。<br>左侧是示意动画：同质配置下三个 Agent 一起选错；差异化配置下各自先独立判断，再汇总。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“多个实例”<em>不等于</em>“多种思路”</h2></div>
+    <div class="seg pe-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="same">同质配置</button><button data-v="div">差异化配置</button></div></header>
+  <div class="pe-body">
+    <div class="pe-st panel fx fx-left" style="--d:3">
+      <div class="pe-opts"><span data-o="0">方案 A</span><span data-o="1">方案 B</span><span data-o="2">方案 C</span><span data-o="3">方案 D</span></div>
+      <svg class="pe-svg" viewBox="0 0 960 520" width="960" height="520"></svg>
+      <div class="pe-ags"></div>
+      <div class="pe-out"></div>
+      <span class="k10-sim pe-sim">示意 · 假设方案 C 才正确</span>
+    </div>
+    <div class="pe-side fx fx-right" style="--d:4">
+      <div class="pe-c"><b>真正的多样性从哪来</b><div class="pe-tags"><span>模型</span><span>上下文</span><span>工具</span><span>可见证据</span><span>职责</span></div><p>主动区分它们，并让各 Agent <b>先独立判断、再汇总结果</b></p></div>
+      <div class="pe-c"><b>实现复杂度更低</b><ul><li>两个 Agent 的角色</li><li>通信机制</li><li>迭代终止条件</li></ul><p>定义好这三样就可以跑起来</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「对等协作模式：相互制衡与迭代改进」</div>
+</section>
+<style>
+#c10-peer .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.pe-body{display:grid;grid-template-columns:960px 1fr;gap:30px}
+.pe-st{position:relative;height:620px;padding:0}
+.pe-opts{position:absolute;left:60px;right:60px;top:30px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px}
+.pe-opts span{padding:14px 0;text-align:center;border-radius:14px;font-size:21px;font-weight:700;border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .4s var(--ease)}
+.pe-opts span.pick{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.pe-opts span.bad{border-color:var(--bad);color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.pe-opts span.good{border-color:var(--ok);color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--ok) 40%,transparent)}
+.pe-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.pe-ln{fill:none;stroke:var(--c);stroke-width:2.6;stroke-dasharray:6 7;animation:flow 1s linear infinite;opacity:.85}
+.pe-ags{position:absolute;left:0;right:0;top:300px;display:grid;grid-template-columns:repeat(3,1fr)}
+.pe-ag{display:flex;flex-direction:column;align-items:center;gap:8px}
+.pe-cfg{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-width:250px}
+.pe-cfg i{font-style:normal;font-size:15px;padding:2px 9px;border-radius:8px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.pe-cfg i.d{color:var(--c);border-color:color-mix(in srgb,var(--c) 55%,transparent)}
+.pe-out{position:absolute;left:60px;right:60px;bottom:52px;text-align:center;font-size:21px;font-weight:700;min-height:32px}
+.pe-out.bad{color:var(--bad)}.pe-out.ok{color:var(--ok)}
+.pe-sim{position:absolute;left:20px;bottom:14px}
+.pe-side{display:flex;flex-direction:column;gap:18px}
+.pe-c{padding:20px 24px;border-radius:18px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.pe-c>b{font-size:22px;color:var(--acc)}
+.pe-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pe-tags span{padding:6px 14px;border-radius:10px;font-size:18px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.pe-c p{font-size:19px;line-height:1.6;margin-top:12px;color:var(--text2)}
+.pe-c p b{color:var(--text)}
+.pe-c ul{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.pe-c li{font-size:19px;padding-left:22px;position:relative}
+.pe-c li::before{content:"";position:absolute;left:2px;top:.55em;width:9px;height:9px;border-radius:3px;background:var(--acc)}
+</style>
+<script>
+HOOKS['c10-peer'] = {
+  A: [['#60a5fa', 'Agent 1'], ['#fbbf24', 'Agent 2'], ['#f472b6', 'Agent 3']],
+  CFG: { same: [['同一模型', '同一上下文', '同一脚手架'], ['同一模型', '同一上下文', '同一脚手架'], ['同一模型', '同一上下文', '同一脚手架']], div: [['模型 X', '只看日志', '检索工具'], ['模型 Y', '只看源码', '测试执行'], ['模型 Z', '只看用户反馈', '截图评审']] },
+  init(s) {
+    s.querySelector('.pe-ags').innerHTML = this.A.map(([c, n], i) => `<div class="pe-ag"><div class="k10-ag" style="--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-robot"/></svg></span><b>${n}</b></div><div class="pe-cfg" data-i="${i}"></div></div>`).join('');
+    this.set = U.seg(s.querySelector('.pe-seg'), (v) => { this.auto = false; this.run(s, v); });
+  },
+  run(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    this.set(m);
+    const opts = [...s.querySelectorAll('.pe-opts span')], out = s.querySelector('.pe-out'), svg = s.querySelector('.pe-svg');
+    opts.forEach((o) => o.classList.remove('pick', 'bad', 'good'));
+    out.className = 'pe-out'; out.textContent = '';
+    svg.innerHTML = '';
+    s.querySelectorAll('.pe-cfg').forEach((c, i) => { c.innerHTML = this.CFG[m][i].map((t) => `<i class="${m === 'div' ? 'd' : ''}" style="--c:${this.A[i][0]}">${t}</i>`).join(''); });
+    if (!ctx) return;
+    // 每个 Agent 的选择：同质配置都选 B（同一个局部错误）；差异化配置各自不同，汇总后取有证据支持的 C
+    const pick = m === 'same' ? [1, 1, 1] : [2, 0, 2];
+    const ax = [160, 480, 800], ox = (o) => 60 + 960 * 0 + o * ((960 - 120 - 72) / 4 + 24) + ((960 - 120 - 72) / 4) / 2;
+    pick.forEach((o, i) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      svg.insertAdjacentHTML('beforeend', `<path class="pe-ln" style="--c:${this.A[i][0]}" d="M${ax[i]} 300C${ax[i]} 200 ${ox(o)} 190 ${ox(o)} 86"/>`);
+      opts[o].classList.add('pick');
+    }, 500 + i * 600));
+    ctx.later(() => {
+      if (tk !== this.tk) return;
+      if (m === 'same') { opts[1].classList.add('bad'); out.classList.add('bad'); out.textContent = '三个实例做出相同选择：局部错误演变为系统性故障'; }
+      else { opts[2].classList.add('good'); out.classList.add('ok'); out.textContent = '先独立判断、再汇总：分歧暴露出来，汇总时以证据取 C'; }
+    }, 2600);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.run(s, 'same');
+    ctx.every(() => { if (this.auto) this.run(s, this.m === 'same' ? 'div' : 'same'); }, 5500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.pe-svg').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-early" data-part="5" data-trans="rise" data-dur="15000" data-title="过早终止：活干到一半就停" data-notes="「Loop 工程」：对等协作最经典的用途，是解决 Agent 实践中极其常见的一类失败：<b>过早终止</b>——活干到一半就停。它有三种典型形态，用 Coding Agent 和笔者团队打造的 Pine AI（替用户打电话与商家、运营商交涉办事的 Agent）各举几例。<br>一是<b>偷懒式假完成</b>：只做了一部分就宣称全部做完——Coding Agent 写完代码，测试没跑、部署没试，就报告“任务完成”；用户交给 Pine AI 两件事，它办完第一件就把第二件忘了，径直汇报“都办好了”。<br>二是<b>过早放弃</b>：一条路走不通就宣布整件事办不成——Pine AI 联系商家本有打电话、填表单、发邮件等多种途径，打了一个电话被拒绝，就直接告诉用户“这事办不了”，其实换个渠道再试很可能就成了。<br>三是<b>假成功</b>：Agent 以为办成了，实际闭环没走完——电话里对方口头同意退款，但用户还需要在手机 App 上确认一步，Agent 却报告“已办妥”，用户不知道还有后续动作，退款实际没有落地。<br>三种形态指向同一个根源：<b>在验证之前，“完成”只是模型的一句宣称，不是证明</b>。三张卡片依次播放，点击任一张可以重播。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">过早终止：<em>活干到一半就停</em></h2>
+  <p class="lead fx fx-up" style="--d:2">对等协作最经典的用途，是解决 Agent 实践中极其常见的这类失败</p></header>
+  <div class="et-row"></div>
+  <p class="tagline et-tag fx fx-up" style="--d:7">三种形态指向同一个根源：<b>在验证之前，“完成”只是模型的一句宣称，不是证明</b></p>
+  <div class="src">第十章 ·「Loop 工程」</div>
+</section>
+<style>
+.et-row{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.et-c{--c:var(--acc);position:relative;height:560px;padding:22px 24px;border-radius:20px;cursor:pointer;background:rgba(12,18,40,.78);border:1px solid var(--line);display:flex;flex-direction:column;gap:12px;transition:border-color .4s,box-shadow .4s}
+.et-c.on{border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 0 40px -12px var(--c)}
+.et-h{display:flex;align-items:center;gap:12px}
+.et-h em{font:800 28px var(--num);font-style:normal;color:var(--c)}
+.et-h b{font-size:25px}
+.et-ex{display:flex;flex-direction:column;gap:8px}
+.et-ex p{font-size:17px;line-height:1.55;color:var(--text2);padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.et-ex p span{display:inline-block;margin-right:8px;padding:0 8px;border-radius:6px;font-size:15px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.et-tl{display:flex;flex-direction:column;gap:7px;margin-top:4px}
+.et-tl li{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--text3);transition:color .35s}
+.et-tl li::before{content:"";flex:none;width:20px;height:20px;border-radius:6px;border:2px solid var(--line2);transition:all .35s}
+.et-tl li.ok{color:var(--text)}
+.et-tl li.ok::before{background:var(--ok);border-color:var(--ok)}
+.et-tl li.miss{color:var(--bad)}
+.et-tl li.miss::before{border-color:var(--bad);border-style:dashed}
+.et-st{position:absolute;right:20px;bottom:24px;padding:8px 18px;border-radius:12px;font-size:21px;font-weight:800;color:var(--bad);border:3px solid var(--bad);transform-origin:center}
+.et-real{position:absolute;left:24px;bottom:30px;font-size:16px;color:var(--warn);opacity:0;transition:opacity .4s}
+.et-c.done .et-real{opacity:1}
+</style>
+<script>
+HOOKS['c10-early'] = {
+  C: [
+    { c: '#fbbf24', n: '偷懒式假完成', d: '只做了一部分，就宣称全部做完', ex: [['Coding Agent', '写完代码，测试没跑、部署没试，就报告“任务完成”'], ['Pine AI', '两件事办完第一件就忘了第二件，径直汇报“都办好了”']], tl: [['写代码', 1], ['跑测试', 0], ['试部署', 0]], st: '任务完成', real: '实际：只完成了 1 / 3' },
+    { c: '#fb923c', n: '过早放弃', d: '一条路走不通，就宣布整件事办不成', ex: [['Pine AI', '打了一个电话被拒绝，就告诉用户“这事办不了”']], tl: [['打电话（被拒绝）', 2], ['填表单', 0], ['发邮件', 0]], st: '这事办不了', real: '实际：换个渠道再试很可能就成了' },
+    { c: '#fb7185', n: '假成功', d: 'Agent 以为办成了，实际闭环没走完', ex: [['Pine AI', '对方口头同意退款，用户还需在手机 App 上确认一步，Agent 却报告“已办妥”']], tl: [['电话里对方口头同意退款', 1], ['用户在 App 上确认', 0], ['退款到账', 0]], st: '已办妥', real: '实际：用户不知道还有后续，退款没有落地' },
+  ],
+  init(s) {
+    s.querySelector('.et-row').innerHTML = this.C.map((c, i) => `
+      <div class="fx fx-up" style="--d:${3 + i}"><div class="et-c" data-i="${i}" style="--c:${c.c}">
+        <div class="et-h"><em>0${i + 1}</em><b>${c.n}</b></div><p class="et-d" style="font-size:18px;color:var(--text)">${c.d}</p>
+        <div class="et-ex">${c.ex.map(([a, b]) => `<p><span>${a}</span>${b}</p>`).join('')}</div>
+        <ul class="et-tl">${c.tl.map(([t]) => `<li>${t}</li>`).join('')}</ul>
+        <span class="et-real">${c.real}</span><span class="et-st stamp">“${c.st}”</span>
+      </div></div>`).join('');
+    s.querySelector('.et-row').addEventListener('click', (e) => { const c = e.target.closest('.et-c'); if (c) { this.auto = false; this.play(s, +c.dataset.i); } });
+  },
+  play(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.i = i;
+    const card = s.querySelectorAll('.et-c')[i], C = this.C[i];
+    s.querySelectorAll('.et-c').forEach((c) => c.classList.toggle('on', c === card));
+    card.classList.remove('done');
+    card.querySelector('.et-st').classList.remove('on');
+    const li = card.querySelectorAll('.et-tl li');
+    li.forEach((l) => l.classList.remove('ok', 'miss'));
+    if (!ctx) return;
+    C.tl.forEach(([, v], j) => ctx.later(() => tk === this.tk && li[j].classList.add(v === 1 ? 'ok' : 'miss'), 400 + j * 500));
+    ctx.later(() => { if (tk !== this.tk) return; card.querySelector('.et-st').classList.add('on'); card.classList.add('done'); }, 400 + C.tl.length * 500 + 200);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.play(s, 0);
+    ctx.every(() => { if (this.auto) this.play(s, (this.i + 1) % 3); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.et-c').forEach((c) => { c.classList.remove('on', 'done'); c.querySelector('.et-st').classList.remove('on'); c.querySelectorAll('li').forEach((l) => l.classList.remove('ok', 'miss')); }); },
+};
+</script>
+
+<section class="slide" id="c10-loop" data-part="5" data-trans="flip" data-dur="15000" data-title="Loop 工程：让验证器决定能否停" data-notes="把宣称变成证明，正是 <b>Loop 工程</b>（Loop Engineering）的课题：设计一个让 Agent 持续运转的循环——<b>发现下一件该做的事、执行、验证、记录进度</b>——由验证器而不是模型自己来判定“是否真的可以停”，人的角色则从“给 Agent 写提示词的操作者”变成“设计循环的工程师”。这个名词在 2026 年 6 月由 Addy Osmani 总结提出，Claude Code 负责人 Boris Cherny 的说法更直白：“我已经不再直接 prompt Claude 了，我的工作是写 loop。”<br>业界在这场讨论中形成的核心共识是：<b>循环的瓶颈在验证器，而不在模型</b>。验证不可靠，循环转得再快，也只是把劣质产出更快地标记为完成。<br>也正如引言所说，实践在前、命名在后：在这个名词流行之前，包括 Pine AI 在内的头部 Agent 团队早已在用“循环加验证”解决过早终止问题。而验证最有效的组织方式，正是后面要讲的提议者-审核者范式。<br>中间的产出流是示意：切换“验证器可靠 / 不可靠”，看劣质产出是被退回修复，还是更快地被标记为完成。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Loop 工程：<em>由验证器</em>判定能否停</h2></div>
+    <div class="seg lp-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="good">验证器可靠</button><button data-v="bad">验证器不可靠</button></div></header>
+  <div class="lp-body">
+    <div class="lp-ring fx fx-scale" style="--d:3"></div>
+    <div class="lp-flow panel fx fx-up" style="--d:4">
+      <div class="lp-fh"><b>产出流</b><span class="k10-sim">示意</span></div>
+      <div class="lp-items"></div>
+      <div class="lp-cnt"><div><b class="lp-c1">0</b><span>标记完成</span></div><div><b class="lp-c2">0</b><span>其中劣质</span></div><div><b class="lp-c3">0</b><span>退回修复</span></div></div>
+    </div>
+    <div class="lp-side fx fx-right" style="--d:5">
+      <div class="lp-c"><b>人的角色</b><p>“给 Agent 写提示词的操作者” → <em>“设计循环的工程师”</em></p></div>
+      <div class="lp-c"><b>名词的来历</b><p>2026 年 6 月 Addy Osmani 总结提出；Claude Code 负责人 Boris Cherny：“我已经不再直接 prompt Claude 了，我的工作是写 loop。”</p></div>
+      <div class="lp-c hl"><b>核心共识</b><p>循环的瓶颈在<em>验证器</em>，而不在模型：验证不可靠，转得再快也只是把劣质产出更快地标记为完成</p></div>
+      <div class="lp-c"><b>实践在前、命名在后</b><p>Pine AI 等头部团队早已在用“循环加验证”解决过早终止</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Loop 工程」· 脚注：Osmani, Loop Engineering: Designing Loops that Prompt Coding Agents, 2026</div>
+</section>
+<style>
+#c10-loop .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.lp-body{display:grid;grid-template-columns:540px 540px 1fr;gap:26px}
+.lp-ring{width:500px;height:500px;margin:40px 0 0 30px}
+.lp-ring .lpc1{fill:var(--text);font-size:34px;font-weight:800;text-anchor:middle}
+.lp-ring .lpc2{fill:var(--text3);font-size:17px;letter-spacing:.14em;text-anchor:middle}
+.lp-flow{padding:18px 20px;height:610px;display:flex;flex-direction:column;gap:12px}
+.lp-fh{display:flex;justify-content:space-between;align-items:center;font-size:20px}
+.lp-items{flex:1;display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.lp-it{display:flex;align-items:center;gap:12px;padding:9px 14px;border-radius:12px;font-size:18px;border:1px solid var(--line);background:rgba(255,255,255,.03);animation:upIn .4s var(--spring) both}
+.lp-it em{font-style:normal;font:700 16px var(--mono);color:var(--text3)}
+.lp-it span{margin-left:auto;padding:2px 10px;border-radius:8px;font-size:15px;border:1px solid var(--line2);color:var(--text2)}
+.lp-it.done span{color:var(--ok);border-color:var(--ok)}
+.lp-it.back span{color:var(--warn);border-color:var(--warn)}
+.lp-it.junk{border-color:color-mix(in srgb,var(--bad) 60%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+.lp-it.junk span{color:var(--bad);border-color:var(--bad)}
+.lp-cnt{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.lp-cnt div{padding:10px;border-radius:12px;text-align:center;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.lp-cnt b{display:block;font:800 30px var(--num);color:var(--acc)}
+.lp-cnt div:nth-child(2) b{color:var(--bad)}.lp-cnt div:nth-child(3) b{color:var(--warn)}
+.lp-cnt span{font-size:15px;color:var(--text3)}
+.lp-side{display:flex;flex-direction:column;gap:14px}
+.lp-c{padding:14px 18px;border-radius:16px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.lp-c b{font-size:19px;color:var(--acc)}
+.lp-c p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+.lp-c em{font-style:normal;color:var(--text);font-weight:700}
+.lp-c.hl{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.8))}
+</style>
+<script>
+HOOKS['c10-loop'] = {
+  Q: [1, 0, 1, 1, 0, 0, 1, 0, 1, 1],
+  init(s) {
+    this.svg = U.ring(s.querySelector('.lp-ring'), {
+      size: 500, labelSize: 20, cometDur: 7,
+      nodes: [{ label: '发现下一件事', color: '#fbbf24' }, { label: '执行', color: '#60a5fa' }, { label: '验证', color: '#34d399' }, { label: '记录进度', color: '#a78bfa' }],
+      center: (c) => `<text class="lpc1" x="${c}" y="${c - 4}">Loop</text><text class="lpc2" x="${c}" y="${c + 28}">验证器判定能否停</text>`,
+    });
+    this.set = U.seg(s.querySelector('.lp-seg'), (v) => { this.auto = false; this.start(s, v); });
+  },
+  node(n) { this.svg.querySelectorAll('.node,.lab').forEach((x) => { const on = +x.dataset.i === n; x.classList.toggle('on', on); x.classList.toggle('dim', n >= 0 && !on); }); },
+  async start(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    this.set(m);
+    const box = s.querySelector('.lp-items'), C = [0, 0, 0];
+    box.innerHTML = '';
+    const cnt = () => ['.lp-c1', '.lp-c2', '.lp-c3'].forEach((q, j) => (s.querySelector(q).textContent = C[j]));
+    cnt();
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    for (let k = 0; k < 40 && ok(); k++) {
+      const good = this.Q[k % this.Q.length] === 1;
+      this.node(0); await U.wait(ctx, 500); if (!ok()) return;
+      this.node(1);
+      box.insertAdjacentHTML('afterbegin', `<div class="lp-it"><em>#${k + 1}</em>候选成果<span>待验证</span></div>`);
+      while (box.children.length > 9) box.lastElementChild.remove();
+      const it = box.firstElementChild, tag = it.querySelector('span');
+      await U.wait(ctx, 600); if (!ok()) return;
+      this.node(2); await U.wait(ctx, 600); if (!ok()) return;
+      if (good || m === 'bad') {
+        this.node(3);
+        it.classList.add('done'); tag.textContent = '标记完成'; C[0]++;
+        if (!good) { it.classList.add('junk'); tag.textContent = '标记完成 · 实为劣质'; C[1]++; }
+      } else { it.classList.add('back'); tag.textContent = '退回修复'; C[2]++; }
+      cnt();
+      await U.wait(ctx, 500);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.start(s, 'good');
+    ctx.every(() => { if (this.auto) this.start(s, this.m === 'good' ? 'bad' : 'good'); }, 11000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.lp-items').innerHTML = ''; this.node(-1); },
+};
+</script>
+
+<section class="slide" id="c10-loopx" data-part="5" data-trans="slide" data-dur="15000" data-title="具体框架：LoopX" data-notes="<b>具体框架：LoopX。</b>LoopX 把循环从模型的提示词和聊天历史中抽离出来，放进一个与 Agent 运行时无关的<b>持久控制面</b>：目标与边界说明“为什么做”，门禁和待办决定“现在能做什么”，证据与配额决定“是否继续”，移交则让下一轮或另一个 Agent 接着工作：LoopX 决策 → Agent 执行 → 独立验证器证明 → LoopX 提交。<br>其中，Agent 仍负责推理、调用工具和生成候选成果；LoopX 不替代 Agent 运行时，而是管理跨轮次的连续性。<b>只有通过独立验证的结果才能写入持久进度并消耗配额</b>；验证失败会进入修复或重规划，人工门禁、等待状态和预算上限则在执行前阻止循环继续。这个边界把 Loop 工程的原则变成了可检查的系统不变量：<b>模型可以提出 “完成”，但不能批准自己的 “完成”。</b><br>LoopX v0.4.0 的受控 Turn 路径仍标为实验性，因此这里把它作为“循环 + 验证 + 终止条件”的具体框架，而不是一般任务质量提升的证据。<br>点击“人工门禁 / 等待状态 / 预算上限”可以在执行前拦住循环；流水线上的任务卡与成败为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">具体框架：<em>LoopX</em>——把循环放进持久控制面</h2></header>
+  <div class="code lx-code fx fx-up" style="--d:2"><span class="t-p">LoopX 决策</span> → <span class="t-n">Agent 执行</span> → <span class="t-g">独立验证器证明</span> → <span class="t-p">LoopX 提交</span></div>
+  <div class="lx-st panel fx fx-up" style="--d:3">
+    <div class="lx-gates"><span class="lx-gl">执行前的拦截：</span><button class="tgl lx-g" data-g="0" style="--tc:var(--warn)"><i></i>人工门禁</button><button class="tgl lx-g" data-g="1" style="--tc:var(--warn)"><i></i>等待状态</button><button class="tgl lx-g" data-g="2" style="--tc:var(--warn)"><i></i>预算上限</button><span class="k10-sim">示意</span></div>
+    <div class="lx-sts">
+      <div class="lx-s" data-s="0" style="--c:#818cf8"><b>LoopX 决策</b><small>选出现在能做的下一件事</small></div>
+      <div class="lx-s" data-s="1" style="--c:#fbbf24"><b>Agent 执行</b><small>推理 · 调用工具 · 候选成果</small></div>
+      <div class="lx-s" data-s="2" style="--c:#34d399"><b>独立验证器证明</b><small>证据决定是否通过</small></div>
+      <div class="lx-s" data-s="3" style="--c:#818cf8"><b>LoopX 提交</b><small>写入持久进度 · 消耗配额</small></div>
+    </div>
+    <div class="lx-fix">验证失败 → 修复或重规划 ↩</div>
+    <div class="lx-tok"></div>
+    <div class="lx-block">执行前阻止：循环暂停</div>
+    <div class="lx-ms"><div><span>持久进度</span><b class="lx-pr">0</b></div><div><span>已消耗配额</span><b class="lx-qt">0</b></div><div><span>修复 / 重规划</span><b class="lx-fx">0</b></div></div>
+  </div>
+  <div class="lx-four fx fx-up" style="--d:5"><div><b>目标与边界</b><span>为什么做</span></div><div><b>门禁和待办</b><span>现在能做什么</span></div><div><b>证据与配额</b><span>是否继续</span></div><div><b>移交</b><span>下一轮或另一个 Agent 接着做</span></div></div>
+  <p class="tagline lx-tag fx fx-up" style="--d:6"><b>模型可以提出“完成”，但不能批准自己的“完成”</b><small>LoopX v0.4.0 的受控 Turn 路径仍标为实验性：这是具体框架，不是一般任务质量提升的证据</small></p>
+  <div class="src">第十章 ·「Loop 工程」· 脚注：LoopX v0.4.0，稳定提交 a893d221</div>
+</section>
+<style>
+.lx-code{margin-top:-10px;padding:12px 24px;border-radius:14px;background:rgba(5,9,22,.85);border:1px solid var(--line);font-size:22px;white-space:normal}
+.lx-st{position:relative;margin-top:16px;height:330px;padding:16px 22px}
+.lx-gates{display:flex;align-items:center;gap:12px}
+.lx-gl{font-size:18px;color:var(--text3)}
+.lx-gates .k10-sim{margin-left:auto}
+.lx-sts{position:absolute;left:22px;right:22px;top:86px;display:grid;grid-template-columns:repeat(4,1fr);gap:60px}
+.lx-s{--c:var(--acc);position:relative;height:100px;padding:14px 16px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 8%,rgba(12,18,40,.9));transition:box-shadow .35s,background .35s}
+.lx-s b{display:block;font-size:21px;color:var(--c)}
+.lx-s small{display:block;font-size:16px;color:var(--text2);margin-top:6px}
+.lx-s:not(:last-child)::after{content:"→";position:absolute;right:-44px;top:30px;font-size:26px;color:var(--text3)}
+.lx-s.on{box-shadow:0 0 30px color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 20%,rgba(12,18,40,.9))}
+.lx-fix{position:absolute;left:calc(22px + 25% + 15px);width:calc(50% - 30px);top:200px;padding:6px 0;text-align:center;font-size:17px;color:var(--warn);border:2px dashed color-mix(in srgb,var(--warn) 50%,transparent);border-top:0;border-radius:0 0 18px 18px;opacity:.5;transition:opacity .35s}
+.lx-fix.on{opacity:1}
+.lx-tok{position:absolute;top:64px;left:40px;padding:4px 12px;border-radius:10px;font:600 15px var(--mono);color:#06101f;background:#e9edf8;box-shadow:0 0 16px rgba(255,255,255,.5);opacity:0;transition:left .7s var(--ease),opacity .3s,background .3s}
+.lx-tok.bad{background:var(--bad)}.lx-tok.ok{background:var(--ok)}
+.lx-block{position:absolute;left:calc(22px + 25% - 70px);top:238px;padding:6px 16px;border-radius:10px;font-size:17px;font-weight:700;color:var(--bad);border:2px solid var(--bad);background:rgba(251,113,133,.1);opacity:0;transition:opacity .35s}
+.lx-block.on{opacity:1}
+.lx-ms{position:absolute;right:22px;bottom:16px;display:flex;gap:12px}
+.lx-ms div{display:flex;align-items:baseline;gap:8px;padding:6px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.lx-ms span{font-size:16px;color:var(--text3)}
+.lx-ms b{font:800 24px var(--num);color:var(--acc)}
+.lx-four{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:18px}
+.lx-four div{padding:12px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.lx-four b{display:block;font-size:20px;color:var(--acc)}
+.lx-four span{font-size:17px;color:var(--text2)}
+.lx-tag{margin-top:18px;font-size:23px;display:flex;align-items:baseline;gap:20px}
+.lx-tag small{font-size:16px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c10-loopx'] = {
+  V: [1, 0, 1, 1, 0, 1],
+  init(s) {
+    this.g = [false, false, false];
+    s.querySelectorAll('.lx-g').forEach((b) => b.addEventListener('click', () => { this.auto = false; const i = +b.dataset.g; this.g[i] = !this.g[i]; b.classList.toggle('on', this.g[i]); }));
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const tok = s.querySelector('.lx-tok'), st = [...s.querySelectorAll('.lx-s')], fix = s.querySelector('.lx-fix'), blk = s.querySelector('.lx-block');
+    const M = { pr: 0, qt: 0, fx: 0 }, upd = () => { s.querySelector('.lx-pr').textContent = M.pr; s.querySelector('.lx-qt').textContent = M.qt; s.querySelector('.lx-fx').textContent = M.fx; };
+    upd();
+    const sw = st[0].offsetWidth + 60, at = (i) => { tok.style.left = 22 + i * sw + 18 + 'px'; st.forEach((x, j) => x.classList.toggle('on', j === i)); };
+    for (let k = 0; ok(); k++) {
+      tok.className = 'lx-tok'; tok.textContent = '任务 #' + (k + 1); tok.style.opacity = 1;
+      at(0); await U.wait(ctx, 900); if (!ok()) return;
+      if (this.g.some(Boolean)) { blk.classList.add('on'); await U.wait(ctx, 1400); blk.classList.remove('on'); tok.style.opacity = 0; await U.wait(ctx, 500); continue; }
+      at(1); await U.wait(ctx, 1000); if (!ok()) return;
+      at(2); await U.wait(ctx, 900); if (!ok()) return;
+      if (this.V[k % this.V.length]) {
+        tok.classList.add('ok'); at(3); await U.wait(ctx, 700);
+        M.pr++; M.qt++; upd();
+      } else {
+        tok.classList.add('bad'); fix.classList.add('on'); M.fx++; upd();
+        await U.wait(ctx, 900); fix.classList.remove('on');
+      }
+      if (!ok()) return;
+      await U.wait(ctx, 500); tok.style.opacity = 0; st.forEach((x) => x.classList.remove('on')); await U.wait(ctx, 400);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.run(s);
+    // 自动演示：跑几轮后打开一次“人工门禁”，再关上
+    ctx.every(() => {
+      if (!this.auto) return;
+      const b = s.querySelector('.lx-g[data-g="0"]');
+      this.g[0] = !this.g[0];
+      b.classList.toggle('on', this.g[0]);
+    }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.g = [false, false, false]; s.querySelectorAll('.lx-g,.lx-s,.lx-fix,.lx-block').forEach((x) => x.classList.remove('on')); s.querySelector('.lx-tok').style.opacity = 0; },
+};
+</script>
+
+<section class="slide" id="c10-lhh" data-part="5" data-trans="zoom" data-dur="17000" data-title="具体框架：LongHorizon-Harness" data-notes="<b>具体框架：LongHorizon-Harness。</b>它与 LoopX 都是 Loop 工程的具体实现，但关注方向不同：LoopX 面向长期 Agent 工作的持久控制面；LongHorizon-Harness 则从多模态 Computer Use 出发，处理同一任务跨越 GUI、CLI、多个桌面应用和多次上下文刷新的连续执行问题。它将长程执行重新表述为<b>任务状态管理</b>，把循环实现为 Manage–Execute–Audit（MEA）：Manager 根据原始目标、已核实进展、失败证据和剩余工作生成下一项有界子任务；Executor 在全新上下文中通过 GUI 或 CLI 改变环境；Auditor 再以只读方式检查真实结果。只有审计通过的内容才能进入下一轮任务状态，失败则被保留为恢复和重规划的依据。它通过适配层复用 Claude Code、Codex CLI 等执行后端，而不改写后端内部的 Agent loop。<br>价值在于把任务连续性从不断增长的执行历史中分离出来：上下文可以刷新，界面操作也可能失败，但下一轮仍能从最近一次核实的状态继续。论文在保持 Qwen 3.7-Plus 模型与 Claude Code 执行后端相同、只改变外层 loop 的对照中，报告 WeaveBench PassRate 从 51.8% 提升到 80.7%，OSWorld 2.0 二元完成率从 2.8% 提升到 8.3%，Terminal-Bench 2.1 成功率从 69.7% 提升到 77.2%。代价也不是固定的：前两个基准分别消耗了基线 2.3 倍的总 token 和 3.6 倍的输出 token，Terminal-Bench 2.1 则减少了 24%。实际部署还需要处理外部环境或用户要求变化造成的旧状态失效，并用轮数、时间和费用预算防止恢复循环无限运行。<br><b>公开轨迹与实验复现。</b>项目网站提供了数百条运行轨迹。以 WeaveBench 的 WEB_task_16_webrtc_simulcast_layer_audit 为例：同一 Qwen 3.7-Plus 模型的基线轨迹在 Wireshark 交互卡住后反复尝试，得分 0.59；MEA 轨迹把失败和未满足的证据项写回任务状态，后续轮次只处理缺口，得分 0.92。这个案例用于展示“失败如何变成下一轮输入”，不能代替总体统计。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">具体框架：<em>LongHorizon-Harness</em>（MEA）</h2>
+  <p class="lead fx fx-up" style="--d:2">把长程执行重新表述为任务状态管理：上下文可以刷新，进度从最近一次核实的状态继续</p></header>
+  <div class="lh-body">
+    <div class="lh-l fx fx-left" style="--d:3">
+      <svg class="lh-svg" viewBox="0 0 760 470" width="760" height="470">
+        <path id="lh-cyc" class="lh-p" d="M200 90H560Q640 90 640 170V300Q640 380 560 380H200Q120 380 120 300V170Q120 90 200 90Z"/>
+        <circle class="lh-k" r="10"/>
+      </svg>
+      <div class="lh-n" data-n="0" style="left:40px;top:28px;--c:#818cf8"><b>Manager</b><small>依据原始目标、已核实进展、失败证据、剩余工作 → 生成下一项有界子任务</small></div>
+      <div class="lh-n" data-n="1" style="left:430px;top:28px;--c:#fbbf24"><b>Executor</b><small>全新上下文中，经 GUI 或 CLI 改变环境（复用 Claude Code、Codex CLI 等后端）</small></div>
+      <div class="lh-n" data-n="2" style="left:430px;top:318px;--c:#34d399"><b>Auditor</b><small>只读检查真实结果，只有审计通过的内容进入下一轮</small></div>
+      <div class="lh-n" data-n="3" style="left:40px;top:318px;--c:#22d3ee"><b>任务状态</b><small>已核实进展 + 失败证据（恢复与重规划的依据）</small></div>
+      <div class="lh-mid"><b>MEA</b><span>Manage–Execute–Audit</span></div>
+    </div>
+    <div class="lh-r fx fx-right" style="--d:4">
+      <div class="lh-hd"><span>同一模型（Qwen 3.7-Plus）与执行后端（Claude Code），只改变外层 loop</span></div>
+      <div class="lh-rows"></div>
+      <div class="lh-tr"><b>公开轨迹</b><span>WEB_task_16_webrtc_simulcast_layer_audit</span>
+        <div class="lh-two"><div><em>基线</em>Wireshark 交互卡住后反复尝试<strong class="bad">0.59</strong></div><div><em>MEA</em>失败与缺口写回任务状态，只补缺口<strong>0.92</strong></div></div>
+        <small>用于展示“失败如何变成下一轮输入”，不能代替总体统计</small></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「Loop 工程」· 脚注：LongHorizon-Harness，arXiv:2608.01964，稳定提交 53bc678e</div>
+</section>
+<style>
+.lh-body{display:grid;grid-template-columns:780px 1fr;gap:30px}
+.lh-l{position:relative;height:620px}
+.lh-svg{position:absolute;left:0;top:40px;overflow:visible}
+.lh-p{fill:none;stroke:rgba(255,255,255,.18);stroke-width:2.5;stroke-dasharray:7 8;animation:flow 1.2s linear infinite}
+.lh-k{fill:#fff;filter:drop-shadow(0 0 10px #fff);opacity:0}
+.lh-n{--c:var(--acc);position:absolute;width:310px;padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:rgba(12,18,40,.92);transition:box-shadow .35s,background .35s}
+.lh-n b{font-size:22px;color:var(--c)}
+.lh-n small{display:block;font-size:16px;line-height:1.5;color:var(--text2);margin-top:6px}
+.lh-n.on{background:color-mix(in srgb,var(--c) 16%,rgba(12,18,40,.92));box-shadow:0 0 34px color-mix(in srgb,var(--c) 45%,transparent)}
+.lh-mid{position:absolute;left:250px;top:250px;width:260px;text-align:center}
+.lh-mid b{display:block;font:800 52px var(--num);color:var(--acc)}
+.lh-mid span{font:16px var(--num);color:var(--text3);letter-spacing:.06em}
+.lh-r{display:flex;flex-direction:column;gap:14px}
+.lh-hd{font-size:17px;color:var(--text3)}
+.lh-rows{display:flex;flex-direction:column;gap:12px}
+.lh-row{padding:12px 16px;border-radius:14px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.lh-rh{display:flex;align-items:baseline;gap:10px}
+.lh-rh b{font-size:19px}
+.lh-rh small{font-size:15px;color:var(--text3)}
+.lh-rh em{margin-left:auto;font-style:normal;font-size:15px;padding:2px 10px;border-radius:8px;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 50%,transparent)}
+.lh-rh em.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.lh-bar{display:grid;grid-template-columns:70px 1fr 70px;gap:10px;align-items:center;margin-top:7px;font-size:15px;color:var(--text3)}
+.lh-bar .meter{height:12px}
+.lh-bar b{font:700 18px var(--num);color:var(--text2);text-align:right}
+.lh-bar.m b{color:var(--acc)}
+.lh-bar.b .meter i{--c:#94a3b8}
+.lh-tr{padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,rgba(12,18,40,.8))}
+.lh-tr>b{font-size:19px;color:var(--acc)}
+.lh-tr>span{font:15px var(--mono);color:var(--text3);margin-left:10px}
+.lh-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.lh-two div{position:relative;padding:10px 70px 10px 12px;border-radius:12px;font-size:16px;line-height:1.5;color:var(--text2);background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.lh-two em{display:block;font-style:normal;font-weight:700;color:var(--text)}
+.lh-two strong{position:absolute;right:12px;top:50%;margin-top:-18px;font:800 28px var(--num);color:var(--ok)}
+.lh-two strong.bad{color:var(--warn)}
+.lh-tr>small{display:block;margin-top:8px;font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c10-lhh'] = {
+  R: [['WeaveBench', 'PassRate', 51.8, 80.7, '2.3 倍总 token', 0], ['OSWorld 2.0', '二元完成率', 2.8, 8.3, '3.6 倍输出 token', 0], ['Terminal-Bench 2.1', '成功率', 69.7, 77.2, 'token 减少 24%', 1]],
+  init(s) {
+    s.querySelector('.lh-rows').innerHTML = this.R.map(([n, m, a, b, c, g]) => `<div class="lh-row"><div class="lh-rh"><b>${n}</b><small>${m}</small><em class="${g ? 'ok' : ''}">${c}</em></div>
+      <div class="lh-bar b"><span>基线</span><div class="meter"><i></i></div><b data-v="${a}">0%</b></div>
+      <div class="lh-bar m"><span>MEA</span><div class="meter"><i></i></div><b data-v="${b}">0%</b></div></div>`).join('');
+  },
+  enter(s, ctx) {
+    s.querySelectorAll('.lh-bar').forEach((x, i) => ctx.later(() => {
+      const v = +x.querySelector('b').dataset.v;
+      x.querySelector('.meter i').style.setProperty('--v', v + '%');
+      U.count(x.querySelector('b'), v, { dec: 1, suffix: '%', dur: 1200, ctx });
+    }, 700 + i * 260));
+    const tk = (this.tk = (this.tk || 0) + 1), k = s.querySelector('.lh-k'), p = s.querySelector('#lh-cyc'), N = [...s.querySelectorAll('.lh-n')];
+    const loop = async () => {
+      while (ctx.alive && tk === this.tk) await U.fly(k, p, 4800, { ctx, linear: true, keep: true });
+    };
+    // 数据包绕一圈 4.8 秒，每 1.2 秒点亮下一个角色
+    let j = 0;
+    const hi = () => { N.forEach((n, i) => n.classList.toggle('on', i === j % 4)); j++; };
+    hi();
+    ctx.every(hi, 1200);
+    loop();
+  },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.lh-bar .meter i').forEach((i) => i.style.setProperty('--v', '0%'));
+    s.querySelectorAll('.lh-bar b').forEach((b) => (b.textContent = '0%'));
+    s.querySelectorAll('.lh-n').forEach((n) => n.classList.remove('on'));
+  },
+};
+</script>
+
+<section class="slide" id="c10-pr" data-part="5" data-trans="iris" data-dur="16000" data-title="提议者-审核者范式" data-notes="「提议者-审核者范式」是最经典的对等协作范式。第五章已经在 PPT 生成、视频编辑和日志可视化三个实验中详细介绍了这一范式的设计原则和实战应用：<b>Proposer Agent 负责生成代码，Reviewer Agent 渲染执行结果并用 Vision LLM 评估质量、给出结构化改进建议，两者反复迭代直到效果达标</b>。<br>图10-3 以 PPT 生成为例：Proposer 读入论文扩展摘要（2000 字），理解内容结构、分解为幻灯片页面，输出 Slidev 代码；Reviewer 先把 Slidev 渲染成 PDF/PNG，再用 Vision LLM 做多维度评估，输出按页码、问题类型、严重度组织的结构化反馈（如 P3 内容过密、P7 字体过小、P11 配色不协调），即“渲染 + 视觉分析 → 可执行改进建议”。图中的迭代：第 1 轮 12 页初稿、5 个问题；第 2 轮拆分密集页后 14 页、2 个问题；第 3 轮修正字体后 0 个问题。<br>为何不用单 Agent？单 Agent 要把每轮的渲染图都放进上下文：1080p 截图每张数千 token × 14 页 × 5 轮，上下文爆炸；双 Agent 时 Reviewer 只看当前版本，Proposer 只累积文本反馈，上下文保持干净。<br>这一范式同样适用于<b>安全审查</b>（提议者生成操作方案，审核者检查合规性和潜在风险）、<b>内容审核</b>（提议者起草回复，审核者检查业务规则和用语规范）、<b>代码审核</b>（提议者编写代码，审核者检查安全性和最佳实践）等场景。图中的页数、问题数为原书图示。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">提议者-审核者：<em>渲染出来再看</em>，反复迭代到达标</h2></header>
+  <div class="pr-body">
+    <div class="pr-card fx fx-left" style="--d:2" data-k="p"><b><svg class="ic"><use href="#i-edit"/></svg>Proposer Agent</b><small>输入：论文扩展摘要（2000 字）</small>
+      <div class="code pr-code"><span class="ln t-c">---</span><span class="ln">theme: academic</span><span class="ln t-c">---</span><span class="ln t-h"># Transformer 注意力机制</span><span class="ln t-p">## 核心思想</span><span class="ln">- 自注意力计算 Q·Kᵀ/√d</span><span class="ln">- 多头注意力并行处理</span></div>
+      <p>理解内容结构 → 分解为幻灯片页面</p></div>
+    <div class="pr-mid fx fx-up" style="--d:3">
+      <div class="pr-arr r">Slidev 代码 →</div>
+      <div class="pr-deck"></div>
+      <div class="pr-arr l">← 结构化反馈</div>
+      <div class="pr-rd"><span class="pr-rn">Round 1</span><b class="pr-pg">12</b> 页 · <b class="pr-is">5</b> 个问题<em class="pr-ok">✓</em></div>
+    </div>
+    <div class="pr-card rv fx fx-right" style="--d:4" data-k="r"><b><svg class="ic"><use href="#i-eye"/></svg>Reviewer Agent</b>
+      <ol class="pr-steps"><li>① Slidev 渲染 → PDF / PNG</li><li>② Vision LLM 多维度评估</li></ol>
+      <div class="pr-tb"><div class="pr-th"><span>页码</span><span>问题类型</span><span>严重度</span></div><div><span>P3</span><span>内容过密</span><span class="h">高</span></div><div><span>P7</span><span>字体过小</span><span class="m">中</span></div><div><span>P11</span><span>配色不协调</span><span class="l">低</span></div></div>
+      <p>渲染 + 视觉分析 → 可执行改进建议</p></div>
+  </div>
+  <div class="pr-bot">
+    <div class="pr-why fx fx-up" style="--d:6"><b>为何不用单 Agent？</b><p><span class="c-bad">单 Agent：</span>渲染图 × N 轮进上下文 → 爆炸（1080p 截图 = 数千 token × 14 页 × 5 轮）</p><p><span class="c-ok">双 Agent：</span>Reviewer 只看当前版本，Proposer 只累积文本反馈 → 上下文干净</p></div>
+    <div class="pr-use fx fx-up" style="--d:7"><span><b>安全审查</b>操作方案 ↔ 合规与风险</span><span><b>内容审核</b>起草回复 ↔ 业务规则与用语规范</span><span><b>代码审核</b>编写代码 ↔ 安全性与最佳实践</span></div>
+  </div>
+  <div class="src">第十章 ·「提议者-审核者范式」· 图10-3（页数与问题数为原书图示）</div>
+</section>
+<style>
+.pr-body{display:grid;grid-template-columns:470px 1fr 470px;gap:24px;align-items:stretch}
+.pr-card{padding:18px 20px;border-radius:18px;background:rgba(12,18,40,.8);border:1px solid color-mix(in srgb,var(--tool) 40%,transparent);display:flex;flex-direction:column;gap:10px;transition:box-shadow .4s}
+.pr-card.rv{border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.pr-card>b{display:flex;align-items:center;gap:10px;font-size:23px;color:var(--tool)}
+.pr-card.rv>b{color:var(--ok)}
+.pr-card small{font-size:16px;color:var(--text3)}
+.pr-card p{font-size:17px;color:var(--text2)}
+.pr-card.on{box-shadow:0 0 36px -8px var(--tool)}
+.pr-card.rv.on{box-shadow:0 0 36px -8px var(--ok)}
+.pr-code{font-size:16px;line-height:1.6;padding:10px 14px;border-radius:12px;background:rgba(5,9,22,.85);border:1px solid var(--line);white-space:pre}
+.pr-steps{display:flex;flex-direction:column;gap:6px}
+.pr-steps li{font-size:18px;padding:6px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.pr-tb{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;border:1px solid var(--line)}
+.pr-tb div{display:grid;grid-template-columns:70px 1fr 70px;padding:6px 12px;font-size:17px}
+.pr-tb div+div{border-top:1px solid var(--line)}
+.pr-th{color:var(--text3);font-size:15px!important;background:rgba(255,255,255,.04)}
+.pr-tb .h{color:var(--bad)}.pr-tb .m{color:var(--warn)}.pr-tb .l{color:var(--tool)}
+.pr-mid{position:relative;display:flex;flex-direction:column;align-items:center;gap:12px;padding-top:6px}
+.pr-arr{font-size:17px;padding:4px 14px;border-radius:999px;border:1px dashed var(--line2);color:var(--text2);transition:all .35s}
+.pr-arr.on{color:#06101f;background:var(--acc);border-color:var(--acc)}
+.pr-deck{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;width:100%}
+.pr-sl{position:relative;height:58px;border-radius:8px;border:1px solid var(--line2);background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));display:flex;align-items:flex-end;padding:4px 6px;font:15px var(--num);color:var(--text3);animation:upIn .35s var(--spring) both}
+.pr-sl::before{content:"";position:absolute;left:8px;right:8px;top:9px;height:5px;border-radius:3px;background:rgba(255,255,255,.18)}
+.pr-sl.bad{border-color:var(--bad);box-shadow:0 0 12px color-mix(in srgb,var(--bad) 45%,transparent)}
+.pr-sl.bad::after{content:"!";position:absolute;right:6px;top:4px;font:800 16px var(--num);color:var(--bad)}
+.pr-rd{font-size:20px;color:var(--text2);margin-top:4px}
+.pr-rd b{font:800 28px var(--num);color:var(--acc)}
+.pr-rn{font:700 18px var(--num);color:var(--text3);margin-right:8px}
+.pr-ok{font-style:normal;color:var(--ok);font-weight:800;margin-left:8px;opacity:0}
+.pr-rd.fin .pr-ok{opacity:1}
+.pr-bot{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:20px}
+.pr-why{padding:14px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.pr-why b{font-size:19px;color:var(--acc)}
+.pr-why p{font-size:17px;line-height:1.55;margin-top:4px;color:var(--text2)}
+.pr-use{display:flex;flex-direction:column;gap:8px}
+.pr-use span{display:flex;gap:12px;align-items:baseline;padding:8px 16px;border-radius:12px;font-size:17px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.pr-use b{color:var(--text);white-space:nowrap}
+</style>
+<script>
+HOOKS['c10-pr'] = {
+  // [页数, 问题页（编号）]
+  R: [[12, [3, 7, 11, 5, 9]], [14, [8, 12]], [14, []]],
+  deck(s, r) {
+    const [n, bad] = this.R[r], d = s.querySelector('.pr-deck');
+    d.innerHTML = Array.from({ length: n }, (_, i) => `<div class="pr-sl${bad.includes(i + 1) ? ' bad' : ''}" style="animation-delay:${i * 30}ms">P${i + 1}</div>`).join('');
+    s.querySelector('.pr-rn').textContent = 'Round ' + (r + 1);
+    s.querySelector('.pr-pg').textContent = n;
+    s.querySelector('.pr-is').textContent = bad.length;
+    s.querySelector('.pr-rd').classList.toggle('fin', !bad.length);
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const P = s.querySelector('.pr-card[data-k=p]'), Rv = s.querySelector('.pr-card[data-k=r]'), ar = s.querySelector('.pr-arr.r'), al = s.querySelector('.pr-arr.l');
+    while (ok()) {
+      for (let r = 0; r < 3 && ok(); r++) {
+        P.classList.add('on'); ar.classList.add('on'); this.deck(s, r);
+        await U.wait(ctx, 1300); if (!ok()) return;
+        P.classList.remove('on'); ar.classList.remove('on'); Rv.classList.add('on');
+        await U.wait(ctx, 1300); if (!ok()) return;
+        Rv.classList.remove('on');
+        if (r < 2) { al.classList.add('on'); await U.wait(ctx, 900); al.classList.remove('on'); }
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.pr-deck').innerHTML = ''; s.querySelectorAll('.pr-card,.pr-arr').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-self" data-part="5" data-trans="slide" data-dur="15000" data-title="为什么不能自己生成再自己审查？" data-notes="<b>为什么不能让一个 Agent 自己生成再自己审查？</b>这正是前面“多 Agent 何时真正优于单 Agent”一节那条判据的具体体现——审查若不引入新信息，就只是“让模型再想一遍”。<br>Huang 等人在 ICLR 2024 论文《Large Language Models Cannot Self-Correct Reasoning Yet》中发现：让 GPT-4 在没有外部反馈的情况下审查并修正自己的回答，准确率反而下降——<b>模型把正确答案改错的次数比把错误答案改对的次数更多</b>。2024 年发表在 TACL 期刊上的综述《When Can LLMs Actually Correct Their Own Mistakes?》（arXiv:2406.01297）进一步确认：除非提供可靠的外部反馈（如测试用例的执行结果、外部工具的验证输出），否则纯粹依赖模型自身的“自我纠正”几乎不起作用。<br>ICLR 2024 的 CRITIC 论文提供了一个直观的对比：让模型使用外部工具（搜索引擎、Python 解释器）验证自己的回答，效果显著提升；一旦移除工具验证、只保留模型的自我评估，大部分提升就消失了。<br>回到第五章的 PPT 生成实验也是同理——审核者的价值不在于“用同一个模型再看一遍代码”，而在于它<b>渲染了 PPT 并截取了画面</b>——截图承载着提议者生成代码时完全无法获得的视觉信息；代码生成场景中执行测试产生的通过 / 失败结果，同样是编写代码时并不存在的新信号。<br>上方动画是示意：八个答案经过两种审查后的变化；右侧开关可以移除工具验证。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">为什么不能让一个 Agent <em>自己生成再自己审查</em>？</h2></div>
+    <button class="tgl sf-tg fx fx-up" style="--d:2;--tc:var(--bad)"><i></i>移除工具验证，只保留自我评估</button></header>
+  <div class="sf-body">
+    <div class="sf-ln panel fx fx-left" style="--d:3" data-k="self"><div class="sf-h"><b>自我审查（无外部反馈）</b><span class="sf-acc"></span></div><div class="sf-ans"></div><p class="sf-cap">没有新信息：只是“让模型再想一遍”</p></div>
+    <div class="sf-ln panel fx fx-right" style="--d:4" data-k="tool"><div class="sf-h"><b>外部工具验证（CRITIC）</b><span class="sf-acc"></span></div><div class="sf-tools"><span><svg class="ic"><use href="#i-search"/></svg>搜索引擎</span><span><svg class="ic"><use href="#i-term"/></svg>Python 解释器</span></div><div class="sf-ans"></div><p class="sf-cap">工具结果是生成时不存在的新信号</p></div>
+  </div>
+  <div class="sf-refs fx fx-up" style="--d:6">
+    <div><b>Huang 等 · ICLR 2024</b><span>GPT-4 无外部反馈自我修正：准确率反而下降，改错的比改对的多</span></div>
+    <div><b>TACL 2024 综述</b><span>没有可靠外部反馈（测试结果、工具输出），“自我纠正”几乎不起作用</span></div>
+    <div><b>CRITIC · ICLR 2024</b><span>用工具验证显著提升；移除工具只留自评，大部分提升消失</span></div>
+  </div>
+  <p class="tagline sf-tag fx fx-up" style="--d:7">PPT 审核者的价值在于它<b>渲染了 PPT 并截取了画面</b>——截图承载着提议者生成代码时完全无法获得的视觉信息<span class="k10-sim">上方答案变化为示意</span></p>
+  <div class="src">第十章 ·「提议者-审核者范式」</div>
+</section>
+<style>
+#c10-self .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.sf-body{display:grid;grid-template-columns:1fr 1fr;gap:26px}
+.sf-ln{padding:18px 22px;height:330px;display:flex;flex-direction:column;gap:12px}
+.sf-h{display:flex;align-items:center;justify-content:space-between}
+.sf-h b{font-size:22px}
+.sf-ln[data-k=self] .sf-h b{color:var(--warn)}
+.sf-ln[data-k=tool] .sf-h b{color:var(--ok)}
+.sf-acc{font:800 26px var(--num);color:var(--acc)}
+.sf-tools{display:flex;gap:10px}
+.sf-tools span{display:flex;align-items:center;gap:8px;padding:4px 12px;border-radius:10px;font-size:16px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);transition:opacity .4s}
+.sf-ln.off .sf-tools span{opacity:.3;text-decoration:line-through}
+.sf-ans{display:grid;grid-template-columns:repeat(8,1fr);gap:10px}
+.sf-a{height:70px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .4s var(--ease)}
+.sf-a i{font-style:normal;font:800 26px var(--num)}
+.sf-a small{font-size:15px;color:var(--text3)}
+.sf-a.ok i{color:var(--ok)}.sf-a.bad i{color:var(--bad)}
+.sf-a.flip{box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent);border-color:var(--acc)}
+.sf-cap{margin-top:auto;font-size:17px;color:var(--text2)}
+.sf-refs{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:20px}
+.sf-refs div{padding:12px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.sf-refs b{display:block;font-size:18px;color:var(--acc)}
+.sf-refs span{font-size:16px;line-height:1.5;color:var(--text2)}
+.sf-tag{margin-top:18px;font-size:21px;display:flex;align-items:center;gap:16px}
+.sf-tag .k10-sim{margin-left:auto}
+</style>
+<script>
+HOOKS['c10-self'] = {
+  INIT: [1, 1, 0, 1, 1, 0, 1, 1],
+  init(s) {
+    s.querySelector('.sf-tg').addEventListener('click', (e) => { this.auto = false; this.noTool = !this.noTool; e.currentTarget.classList.toggle('on', this.noTool); this.run(s); });
+  },
+  paint(box, v, flips) {
+    box.innerHTML = v.map((x, i) => `<div class="sf-a ${x ? 'ok' : 'bad'}${flips && flips.includes(i) ? ' flip' : ''}"><i>${x ? '✓' : '✗'}</i><small>#${i + 1}</small></div>`).join('');
+  },
+  acc(el, v) { el.textContent = Math.round((v.filter(Boolean).length / v.length) * 100) + '%'; },
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    const L = s.querySelector('.sf-ln[data-k=self]'), T = s.querySelector('.sf-ln[data-k=tool]');
+    T.classList.toggle('off', !!this.noTool);
+    [L, T].forEach((x) => { this.paint(x.querySelector('.sf-ans'), this.INIT); this.acc(x.querySelector('.sf-acc'), this.INIT); });
+    if (!ctx) return;
+    // 自我审查：两个对的被改错、一个错的被改对（示意）；工具验证：两个错的都被改对；移除工具后与自评相同
+    const selfV = [1, 0, 1, 1, 0, 0, 1, 1], toolV = this.noTool ? selfV : [1, 1, 1, 1, 1, 1, 1, 1];
+    const fl = (a) => a.map((x, i) => (x !== this.INIT[i] ? i : -1)).filter((i) => i >= 0);
+    ctx.later(() => { if (tk !== this.tk) return; this.paint(L.querySelector('.sf-ans'), selfV, fl(selfV)); this.acc(L.querySelector('.sf-acc'), selfV); }, 1600);
+    ctx.later(() => { if (tk !== this.tk) return; this.paint(T.querySelector('.sf-ans'), toolV, fl(toolV)); this.acc(T.querySelector('.sf-acc'), toolV); }, 2400);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.noTool = false;
+    this.run(s);
+    ctx.every(() => {
+      if (!this.auto) return;
+      this.noTool = !this.noTool;
+      s.querySelector('.sf-tg').classList.toggle('on', this.noTool);
+      this.run(s);
+    }, 5200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.sf-tg').classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c10-invar" data-part="5" data-trans="flip" data-dur="17000" data-title="最小不变量：独立证据与可定位的修复条件" data-notes="提议者—审核者循环的最小不变量是：审核者读取<b>独立证据</b>，而不是只复述提议者的解释；退回时必须给出<b>可定位的修复条件</b>。左侧伪代码原样取自原书：先生成候选，再执行或渲染得到证据（测试、状态、截图、事实），交给独立审核者；只要审核否决且预算尚有剩余，就带着可定位的问题清单修复，再取证、再审；通过则连同证据与审核意见一起发布，否则升级或拒绝。<br><b>审核者不能修改测试、证据采集器或发布门槛；否则“独立验证”会退化成自我批准。</b><br>Anthropic 2026 年的长程应用开发实验把这一思路实现为<b>规划者–生成者–评估者</b>三 Agent 架构：规划者把用户的需求展开为产品规格，生成者与评估者先约定每轮的完成标准，再由生成者实现，然后评估者使用 Playwright 操作真实应用并提交缺陷报告；Agent 之间通过文件交接状态。实验说明，当任务超出当前模型单独可靠完成的范围时，带外部证据的独立审核可以用显著更高的成本换取更好的开发质量（Prithvi Rajasekaran, Harness Design for Long-Running Application Development, Anthropic Engineering, 2026-03-24）。<br>代码逐行高亮，右侧流程同步：第一轮演示“否决两次后通过”，下一轮演示“预算耗尽 → 升级或拒绝”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">最小不变量：<em>独立证据</em> + 可定位的修复条件</h2></header>
+  <div class="iv-body">
+    <div class="win iv-win fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>proposer_reviewer.py · 原书伪代码</span></div>
+      <div class="code iv-code"><span class="ln" data-l="0">candidate = <span class="t-p">proposer</span>(task, constraints)</span><span class="ln" data-l="1">evidence = <span class="t-p">execute_or_render</span>(candidate)  <span class="t-c"># tests, state, screenshot, facts</span></span><span class="ln" data-l="2">review = <span class="t-p">independent_reviewer</span>(candidate, evidence)</span><span class="ln"> </span><span class="ln" data-l="4"><span class="t-k">while</span> review.veto <span class="t-k">and</span> budget_remaining:</span><span class="ln" data-l="5">    candidate = proposer.<span class="t-p">repair</span>(candidate, review.findings)</span><span class="ln" data-l="6">    evidence = <span class="t-p">execute_or_render</span>(candidate)</span><span class="ln" data-l="7">    review = <span class="t-p">independent_reviewer</span>(candidate, evidence)</span><span class="ln"> </span><span class="ln" data-l="9"><span class="t-k">if</span> review.pass:</span><span class="ln" data-l="10">    <span class="t-g">publish</span>(candidate, evidence, review)</span><span class="ln" data-l="11"><span class="t-k">else</span>:</span><span class="ln" data-l="12">    <span class="t-r">escalate_or_reject</span>(review)</span></div></div>
+    <div class="iv-flow fx fx-right" style="--d:3">
+      <div class="iv-n" data-n="p" style="--c:#fbbf24"><b>提议者</b><small>生成 / 按 findings 修复</small></div>
+      <div class="iv-n" data-n="e" style="--c:#22d3ee"><b>执行或渲染</b><small>测试 · 状态 · 截图 · 事实</small></div>
+      <div class="iv-n" data-n="r" style="--c:#34d399"><b>独立审核者</b><small>读独立证据，不复述解释</small></div>
+      <div class="iv-gate"><span class="iv-v">否决？</span><span class="iv-bud">预算 <b>3</b></span></div>
+      <div class="iv-out"><span class="iv-pub">publish：候选 + 证据 + 审核</span><span class="iv-esc">escalate_or_reject</span></div>
+      <div class="iv-rule"><svg class="ic"><use href="#i-lock"/></svg>审核者不能修改测试、证据采集器或发布门槛——否则“独立验证”退化成自我批准</div>
+    </div>
+  </div>
+  <div class="iv-anth fx fx-up" style="--d:5"><b>Anthropic 2026 · 长程应用开发</b><span class="iv-a" data-a="0">规划者：需求 → 产品规格</span><i>→</i><span class="iv-a" data-a="1">生成者 ⇄ 评估者：先约定每轮完成标准</span><i>→</i><span class="iv-a" data-a="2">生成者实现</span><i>→</i><span class="iv-a" data-a="3">评估者用 Playwright 操作真实应用，提交缺陷报告</span><em>文件交接状态 · 更高成本换更好质量</em></div>
+  <div class="src">第十章 ·「提议者-审核者范式」· 脚注：Rajasekaran, Harness Design for Long-Running Application Development, 2026-03-24</div>
+</section>
+<style>
+.iv-body{display:grid;grid-template-columns:900px 1fr;gap:28px}
+.iv-code{font-size:18px;line-height:1.75;padding:14px 18px}
+.iv-flow{position:relative;display:flex;flex-direction:column;gap:12px}
+.iv-n{--c:var(--acc);display:flex;align-items:baseline;gap:14px;padding:12px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(12,18,40,.85);transition:all .35s}
+.iv-n b{font-size:20px;color:var(--c);min-width:110px}
+.iv-n small{font-size:16px;color:var(--text2)}
+.iv-n.on{background:color-mix(in srgb,var(--c) 18%,rgba(12,18,40,.85));box-shadow:0 0 26px color-mix(in srgb,var(--c) 40%,transparent);translate:6px 0}
+.iv-gate{display:flex;gap:12px;align-items:center}
+.iv-gate span{padding:8px 16px;border-radius:12px;font-size:18px;border:1px dashed var(--line2);color:var(--text2);transition:all .35s}
+.iv-gate .iv-v.on{color:var(--bad);border-color:var(--bad);border-style:solid}
+.iv-gate .iv-v.ok{color:var(--ok);border-color:var(--ok);border-style:solid}
+.iv-bud b{font:800 22px var(--num);color:var(--acc)}
+.iv-out{display:flex;gap:12px}
+.iv-out span{flex:1;padding:10px 14px;border-radius:12px;text-align:center;font:600 16px var(--mono);border:1px solid var(--line);color:var(--text3);transition:all .35s}
+.iv-out .iv-pub.on{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.iv-out .iv-esc.on{color:#fff;background:var(--bad);border-color:var(--bad)}
+.iv-rule{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.55;color:var(--text);border:1px solid color-mix(in srgb,var(--warn) 50%,transparent);background:rgba(251,146,60,.08)}
+.iv-rule .ic{flex:none;color:var(--warn);margin-top:3px}
+.iv-anth{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:18px;padding:12px 18px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.iv-anth b{font-size:18px;color:var(--acc);margin-right:6px}
+.iv-anth i{font-style:normal;color:var(--text3)}
+.iv-a{padding:5px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);transition:all .35s}
+.iv-a.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.iv-anth em{font-style:normal;font-size:16px;color:var(--text3);margin-left:auto}
+</style>
+<script>
+HOOKS['c10-invar'] = {
+  // 行号 → 流程节点
+  N: { 0: 'p', 1: 'e', 2: 'r', 5: 'p', 6: 'e', 7: 'r' },
+  async run(s, pass) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const L = (l) => { s.querySelectorAll('.iv-code .ln').forEach((x) => x.classList.toggle('hl', x.dataset.l === String(l))); s.querySelectorAll('.iv-n').forEach((n) => n.classList.toggle('on', n.dataset.n === this.N[l])); };
+    const v = s.querySelector('.iv-v'), bud = s.querySelector('.iv-bud b'), pub = s.querySelector('.iv-pub'), esc = s.querySelector('.iv-esc');
+    v.className = 'iv-v'; pub.classList.remove('on'); esc.classList.remove('on');
+    let b = 3; bud.textContent = b;
+    const seq = async (ls) => { for (const l of ls) { if (!ok()) return; L(l); await U.wait(ctx, 750); } };
+    await seq([0, 1, 2]);
+    // 第一轮演示：否决两次后通过；第二轮：一直否决直到预算耗尽
+    for (let k = 0; ok(); k++) {
+      const veto = pass ? k < 2 : true;
+      L(4); v.className = 'iv-v ' + (veto ? 'on' : 'ok'); v.textContent = veto ? '否决：附可定位的 findings' : '通过';
+      await U.wait(ctx, 900); if (!ok()) return;
+      if (!veto || b === 0) break;
+      b--; bud.textContent = b;
+      await seq([5, 6, 7]);
+    }
+    if (!ok()) return;
+    if (pass) { L(9); await U.wait(ctx, 600); L(10); pub.classList.add('on'); }
+    else { v.textContent = '预算耗尽'; L(11); await U.wait(ctx, 600); L(12); esc.classList.add('on'); }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    let pass = true;
+    this.run(s, pass);
+    ctx.every(() => { pass = !pass; this.run(s, pass); }, 11500);
+    let a = 0;
+    ctx.every(() => { s.querySelectorAll('.iv-a').forEach((x) => x.classList.toggle('on', +x.dataset.a === a)); a = (a + 1) % 4; }, 1400);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.iv-code .ln,.iv-n,.iv-a,.iv-pub,.iv-esc').forEach((x) => x.classList.remove('hl', 'on')); const v = s.querySelector('.iv-v'); v.className = 'iv-v'; v.textContent = '否决？'; },
+};
+</script>
+
+<section class="slide" id="c10-debate" data-part="5" data-trans="rise" data-dur="16000" data-title="辩论模式：等计算量下未必更好" data-notes="「辩论模式」：多个 Agent 各持不同立场，通过对抗性对话深入探索问题空间。比如评估一个技术方案时，Agent A 扮演“支持者”列举方案优势和机会，Agent B 扮演“反对者”指出风险和局限，每轮辩论都针对对方的论点提出反驳或补充。单一 Agent 分析时，模型往往倾向某个观点而忽视反面证据；辩论模式则通过<b>制度化的对抗</b>，确保正反两面都得到充分论证，帮助决策者做出更平衡的判断。<br>不过，辩论模式的实际效果在学术界仍有争议。2026 年 Tran 与 Kiela 的研究在多跳推理任务上对比了单 Agent 与五种多 Agent 架构（顺序、辩论、集成、并行角色、子任务并行），发现<b>当思考 token 预算被严格控制为相同时，单 Agent 的表现与多 Agent 持平甚至更好</b>。研究者基于信息论中的<b>数据处理不等式</b>给出了解释：辩论中的多个 Agent 处理的是完全相同的文本信息，Agent 之间每一次串行传递中间结论都只可能丢失信息、不可能凭空创造信息。辩论模式在一些学术论文中的收益很可能来源于多个 Agent 消耗了更多的总计算量。<br>不过，它并不否定另一类做法——对同一问题<b>多次独立采样再聚合</b>（如自一致性、多数投票），或利用<b>生成与验证的难度不对称</b>（写出答案难、检验答案易）来做生成-验证分工。<br>左侧对话内容与右侧信息条均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">辩论模式：制度化的对抗，<em>等计算量下</em>未必更好</h2></header>
+  <div class="db-body">
+    <div class="db-arena panel fx fx-left" style="--d:2">
+      <div class="db-ag pro"><div class="k10-ag" style="--c:#34d399"><span class="k10-av"><svg class="ic"><use href="#i-thumb"/></svg></span><b>支持者</b><small>列举优势和机会</small></div></div>
+      <div class="db-ag con"><div class="k10-ag" style="--c:#fb7185"><span class="k10-av"><svg class="ic"><use href="#i-alert"/></svg></span><b>反对者</b><small>指出风险和局限</small></div></div>
+      <div class="db-talk"></div>
+      <div class="db-judge"><svg class="ic"><use href="#i-scale"/></svg>决策者：正反两面都得到充分论证 → 更平衡的判断</div>
+      <span class="k10-sim db-sim">示意</span>
+    </div>
+    <div class="db-r fx fx-right" style="--d:3">
+      <div class="db-dpi panel"><b>数据处理不等式</b><p>辩论双方处理的是完全相同的文本；每一次串行传递中间结论，<em>只可能丢失信息、不可能凭空创造信息</em></p>
+        <div class="db-chain"></div></div>
+      <div class="db-tk panel"><b>Tran 与 Kiela 2026 · 多跳推理 · 思考 token 预算相同</b>
+        <div class="db-cmp"><span class="db-one">单 Agent</span><span class="db-ge">持平甚至更好</span><div class="db-multi"><i>顺序</i><i>辩论</i><i>集成</i><i>并行角色</i><i>子任务并行</i></div></div>
+        <p>论文中辩论的收益，很可能来自<em>更多的总计算量</em></p></div>
+    </div>
+  </div>
+  <div class="db-keep fx fx-up" style="--d:5"><span class="db-kl">它并不否定：</span><div><b>多次独立采样再聚合</b><span>自一致性、多数投票</span></div><div><b>生成与验证的难度不对称</b><span>写出答案难、检验答案易 → 生成-验证分工</span></div></div>
+  <div class="src">第十章 ·「辩论模式」· 脚注：Tran, Kiela, arXiv:2604.02460, 2026</div>
+</section>
+<style>
+.db-body{display:grid;grid-template-columns:900px 1fr;gap:28px}
+.db-arena{position:relative;height:560px;padding:0}
+.db-ag{position:absolute;top:24px;width:170px}
+.db-ag.pro{left:20px}.db-ag.con{right:20px}
+.db-talk{position:absolute;left:200px;right:200px;top:20px;display:flex;flex-direction:column;gap:12px}
+.db-b{max-width:440px;padding:10px 16px;border-radius:14px;font-size:18px;line-height:1.5;animation:upIn .45s var(--spring) both}
+.db-b.p{align-self:flex-start;background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.4);border-top-left-radius:4px}
+.db-b.c{align-self:flex-end;background:rgba(251,113,133,.1);border:1px solid rgba(251,113,133,.4);border-top-right-radius:4px}
+.db-judge{position:absolute;left:24px;right:24px;bottom:52px;display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:14px;font-size:19px;color:var(--text2);border:1px dashed var(--line2);opacity:.4;transition:all .5s}
+.db-judge .ic{font-size:26px;color:var(--acc)}
+.db-judge.on{opacity:1;color:var(--text);border-style:solid;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.db-sim{position:absolute;left:24px;bottom:14px}
+.db-r{display:flex;flex-direction:column;gap:18px}
+.db-dpi,.db-tk{padding:16px 20px}
+.db-r b{font-size:20px;color:var(--acc)}
+.db-r p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+.db-r em{font-style:normal;color:var(--text);font-weight:700}
+.db-chain{display:flex;align-items:flex-end;gap:14px;margin-top:12px;height:120px}
+.db-st{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.db-st i{display:block;width:44px;height:var(--h);border-radius:8px 8px 3px 3px;background:linear-gradient(0deg,var(--acc),color-mix(in srgb,var(--acc) 40%,transparent));transition:height 1s var(--ease)}
+.db-st span{font-size:15px;color:var(--text3);white-space:nowrap}
+.db-cmp{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.db-one{padding:8px 16px;border-radius:12px;font-size:18px;font-weight:700;color:#06101f;background:var(--acc)}
+.db-ge{font-size:17px;color:var(--acc)}
+.db-multi{display:flex;flex-wrap:wrap;gap:6px}
+.db-multi i{font-style:normal;font-size:15px;padding:3px 10px;border-radius:8px;border:1px solid var(--line2);color:var(--text2)}
+.db-keep{display:flex;align-items:center;gap:16px;margin-top:18px}
+.db-kl{font-size:18px;color:var(--text3);white-space:nowrap}
+.db-keep div{flex:1;padding:12px 18px;border-radius:14px;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:rgba(52,211,153,.06)}
+.db-keep b{display:block;font-size:19px;color:var(--ok)}
+.db-keep span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-debate'] = {
+  T: [['p', '方案能复用现有组件，开发成本低、上线快'], ['c', '复用的组件不支持并发写入，规模上来会出问题'], ['p', '短期内可以先加乐观锁兜住'], ['c', '乐观锁只防同一文件的冲突，跨文件的语义冲突还在']],
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, box = s.querySelector('.db-talk'), j = s.querySelector('.db-judge');
+    box.innerHTML = ''; j.classList.remove('on');
+    const ch = s.querySelector('.db-chain');
+    ch.innerHTML = ['原始文本', 'Agent 1', 'Agent 2', 'Agent 3'].map((n) => `<div class="db-st"><i style="--h:100px"></i><span>${n}</span></div>`).join('');
+    if (!ctx) return;
+    this.T.forEach(([w, t], i) => ctx.later(() => { if (tk === this.tk) box.insertAdjacentHTML('beforeend', `<div class="db-b ${w}">${t}</div>`); }, 400 + i * 1100));
+    ctx.later(() => tk === this.tk && j.classList.add('on'), 400 + this.T.length * 1100);
+    [100, 82, 66, 52].forEach((h, i) => ctx.later(() => { if (tk === this.tk) ch.children[i].querySelector('i').style.setProperty('--h', h + 'px'); }, 1200 + i * 700));
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); ctx.every(() => this.run(s), 8000); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.db-talk').innerHTML = ''; s.querySelector('.db-judge').classList.remove('on'); },
+};
+</script>
+
+<section class="slide" id="c10-ideas" data-part="5" data-trans="zoom" data-dur="13000" data-title="头脑风暴与专家小组" data-notes="「头脑风暴模式」：多个 Agent 独立生成创意，然后相互分享、彼此启发。比如在产品创新任务中，Agent 1 提出“增加社交分享功能”，Agent 2 受启发提出“不仅分享到社交网络，还可以生成个性化分享海报”，Agent 3 综合前两者提出“用户自定义海报模板并形成模板市场”。不同 Agent 拥有不同的<b>“思维偏好”</b>（通过不同提示词或模型实现），通过相互激发来探索更广阔的解空间，找到单一 Agent 难以想到的创意组合。<br>「专家小组模式」：多个 Agent 各自代表一个专业领域的视角，共同讨论跨学科问题。比如评估新产品的可行性时，工程师 Agent 从技术角度分析实现难度，产品 Agent 从用户体验角度评估市场吸引力，运营 Agent 从成本和资源角度分析商业可行性。这些 Agent 之间<b>不是对抗关系，而是互补关系</b>，共同拼出问题的全貌，识别跨领域的约束和机会。<br>两种模式自动切换，也可以点击右上角按钮。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">头脑风暴与专家小组：<em>相互激发</em>，互补拼图</h2></div>
+    <div class="seg id-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="bs">头脑风暴模式</button><button data-v="ex">专家小组模式</button></div></header>
+  <div class="id-st panel fx fx-up" style="--d:3">
+    <div class="id-v" data-v="bs">
+      <div class="id-chain"></div>
+      <p class="id-cap">不同的“思维偏好”（不同提示词或模型）相互激发 → 探索更广阔的解空间，找到单一 Agent 难以想到的创意组合</p>
+    </div>
+    <div class="id-v" data-v="ex">
+      <div class="id-ex"></div>
+      <div class="id-puz"><b>新产品可行性</b><div class="id-pcs"><span data-k="0">实现难度</span><span data-k="1">市场吸引力</span><span data-k="2">商业可行性</span></div><small>不是对抗，而是互补：拼出问题的全貌，识别跨领域的约束和机会</small></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「头脑风暴模式」·「专家小组模式」</div>
+</section>
+<style>
+#c10-ideas .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.id-st{position:relative;height:640px;padding:0}
+.id-v{position:absolute;inset:0;padding:30px 36px;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+#c10-ideas[data-v=bs] .id-v[data-v=bs],#c10-ideas[data-v=ex] .id-v[data-v=ex]{opacity:1;visibility:visible}
+.id-chain{display:grid;grid-template-columns:repeat(3,1fr);gap:40px;margin-top:10px}
+.id-i{display:flex;flex-direction:column;align-items:center;gap:16px;opacity:.25;transition:opacity .6s}
+.id-i.on{opacity:1}
+.id-bub{position:relative;width:100%;min-height:150px;padding:18px 22px;border-radius:20px;font-size:22px;line-height:1.55;text-align:center;display:grid;place-items:center;border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9))}
+.id-i:not(:last-child) .id-bub::after{content:"启发 →";position:absolute;right:-48px;top:50%;margin-top:-12px;font-size:15px;color:var(--text3);writing-mode:horizontal-tb}
+.id-pref{font-size:16px;color:var(--c);padding:3px 12px;border-radius:999px;border:1px dashed color-mix(in srgb,var(--c) 55%,transparent)}
+.id-cap{margin-top:40px;font-size:21px;line-height:1.6;color:var(--text2);text-align:center}
+.id-ex{display:grid;grid-template-columns:repeat(3,1fr);gap:30px}
+.id-e{display:flex;flex-direction:column;align-items:center;gap:10px;opacity:.3;transition:opacity .5s}
+.id-e.on{opacity:1}
+.id-e p{font-size:18px;text-align:center;color:var(--text2);line-height:1.5}
+.id-puz{margin:34px auto 0;width:900px;padding:20px 26px;border-radius:20px;text-align:center;border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+.id-puz>b{font-size:24px}
+.id-pcs{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:16px 0 12px}
+.id-pcs span{padding:16px 0;font-size:20px;font-weight:700;color:var(--text3);border:2px dashed var(--line2);transition:all .6s var(--spring);opacity:.4;translate:0 30px}
+.id-pcs span:first-child{border-radius:14px 0 0 14px}.id-pcs span:last-child{border-radius:0 14px 14px 0}
+.id-pcs span.on{opacity:1;translate:0 0;color:#06101f;background:var(--c);border-style:solid;border-color:var(--c)}
+.id-puz small{font-size:18px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-ideas'] = {
+  BS: [['Agent 1', '#22d3ee', '增加社交分享功能'], ['Agent 2', '#fbbf24', '不仅分享到社交网络，还可以生成个性化分享海报'], ['Agent 3', '#f472b6', '用户自定义海报模板并形成模板市场']],
+  EX: [['工程师 Agent', '#60a5fa', 'wrench', '从技术角度分析实现难度'], ['产品 Agent', '#f472b6', 'user', '从用户体验角度评估市场吸引力'], ['运营 Agent', '#34d399', 'coin', '从成本和资源角度分析商业可行性']],
+  init(s) {
+    s.querySelector('.id-chain').innerHTML = this.BS.map(([n, c, t], i) => `<div class="id-i" style="--c:${c}"><div class="k10-ag" style="--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-lightbulb"/></svg></span><b>${n}</b></div><span class="id-pref">思维偏好 ${String.fromCharCode(65 + i)}</span><div class="id-bub">“${t}”</div></div>`).join('');
+    s.querySelector('.id-ex').innerHTML = this.EX.map(([n, c, ic, t]) => `<div class="id-e"><div class="k10-ag" style="--c:${c}"><span class="k10-av"><svg class="ic"><use href="#i-${ic}"/></svg></span><b>${n}</b></div><p>${t}</p></div>`).join('');
+    s.querySelectorAll('.id-pcs span').forEach((p, i) => p.style.setProperty('--c', this.EX[i][1]));
+    this.set = U.seg(s.querySelector('.id-seg'), (v) => { this.auto = false; this.show(s, v); });
+  },
+  show(s, v) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.v = v;
+    s.dataset.v = v;
+    this.set(v);
+    const items = v === 'bs' ? s.querySelectorAll('.id-i') : s.querySelectorAll('.id-e'), pcs = s.querySelectorAll('.id-pcs span');
+    s.querySelectorAll('.id-i,.id-e').forEach((x) => x.classList.remove('on'));
+    pcs.forEach((p) => p.classList.remove('on'));
+    if (!ctx) return;
+    items.forEach((x, i) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      x.classList.add('on');
+      if (v === 'ex') ctx.later(() => tk === this.tk && pcs[i].classList.add('on'), 500);
+    }, 400 + i * 1200));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 'bs');
+    ctx.every(() => { if (this.auto) this.show(s, this.v === 'bs' ? 'ex' : 'bs'); }, 6000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.v = ''; },
+};
+</script>

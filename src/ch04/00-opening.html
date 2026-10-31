@@ -1,0 +1,297 @@
+<!-- ================= 第四章 · 共用件（全章可用） =================
+  CSS：.c4x-sx（“示意”小标）、.c4x-term / .c4x-ln / .c4x-k（终端正文）、.c4x-hint（虚线提示框）
+  JS ：window.C4 —— T（五类工具的名称 / 颜色 / 图标）、guard（令牌）、typeTo（逐字写入，返回 Promise）、esc、jump（跳到某部分）
+-->
+<style>
+#deck{--tp-per:#22d3ee;--tp-exe:#fbbf24;--tp-col:#a78bfa;--tp-evt:#f472b6;--tp-usr:#34d399}
+.c4x-sx{display:inline-flex;align-items:center;gap:6px;padding:2px 10px;border-radius:8px;font-size:15px;line-height:1.5;color:var(--text3);border:1px dashed var(--line2);letter-spacing:.12em;white-space:nowrap;font-weight:400}
+.c4x-term{font:17px/1.65 var(--mono);color:#cbd5f5;padding:14px 18px;white-space:pre-wrap;word-break:break-all}
+.c4x-ln{display:block;min-height:1.65em}
+.c4x-k{color:var(--env)}
+.c4x-hint{padding:10px 14px;border-radius:12px;border:1px dashed var(--line2);font-size:16px;color:var(--text2);line-height:1.55}
+</style>
+<script>
+window.C4 = {
+  // 五类工具：全章统一的名称、颜色与图标
+  T: {
+    per: { n: '感知工具', c: '#22d3ee', ic: 'search' },
+    exe: { n: '执行工具', c: '#fbbf24', ic: 'zap' },
+    col: { n: '协作工具', c: '#a78bfa', ic: 'users' },
+    evt: { n: '事件触发工具', c: '#f472b6', ic: 'bell' },
+    usr: { n: '用户沟通工具', c: '#34d399', ic: 'chat' },
+  },
+  esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); },
+  // 令牌：每次调用都让旧的动画序列失效，返回 ok() 供 await 之后检查
+  guard(h, ctx) { const tk = (h.tk = (h.tk || 0) + 1); return () => !!ctx && ctx.alive && tk === h.tk; },
+  // 逐字写入文本，返回 Promise；离开页面或令牌失效后不再结算
+  typeTo(el, text, o = {}) {
+    const ctx = o.ctx, sp = o.speed || 26, ok = o.ok || (() => true), n = o.step || 1;
+    return new Promise((res) => {
+      let i = 0;
+      el.textContent = '';
+      const tick = () => {
+        if ((ctx && !ctx.alive) || !ok()) return;
+        i = Math.min(text.length, i + n);
+        el.textContent = text.slice(0, i);
+        if (i < text.length) U.later(ctx, tick, sp);
+        else res(true);
+      };
+      U.later(ctx, tick, o.delay || 0);
+    });
+  },
+  // 跳到某个部分的第一页
+  jump(p) {
+    const i = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (i >= 0) DECK.go(i, 0);
+  },
+};
+</script>
+
+<!-- ================= 开篇 ================= -->
+<section class="slide" id="c04-cover" data-part="0" data-title="封面" data-notes="第四章讨论 Agent 公式里的第三个组件——<b>工具</b>。如果说 LLM 是大脑、上下文是眼睛，工具就是 Agent 用来感知或改变外部世界的手脚和感官。<br>本章先给出<b>五类工具</b>（感知、执行、协作、事件触发、用户沟通）的分类总览；再讨论适用于所有工具的通用设计原则——能力做成什么形态、工具怎么描述、参数如何忠实传递；然后看工具生态用哪两条渠道分发能力（<b>MCP 协议</b>与 <b>Skill Hub</b>）；接着回答横跨所有工具的共同问题：工具多到成百上千时，一次该让模型看见多少；最后逐类深入 Agent 主动调用的三类工具——<b>感知、执行、协作</b>。右侧轨道图：核心是 Agent，五颗卫星是五类工具，外圈是 Agent 通过工具接触的外部世界。">
+  <div class="cv4-orbit fx fx-scale" style="--d:4"></div>
+  <div class="cv4-text">
+    <div class="cv4-tag fx fx-up"><i></i>深入理解 AI Agent · 第四章</div>
+    <h1 class="cv4-title"><span class="split" data-grad="#fde68a,#fbbf24,#fb923c">工具</span></h1>
+    <p class="cv4-sub fx fx-up" style="--d:8">连接语言“大脑”与真实数字世界的<br>“手脚和感官”</p>
+    <div class="cv4-chips fx fx-up" style="--d:10"><span>五类工具</span><span>能力的表达形式</span><span>MCP 与 Skill Hub</span><span>主动工具发现</span><span>多模态感知</span><span>执行安全</span><span>协作与人在回路</span></div>
+    <div class="cv4-meta fx fx-up" style="--d:12"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="cv4-hint fx fx-up" style="--d:16"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c04-cover{justify-content:center;padding-left:150px}
+#c04-cover .cv4-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+#c04-cover .cv4-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+#c04-cover .cv4-title{margin-top:24px;font-size:200px;line-height:1.05;font-weight:800;letter-spacing:.08em}
+#c04-cover .cv4-sub{margin-top:24px;font-size:34px;color:var(--text2);line-height:1.55}
+#c04-cover .cv4-chips{margin-top:30px;display:flex;flex-wrap:wrap;gap:10px;max-width:860px}
+#c04-cover .cv4-chips span{padding:7px 16px;border-radius:999px;font-size:18px;color:var(--text2);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c04-cover .cv4-meta{margin-top:34px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+#c04-cover .cv4-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+#c04-cover .cv4-orbit{position:absolute;right:100px;top:50%;width:740px;height:740px;margin-top:-382px}
+#c04-cover .cv4-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+#c04-cover .cv4-hint span{margin:0 4px}
+</style>
+<script>
+HOOKS['c04-cover'] = {
+  init(s) {
+    const T = C4.T;
+    U.orbit(s.querySelector('.cv4-orbit'), {
+      size: 740, core: 'Agent', outer: 'ENVIRONMENT · 外部世界 · ENVIRONMENT · 外部世界', coreColor: '#fbbf24',
+      sats: [
+        { label: '感知', color: T.per.c, rx: 0.37, ry: 0.14, tilt: -20, dur: 13, phase: 0 },
+        { label: '执行', color: T.exe.c, rx: 0.34, ry: 0.16, tilt: 32, dur: 11, phase: 0.3 },
+        { label: '协作', color: T.col.c, rx: 0.3, ry: 0.19, tilt: 84, dur: 15, phase: 0.55 },
+        { label: '事件触发', color: T.evt.c, rx: 0.39, ry: 0.11, tilt: 8, dur: 17, phase: 0.78 },
+        { label: '用户沟通', color: T.usr.c, rx: 0.27, ry: 0.13, tilt: -58, dur: 12, phase: 0.15 },
+      ],
+    });
+  },
+};
+</script>
+
+<section class="slide" id="c04-her" data-part="0" data-title="《Her》里的 Samantha" data-dur="16000" data-notes="在科幻电影<b>《Her》</b>中，AI 助手 Samantha 能主动整理邮件、识别出情感复杂的信件并提议润色回复，能代表主角处理出版事宜，还能在不同的沟通渠道间无缝切换。<b>她的智能之所以动人，是因为她拥有强大的工具</b>——连接语言“大脑”与真实数字世界的“手脚和感官”。<br>今天的 <b>Manus、OpenClaw</b> 等通用 Agent 已经基本实现了《Her》中 Samantha 所需的大部分能力。<br>演示会依次播放 Samantha 的四项能力：请求进入语言大脑，经由不同类别的工具，最终作用在数字世界里。能力与工具类别的对应关系是示意，帮助把电影里的场景和本章的分类联系起来；也可以点击左侧任一能力。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Samantha 动人，是因为她拥有<em>强大的工具</em></h2>
+  <p class="lead fx fx-up" style="--d:2">科幻电影《Her》：工具连接语言“大脑”与真实数字世界的“手脚和感官”</p></header>
+  <div class="hr4-stage fx fx-scale" style="--d:3">
+    <svg class="hr4-svg" viewBox="0 0 1660 540" width="1660" height="540"><g class="hr4-ps"></g>
+      <circle class="hr4-k k1" r="9"/><circle class="hr4-k k2" r="9"/></svg>
+    <div class="hr4-abs"></div>
+    <div class="hr4-brain"><div class="hr4-ring"></div><svg class="ic"><use href="#i-brain"/></svg><b>语言大脑</b><span>理解 · 推理 · 决定</span></div>
+    <div class="hr4-tools"><span class="hr4-tl">经由的工具</span><div class="hr4-tc"></div></div>
+    <div class="hr4-ws"></div>
+    <span class="hr4-sx c4x-sx">能力 ↔ 工具类别的对应为示意</span>
+  </div>
+  <div class="hr4-now fx fx-up" style="--d:6"><svg class="ic"><use href="#i-rocket"/></svg><span>今天的 <b>Manus</b>、<b>OpenClaw</b> 等通用 Agent，已经基本实现了 Samantha 所需的大部分能力</span></div>
+  <div class="src">第四章 开篇</div>
+</section>
+<style>
+#c04-her .hr4-stage{position:relative;width:1660px;height:540px;margin-top:-6px}
+#c04-her .hr4-svg{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:1}
+#c04-her .hr4-p{fill:none;stroke:rgba(255,255,255,.12);stroke-width:2.5;stroke-dasharray:6 8;transition:stroke .4s}
+#c04-her .hr4-p.on{stroke:var(--c);stroke-width:3.5;animation:flow 1s linear infinite;filter:drop-shadow(0 0 6px var(--c))}
+#c04-her .hr4-k{opacity:0;fill:#fff;filter:drop-shadow(0 0 8px #fbbf24)}
+#c04-her .hr4-ab{position:absolute;left:0;width:450px;height:116px;padding:16px 20px 16px 74px;border-radius:18px;cursor:pointer;border:1px solid var(--line);background:rgba(12,18,40,.82);transition:all .45s var(--ease);z-index:2}
+#c04-her .hr4-ab em{position:absolute;left:18px;top:50%;margin-top:-20px;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:700 19px var(--num);font-style:normal;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+#c04-her .hr4-ab b{display:block;font-size:22px;line-height:1.35}
+#c04-her .hr4-ab small{display:block;margin-top:6px;font-size:16px;color:var(--text3)}
+#c04-her .hr4-ab.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 11%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--acc) 28%,transparent);translate:8px 0}
+#c04-her .hr4-ab.on em{background:var(--acc);color:#06101f}
+#c04-her .hr4-brain{position:absolute;left:730px;top:150px;width:200px;height:200px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:2px solid var(--llm);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--llm) 30%,#0a1024),#0a1024 70%);box-shadow:0 0 50px color-mix(in srgb,var(--llm) 30%,transparent);z-index:2;transition:box-shadow .4s}
+#c04-her .hr4-brain>.ic{font-size:50px;color:var(--llm)}
+#c04-her .hr4-brain b{font-size:22px}
+#c04-her .hr4-brain span{font-size:15px;color:var(--text3)}
+#c04-her .hr4-ring{position:absolute;inset:-26px;border-radius:50%;border:2px dashed color-mix(in srgb,var(--acc) 55%,transparent);animation:spin 40s linear infinite}
+#c04-her .hr4-brain.hit{box-shadow:0 0 0 8px color-mix(in srgb,var(--llm) 18%,transparent),0 0 70px color-mix(in srgb,var(--llm) 55%,transparent)}
+#c04-her .hr4-tools{position:absolute;left:580px;top:400px;width:500px;display:flex;flex-direction:column;align-items:center;gap:10px;z-index:2}
+#c04-her .hr4-tl{font-size:15px;letter-spacing:.2em;color:var(--text3)}
+#c04-her .hr4-tc{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;min-height:44px}
+#c04-her .hr4-t{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:12px;font-size:18px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);animation:upIn .5s var(--spring) both}
+#c04-her .hr4-t i{font-style:normal;color:var(--text2)}
+#c04-her .hr4-w{position:absolute;left:1210px;width:450px;height:116px;padding:0 20px;border-radius:18px;display:flex;align-items:center;gap:16px;border:1px solid color-mix(in srgb,var(--env) 30%,transparent);background:color-mix(in srgb,var(--env) 5%,rgba(12,18,40,.85));transition:all .45s var(--ease);z-index:2}
+#c04-her .hr4-w>.ic{font-size:34px;color:var(--env);flex:none}
+#c04-her .hr4-w b{display:block;font-size:22px}
+#c04-her .hr4-w small{display:block;margin-top:4px;font-size:16px;color:var(--text3);min-height:22px}
+#c04-her .hr4-w.on{border-color:var(--env);background:color-mix(in srgb,var(--env) 15%,rgba(12,18,40,.9));box-shadow:0 0 30px color-mix(in srgb,var(--env) 35%,transparent)}
+#c04-her .hr4-w.on small{color:var(--env)}
+#c04-her .hr4-sx{position:absolute;right:0;bottom:-34px}
+#c04-her .hr4-now{display:flex;align-items:center;gap:14px;margin-top:44px;padding:14px 24px;border-radius:14px;font-size:22px;color:var(--text2);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent);border-left:4px solid var(--acc)}
+#c04-her .hr4-now .ic{font-size:26px;color:var(--acc)}
+#c04-her .hr4-now b{color:var(--text)}
+</style>
+<script>
+HOOKS['c04-her'] = {
+  A: [
+    { t: '主动整理邮件', d: '不等吩咐，自己把收件箱理清', w: 0, tools: [['per', '读取邮件'], ['exe', '归档整理']], r: '收件箱已整理好' },
+    { t: '识别情感复杂的信件，提议润色回复', d: '读懂字里行间，再给出建议', w: 1, tools: [['per', '理解信件'], ['usr', '提议回复']], r: '润色建议已发给主角' },
+    { t: '代表主角处理出版事宜', d: '以主角的名义对外办事', w: 2, tools: [['exe', '发送邮件'], ['col', '与出版方往来']], r: '出版事宜在推进' },
+    { t: '在不同的沟通渠道间无缝切换', d: '电话、消息、邮件随时切换', w: 3, tools: [['usr', '多渠道触达']], r: '在合适的渠道找到主角' },
+  ],
+  W: [{ n: '邮箱', ic: 'mail' }, { n: '主角（用户）', ic: 'user' }, { n: '出版方', ic: 'book' }, { n: '多个沟通渠道', ic: 'phone' }],
+  Y: [0, 141, 282, 424],
+  init(s) {
+    const Y = this.Y;
+    s.querySelector('.hr4-abs').innerHTML = this.A.map((a, i) => `<div class="hr4-ab" data-i="${i}" style="top:${Y[i]}px"><em>${i + 1}</em><b>${a.t}</b><small>${a.d}</small></div>`).join('');
+    s.querySelector('.hr4-ws').innerHTML = this.W.map((w, i) => `<div class="hr4-w" style="top:${Y[i]}px"><svg class="ic"><use href="#i-${w.ic}"/></svg><div><b>${w.n}</b><small></small></div></div>`).join('');
+    // 左侧四条线汇入大脑，右侧四条线从大脑流向数字世界
+    s.querySelector('.hr4-ps').innerHTML = Y.map((y, i) => `<path class="hr4-p l" data-i="${i}" d="M450 ${y + 58} C 600 ${y + 58}, 600 250, 704 250"/>`).join('')
+      + Y.map((y, i) => `<path class="hr4-p r" data-i="${i}" d="M956 250 C 1060 250, 1070 ${y + 58}, 1210 ${y + 58}"/>`).join('');
+    s.querySelector('.hr4-abs').addEventListener('click', (e) => { const a = e.target.closest('[data-i]'); if (a) { this.auto = false; this.show(s, +a.dataset.i); } });
+  },
+  async show(s, i) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx, a = this.A[i];
+    this.i = i;
+    s.querySelectorAll('.hr4-ab').forEach((x, j) => x.classList.toggle('on', j === i));
+    s.querySelectorAll('.hr4-w').forEach((x) => { x.classList.remove('on'); x.querySelector('small').textContent = ''; });
+    s.querySelectorAll('.hr4-p').forEach((p) => p.classList.remove('on'));
+    const tc = s.querySelector('.hr4-tc');
+    tc.innerHTML = '';
+    if (!ctx) return;
+    const pl = s.querySelector(`.hr4-p.l[data-i="${i}"]`), pr = s.querySelector(`.hr4-p.r[data-i="${a.w}"]`);
+    const brain = s.querySelector('.hr4-brain'), k1 = s.querySelector('.hr4-k.k1'), k2 = s.querySelector('.hr4-k.k2');
+    pl.style.setProperty('--c', 'var(--acc)');
+    pl.classList.add('on');
+    await U.fly(k1, pl, 900, { ctx });
+    if (!ok()) return;
+    brain.classList.add('hit');
+    await U.wait(ctx, 500);
+    if (!ok()) return;
+    for (const [k, txt] of a.tools) {
+      const t = C4.T[k];
+      tc.insertAdjacentHTML('beforeend', `<span class="hr4-t" style="--c:${t.c}"><svg class="ic"><use href="#i-${t.ic}"/></svg>${t.n.replace('工具', '')}<i>· ${txt}</i></span>`);
+      await U.wait(ctx, 380);
+      if (!ok()) return;
+    }
+    brain.classList.remove('hit');
+    const c0 = C4.T[a.tools[a.tools.length - 1][0]].c;
+    pr.style.setProperty('--c', c0);
+    pr.classList.add('on');
+    k2.style.fill = c0;
+    await U.fly(k2, pr, 900, { ctx });
+    if (!ok()) return;
+    const w = s.querySelectorAll('.hr4-w')[a.w];
+    w.classList.add('on');
+    w.querySelector('small').textContent = a.r;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.show(s, ((this.i ?? -1) + 1) % this.A.length); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.i = undefined;
+    s.querySelectorAll('.on,.hit').forEach((e) => e.classList.remove('on', 'hit'));
+    s.querySelector('.hr4-tc').innerHTML = '';
+    s.querySelectorAll('.hr4-w small').forEach((x) => (x.textContent = ''));
+  },
+};
+</script>
+
+<section class="slide" id="c04-map" data-part="0" data-steps="1" data-trans="zoom" data-title="本章导览" data-dur="12000" data-notes="本章首先给出<b>五类工具的分类总览</b>；然后讨论适用于所有工具的<b>通用设计原则</b>，以及工具生态用哪两条渠道分发能力——<b>MCP 协议与 Skill Hub</b>；再回答一个横跨所有工具的共同问题：<b>当工具多到成百上千，一次该让模型看见多少</b>；最后逐类深入 Agent 主动调用的三类工具——<b>感知、执行、协作</b>。<br>其中“一次看见多少”与开头的“能力做成什么形态”是<b>两个彼此独立的决策</b>——形态定每条能力的常驻成本与传参方式，披露定同时有多少条摆在模型面前。两者在书中只隔一节工具生态，因为正是生态把接入一条能力的成本压到了一条命令，才有了“太多”这个问题。<br>至于由外部事件驱动的另外两类工具（事件触发与用户沟通），它们的设计与事件驱动的异步运行时密不可分，留到第六章与实时交互一并讨论。按 → 展开两个独立决策；站点下方的小标签可以点击，直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章导览：从<em>分类</em>到<em>逐类深入</em></h2></header>
+  <div class="mp4-stage">
+    <svg class="mp4-svg" viewBox="0 0 1660 400" width="1660" height="400">
+      <defs><linearGradient id="c04-map-g" x1="0" x2="1"><stop offset="0" stop-color="#fbbf24"/><stop offset=".35" stop-color="#fb923c"/><stop offset=".65" stop-color="#38bdf8"/><stop offset="1" stop-color="#a78bfa"/></linearGradient></defs>
+      <path id="c04-map-p" class="mp4-route" d="M110 120 C 260 40, 330 200, 470 120 S 700 40, 830 120 S 1060 200, 1190 120 S 1420 40, 1550 120"/>
+      <path class="mp4-flow" d="M110 120 C 260 40, 330 200, 470 120 S 700 40, 830 120 S 1060 200, 1190 120 S 1420 40, 1550 120"/>
+      <circle class="mp4-comet" r="9"><animateMotion dur="8s" repeatCount="indefinite"><mpath href="#c04-map-p"/></animateMotion></circle>
+      <path class="mp4-arc" d="M470 70 C 600 -40, 1060 -40, 1190 70"/>
+    </svg>
+    <span class="mp4-arcl">两个彼此独立的决策</span>
+    <div class="mp4-st"></div>
+  </div>
+  <div class="mp4-dec" data-step="1">
+    <div class="mp4-c fx fx-up" style="--d:1;--c:#fb923c"><span class="lbl">形态 · 能力做成什么形态</span><b>定每条能力的常驻成本与传参方式</b><small>专用工具 · 通用执行器 · Skill</small></div>
+    <div class="mp4-c mid fx fx-up" style="--d:2;--c:#38bdf8"><span class="lbl">中间隔着的一节：工具生态</span><b>生态把接入一条能力的成本压到了一条命令</b><small>才有了“太多”这个问题</small></div>
+    <div class="mp4-c fx fx-up" style="--d:3;--c:#c084fc"><span class="lbl">披露 · 一次看见多少</span><b>定同时有多少条摆在模型面前</b><small>全量常驻 · 按需加载 · 主动发现 · Skills</small></div>
+    <div class="mp4-ch6 fx fx-up" style="--d:4"><svg class="ic"><use href="#i-bell"/></svg><div><b>事件触发 · 用户沟通</b><small>依赖事件驱动的异步运行时，留到第六章</small></div></div>
+  </div>
+  <div class="src">第四章 开篇</div>
+</section>
+<style>
+#c04-map .mp4-stage{position:relative;height:390px;margin-top:40px}
+#c04-map .mp4-svg{position:absolute;inset:0;overflow:visible}
+#c04-map .mp4-route{fill:none;stroke:url(#c04-map-g);stroke-width:4;stroke-linecap:round;opacity:.5;stroke-dasharray:1900;stroke-dashoffset:1900}
+#c04-map.active .mp4-route{animation:arcDraw 2.4s var(--ease) .3s forwards}
+#c04-map .mp4-flow{fill:none;stroke:#fff;stroke-width:2;stroke-dasharray:2 18;opacity:0;animation:flow 1.2s linear infinite}
+#c04-map.active .mp4-flow{opacity:.4;transition:opacity 1s 2.4s}
+#c04-map .mp4-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff);opacity:0}
+#c04-map.active .mp4-comet{opacity:1;transition:opacity 1s 2.6s}
+#c04-map .mp4-arc{fill:none;stroke:#fbbf24;stroke-width:3;stroke-dasharray:10 9;opacity:0;transition:opacity .8s}
+#c04-map[data-k="1"] .mp4-arc{opacity:.9;animation:flow 1.2s linear infinite}
+#c04-map .mp4-arcl{position:absolute;left:830px;top:-14px;transform:translateX(-50%);padding:5px 16px;border-radius:999px;font-size:18px;font-weight:700;color:#06101f;background:linear-gradient(90deg,#fb923c,#c084fc);opacity:0;transition:opacity .8s;white-space:nowrap}
+#c04-map[data-k="1"] .mp4-arcl{opacity:1}
+#c04-map .mp4-s{--c:var(--acc);position:absolute;top:120px;width:320px;margin-left:-160px;text-align:center}
+#c04-map .mp4-dot{position:relative;width:92px;height:92px;margin:-46px auto 0;border-radius:50%;display:grid;place-items:center;font-size:40px;color:var(--c);background:radial-gradient(circle at 30% 25%,#1a2347,#0a1024 70%);border:2px solid var(--c);box-shadow:0 0 0 8px color-mix(in srgb,var(--c) 12%,transparent),0 0 46px color-mix(in srgb,var(--c) 45%,transparent);transform:scale(0)}
+#c04-map.active .mp4-dot{animation:pop .6s var(--spring) forwards;animation-delay:calc(var(--i)*300ms + 500ms)}
+#c04-map .mp4-dot em{position:absolute;right:-8px;top:-8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:700 15px var(--num);font-style:normal;color:#06101f;background:var(--c)}
+#c04-map .mp4-s b{display:block;margin-top:20px;font-size:28px;color:var(--c)}
+#c04-map .mp4-sub{display:block;margin-top:6px;font-size:18px;color:var(--text2)}
+#c04-map .mp4-chips{margin-top:14px;display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+#c04-map .mp4-chips button{padding:6px 13px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .25s}
+#c04-map .mp4-chips button:hover{color:#06101f;background:var(--c);border-color:var(--c)}
+#c04-map .mp4-txt{opacity:0;transform:translateY(16px);transition:opacity .8s var(--ease),transform .8s var(--ease);transition-delay:calc(var(--i)*300ms + 800ms)}
+#c04-map.active .mp4-txt{opacity:1;transform:none}
+#c04-map .mp4-s.hl .mp4-dot{box-shadow:0 0 0 10px color-mix(in srgb,var(--c) 22%,transparent),0 0 70px color-mix(in srgb,var(--c) 65%,transparent)}
+#c04-map .mp4-dec{display:grid;grid-template-columns:1fr 1fr 1fr 300px;gap:18px;margin-top:4px}
+#c04-map .mp4-c{padding:16px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 9%,rgba(12,18,40,.85))}
+#c04-map .mp4-c .lbl{color:var(--c)}
+#c04-map .mp4-c b{display:block;margin-top:8px;font-size:21px;line-height:1.45}
+#c04-map .mp4-c small{display:block;margin-top:6px;font-size:16px;color:var(--text2)}
+#c04-map .mp4-c.mid{border-style:dashed}
+#c04-map .mp4-ch6{display:flex;gap:14px;align-items:center;padding:16px 18px;border-radius:16px;border:1px dashed color-mix(in srgb,var(--tp-evt) 55%,transparent);background:color-mix(in srgb,var(--tp-evt) 7%,transparent)}
+#c04-map .mp4-ch6>.ic{font-size:30px;color:var(--tp-evt);flex:none}
+#c04-map .mp4-ch6 b{display:block;font-size:20px}
+#c04-map .mp4-ch6 small{display:block;margin-top:4px;font-size:16px;color:var(--text2);line-height:1.5}
+</style>
+<script>
+HOOKS['c04-map'] = {
+  S: [
+    { x: 110, c: '#fbbf24', ic: 'grid', b: '五类工具', sub: '分类总览：调用方向 × 作用对象', p: [[1, '工具的分类']] },
+    { x: 470, c: '#fb923c', ic: 'sliders', b: '通用设计原则', sub: '形态 · 描述 · 保真（ACI）', p: [[2, '能力的表达形式'], [3, '描述与保真']] },
+    { x: 830, c: '#38bdf8', ic: 'plug', b: '工具生态', sub: 'MCP 协议 · Skill Hub', p: [[4, 'MCP 与 Skill Hub']] },
+    { x: 1190, c: '#c084fc', ic: 'layers', b: '工具太多怎么办', sub: '一次该让模型看见多少', p: [[5, '分层 · 主动发现 · Skills']] },
+    { x: 1550, c: '#22d3ee', ic: 'compass', b: '逐类深入', sub: 'Agent 主动调用的三类', p: [[6, '感知'], [7, '执行 · 安全'], [8, '执行 · 工程'], [9, '协作']] },
+  ],
+  init(s) {
+    s.querySelector('.mp4-st').innerHTML = this.S.map((t, i) => `
+      <div class="mp4-s" style="left:${t.x}px;--c:${t.c};--i:${i}">
+        <div class="mp4-dot"><svg class="ic"><use href="#i-${t.ic}"/></svg><em>${i + 1}</em></div>
+        <div class="mp4-txt"><b>${t.b}</b><span class="mp4-sub">${t.sub}</span>
+        <div class="mp4-chips">${t.p.map(([p, n]) => `<button data-p="${p}">${n}</button>`).join('')}</div></div>
+      </div>`).join('');
+    s.querySelector('.mp4-st').addEventListener('click', (e) => { const b = e.target.closest('[data-p]'); if (b) C4.jump(+b.dataset.p); });
+  },
+  apply(s, k) {
+    s.dataset.k = k;
+    s.querySelectorAll('.mp4-s').forEach((x, i) => x.classList.toggle('hl', k >= 1 && (i === 1 || i === 3)));
+  },
+  enter(s, ctx, k) { this.apply(s, k); },
+  step(s, ctx, k) { this.apply(s, k); },
+  reset(s) { this.apply(s, 0); },
+};
+</script>

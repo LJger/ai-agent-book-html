@@ -1,0 +1,254 @@
+<!-- ================= 收束分隔页 ================= -->
+<section class="slide chapter" id="c08-d10" data-part="10" data-title="收束" data-notes="「后训练实践要点」与「本章小结」。这一章从预训练的“预测下一个词”出发，走了很长一段路：Mid-training 在目标分布上补知识与基础能力，SFT 高效学习格式与协议，结果导向的 RL 在本章的对照实验中改善了分布外泛化；多轮任务引入信用分配难题，奖励设计从结果奖励延伸到“奖励结果、约束过程”的路径信号，工具使用则带来组合爆炸。贯穿其中的线索只有一条——<b>模型学到什么，取决于训练信号教了它什么；而信号的质量主要由数据和环境决定，不是由算法决定。</b>">
+  <div class="ch-k fx fx-up">CLOSING</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">收束</h1>
+  <div class="ch-s fx fx-up" style="--d:3">常见陷阱 · 核心原则 · 本章小结 · 思考题</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型学到什么，取决于训练信号教了它什么；而信号的质量主要由数据和环境决定，不是由算法决定。</blockquote>
+  <div class="ch-loop" data-node="9" data-num="10"></div>
+</section>
+
+<!-- ================= 常见陷阱 ================= -->
+<section class="slide" id="c08-traps" data-part="10" data-trans="zoom" data-dur="40000" data-title="后训练实践要点：常见陷阱" data-notes="以下<b>常见陷阱</b>值得警惕，识别这些问题往往比掌握技术细节更能避免资源浪费：<br>1. <b>用 SFT 硬塞知识库，或把所有知识都交给参数</b>——大量稳定领域知识与基础能力可以用 Mid-training 写入参数，SFT 再教模型如何访问和表达；需要动态更新、引用、权限控制或删除的事实应由 RAG 管理。<br>2. <b>格式未稳定就引入 RL</b>——如果模型不能稳定生成奖励计算所需的 JSON，训练信号会变得稀疏或失真。可接受的解析失败率取决于任务与奖励设计，不应把固定阈值当作普遍标准；先用小规模评估设定格式稳定性门槛，必要时通过 SFT 或约束解码稳定输出后再应用 RL。<br>3. <b>把标称窗口当成有效窗口</b>——位置编码允许 128K 输入，不代表模型在 128K 上仍会检索、推理和规划。扩窗前应完成当前长度的能力门禁，每个阶段保留短数据和前序阶段 replay，并用“能力 × 长度”矩阵检查退化。<br>4. <b>pass@k 近零仍直接上 RL</b>——全失败的 rollout 没有正向轨迹，GRPO 组内优势也会消失。先用 Mid-training 补能力、用 SFT/蒸馏扩大有效支持，或构造与最终目标一致且可达的课程和部分奖励。<br>5. <b>奖励函数设计不当</b>导致奖励黑客——模型学会钻奖励的漏洞来获得高分，而非真正完成任务（比如只看回复长度就生成冗长无意义的文本）。应该评估最终目标而非中间指标。<br>6. <b>忽视仿真保真度</b>——若仿真过于简化（客服总按固定模式回复）或环境响应不真实（错误信息与生产环境不一致），训练出的策略在真实场景中会完全失效。高保真仿真环境的构建成本可能高于训练本身。<br>7. <b>过度训练导致泛化下降</b>——训练损失持续下降但验证集性能反而恶化时，模型正在死记训练细节。Mid-training 会造成通用能力遗忘，SFT 会过拟合示范，RL 过度优化也会让策略过拟合当前奖励与任务分布；三者都需要独立保留集和早停。<br>8. <b>价值函数崩溃与探索不足</b>——PPO 中价值估计不准确会导致优势计算出现偏差，表现为训练曲线剧烈震荡。温度参数过低或随机性不足会使 Agent 陷入局部最优。<br>9. <b>把训练—推理数值失配当成小噪声</b>——更新前 sampler/trainer 的概率比已经偏离 1，会把 on-policy 训练悄悄变成 off-policy。应监控 log probability 差异、近似 KL、裁剪比例和策略 staleness。<br>10. <b>低估 RL 的计算成本</b>——SFT 上表现良好的任务转 RL 可能需要 10-100 倍训练时间。如果测试分布与训练高度一致，SFT 可能已经足够。<br>11. <b>训练数据质量低下</b>——Mid-training 会吸收语料中的错误关联，SFT 会直接学习示范噪声，RL 的奖励若有系统性偏差则会把策略朝错误方向放大。<br>卡片会依次翻开，也可以点击任一卡片翻看正确做法。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">识别陷阱，<em>往往比掌握技术细节更能避免资源浪费</em></h2></header>
+  <div class="c8tp-grid fx fx-up" style="--d:2"></div>
+  <div class="src">第八章 ·「后训练实践要点」· 常见陷阱</div>
+</section>
+<style>
+.c8tp-grid{display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:1fr;gap:14px;flex:1;min-height:0}
+.c8tp-c{position:relative;perspective:1200px;cursor:pointer}
+.c8tp-in{position:absolute;inset:0;transform-style:preserve-3d;transition:rotate .7s var(--ease)}
+.c8tp-c.open .c8tp-in{rotate:y 180deg}
+.c8tp-f,.c8tp-b{position:absolute;inset:0;backface-visibility:hidden;border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--line)}
+.c8tp-f{background:rgba(12,18,40,.82)}
+.c8tp-f em{font:800 26px var(--num);font-style:normal;color:#fb7185}
+.c8tp-f b{font-size:18px;line-height:1.4}
+.c8tp-f small{margin-top:auto;font-size:15px;color:var(--text3)}
+.c8tp-b{rotate:y 180deg;background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.92));border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+.c8tp-b b{font-size:15px;color:#6ee7b7}
+.c8tp-b p{font-size:15px;line-height:1.5;color:var(--text2)}
+.c8tp-sum{display:flex;flex-direction:column;justify-content:center;gap:10px;padding:16px 18px;border-radius:16px;border:1px dashed var(--line2)}
+.c8tp-sum b{font-size:19px;color:var(--acc)}.c8tp-sum p{font-size:15px;line-height:1.55;color:var(--text2)}
+</style>
+<script>
+HOOKS['c08-traps'] = {
+  T: [
+    ['用 SFT 硬塞知识库，或把所有知识都交给参数', '稳定领域知识与基础能力用 Mid-training 写入参数，SFT 教模型如何访问和表达；需要动态更新、引用、权限控制或删除的事实交给 RAG'],
+    ['格式未稳定就引入 RL', '解析失败率门槛取决于任务与奖励设计，不设普遍固定阈值；先小规模评估定门槛，必要时用 SFT 或约束解码稳定输出再上 RL'],
+    ['把标称窗口当成有效窗口', '允许 128K 输入 ≠ 在 128K 上仍会检索、推理、规划；先过当前长度门禁，保留短数据与前序 replay，用“能力 × 长度”矩阵查退化'],
+    ['pass@k 近零仍直接上 RL', '全失败 rollout 没有正向轨迹，GRPO 组内优势消失；先 Mid-training 补能力、SFT/蒸馏扩大有效支持，或构造可达的课程与部分奖励'],
+    ['奖励函数设计不当 → 奖励黑客', '模型钻漏洞拿高分（只看长度就生成冗长文本）；评估最终目标而非中间指标'],
+    ['忽视仿真保真度', '客服总按固定模式回复、错误信息与生产不一致 → 策略在真实场景完全失效；高保真仿真的成本可能高于训练本身'],
+    ['过度训练导致泛化下降', '训练损失降、验证集恶化 = 在死记细节；Mid-training 遗忘、SFT 过拟合示范、RL 过拟合奖励与任务分布——都要独立保留集和早停'],
+    ['价值函数崩溃与探索不足', 'PPO 价值估计不准 → 优势偏差、曲线剧烈震荡；温度过低或随机性不足 → 陷入局部最优'],
+    ['把训练—推理数值失配当成小噪声', '概率比偏离 1 会把 on-policy 悄悄变成 off-policy；监控 log probability 差异、近似 KL、裁剪比例、策略 staleness'],
+    ['低估 RL 的计算成本', 'SFT 上表现好的任务转 RL 可能要 10-100 倍训练时间；测试分布与训练高度一致时，SFT 可能已经足够'],
+    ['训练数据质量低下', 'Mid-training 吸收错误关联，SFT 学习示范噪声，RL 奖励的系统性偏差会把策略朝错误方向放大'],
+  ],
+  init(s) {
+    const g = s.querySelector('.c8tp-grid');
+    g.innerHTML = this.T.map(([a, b], i) => `<div class="c8tp-c"><div class="c8tp-in"><div class="c8tp-f"><em>${String(i + 1).padStart(2, '0')}</em><b>${a}</b><small>点击翻看正确做法</small></div><div class="c8tp-b"><b>正确做法</b><p>${b}</p></div></div></div>`).join('') + '<div class="c8tp-sum"><b>一条线索</b><p>模型学到什么，取决于训练信号教了它什么；信号质量主要由<b>数据和环境</b>决定，不是由算法决定</p></div>';
+    g.querySelectorAll('.c8tp-c').forEach((c) => c.addEventListener('click', () => { this.auto = false; c.classList.toggle('open'); }));
+  },
+  enter(s, ctx) {
+    const cs = [...s.querySelectorAll('.c8tp-c')];
+    C8.auto(this, ctx, cs.length, 2600, (i) => { this.i = i; cs.forEach((c, j) => c.classList.toggle('open', j === i)); }, 1200);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c8tp-c').forEach((c) => c.classList.remove('open')); },
+};
+</script>
+
+<!-- ================= 核心原则与协同 ================= -->
+<section class="slide" id="c08-principle" data-part="10" data-trans="rise" data-dur="26000" data-title="核心原则与 RAG / ICL 的协同" data-notes="核心原则：<b>在投入大规模资源前，先用小规模实验验证关键假设</b>——小批 Mid-training 语料检查知识/能力与遗忘曲线，少量 SFT 数据测试格式能否稳定，小批 rollout 检查 pass@k、奖励差异和 sampler/trainer 数值一致性。快速失败比大规模失败更可接受。<br><b>与 RAG/ICL（上下文学习）的协同</b>：三者不是互斥方案，而是作用于不同位置。ICL 用示例、规则和当前状态实现零参数的即时适应，但随着上下文增长，延迟与费用也会上升；RAG 把事实与证据放在可动态更新、可追溯的外部知识中；后训练则把高维感知、生成风格和隐式决策策略写入参数。选择依据不只是任务是否长期稳定，更重要的是<b>能力能否被外部符号充分表达</b>。医疗影像识别、自然语气等能力即使面对持续变化的领域，仍往往需要参数更新；反过来，长期稳定的转账审批规则也应由代码提供确定性保障，而不能只靠模型记忆。<br>稳健的系统通常组合使用这些方法：用 RAG 管理动态事实与证据，用 ICL 快速试验可用语言描述的策略，用程序固化确定性流程与硬约束，用 Mid-training 吸收稳定领域知识和基础能力，再用 SFT/RL 塑造难以由外部规则完整表达的行为。蒸馏还可以把高能力大模型的行为迁移到成本更低的小模型中。<br>右侧“能力路由器”依次把几种能力送到它该去的位置；医疗影像、自然语气、转账审批规则三例来自原书，其余为按原书原则举的示意例子。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先小规模验证；<em>按“能否被外部符号表达”分配位置</em></h2></header>
+  <div class="c8pr-body">
+    <div class="c8pr-l fx fx-left" style="--d:2">
+      <div class="c8-card c8pr-k"><b>核心原则</b><p>在投入大规模资源前，<b>先用小规模实验验证关键假设</b>；快速失败比大规模失败更可接受</p>
+        <div class="c8pr-ck">
+          <div class="chk"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>小批 Mid-training 语料</b><p>知识 / 能力与遗忘曲线</p></div></div>
+          <div class="chk"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>少量 SFT 数据</b><p>格式能否稳定</p></div></div>
+          <div class="chk"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>小批 rollout</b><p>pass@k、奖励差异、sampler/trainer 数值一致性</p></div></div>
+        </div>
+      </div>
+      <p class="c8pr-nt">三者不互斥，作用于不同位置；蒸馏还可把大模型的行为迁移到更便宜的小模型</p>
+    </div>
+    <div class="c8pr-r panel fx fx-right" style="--d:3">
+      <div class="c8pr-in"><span>能力</span><b class="c8pr-cap">—</b><small class="c8pr-why"></small></div>
+      <div class="c8pr-bins"></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「后训练实践要点」· 与 RAG/ICL 的协同</div>
+</section>
+<style>
+.c8pr-body{display:grid;grid-template-columns:.9fr 1.1fr;gap:22px;flex:1;min-height:0}
+.c8pr-l{display:flex;flex-direction:column;gap:14px}
+.c8pr-k>b{font-size:19px;color:var(--acc)}.c8pr-k>p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:6px}.c8pr-k>p b{color:var(--text)}
+.c8pr-ck{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.c8pr-ck .chk b{font-size:17px}.c8pr-ck .chk p{font-size:15px;color:var(--text2)}
+.c8pr-nt{font-size:16px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.c8pr-r{position:relative;padding:20px 22px;display:flex;flex-direction:column;gap:16px}
+.c8pr-in{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);min-height:110px}
+.c8pr-in span{font-size:15px;color:var(--text3)}
+.c8pr-cap{font-size:26px;animation:c8hkIn .4s var(--ease) both}
+.c8pr-why{font-size:15px;color:var(--text2);line-height:1.5}
+.c8pr-bins{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c8pr-bin{--c:var(--acc);padding:12px 14px;border-radius:14px;border:1px solid var(--line);display:flex;flex-direction:column;gap:4px;transition:all .4s}
+.c8pr-bin b{font-size:17px;color:var(--c)}.c8pr-bin p{font-size:15px;line-height:1.45;color:var(--text3)}
+.c8pr-bin.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:0 0 26px -6px var(--c);scale:1.03}
+.c8pr-bin.on p{color:var(--text2)}
+</style>
+<script>
+HOOKS['c08-principle'] = {
+  B: [['#22d3ee', 'RAG', '动态事实与证据：可更新、可追溯'], ['#a78bfa', 'ICL / Prompt', '零参数即时适应；可用语言描述的策略，上下文越长越贵'], ['#fbbf24', '程序', '确定性流程与硬约束'], ['#60a5fa', 'Mid-training', '稳定领域知识与基础能力'], ['#f472b6', 'SFT / RL', '高维感知、生成风格、隐式决策策略'], ['#34d399', '蒸馏', '大模型行为迁移到更便宜的小模型']],
+  C: [['医疗影像识别', 4, '高维感知，难以被外部符号表达——领域持续变化也往往需要参数更新（原书例）'], ['自然的语气', 4, '生成风格写入参数（原书例）'], ['转账审批规则', 2, '长期稳定也应由代码提供确定性保障，不能只靠模型记忆（原书例）'], ['本周的产品价格表', 0, '需要动态更新与引用的事实（示意）'], ['刚提出的一条服务原则', 1, '可用语言描述，先用 ICL 快速试验（示意）'], ['某专业领域的大量稳定术语', 3, '稳定领域知识与基础能力（示意）'], ['把大模型的工具调用能力搬到端侧小模型', 5, '降低成本（示意）']],
+  init(s) { s.querySelector('.c8pr-bins').innerHTML = this.B.map(([c, b, p]) => `<div class="c8pr-bin" style="--c:${c}"><b>${b}</b><p>${p}</p></div>`).join(''); },
+  enter(s, ctx) {
+    s.querySelectorAll('.c8pr-ck .chk').forEach((c, i) => ctx.later(() => c.classList.add('done'), 900 + i * 700));
+    C8.auto(this, ctx, this.C.length, 3200, (i) => {
+      this.i = i; const [c, b, w] = this.C[i], cap = s.querySelector('.c8pr-cap');
+      cap.textContent = c; U.restart(cap, 'c8pr-cap'); s.querySelector('.c8pr-why').textContent = w;
+      s.querySelectorAll('.c8pr-bin').forEach((x, j) => x.classList.toggle('on', j === b));
+    }, 600);
+  },
+  reset(s) { this.i = null; s.querySelectorAll('.c8pr-ck .chk').forEach((c) => c.classList.remove('done')); s.querySelectorAll('.c8pr-bin').forEach((x) => x.classList.remove('on')); s.querySelector('.c8pr-cap').textContent = '—'; s.querySelector('.c8pr-why').textContent = ''; },
+};
+</script>
+
+<!-- ================= 本章小结 ================= -->
+<section class="slide" id="c08-summary" data-part="10" data-steps="3" data-trans="flip" data-dur="11000" data-title="本章小结" data-notes="按 → 逐条展开。<br>Mid-training、SFT 和 RL 不是三种可互换的“微调力度”，而是分别处理<b>底座、协议与策略</b>。Mid-training 还应通过长度课程、混合数据和逐级门禁，把标称上下文扩展变成不遗忘短程能力的有效上下文。如果合理采样下 pass@k 仍接近零，先用 Mid-training 补知识与能力；如果模型偶尔会做却输出不可解析，先用 SFT 稳定格式；只有当当前策略能产生可评分且有奖励差异的轨迹时，RL 才能高效地重新分配概率并探索策略。“SFT 记忆、RL 泛化”概括的是本章受控实验中观察到的倾向，并不是不受数据、模型、奖励与环境影响的普遍规律。<br>还有两条贯穿全章、比任何算法都值得记住的判断。其一，<b>数据和环境比算法更重要</b>：Mid-training 语料决定底座补到了哪里，SFT 示范决定协议是否稳定，环境和奖励决定 RL 能探索并强化什么。造不出真实环境时，用模型模拟环境也是一条可行路线，但模拟器的偏差就是训练的天花板。很多场景下，只要底座和示范数据到位，甚至不需要做 RL。<br>其二，<b>当前 RL 的主要瓶颈是样本效率与分布一致性</b>：On-Policy Distillation 把一条 rollout 的终点标量扩展为学生实际状态上的逐 token 监督，RLVP 把被浪费的环境反馈变成可学习信号；真正 on-policy 的 rollout 又减少了重要性修正的偏差与方差。训练—推理数值失配会破坏这个前提，因此 sampler/trainer 一致性应与奖励曲线同等重要。<br>本章回答了怎样通过更新模型参数来实现 Agent 持续进化的问题。下一章我们将看到，参数只是知识、指令、程序与参数四种 Agent 自我进化的载体之一。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">本章小结：<em>底座、协议与策略</em></h2></header>
+  <div class="c8sm-body">
+    <div class="c8sm-c fx fx-up" data-step="1"><em>01</em><b>底座、协议与策略</b><div class="c8sm-st"><span style="--c:#60a5fa">Mid-training<small>pass@k 近零 → 补知识与能力；长度课程 + 混合数据 + 逐级门禁</small></span><span style="--c:#38bdf8">SFT<small>偶尔会做却不可解析 → 稳定格式</small></span><span style="--c:#a78bfa">RL<small>可评分且有奖励差异 → 重新分配概率、探索策略</small></span></div><p>“SFT 记忆、RL 泛化”是本章受控实验中的<b>倾向</b>，不是普遍规律</p></div>
+    <div class="c8sm-c fx fx-up" data-step="2"><em>02</em><b>数据和环境比算法更重要</b><p>语料决定底座补到哪里，示范决定协议是否稳定，环境和奖励决定 RL 能探索并强化什么</p><p>模拟环境可行，但<b>模拟器的偏差就是训练的天花板</b>；很多场景下底座和示范到位，甚至不需要 RL</p></div>
+    <div class="c8sm-c fx fx-up" data-step="3"><em>03</em><b>当前 RL 的主要瓶颈是样本效率与分布一致性</b><p>On-Policy Distillation：终点标量 → 学生实际状态上的逐 token 监督；RLVP：被浪费的环境反馈 → 可学习信号</p><p>真正 on-policy 减少重要性修正的偏差与方差；<b>sampler/trainer 一致性与奖励曲线同等重要</b></p></div>
+  </div>
+  <p class="c8sm-next fx fx-up" style="--d:4">下一章：参数只是知识、指令、程序与参数<b>四种自我进化载体</b>之一</p>
+  <div class="src">第八章 ·「本章小结」</div>
+</section>
+<style>
+.c8sm-body{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;flex:1;min-height:0;margin-top:10px}
+.c8sm-c{display:flex;flex-direction:column;gap:12px;padding:22px 24px;border-radius:20px;border:1px solid var(--line);background:rgba(12,18,40,.8)}
+.c8sm-c>em{font:800 44px var(--num);font-style:normal;color:var(--acc);opacity:.8}
+.c8sm-c>b{font-size:24px;line-height:1.35}
+.c8sm-c p{font-size:16px;line-height:1.6;color:var(--text2)}.c8sm-c p b{color:var(--text)}
+.c8sm-st{display:flex;flex-direction:column;gap:8px}
+.c8sm-st span{display:flex;flex-direction:column;gap:2px;padding:8px 12px;border-radius:10px;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 9%,transparent);font-size:17px;font-weight:700;color:var(--c)}
+.c8sm-st small{font-size:15px;font-weight:400;color:var(--text2)}
+.c8sm-next{font-size:19px;color:var(--text2);margin-top:14px}.c8sm-next b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-summary'] = {};
+</script>
+
+<!-- ================= 思考题 ================= -->
+<section class="slide" id="c08-qa1" data-part="10" data-trans="flip" data-dur="26000" data-title="思考题（1–4）" data-notes="思考题 1–4：第 1 题是怎样进一步缓解微调带来的能力遗忘，第 2 题是一项能力该走后训练还是上下文学习，第 3 题是蒸馏 Chat、Reasoning、Agentic 三类模型的难点有何不同，第 4 题是多轮交互中怎样设计奖励分配。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。自动播放时会依次展开。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>1–4</em> · 遗忘、路径、蒸馏与归因</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c08qa-list fx fx-up" style="--d:3" data-qs="0" data-n="4"></div>
+  <div class="src">第八章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c08-qa2" data-part="10" data-trans="zoom" data-dur="26000" data-title="思考题（5–8）" data-notes="思考题 5–8：第 5 题是 1 万美元预算如何在上下文与知识、Prompt/Skills、程序约束和参数训练之间分配，第 6 题是无明确奖励、样本稀少的自主学习还有多远，第 7 题是给每个用户训练专属 LoRA 是否可行，第 8 题是“小模型教大模型”的逆向蒸馏。题目保留原书难度星级。点击题目展开参考答案提纲（摘自原书附录「思考题参考答案」），每题下方的按钮可以跳回相关页面复习。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>5–8</em> · 预算、自主学习、专属 LoRA 与逆向蒸馏</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c08qa-list fx fx-up" style="--d:3" data-qs="4" data-n="4"></div>
+  <div class="src">第八章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+
+<section class="slide" id="c08-qa3" data-part="10" data-trans="rise" data-dur="30000" data-title="思考题（9–13）" data-notes="思考题 9–13：第 9 题是“正确过程错误结果”与“错误过程侥幸成功”哪个更值得奖励，第 10 题是评估集用于训练会不会破坏评估独立性，第 11 题是怎样联合 pass@k、格式解析率、部分进展率和失败归因决定先做哪个阶段，第 12 题是长尾响应下怎样提升训练集群利用率，第 13 题是用 LLM 模拟环境训练时可能出现哪些 reward hacking。<br>注意：附录第 11 题对应的是旧版题干（如何判断 SFT 已经“足够”、应切换到 RL），页面显示正文题干，答案区给出附录要点并注明，另附正文表8-4 的阶段门槛作为相关内容。题目保留原书难度星级。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">思考题 <em>9–13</em> · 过程奖励、评估复用、阶段切换、长尾与模拟器</h2>
+  <p class="lead fx fx-up" style="--d:2">点击题目展开参考答案提纲（原书附录）</p></header>
+  <div class="qa c08qa-list fx fx-up" style="--d:3" data-qs="8" data-n="5"></div>
+  <div class="src">第八章 ·「思考题」· 参考答案：原书附录「思考题参考答案」</div>
+</section>
+<style>
+#c08-qa1 .qa-q,#c08-qa2 .qa-q,#c08-qa3 .qa-q{font-size:18px;padding:12px 18px}
+#c08-qa1 .qa-a>div,#c08-qa2 .qa-a>div,#c08-qa3 .qa-a>div{font-size:16px;visibility:hidden;transition:visibility 0s linear .5s}
+#c08-qa1 .qa-it.open .qa-a>div,#c08-qa2 .qa-it.open .qa-a>div,#c08-qa3 .qa-it.open .qa-a>div{visibility:visible;transition-delay:0s}
+#c08-qa3 .qa-q{font-size:17px;padding:10px 18px}
+.c08qa-tag{display:inline-block;margin:2px 0 4px;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.c08qa-a p{margin-top:5px;line-height:1.55}
+.c08qa-go{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:5px 14px;border-radius:10px;font-size:15px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+</style>
+<script>
+HOOKS['c08-qa1'] = {
+  ALL: [
+    { st: '★★', go: ['c08-lora', 'LoRA'], q: '灾难性遗忘——一次针对特定任务的微调破坏了模型原有的通用能力（如通用工具调用）——在 Agent 场景下尤其棘手。相比全参微调，LoRA 冻结基座权重、遗忘风险更低，但并非免疫。有哪些策略可以进一步缓解微调带来的能力遗忘？', a: ['<b>数据配比</b>：混入约 20% 的通用或原分布数据；<b>控制训练量</b>：SFT 到“格式稳定、能力初具”即停，早停防塌缩。', 'RL 用较小的 rank（8–32）并保留 KL 惩罚，使策略留在参考模型附近；冻结关键组件（如 VLM 只训练投影层）；按任务挂载多个 LoRA adapter 隔离能力；用通用基准做回归测试。'] },
+    { st: '★★', go: ['c08-principle', '与 RAG / ICL 的协同'], q: '后训练将能力固化为模型权重（“肌肉记忆”），而上下文学习将知识放在推理时的输入中。但有些能力（如领域知识）既可以通过后训练学习，也可以通过 few-shot 示例提供。你会用什么标准来决定某项能力应该走哪条路径？', a: ['首先看<b>能力能否被外部符号充分表达</b>：事实与证据 → RAG；可语言化原则 → Prompt/Skill；确定性流程与硬约束 → 程序；医疗影像理解、自然语气、隐式策略等高维能力即使领域在变，也往往需要参数更新。', '再看更新成本、调用规模、时效和风险：探索期先用上下文快速验证，稳定有效且需广泛泛化时再训练；硬性规则无论多稳定都不应只依赖参数记忆。'] },
+    { st: '★★', go: ['c08-opd', '在轨蒸馏'], q: '模型蒸馏让小模型学习大模型的行为。按能力层次，被蒸馏的模型大致可分为三级——Chat 模型（单轮对话、直接作答）、Reasoning 模型（带长链思考再作答）、Agentic 模型（多轮调用工具、与环境交互）。分别蒸馏这三类模型，难点有什么不同？（提示：要蒸馏的到底是什么；哪些 token 该学、哪些是环境返回的不该学；成败信号出现得有多晚、有多稀疏。）', a: ['<b>Chat 模型</b>：只学“输入→输出”的映射与风格，标准 SFT 即可，最简单。', '<b>Reasoning 模型</b>：要学完整思考轨迹，因此要用开源教师模型；必须过滤答案错误的轨迹。', '<b>Agentic 模型</b>：需要真实的仿真环境；离线学习易出现 learner-sampler mismatch，建议基于开源教师做 On-Policy Distillation。'] },
+    { st: '★★★', go: ['c08-rlvp2', 'RLVP 恢复组内差异'], q: '在多轮 Agent 交互中，奖励的归因（credit assignment）问题比单轮更严重——一个最终的成功或失败很难归因到第 3 轮还是第 7 轮的决策。你会如何设计奖励分配策略？', a: ['中间步骤可以判定时，加入过程奖励（V-IRL 每步 ±1）。', '参考 RLVP，用确定性规则逐个动作提供路径信号，补回全败组或全胜组的组内方差。'] },
+    { st: '★★★', go: ['c08-principle', '与 RAG / ICL 的协同'], q: '如果你有固定预算（比如 $10,000），要提升一个客服 Agent 的性能，你会如何在上下文与知识、Prompt/Skills、程序约束和参数训练之间分配预算？你的决策取决于哪些因素？', a: ['先预留预算<b>建立评估集和轨迹验证器</b>，否则其余投入无法比较。', '产品事实和政策放入可追溯的知识库；少量可语言化的服务原则先用 Prompt/Skills 验证；退款权限、隐私和承诺—行动一致性用程序兜底；只有自然语气、复杂意图理解等难以写成规则且调用规模足够大的能力才投入参数训练。', '比例取决于瓶颈、风险、更新频率、调用量和现有模型能力。'] },
+    { st: '★★★', go: ['c08-effic', '蒸馏：提升样本效率'], q: '让模型在没有明确奖励函数、样本稀少的情况下自主学习，被一些人认为是后训练的终极目标。当前的 RL 训练方法距离这个目标还有多远？你认为下一个突破最可能来自哪个方向？', a: ['差距：如 Silver 与 Sutton 所指，当前 RL 只能从最终成败中学习，“客服要求提供信用卡后四位”这类丰富反馈全被浪费，需要数百次盲目试错；样本效率和可验证奖励是主要瓶颈。', '可能的突破：让生成式奖励模型自主制定原则，从一次失败中找到改进方向；以及对环境建模的 world model 路线。'] },
+    { st: '★★', go: ['c08-lora', 'LoRA'], q: '本章指出 LoRA 微调的成本并不高。那么，是否有可能给每个用户（或每个客户公司）训练一个专属的 LoRA，将用户记忆或企业知识写入参数，而非像第三章那样存储在外部知识库中？在什么场景下，“记忆写入参数”比“记忆存入知识库”更有优势？又在什么场景下会适得其反？', a: ['LoRA 难以准确记忆大量事实（须继续预训练，成本剧增）；即使记住了，模型也很难用这些事实做多跳推理——用 LoRA 记忆事实不是好的技术路线。', '事实频繁变更、需可追溯审计时，RAG 更优。'] },
+    { st: '★★★', go: ['c08-opsd', '在轨自蒸馏'], q: 'On-Policy Distillation 依赖更强的教师模型来监督学生。但 OpenAI 的 Weak-to-Strong Generalization 研究提出了一个反直觉的发现：弱模型的监督信号有时能激发强模型本身潜在但未被激活的能力。如果将这一思路应用到 Agent 训练，是否可能实现“小模型教大模型”的逆向蒸馏？', a: ['有可能，关键在于<b>“验证比生成容易”</b>：弱模型不充当示范者（SFT 的上限就是示范者的水平），而是充当验证器或奖励模型。', '由强模型自行探索，弱模型只负责判断。'] },
+    { st: '★★', go: ['c08-ormprm', '结果还是过程'], q: '过程奖励模型（PRM）评估每个思考步骤，而结果奖励模型（ORM）只看最终结果。但“正确的过程导致错误结果”和“错误的过程侥幸得到正确结果”哪个更值得奖励？在 Agent 的多步工具调用场景中，你会如何权衡？', a: ['<b>侥幸成功更危险</b>：违规抄近路（修改测试文件、跳过验证）往往抬高表面成功率，是 reward hacking 的温床。', '按 RLVP“奖励结果、惩罚路径”：错误的工具调用容易验证，可逐个动作扣分；中间步骤易判断时也可给过程奖励。但过程约束不宜过密——“推切”这类更优策略，正是模型在结果奖励留下的探索空间里自己发现的。'] },
+    { st: '★★★', go: ['c08-t85', '表8-5 评估到训练的映射'], q: '本章讨论的评估数据集（如 SWE-Bench Verified、τ²-bench、AndroidWorld）既可以用于评估也可以用于后训练。但如果将评估集用于训练，它就不再是独立的评估集——这是否违反了训练集与测试集必须分离的基本原则？动态参数生成和参数化模板在一定程度上缓解了这个问题，但模板结构本身仍然是固定的。如何在充分利用评估数据的训练价值与维护评估独立性之间找到平衡？', a: ['<b>复用环境，不复用题目</b>。动态参数只防“背答案”，防不了模板过拟合。', '留出整批未见模板 / 域外场景做评估（类比 V-IRL 训练纽约、测试九个陌生城市）；用参数化模板批量生成训练变体支撑课程学习，以 OOD 成绩作为真正的泛化指标。'] },
+    { st: '★★★', go: ['c08-t84', '表8-4 阶段选择'], q: '面对一个目标任务，基模的 pass@1 很低。你会怎样联合 pass@k、格式解析率、部分进展率和失败归因，判断应该先做 Mid-training、SFT，还是可以直接进入 RL？这些指标达到什么条件时才值得切换阶段？', a: ['<b>注：附录第 11 题对应旧版题干</b>（如何判断 SFT 已“足够”、应切换到 RL），以下为附录要点：', '格式信号：工具调用输出可稳定解析、执行，失败率降到奖励可可靠计算的水平；收益信号：再加示范数据，OOD 新场景表现仍不上去——瓶颈已在 SFT 的记忆目标本身；过拟合信号：验证集开始恶化就停——V-IRL 表明 SFT 过度训练塌缩到训练分布后，RL 也无法恢复 OOD 性能。', '相关正文（表8-4）：合理采样下 pass@k 仍近零 → 先 Mid-training；偶尔会做但输出不可解析 → 先 SFT；能产生可评分且有奖励差异的轨迹 → RL。'] },
+    { st: '★★★', go: ['c08-retool', '实验 8-14 ReTool'], q: 'ReTool 的训练动态显示（见实验 8-14），少数超长响应会显著拖长整个训练周期——一批 rollout 里绝大多数已经生成完毕，却要等那几条最长的响应收尾，其间集群的 GPU 利用率很低。如何提升这种长尾响应场景下训练集群的资源利用率？', a: ['基础设施层：解耦 rollout 与训练集群，采用异步流水线；用连续批处理向空闲 GPU 填入新请求。', '从源头缩短长尾：采用 DAPO 的 Overlong Reward Shaping，对超长响应施加软惩罚。'] },
+    { st: '★★★', go: ['c08-simenv', '让模型扮演环境'], q: '用 LLM 模拟环境（如模拟搜索引擎、模拟用户）训练 Agent 时，Agent 钻空子的对象从“真实环境的规则”变成了“模拟器本身的偏见与漏洞”。这类训练中可能出现哪些具体的 reward hacking 行为？又该如何防范？', a: ['典型行为：对模拟用户过度承诺、堆砌道歉讨好；编造模拟器不会核实的事实；为模拟搜索引擎构造诱导性 query 走捷径；对 LLM 评分输出冗长、模板化、“看起来专业”的回复刷分；更隐蔽的是把策略收缩到模拟器熟悉的分布内，回避其盲区。', '防范第一原则：<b>把奖励锚定在可由程序验证的真实状态上</b>，模拟器 / 评判者打分只作辅助并定期审计与真实结果的相关性，配合路径约束。有真实对应物的模拟器（搜索）走混合路线、用真实调用定期校准（如 ZeroSearch 课程式降质）；模拟用户无法引入真实用户，只能对比线上轨迹持续校准，线上真实指标是唯一发布门槛。'] },
+  ],
+  build(s) {
+    const host = s.querySelector('.c08qa-list'), base = +host.dataset.qs, list = HOOKS['c08-qa1'].ALL.slice(base, base + +host.dataset.n);
+    this.n = list.length;
+    host.innerHTML = list.map((x, i) => `<div class="qa-it"><button class="qa-q"><em>${base + i + 1}</em><span class="qa-st">${x.st}</span><span>${x.q}</span></button><div class="qa-a"><div class="c08qa-a"><span class="c08qa-tag">参考答案提纲 · 原书附录</span>${x.a.map((p) => `<p>${p}</p>`).join('')}<button class="c08qa-go" data-go="${x.go[0]}"><svg class="ic"><use href="#i-undo"/></svg>回看：${x.go[1]}</button></div></div></div>`).join('');
+    this.open = U.qa(host, { single: true });
+    host.querySelectorAll('.qa-q').forEach((q) => q.addEventListener('click', () => { this.auto = false; }));
+    host.querySelectorAll('.c08qa-go').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === b.dataset.go);
+      if (idx >= 0) DECK.go(idx, 0);
+    }));
+  },
+  play(s, ctx) {
+    this.auto = true;
+    let n = 0;
+    ctx.later(() => this.open(0), 800);
+    ctx.every(() => { if (this.auto) { n = (n + 1) % this.n; this.open(n); } }, 6000);
+  },
+  init(s) { this.build(s); },
+  enter(s, ctx) { this.play(s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c08-qa2'] = {
+  init(s) { HOOKS['c08-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c08-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+HOOKS['c08-qa3'] = {
+  init(s) { HOOKS['c08-qa1'].build.call(this, s); },
+  enter(s, ctx) { HOOKS['c08-qa1'].play.call(this, s, ctx); },
+  reset(s) { s.querySelectorAll('.qa-it').forEach((it) => it.classList.remove('open')); },
+};
+</script>
+
+<!-- ================= 章末导航 ================= -->
+<section class="slide" id="c08-end" data-part="10" data-trans="iris" data-title="第八章 · 完" data-notes="第八章到这里结束。本章回答了怎样通过更新模型参数来实现 Agent 持续进化的问题：Mid-training 处理底座，SFT 处理协议，RL 处理策略；奖励设计把任务目标变成学习信号，蒸馏提升样本效率，问题案例经过归因变成训练数据。<br>下一章我们将看到，参数只是知识、指令、程序与参数四种 Agent 自我进化的载体之一。下方按钮可以进入下一章、回到上一章或返回总目录。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">把能力沉淀进参数，<em>参数只是进化的载体之一</em></h2>
+  <p class="lead fx fx-up" style="--d:2">接下来，第九章讨论知识、指令、程序与参数四种自我进化载体</p></header>
+  <div class="c8en-row">
+    <div class="chk c8en-c fx fx-up" style="--d:3"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>底座、协议与策略</b><p>Mid-training · SFT · RL 各管一层</p></div></div>
+    <div class="chk c8en-c fx fx-up" style="--d:4"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>环境与奖励</b><p>仿真、信用分配、路径信号 RLVP</p></div></div>
+    <div class="chk c8en-c fx fx-up" style="--d:5"><div class="box"><svg viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></svg></div><div><b>蒸馏与问题案例</b><p>密集监督；归因 → 数据 → 双集验证</p></div></div>
+  </div>
+  <div class="c8en-nav fx fx-up" style="--d:7">
+    <div class="end-nav">
+      <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+    </div>
+  </div>
+  <div class="src">第八章 ·「本章小结」</div>
+</section>
+<style>
+#c08-end .c8en-row{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:40px}
+#c08-end .c8en-c{padding:26px 28px;border-radius:20px}
+#c08-end .c8en-c b{font-size:30px}
+#c08-end .c8en-c p{font-size:19px;line-height:1.6;color:var(--text2);margin-top:8px}
+#c08-end .c8en-nav{margin-top:70px}
+</style>
+<script>
+HOOKS['c08-end'] = {
+  init(s) { s.querySelectorAll('.c8en-c').forEach((c) => c.addEventListener('click', () => c.classList.toggle('done'))); },
+  enter(s, ctx) { s.querySelectorAll('.c8en-c').forEach((c, i) => ctx.later(() => c.classList.add('done'), 1000 + i * 600)); },
+  reset(s) { s.querySelectorAll('.c8en-c').forEach((c) => c.classList.remove('done')); },
+};
+</script>

@@ -1,0 +1,1610 @@
+<!-- ================= PART 04 语音：全双工与快慢思考 ================= -->
+<section class="slide chapter" id="c06-d4" data-part="4" data-title="PART 04 · 语音：全双工与快慢思考" data-notes="上一部分的级联流水线即使用上流式感知，听、想、说仍通过离散接口交接，情绪、语调和环境声可能在转成纯文本时丢失。这一部分沿三条线继续推进：<b>范式二 · 端到端全模态模型（Omni）</b>用同一个模型直接听音频、生成回复并输出语音，有机会保留这些信息，但仍按轮次推进、靠 VAD 划分发言权；<b>范式三 · 全双工交互模型</b>不再预设轮次，持续听、持续说，把“该谁说话”变成模型的持续决策。<br>接着是<b>认知时序</b>：“交互表现”和“智能上限”是两个维度，前台模型要在用户仍然在线时回应，后台模型则可以花更多时间思考——快思考回应慢思考回答、快思考交互慢思考提醒、端到端思考与表达统一，三种方案是设计取舍，不是线性迭代；快慢分离与端到端统一各有代价，“端到端”本身还有两种彼此独立的含义。最后讨论<b>更像人的语音合成</b>：停顿、填充词与控制标记，以及实验 6-6、6-7 的真实运行记录。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">全双工与快慢思考</h1>
+  <div class="ch-s fx fx-up" style="--d:3">从“轮流说话”走向持续听说，再在前台实时交互与后台深度思考之间分工</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">“交互表现”和“智能上限”是两个维度：前台模型要在用户仍然在线时回应，后台模型则可以花更多时间思考。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c06-omni" data-part="4" data-steps="1" data-trans="zoom" data-dur="14000" data-title="范式二 · 端到端全模态（Omni）" data-notes="级联即使采用流式感知，听、想、说仍通过离散接口交接；情绪、语调和环境声等信息可能在转成纯文本时丢失。<b>Omni 方案用同一个模型直接听音频、生成回复并输出语音</b>，因而有机会保留这些信息，但训练的成本更高（图6-9）。相比范式一的级联方案，Omni 的优势主要体现在<b>延迟</b>和<b>非文字信息的理解和生成</b>上：理解方面，它可以理解声音中的停顿等信息；生成方面，它可以传递更丰富的副语言信息，例如唱歌、用特殊的语调讲一句话。<br>但 <b>Omni 模型仍然假设轮流说话，通常要靠 VAD 划分发言权</b>，因此用户报数字时的中途停顿仍可能被误判为说完（左下为示意）。<br>按 → 展开图6-9 的下半部分。四种方案：OpenAI Realtime（服务端 VAD + 轮次检测、异步函数调用、打断即停止当前生成，本质仍在 VAD 框架下）、Gemini Live（VAD 敏感度可配置、打断保留已发信息）、Qwen3-Omni（Thinker-Talker MoE、多码本语音编码、首包延迟 234ms）、Step-Audio 2（潜在音频编码 + RL，副语言理解 83.09%，超越 Qwen2.5-Omni 的 44.18%）。<b>多数方案的共同局限是仍依赖轮次检测机制</b>：用户停顿不等于说完，“嗯”“对”是附和不是打断，背景噪音会被误判为发言——根本原因是 VAD 基于声学信号，无法捕捉语义层面信息。架构对比的最后一行是全双工的 Moshi：并行双音频流加内心独白文本流，不再需要 VAD 和轮次检测，这正是下一页的范式三。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">范式二 · Omni：<em>同一个模型直接听、想、说</em></h2>
+  <p class="lead fx fx-up" style="--d:2">有机会保留语气、情绪和环境声，延迟更低——但仍按轮次推进，靠 VAD 划分发言权</p></header>
+  <div class="om-body">
+    <div class="om-left">
+      <div class="om-flow panel fx fx-left" style="--d:3">
+        <div class="om-h"><b>信息在哪里丢失</b><span class="om-leg"><span style="--c:#fff"><i></i>文字</span><span style="--c:#f472b6"><i></i>情绪</span><span style="--c:#a78bfa"><i></i>语调</span><span style="--c:#34d399"><i></i>环境声</span></span></div>
+        <div class="om-stage">
+          <span class="om-rl" style="top:6px">级联 · 离散接口交接</span>
+          <span class="om-rl" style="top:104px">Omni · 同一个模型</span>
+          <div class="om-n om-c" data-n="in1" style="left:24px;top:64px"><svg class="ic"><use href="#i-mic"/></svg></div>
+          <div class="om-n om-b" data-n="asr" style="left:128px;top:64px">ASR</div>
+          <div class="om-n om-t" data-n="txt" style="left:238px;top:64px">纯文本</div>
+          <div class="om-n om-b" data-n="llm" style="left:344px;top:64px">LLM</div>
+          <div class="om-n om-b" data-n="tts" style="left:446px;top:64px">TTS</div>
+          <div class="om-n om-c" data-n="out1" style="left:552px;top:64px"><svg class="ic"><use href="#i-speaker"/></svg></div>
+          <div class="om-n om-c" data-n="in2" style="left:24px;top:160px"><svg class="ic"><use href="#i-mic"/></svg></div>
+          <div class="om-n om-o" data-n="omni" style="left:288px;top:160px">Omni 模型：直接听 · 想 · 说</div>
+          <div class="om-n om-c" data-n="out2" style="left:552px;top:160px"><svg class="ic"><use href="#i-speaker"/></svg></div>
+          <span class="om-lost">副语言在此丢失</span>
+          <svg class="om-svg" viewBox="0 0 580 196" width="580" height="196">
+            <path class="om-p om-p1" d="M46 64 H530"/>
+            <path class="om-p1s" d="M46 64 H170" fill="none" stroke="none"/>
+            <path class="om-p om-p2" d="M46 160 H530"/>
+            <circle class="om-d1" r="7" fill="#ffffff"/><circle class="om-d1" r="6" fill="#f472b6"/><circle class="om-d1" r="6" fill="#a78bfa"/><circle class="om-d1" r="6" fill="#34d399"/>
+            <circle class="om-d2" r="7" fill="#ffffff"/><circle class="om-d2" r="6" fill="#f472b6"/><circle class="om-d2" r="6" fill="#a78bfa"/><circle class="om-d2" r="6" fill="#34d399"/>
+          </svg>
+        </div>
+        <div class="om-adv"><span class="chip acc">延迟更低</span><span class="chip acc">理解声音中的停顿等信息</span><span class="chip acc">生成更丰富的副语言：唱歌、特殊语调</span><span class="chip warn">训练成本更高</span></div>
+      </div>
+      <div class="om-turn panel fx fx-left" style="--d:5">
+        <div class="om-h"><b>仍然假设轮流说话</b><span class="chip warn">示意</span></div>
+        <div class="om-tl">
+          <span class="om-ln" style="top:12px">用户</span><span class="om-ln" style="top:76px">模型</span>
+          <div class="om-tr">
+            <div class="om-seg u" data-t0="0.2" data-t1="1.7"><span>我的号码是 138</span></div>
+            <div class="om-pause" data-t0="1.7" data-t1="2.5"><span>停顿</span><i class="om-vad"></i></div>
+            <div class="om-seg u" data-t0="2.75" data-t1="4.55"><span>……0013 8000</span></div>
+            <div class="om-seg m" data-t0="2.5" data-t1="4.8"><span>好的，您的号码是……</span></div>
+            <div class="om-mk l" data-t="2.5"><span>VAD 判定：说完了</span></div>
+            <div class="om-mk r" data-t="2.75"><span>用户还没说完 → 抢话</span></div>
+            <div class="om-ph"></div>
+          </div>
+        </div>
+        <p class="om-cap">Omni 通常靠 VAD 划分发言权：报数字时的中途停顿，仍可能被误判为说完</p>
+      </div>
+    </div>
+    <div class="om-right">
+      <div class="om-cards fx fx-right" style="--d:4">
+        <div class="om-card" data-i="0" style="--c:#60a5fa"><b>OpenAI Realtime</b><span class="om-mdl">gpt-realtime</span>
+          <ul><li>服务端 VAD + 轮次检测</li><li>异步函数调用</li><li>打断：停止当前生成</li><li class="k">本质仍在 VAD 框架下</li></ul><small>2024 preview 基于 GPT-4o</small></div>
+        <div class="om-card" data-i="1" style="--c:#34d399"><b>Gemini Live</b><span class="om-mdl">Gemini 2.0</span>
+          <ul><li>VAD 敏感度可配置</li><li>打断保留已发信息</li><li>对话连贯性优化</li><li>与 OpenAI 策略类似</li></ul></div>
+        <div class="om-card" data-i="2" style="--c:#c084fc"><b>Qwen3-Omni</b><span class="om-mdl">Thinker-Talker MoE</span>
+          <ul><li>思考（理解）+ 表达（生成）</li><li>多码本语音编码</li><li class="k">首包延迟 234ms</li><li class="k">32/36 达开源 SOTA</li></ul></div>
+        <div class="om-card" data-i="3" style="--c:#f472b6"><b>Step-Audio 2</b><span class="om-mdl">潜在音频编码 + RL</span>
+          <ul><li>端到端语音 token</li><li class="k">副语言理解 83.09%</li><li>CoT 思考 + RAG + 工具</li><li>超越 Qwen2.5-Omni（44.18%）</li></ul></div>
+      </div>
+      <div class="om-lim panel fx fx-up" data-step="1">
+        <b class="om-lt"><svg class="ic"><use href="#i-alert"/></svg>多数方案的共同局限：<br>仍依赖轮次检测机制</b>
+        <div class="om-lc"><em>轮次检测不足</em><span>用户停顿 ≠ 说完</span><span>犹豫时需主动引导</span></div>
+        <div class="om-lc"><em>打断判断原始</em><span>“嗯”“对”是附和不是打断</span><span>背景噪音误判为发言</span></div>
+        <div class="om-lc"><em>根本原因</em><span>VAD 基于声学信号</span><span>无法捕捉语义层面信息</span></div>
+      </div>
+      <div class="om-io panel fx fx-up" data-step="1" style="--d:2">
+        <span class="lbl">输入 / 输出架构对比</span>
+        <div class="om-rows"></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式二 · 端到端全模态模型（Omni）」· 图6-9</div>
+</section>
+<style>
+#c06-omni .om-body{display:flex;gap:30px;height:672px}
+#c06-omni .om-left{width:620px;flex:none;display:flex;flex-direction:column;gap:16px}
+#c06-omni .om-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-omni .om-flow{padding:16px 20px 14px;height:344px;display:flex;flex-direction:column}
+#c06-omni .om-turn{padding:16px 20px 12px;flex:1;display:flex;flex-direction:column}
+#c06-omni .om-h{display:flex;align-items:center;gap:12px}
+#c06-omni .om-h b{font-size:21px}
+#c06-omni .om-h .chip{font-size:15px;padding:3px 10px;margin-left:auto}
+#c06-omni .om-leg{margin-left:auto;display:flex;gap:12px;font-size:15px;color:var(--text2)}
+#c06-omni .om-leg i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;background:var(--c);vertical-align:0}
+#c06-omni .om-stage{position:relative;width:580px;height:196px;margin-top:6px}
+#c06-omni .om-rl{position:absolute;left:0;font-size:15px;color:var(--text3);letter-spacing:.08em}
+#c06-omni .om-n{position:absolute;transform:translate(-50%,-50%);display:grid;place-items:center;font:700 16px var(--num);border-radius:12px;border:1px solid var(--line2);background:rgba(12,18,40,.94);transition:box-shadow .35s,border-color .35s,color .35s;z-index:1}
+#c06-omni .om-c{width:44px;height:44px;border-radius:50%;font-size:22px;color:var(--acc)}
+#c06-omni .om-b{width:76px;height:40px}
+#c06-omni .om-t{width:86px;height:34px;border-style:dashed;font-family:var(--font);font-size:15px;color:var(--text2)}
+#c06-omni .om-o{width:400px;height:46px;font-family:var(--font);font-size:17px;color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.94))}
+#c06-omni .om-n.hit{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 55%,transparent)}
+#c06-omni .om-lost{position:absolute;left:183px;top:22px;transform:translateX(-50%);font-size:15px;color:#f472b6;white-space:nowrap;opacity:0}
+#c06-omni .om-lost.go{animation:c06om-lost 1.6s var(--ease)}
+@keyframes c06om-lost{0%{opacity:0;translate:0 6px}20%{opacity:1;translate:0 0}75%{opacity:1}100%{opacity:0}}
+#c06-omni .om-svg{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:2}
+#c06-omni .om-p{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2;stroke-dasharray:5 7}
+#c06-omni .om-d1,#c06-omni .om-d2{opacity:0;filter:drop-shadow(0 0 6px currentColor)}
+#c06-omni .om-adv{margin-top:auto;display:flex;flex-wrap:wrap;gap:8px}
+#c06-omni .om-adv .chip{font-size:15px;padding:4px 12px}
+#c06-omni .om-tl{position:relative;height:166px;margin-top:10px}
+#c06-omni .om-ln{position:absolute;left:0;font-size:16px;color:var(--text2)}
+#c06-omni .om-tr{position:absolute;left:58px;top:0;width:520px;height:118px;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+#c06-omni .om-seg,#c06-omni .om-pause{position:absolute;height:44px;border-radius:10px;display:flex;align-items:center;padding:0 9px;font-size:15px;white-space:nowrap;clip-path:inset(0 calc((1 - var(--f,0)) * 100%) 0 0)}
+#c06-omni .om-seg.u{top:2px;background:color-mix(in srgb,var(--tool) 18%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--tool) 50%,transparent)}
+#c06-omni .om-seg.m{top:66px;background:color-mix(in srgb,var(--bad) 16%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--bad) 60%,transparent)}
+#c06-omni .om-pause{top:2px;border:1px dashed var(--line2);color:var(--text3);flex-direction:column;justify-content:center;gap:4px;padding:0 6px}
+#c06-omni .om-vad{display:block;width:100%;height:5px;border-radius:5px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+#c06-omni .om-vad::after{content:"";position:absolute;inset:0;width:calc(var(--v,0) * 100%);background:var(--warn)}
+#c06-omni .om-mk{position:absolute;top:-6px;height:126px;width:0;border-left:2px dashed var(--warn);opacity:0;transition:opacity .3s}
+#c06-omni .om-mk.vis{opacity:1}
+#c06-omni .om-mk span{position:absolute;top:130px;font-size:15px;color:var(--warn);white-space:nowrap}
+#c06-omni .om-mk.l span{right:6px}
+#c06-omni .om-mk.r{border-color:var(--bad)}
+#c06-omni .om-mk.r span{left:6px;color:var(--bad)}
+#c06-omni .om-ph{position:absolute;top:-8px;height:132px;width:2px;background:#fff;box-shadow:0 0 10px #fff;opacity:.75}
+#c06-omni .om-cap{margin-top:auto;font-size:16px;line-height:1.5;color:var(--text2)}
+#c06-omni .om-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;height:286px}
+#c06-omni .om-card{--c:var(--acc);position:relative;padding:16px 16px 12px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.015));display:flex;flex-direction:column;gap:9px;cursor:pointer;transition:border-color .4s,box-shadow .4s,opacity .4s,translate .45s var(--ease)}
+#c06-omni .om-card.on{border-color:color-mix(in srgb,var(--c) 65%,transparent);box-shadow:0 0 34px -6px color-mix(in srgb,var(--c) 55%,transparent);translate:0 -6px}
+#c06-omni .om-card.dim{opacity:.55}
+#c06-omni .om-card b{font:800 21px var(--num);color:var(--c)}
+#c06-omni .om-mdl{align-self:flex-start;padding:3px 10px;border-radius:8px;font:600 15px var(--mono);color:var(--text);background:rgba(255,255,255,.06);border:1px solid var(--line2)}
+#c06-omni .om-card ul{display:flex;flex-direction:column;gap:5px}
+#c06-omni .om-card li{position:relative;padding-left:14px;font-size:16px;line-height:1.45;color:var(--text2)}
+#c06-omni .om-card li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--c)}
+#c06-omni .om-card li.k{color:var(--text);font-weight:700}
+#c06-omni .om-card small{margin-top:auto;font-size:15px;color:var(--text3)}
+#c06-omni .om-lim{padding:14px 20px;display:grid;grid-template-columns:250px 1fr 1fr 1fr;gap:16px;align-items:center;background:rgba(251,146,60,.07);border-color:rgba(251,146,60,.3)}
+#c06-omni .om-lt{display:flex;align-items:center;gap:10px;font-size:18px;line-height:1.4;color:var(--warn)}
+#c06-omni .om-lt .ic{font-size:26px;flex:none}
+#c06-omni .om-lc{display:flex;flex-direction:column;gap:4px;padding-left:14px;border-left:2px solid rgba(251,146,60,.35)}
+#c06-omni .om-lc em{font-style:normal;font-size:17px;font-weight:700;color:var(--text)}
+#c06-omni .om-lc span{font-size:15px;color:var(--text2)}
+#c06-omni .om-io{flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:6px}
+#c06-omni .om-rows{display:flex;flex-direction:column;gap:6px}
+#c06-omni .om-row{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;padding:4px 10px;border-radius:10px;border:1px solid transparent;transition:all .4s var(--ease)}
+#c06-omni .om-row b{font:700 16px var(--num);color:var(--text2)}
+#c06-omni .om-ch{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+#c06-omni .om-ch span{padding:2px 9px;border-radius:7px;font-size:15px;color:var(--text2);background:rgba(255,255,255,.05);border:1px solid var(--line)}
+#c06-omni .om-ch i{font-style:normal;font-size:15px;color:var(--text3)}
+#c06-omni .om-row.on{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-omni .om-row.on b,#c06-omni .om-row.on span{color:var(--text)}
+#c06-omni .om-row[data-r="4"] b{color:var(--acc2)}
+#c06-omni .om-row[data-r="4"] span{border-color:color-mix(in srgb,var(--acc2) 45%,transparent);color:var(--text)}
+</style>
+<script>
+HOOKS['c06-omni'] = {
+  IO: [
+    ['传统串行', ['音频', 'VAD', 'ASR', '文本', 'LLM', '文本', 'TTS', '音频']],
+    ['OpenAI / Gemini', ['音频', '端到端模型（内置 VAD）', '音频 / 文本']],
+    ['Qwen3-Omni', ['音频 / 图像 / 视频', 'Thinker（MoE）', 'Talker', '语音编码']],
+    ['Step-Audio 2', ['原始音频', '潜在编码器', 'LLM + RL', '音频 + 文本 token']],
+    ['全双工 Moshi', ['并行双音频流 + 内心独白文本流', '无需 VAD / 轮次检测']],
+  ],
+  T: 5.2,
+  init(s) {
+    s.querySelector('.om-rows').innerHTML = this.IO.map(([n, c], i) => `<div class="om-row" data-r="${i}"><b>${n}</b><div class="om-ch">${c.map((x) => `<span>${x}</span>`).join('<i>→</i>')}</div></div>`).join('');
+    this.cards = [...s.querySelectorAll('.om-card')];
+    this.rows = [...s.querySelectorAll('.om-row')];
+    this.cards.forEach((c, i) => c.addEventListener('click', () => { this.auto = false; this.pick(i); }));
+    s.querySelectorAll('.om-tr [data-t0]').forEach((g) => {
+      const a = +g.dataset.t0, b = +g.dataset.t1;
+      g.style.left = (a / this.T) * 100 + '%';
+      g.style.width = ((b - a) / this.T) * 100 + '%';
+    });
+    s.querySelectorAll('.om-tr [data-t]').forEach((m) => { m.style.left = (+m.dataset.t / this.T) * 100 + '%'; });
+  },
+  // 选中一张方案卡，下方架构对比里对应的一行同步高亮
+  pick(i) {
+    this.i = i;
+    const map = [1, 1, 2, 3];
+    this.cards.forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+    this.rows.forEach((r, j) => r.classList.toggle('on', j === map[i]));
+  },
+  // 级联：彩色的副语言点在 ASR 处消失，只有文字继续；Omni：全部穿过
+  async flow(s, ctx, tk) {
+    const q = (x) => s.querySelector(x), ok = () => ctx.alive && tk === this.tk;
+    const P1 = q('.om-p1'), P1s = q('.om-p1s'), P2 = q('.om-p2'), lost = q('.om-lost');
+    const d1 = [...s.querySelectorAll('.om-d1')], d2 = [...s.querySelectorAll('.om-d2')];
+    const N = (n) => s.querySelector(`[data-n="${n}"]`);
+    const hit = (n, at, dur = 420) => ctx.later(() => { if (!ok()) return; N(n).classList.add('hit'); ctx.later(() => N(n).classList.remove('hit'), dur); }, at);
+    while (ok()) {
+      const run1 = d1.map((d, j) => (j === 0 ? U.fly(d, P1, 2600, { ctx, linear: true }) : U.fly(d, P1s, 900, { ctx, linear: true, delay: j * 150 })));
+      hit('in1', 0); hit('asr', 520, 700); hit('txt', 1100); hit('llm', 1600); hit('tts', 2080); hit('out1', 2560);
+      ctx.later(() => { if (ok()) U.restart(lost, 'go'); }, 950);
+      await Promise.all(run1);
+      if (!ok()) return;
+      await U.wait(ctx, 300);
+      if (!ok()) return;
+      const run2 = d2.map((d, j) => U.fly(d, P2, 2600, { ctx, linear: true, delay: j * 150 }));
+      hit('in2', 0); hit('omni', 400, 1900); hit('out2', 2700, 600);
+      await Promise.all(run2);
+      if (!ok()) return;
+      await U.wait(ctx, 900);
+    }
+  },
+  // 左下时间线：播放头扫过，片段逐渐显现；停顿里的 VAD 计时条到阈值就判定“说完了”
+  turn(s, ctx) {
+    const segs = [...s.querySelectorAll('.om-tr [data-t0]')], mks = [...s.querySelectorAll('.om-tr [data-t]')];
+    const ph = s.querySelector('.om-ph'), vad = s.querySelector('.om-pause'), T = this.T, t0 = performance.now();
+    ctx.raf((now) => {
+      const t = Math.min(T, (((now - t0) / 1000) % (T + 1.6)));
+      ph.style.left = (t / T) * 100 + '%';
+      segs.forEach((g) => { const a = +g.dataset.t0, b = +g.dataset.t1; g.style.setProperty('--f', Math.max(0, Math.min(1, (t - a) / (b - a))).toFixed(3)); });
+      vad.style.setProperty('--v', Math.max(0, Math.min(1, (t - 1.7) / 0.8)).toFixed(3));
+      mks.forEach((m) => m.classList.toggle('vis', t >= +m.dataset.t));
+    });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    const tk = (this.tk = (this.tk || 0) + 1);
+    this.auto = true;
+    ctx.later(() => this.pick(0), 700);
+    ctx.every(() => { if (this.auto) this.pick((this.i + 1) % 4); }, 3400);
+    ctx.later(() => this.flow(s, ctx, tk), 900);
+    this.turn(s, ctx);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.cards.forEach((c) => c.classList.remove('on', 'dim'));
+    this.rows.forEach((r) => r.classList.remove('on'));
+    s.querySelectorAll('.om-n.hit').forEach((n) => n.classList.remove('hit'));
+    s.querySelectorAll('.om-d1,.om-d2').forEach((d) => (d.style.opacity = 0));
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp6" data-part="4" data-steps="1" data-trans="rise" data-dur="16000" data-title="实验 6-6 ★★：本地运行 MiniCPM-o 4.5，对比端到端与自级联" data-notes="<b>实验 6-6 ★★</b> 使用本地 MiniCPM-o 4.5，关闭 thinking mode，比较<b>直接从音频作答</b>与<b>同模型自级联先转录再作答</b>。它测的是音频信息是否被保留，<b>不是</b>后文的“边想边说”。<br>配套仓库的本地运行（2026-08-01，单张 96GB RTX PRO 6000，BF16，固定 revision，11 项验收全部通过）固定了四条小型合成语音：两道只依赖语义的口述算术题，以及文字完全相同、语速分别为快和慢的两条副语言题，每条都跑两臂。结果<b>总分相同（都是 3/4），但错误互补</b>：端到端在第一题把 “twelve boxes” 感知成 8，算出 47；自级联先正确转录出 12，再算出 79。相反，快、慢两条音频在自级联中都被压成完全相同的 “Please send the report before lunch.”，于是 fast 样本也被猜成 slow；端到端保留了速度信息，两条都正确。<br>加载后的平均整次调用为端到端 0.686 秒、自级联 0.551 秒，但端到端固定先跑、回复长度不同且只有四条，<b>不是可推广的延迟排名</b>。另一条 audio-to-audio 检查生成了 11.56 秒的 24kHz 语音，却继承了第一题的感知错误——路径真实跑通不等于答案正确。小样本只用于验证机制与本地可运行性，不是模型排行榜。按 → 或点击右上角切换两臂；点击任一行可单独重放。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-6 ★★：<em>端到端 vs 自级联</em></h2>
+  <p class="lead fx fx-up" style="--d:2">本地 MiniCPM-o 4.5、关闭 thinking：直接听音频作答，还是先转录再作答</p></div>
+    <div class="e6-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="e2e">端到端：音频直入</button><button data-v="cas">自级联：先转文字</button></div></header>
+  <div class="e6-body">
+    <div class="e6-cases fx fx-left" style="--d:3"></div>
+    <div class="e6-side fx fx-right" style="--d:4">
+      <div class="e6-sc panel">
+        <div class="e6-tr h"><span>四条小型合成语音</span><b data-c="e2e">端到端</b><b data-c="cas">自级联</b></div>
+        <div class="e6-tr"><span>语义算术（2 条）</span><em data-c="e2e">1/2</em><em data-c="cas">2/2</em></div>
+        <div class="e6-tr"><span>副语言语速（2 条）</span><em data-c="e2e">2/2</em><em data-c="cas">1/2</em></div>
+        <div class="e6-tr t"><span>合计</span><em data-c="e2e">3/4</em><em data-c="cas">3/4</em></div>
+      </div>
+      <div class="e6-why panel">
+        <b>总分相同，错误互补</b>
+        <p><span class="e6-k e">端到端</span>把 “twelve boxes” 感知成 8，算出 47；自级联先正确转录出 12，算出 79</p>
+        <p><span class="e6-k c">自级联</span>快、慢两条音频被压成同一句文字，fast 也被猜成 slow；端到端保留了速度信息</p>
+      </div>
+      <ul class="e6-cav">
+        <li>测的是音频信息是否被保留，<b>不是</b>后文的“边想边说”</li>
+        <li>平均整次调用 0.686 s vs 0.551 s：端到端固定先跑、回复长度不同、只有四条，不是延迟排名</li>
+        <li>audio-to-audio 另生成 11.56 s、24kHz 语音，却继承了第一题的感知错误：跑通 ≠ 答对</li>
+      </ul>
+      <div class="e6-env"><span>RTX PRO 6000 · BF16</span><span>加载 6.154 s</span><span>峰值显存 20.269 GiB</span><span>11/11 验收</span></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式二 · 端到端全模态模型（Omni）」· 实验 6-6 · 数据：配套仓库 chapter6/end-to-end-speech 验收记录（2026-08-01，MiniCPM-o 4.5）</div>
+</section>
+<style>
+#c06-exp6 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-exp6 .e6-body{display:flex;gap:28px;height:660px}
+#c06-exp6 .e6-cases{width:1020px;flex:none;display:flex;flex-direction:column;gap:12px}
+#c06-exp6 .e6-row{display:grid;grid-template-columns:226px 150px 1fr 128px;align-items:center;gap:14px;height:154px;padding:0 18px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:border-color .4s,background .4s}
+#c06-exp6 .e6-row.cur{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c06-exp6 .e6-q{display:flex;flex-direction:column;gap:6px}
+#c06-exp6 .e6-tag{align-self:flex-start;padding:2px 10px;border-radius:8px;font-size:15px;color:var(--ctx);border:1px solid color-mix(in srgb,var(--ctx) 45%,transparent);background:color-mix(in srgb,var(--ctx) 10%,transparent)}
+#c06-exp6 .e6-tag.p{color:var(--pink);border-color:color-mix(in srgb,var(--pink) 45%,transparent);background:color-mix(in srgb,var(--pink) 10%,transparent)}
+#c06-exp6 .e6-q b{font-size:19px;line-height:1.4}
+#c06-exp6 .e6-q small{font-size:15px;color:var(--text3)}
+#c06-exp6 .e6-wv{display:flex;flex-direction:column;align-items:center;gap:6px}
+#c06-exp6 .e6-wv span{font-size:15px;color:var(--text3)}
+#c06-exp6 .e6-bars{height:56px;display:flex;align-items:center;justify-content:center;width:150px}
+#c06-exp6 .e6-bars i{display:block;width:2.5px;height:calc(var(--h) * 52px);border-radius:2px;background:color-mix(in srgb,var(--acc) 75%,#fff);opacity:.75}
+#c06-exp6 .e6-bars.fast{gap:.6px}#c06-exp6 .e6-bars.mid{gap:1.6px}#c06-exp6 .e6-bars.slow{gap:2.8px}
+#c06-exp6 .e6-row.cur .e6-bars i{animation:c06e6-bar .42s ease-in-out infinite alternate;animation-delay:calc(var(--i) * -37ms)}
+@keyframes c06e6-bar{to{scale:1 .35}}
+#c06-exp6 .e6-path{display:flex;align-items:center;gap:8px;min-width:0}
+#c06-exp6 .e6-ar{flex:none;width:28px;height:2px;background:var(--line2);position:relative;transition:background .3s}
+#c06-exp6 .e6-ar::after{content:"";position:absolute;right:-1px;top:-4px;border:5px solid transparent;border-left:7px solid var(--line2);border-right:0;transition:border-color .3s}
+#c06-exp6 .e6-row.a1 .a1,#c06-exp6 .e6-row.a2 .a2{background:var(--acc)}
+#c06-exp6 .e6-row.a1 .a1::after,#c06-exp6 .e6-row.a2 .a2::after{border-left-color:var(--acc)}
+#c06-exp6 .e6-tx{flex:1;min-width:0;padding:8px 12px;border-radius:12px;font-size:15px;line-height:1.4;border:1px dashed var(--line2);color:var(--text2);opacity:.25;transition:opacity .4s,border-color .4s}
+#c06-exp6 .e6-tx em{font-style:normal}
+#c06-exp6 .e6-tx .t-c{display:none;font-family:var(--mono);color:#cbd5f5}
+#c06-exp6[data-m=cas] .e6-tx .t-c{display:inline}
+#c06-exp6[data-m=cas] .e6-tx .t-e{display:none}
+#c06-exp6[data-m=cas] .e6-tx{border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+#c06-exp6 .e6-row.tx .e6-tx{opacity:1}
+#c06-exp6 .e6-md{flex:none;padding:8px 12px;border-radius:12px;font:700 15px var(--num);color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 45%,transparent);background:color-mix(in srgb,var(--llm) 8%,transparent);transition:box-shadow .3s,background .3s}
+#c06-exp6 .e6-row.md .e6-md{background:color-mix(in srgb,var(--llm) 22%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--llm) 50%,transparent)}
+#c06-exp6 .e6-an{display:flex;align-items:center;gap:8px;opacity:0;transform:translateX(10px);transition:opacity .45s,transform .45s var(--ease)}
+#c06-exp6 .e6-row.an .e6-an{opacity:1;transform:none}
+#c06-exp6 .e6-a{font:700 16px/1.4 var(--mono);color:var(--text)}
+#c06-exp6 .e6-mk{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 17px var(--num);font-style:normal;color:#06101f;background:var(--text3)}
+#c06-exp6 .e6-row.ok .e6-mk{background:var(--ok);box-shadow:0 0 14px var(--ok)}
+#c06-exp6 .e6-row.bad .e6-mk{background:var(--bad);box-shadow:0 0 14px var(--bad)}
+#c06-exp6 .e6-row.bad .e6-a{color:#fecdd3}
+#c06-exp6 .e6-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-exp6 .e6-sc{padding:10px 18px}
+#c06-exp6 .e6-tr{display:grid;grid-template-columns:1fr 104px 104px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}
+#c06-exp6 .e6-tr:last-child{border-bottom:0}
+#c06-exp6 .e6-tr span{font-size:17px;color:var(--text2)}
+#c06-exp6 .e6-tr.h span{font-size:15px;color:var(--text3)}
+#c06-exp6 .e6-tr b,#c06-exp6 .e6-tr em{text-align:center;font-style:normal;border-radius:10px;padding:4px 0;transition:all .4s}
+#c06-exp6 .e6-tr b{font-size:17px;color:var(--text2)}
+#c06-exp6 .e6-tr em{font:800 24px var(--num);color:var(--text2)}
+#c06-exp6 .e6-tr .on{color:var(--text);background:color-mix(in srgb,var(--acc) 16%,transparent)}
+#c06-exp6 .e6-tr.t em.on{color:var(--acc)}
+#c06-exp6 .e6-why{padding:14px 18px;display:flex;flex-direction:column;gap:8px}
+#c06-exp6 .e6-why b{font-size:20px;color:var(--acc)}
+#c06-exp6 .e6-why p{font-size:16px;line-height:1.55;color:var(--text2)}
+#c06-exp6 .e6-k{display:inline-block;margin-right:8px;padding:0 8px;border-radius:6px;font-size:15px;font-weight:700}
+#c06-exp6 .e6-k.e{color:#06101f;background:var(--acc)}
+#c06-exp6 .e6-k.c{color:#06101f;background:var(--warn)}
+#c06-exp6 .e6-cav{display:flex;flex-direction:column;gap:8px}
+#c06-exp6 .e6-cav li{position:relative;padding:8px 12px 8px 30px;border-radius:12px;font-size:15px;line-height:1.5;color:var(--text2);background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#c06-exp6 .e6-cav li::before{content:"!";position:absolute;left:11px;top:8px;font:800 15px var(--num);color:var(--warn)}
+#c06-exp6 .e6-cav b{color:var(--warn)}
+#c06-exp6 .e6-env{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
+#c06-exp6 .e6-env span{padding:3px 10px;border-radius:8px;font:15px var(--num);color:var(--text3);border:1px solid var(--line)}
+</style>
+<script>
+HOOKS['c06-exp6'] = {
+  C: [
+    { tag: '语义算术', q: '12 盒 × 每盒 8 支，送出 17 支', exp: '79', pace: 'mid', tx: '“…twelve boxes with eight pencils in each box…”', e2e: ['听成 8 盒：64 − 17 = 47', 0], cas: ['96 − 17 = 79', 1] },
+    { tag: '语义算术', q: '上午 18 张 + 下午 24 张', exp: '42', pace: 'mid', tx: '“…eighteen tickets … twenty four tickets…”', e2e: ['18 + 24 = 42', 1], cas: ['42', 1] },
+    { tag: '副语言', q: '同一句话 · 快语速', exp: 'fast', pace: 'fast', tx: '“Please send the report before lunch.”', e2e: ['fast', 1], cas: ['slow', 0] },
+    { tag: '副语言', q: '同一句话 · 慢语速', exp: 'slow', pace: 'slow', tx: '“Please send the report before lunch.”', e2e: ['slow', 1], cas: ['slow', 1] },
+  ],
+  init(s) {
+    s.querySelector('.e6-cases').innerHTML = this.C.map((c, i) => {
+      const r = U.rand(17 + i * 31);
+      const bars = Array.from({ length: 26 }, (_, j) => `<i style="--h:${(0.22 + 0.78 * Math.abs(Math.sin(j * 0.85 + i) * 0.55 + r() * 0.45)).toFixed(2)};--i:${j}"></i>`).join('');
+      const pl = c.pace === 'fast' ? '快语速' : c.pace === 'slow' ? '慢语速' : '口述算术题';
+      return `<div class="e6-row" data-i="${i}">
+        <div class="e6-q"><span class="e6-tag${c.tag === '副语言' ? ' p' : ''}">${c.tag}</span><b>${c.q}</b><small>期望答案：${c.exp}</small></div>
+        <div class="e6-wv"><div class="e6-bars ${c.pace}">${bars}</div><span>${pl}</span></div>
+        <div class="e6-path"><i class="e6-ar a1"></i><span class="e6-tx"><em class="t-c">${c.tx}</em><em class="t-e">音频直接进入编码器与隐空间，不经过文字</em></span><i class="e6-ar a2"></i><span class="e6-md">MiniCPM-o 4.5</span></div>
+        <div class="e6-an"><span class="e6-a"></span><em class="e6-mk"></em></div>
+      </div>`;
+    }).join('');
+    this.set = U.seg(s.querySelector('.e6-seg'), (v) => this.mode(s, v));
+    s.querySelectorAll('.e6-row').forEach((r) => r.addEventListener('click', () => this.replay(s, +r.dataset.i)));
+  },
+  clear(r) { r.classList.remove('a1', 'a2', 'tx', 'md', 'an', 'ok', 'bad'); },
+  // 一行的动画：音频 → (转写) → 模型 → 答案与对错
+  async row(s, r, i, tk) {
+    const ctx = this.ctx;
+    if (!ctx) return false;
+    const ok = () => ctx.alive && tk === this.tk, [ans, good] = this.C[i][this.m];
+    s.querySelectorAll('.e6-row').forEach((x) => x.classList.toggle('cur', x === r));
+    r.querySelector('.e6-a').textContent = ans;
+    r.querySelector('.e6-mk').textContent = good ? '✓' : '✗';
+    for (const [cls, ms] of [['a1', 520], ['tx', 420], ['a2', 480], ['md', 480], ['an', 520]]) {
+      await U.wait(ctx, ms);
+      if (!ok()) return false;
+      r.classList.add(cls);
+    }
+    r.classList.add(good ? 'ok' : 'bad');
+    await U.wait(ctx, 900);
+    return ok();
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    s.dataset.m = m;
+    this.set(m);
+    s.querySelectorAll('.e6-sc [data-c]').forEach((x) => x.classList.toggle('on', x.dataset.c === m));
+    const rows = [...s.querySelectorAll('.e6-row')];
+    rows.forEach((r) => { this.clear(r); r.classList.remove('cur'); });
+    if (!ctx) return;
+    const run = async () => {
+      while (ctx.alive && tk === this.tk) {
+        for (let i = 0; i < rows.length; i++) if (!(await this.row(s, rows[i], i, tk))) return;
+        rows.forEach((r) => r.classList.remove('cur'));
+        await U.wait(ctx, 2600);
+        if (!(ctx.alive && tk === this.tk)) return;
+        rows.forEach((r) => this.clear(r));
+      }
+    };
+    run();
+  },
+  replay(s, i) {
+    if (!this.ctx) return;
+    const tk = (this.tk = (this.tk || 0) + 1), r = s.querySelectorAll('.e6-row')[i];
+    this.clear(r);
+    this.row(s, r, i, tk);
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 'cas' : 'e2e'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'cas' : 'e2e'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.dataset.m = '';
+    s.querySelectorAll('.e6-row').forEach((r) => { this.clear(r); r.classList.remove('cur'); });
+    s.querySelectorAll('.e6-sc [data-c]').forEach((x) => x.classList.remove('on'));
+  },
+};
+</script>
+<section class="slide" id="c06-duplex" data-part="4" data-steps="2" data-trans="flip" data-dur="15000" data-title="范式三 · 全双工交互模型" data-notes="Omni 仍然把对话分成“用户说”和“模型说”两个时段，但同声传译等任务要求两者重叠进行。<b>全双工模型因此不再预设轮次，而是持续听、持续说，并不断决定继续、停顿、打断或调用工具。</b><br>研究上的先声是 Kyutai 的 <b>Moshi</b>（2024）：它并行建模用户和模型的音频流，因此重叠说话和打断可以成为模型的自然行为。Thinking Machines Lab 将这类路线称为<b>交互模型（Interaction Model）</b>：交互性不再依靠 VAD 等外部 harness 拼装实现，而是内建在模型中。其<b>微轮次</b>机制以短音频块持续推进，让静音、重叠和打断都作为连续上下文保留；交互模型还可以把完整对话委派给后台推理模型，自己继续维持话头，后台结果返回后，前台再在合适时机接入。OpenAI 的 <b>GPT-Live</b> 则把全双工路线带到生产规模：模型持续处理输入并生成输出，能等待用户、附和、被打断，也能处理实时翻译；它与交互模型一样，把复杂任务委派给后台模型，前台继续维持对话。<br>左侧三种场景均为示意，按 → 或点击右上角切换：轮次式下，附和“嗯”被当成打断，每次换手都要先等 VAD；全双工对话中，附和、停顿时继续等待、被打断时让出话头、委派后台再接入，都是模型在每个微轮次上的持续决策；同声传译中，两条音频流重叠进行。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">范式三 · 全双工：<em>不再预设轮次</em></h2>
+  <p class="lead fx fx-up" style="--d:2">持续听、持续说，并不断决定继续、停顿、打断或调用工具</p></div>
+    <div class="dx-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="turn">轮次式（Omni）</button><button data-v="duplex">全双工对话</button><button data-v="interp">同声传译</button></div></header>
+  <div class="dx-body">
+    <div class="dx-main fx fx-left" style="--d:3">
+      <div class="dx-cvw panel"><canvas class="dx-cv" width="2160" height="840"></canvas><span class="chip warn dx-sim">示意</span></div>
+      <div class="dx-dec panel"><div class="dx-dh"><span class="lbl">模型的持续决策</span><span class="dx-note"></span></div><div class="dx-list"></div></div>
+    </div>
+    <div class="dx-side fx fx-right" style="--d:4">
+      <div class="dx-card" data-i="0" style="--c:#f472b6"><div class="dx-ch"><b>Moshi</b><span>Kyutai · 2024 · 研究先声</span></div>
+        <p>并行建模用户和模型的音频流——重叠说话和打断成为模型的<em>自然行为</em></p></div>
+      <div class="dx-card" data-i="1" style="--c:#c084fc"><div class="dx-ch"><b>交互模型（Interaction Model）</b><span>Thinking Machines Lab</span></div>
+        <ul><li>交互性内建在模型中，不再靠 VAD 等外部 harness 拼装</li><li><em>微轮次</em>：短音频块持续推进，静音、重叠、打断都作为连续上下文保留</li><li>把完整对话委派给后台推理模型，自己继续维持话头</li></ul></div>
+      <div class="dx-card" data-i="2" style="--c:#60a5fa"><div class="dx-ch"><b>GPT-Live</b><span>OpenAI · 生产规模</span></div>
+        <ul><li>持续处理输入并生成输出：能等待、附和、被打断</li><li>也能处理<em>实时翻译</em></li><li>复杂任务委派给后台模型，前台继续维持对话</li></ul></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式三 · 全双工交互模型」</div>
+</section>
+<style>
+#c06-duplex .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-duplex .dx-body{display:flex;gap:30px;height:660px}
+#c06-duplex .dx-main{width:1080px;flex:none;display:flex;flex-direction:column;gap:14px}
+#c06-duplex .dx-cvw{position:relative;height:440px;padding:0}
+#c06-duplex .dx-cv{display:block;width:1080px;height:420px;margin-top:10px}
+#c06-duplex .dx-sim{position:absolute;right:14px;top:12px;font-size:15px;padding:3px 10px}
+#c06-duplex .dx-dec{flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:8px}
+#c06-duplex .dx-dh{display:flex;align-items:center;gap:14px}
+#c06-duplex .dx-note{font-size:16px;color:var(--text2)}
+#c06-duplex .dx-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#c06-duplex .dx-it{display:flex;align-items:center;gap:10px;padding:7px 12px;border-radius:12px;font-size:16px;color:var(--text);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent);animation:upIn .45s var(--spring) both}
+#c06-duplex .dx-it em{flex:none;font:700 15px var(--num);font-style:normal;color:var(--acc);min-width:44px}
+#c06-duplex .dx-it.bad{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+#c06-duplex .dx-it.bad em{color:var(--bad)}
+#c06-duplex .dx-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-duplex .dx-card{--c:var(--acc);flex:1;padding:16px 20px;border-radius:18px;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.015));display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:border-color .4s,box-shadow .4s,opacity .4s,translate .45s var(--ease)}
+#c06-duplex .dx-card.on{border-color:color-mix(in srgb,var(--c) 65%,transparent);box-shadow:0 0 34px -8px color-mix(in srgb,var(--c) 60%,transparent);translate:-6px 0}
+#c06-duplex .dx-card.dim{opacity:.5}
+#c06-duplex .dx-ch{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#c06-duplex .dx-ch b{font-size:22px;color:var(--c)}
+#c06-duplex .dx-ch span{font-size:15px;color:var(--text3)}
+#c06-duplex .dx-card p{font-size:17px;line-height:1.6;color:var(--text2)}
+#c06-duplex .dx-card ul{display:flex;flex-direction:column;gap:5px}
+#c06-duplex .dx-card li{position:relative;padding-left:14px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c06-duplex .dx-card li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--c)}
+#c06-duplex .dx-card em{font-style:normal;font-weight:700;color:var(--text)}
+</style>
+<script>
+HOOKS['c06-duplex'] = {
+  W: 1080, H: 420, X0: 132, X1: 1056, T: 12,
+  F: '"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif',
+  LANES: [{ n: '用户', y: 92, c: '#fbbf24' }, { n: '前台模型', y: 214, c: '#c084fc' }, { n: '后台推理模型', y: 336, c: '#22d3ee' }],
+  SC: {
+    turn: {
+      note: 'Omni 仍把对话分成“用户说”和“模型说”两个时段',
+      bgNote: '轮次式：不委派后台',
+      segs: [
+        { l: 0, a: 0.3, b: 2.6, t: '帮我订明天去上海的机票' },
+        { l: 1, a: 3.3, b: 5.0, t: '好的，请问要上午……' },
+        { l: 0, a: 4.6, b: 4.95, t: '嗯', k: 'bc' },
+        { l: 1, a: 5.7, b: 7.6, t: '请问要上午还是下午？' },
+        { l: 0, a: 8.1, b: 9.1, t: '下午' },
+        { l: 1, a: 9.8, b: 11.7, t: '好的，正在为您查询' },
+      ],
+      gaps: [{ a: 2.6, b: 3.3 }, { a: 4.95, b: 5.7 }, { a: 9.1, b: 9.8 }],
+      marks: [{ t: 5.0, l: 1, c: '#fb7185', txt: '附和被当成打断 → 停止生成' }],
+      dec: [
+        { t: 0.3, txt: '用户开口：模型只听，不说' },
+        { t: 2.6, txt: '用户静音：VAD 开始计时' },
+        { t: 3.3, txt: '静音超过阈值 → 轮到模型说' },
+        { t: 4.6, txt: '检测到用户声音（其实只是附和）' },
+        { t: 5.0, txt: '按打断处理：停止当前生成', bad: 1 },
+        { t: 5.7, txt: '再等一段静音后，重说一遍' },
+        { t: 9.8, txt: '每次换手都要先等 VAD 判定' },
+      ],
+    },
+    duplex: {
+      note: '每个微轮次都在决定：继续、停顿、打断还是调用工具',
+      ticks: 1,
+      segs: [
+        { l: 0, a: 0.3, b: 2.4, t: '帮我订明天去上海的机票，' },
+        { l: 1, a: 1.3, b: 1.65, t: '嗯', k: 'bc' },
+        { l: 0, a: 3.1, b: 4.2, t: '要下午的' },
+        { l: 1, a: 4.4, b: 6.45, t: '好的，下午有几个航班……' },
+        { l: 0, a: 6.0, b: 6.9, t: '要直飞的', below: 1 },
+        { l: 1, a: 7.1, b: 8.3, t: '明白，我查一下直飞' },
+        { l: 2, a: 7.3, b: 10.2, t: '后台推理：比较直飞航班', k: 'th' },
+        { l: 1, a: 8.9, b: 9.7, t: '稍等，马上好', below: 1 },
+        { l: 1, a: 10.4, b: 11.9, t: '下午三点有一班直飞' },
+      ],
+      pause: { l: 0, a: 2.4, b: 3.1, txt: '停顿 ≠ 说完' },
+      marks: [{ t: 6.0, l: 0, c: '#fb923c', txt: '用户打断', up: 1 }, { t: 6.45, l: 1, c: '#34d399', txt: '让出话头' }],
+      arrows: [{ t: 7.3, f: 1, to: 2, txt: '委派完整对话' }, { t: 10.2, f: 2, to: 1, txt: '结果返回' }],
+      dec: [
+        { t: 0.4, txt: '持续听', c: 1 },
+        { t: 1.3, txt: '附和“嗯”，不抢话', c: 0 },
+        { t: 2.5, txt: '用户停顿：继续等，不判定说完', c: 1 },
+        { t: 4.4, txt: '开口回应', c: 1 },
+        { t: 6.0, txt: '边说边听：听到用户打断', c: 0 },
+        { t: 6.45, txt: '停下来，让出话头', c: 0 },
+        { t: 7.3, txt: '把完整对话委派给后台推理模型', c: 1 },
+        { t: 8.9, txt: '维持话头：先请用户稍等', c: 2 },
+        { t: 10.4, txt: '后台结果返回 → 在合适时机接入', c: 1 },
+      ],
+    },
+    interp: {
+      note: '同声传译：两条音频流必须重叠进行',
+      bgNote: '本场景无需委派后台',
+      ticks: 1,
+      segs: [
+        { l: 0, a: 0.3, b: 3.0, t: '各位好，今天我们讨论' },
+        { l: 0, a: 3.3, b: 6.8, t: '语音 Agent 的交互时序' },
+        { l: 0, a: 7.1, b: 10.6, t: '以及全双工模型的优势' },
+        { l: 1, a: 1.4, b: 4.2, t: 'Hello everyone, today we discuss', en: 1 },
+        { l: 1, a: 4.5, b: 8.0, t: 'the interaction timing of voice agents', en: 1 },
+        { l: 1, a: 8.3, b: 11.8, t: 'and the advantages of full-duplex models', en: 1 },
+      ],
+      dec: [
+        { t: 0.4, txt: '持续听', c: 0 },
+        { t: 1.4, txt: '不等说完：边听边译', c: 2 },
+        { t: 3.3, txt: '两条音频流重叠进行', c: 0 },
+        { t: 7.1, txt: '持续跟随，不预设轮次', c: 2 },
+      ],
+    },
+  },
+  init(s) {
+    this.cv = s.querySelector('.dx-cv');
+    this.g = this.cv.getContext('2d');
+    this.g.setTransform(2, 0, 0, 2, 0, 0);
+    const r = U.rand(606);
+    this.N = Array.from({ length: 640 }, () => r());
+    this.set = U.seg(s.querySelector('.dx-seg'), (v) => this.mode(s, v));
+    s.querySelectorAll('.dx-card').forEach((c) => c.addEventListener('click', () => this.hl(s, +c.dataset.i, true)));
+  },
+  x(t) { return this.X0 + (t / this.T) * (this.X1 - this.X0); },
+  hl(s, i, hold) {
+    if (hold) this.hold = true;
+    s.querySelectorAll('.dx-card').forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', i >= 0 && j !== i); });
+  },
+  rr(x, y, w, h, r) {
+    const g = this.g;
+    g.beginPath();
+    if (g.roundRect) g.roundRect(x, y, w, h, r);
+    else g.rect(x, y, w, h);
+  },
+  // 画一帧：三条泳道、已经“发生”的片段、标记、委派箭头、微轮次刻度、播放头
+  draw(t) {
+    const g = this.g, sc = this.SC[this.m], F = this.F, L = this.LANES;
+    g.clearRect(0, 0, this.W, this.H);
+    g.textBaseline = 'middle';
+    L.forEach((ln, i) => {
+      g.fillStyle = 'rgba(255,255,255,0.035)';
+      this.rr(this.X0 - 10, ln.y - 44, this.X1 - this.X0 + 20, 88, 14);
+      g.fill();
+      g.fillStyle = ln.c;
+      g.font = '700 17px ' + F;
+      g.textAlign = 'left';
+      g.fillText(ln.n, 14, ln.y);
+      if (i === 2 && sc.bgNote) { g.fillStyle = 'rgba(165,175,201,0.55)'; g.font = '15px ' + F; g.fillText(sc.bgNote, this.X0 + 10, ln.y); }
+    });
+    g.textAlign = 'center';
+    for (let k = 0; k <= this.T; k++) {
+      const x = this.x(k);
+      g.strokeStyle = 'rgba(255,255,255,0.05)';
+      g.lineWidth = 1;
+      g.beginPath(); g.moveTo(x, 44); g.lineTo(x, 384); g.stroke();
+      if (k % 2 === 0) { g.fillStyle = 'rgba(165,175,201,0.75)'; g.font = '15px ' + F; g.fillText(k + 's', x, 404); }
+    }
+    (sc.gaps || []).forEach((gp) => {
+      if (t < gp.a) return;
+      const xa = this.x(gp.a), xb = this.x(Math.min(gp.b, t));
+      g.fillStyle = 'rgba(251,146,60,0.13)';
+      g.fillRect(xa, 48, xb - xa, 210);
+      g.setLineDash([4, 4]); g.strokeStyle = 'rgba(251,146,60,0.6)'; g.strokeRect(xa, 48, xb - xa, 210); g.setLineDash([]);
+      g.fillStyle = '#fb923c'; g.font = '600 15px ' + F; g.fillText('等静音', (this.x(gp.a) + this.x(gp.b)) / 2, 153);
+    });
+    if (sc.pause && t >= sc.pause.a) {
+      const p = sc.pause, y = L[p.l].y, xa = this.x(p.a), xb = this.x(Math.min(p.b, t));
+      g.setLineDash([4, 4]); g.strokeStyle = 'rgba(251,191,36,0.6)'; g.strokeRect(xa, y - 26, xb - xa, 52); g.setLineDash([]);
+      g.fillStyle = '#fbbf24'; g.font = '600 15px ' + F; g.fillText(p.txt, (this.x(p.a) + this.x(p.b)) / 2, y + 34);
+    }
+    sc.segs.forEach((sg) => {
+      if (t < sg.a) return;
+      const ln = L[sg.l], y = ln.y, xa = this.x(sg.a), xb = this.x(sg.b), xe = this.x(Math.min(sg.b, t));
+      if (sg.k === 'th') {
+        g.setLineDash([8, 6]); g.lineDashOffset = -t * 30;
+        g.strokeStyle = ln.c; g.lineWidth = 2;
+        this.rr(xa, y - 18, Math.max(4, xe - xa), 36, 10); g.stroke();
+        g.setLineDash([]); g.lineDashOffset = 0;
+        g.fillStyle = 'rgba(34,211,238,0.08)'; g.fill();
+        g.fillStyle = '#a5f3fc'; g.font = '600 16px ' + F; g.fillText(sg.t, (xa + xb) / 2, y);
+        return;
+      }
+      const amp = sg.k === 'bc' ? 12 : 24;
+      g.fillStyle = ln.c;
+      for (let x = xa; x < xe; x += 4) {
+        const u = (x - xa) / Math.max(1, xb - xa), env = Math.pow(Math.sin(Math.PI * Math.min(1, Math.max(0, u))), 0.45);
+        const n = this.N[Math.floor(x) % this.N.length], syl = 0.55 + 0.45 * Math.abs(Math.sin(x * 0.11 + sg.a));
+        const h = Math.max(1.5, amp * env * syl * (0.35 + 0.65 * n));
+        g.globalAlpha = 0.85;
+        g.fillRect(x, y - h, 2.4, h * 2);
+      }
+      g.globalAlpha = 1;
+      g.fillStyle = '#e9edf8';
+      g.font = (sg.en ? '15px ' : '600 16px ') + F;
+      g.textAlign = 'left';
+      g.fillText(sg.t, xa, sg.below ? y + 34 : y - 34);
+      g.textAlign = 'center';
+    });
+    (sc.marks || []).forEach((mk) => {
+      if (t < mk.t) return;
+      const y = L[mk.l].y, x = this.x(mk.t);
+      g.strokeStyle = mk.c; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(x, y - 42); g.lineTo(x, y + 42); g.stroke();
+      g.fillStyle = mk.c; g.font = '700 15px ' + F; g.textAlign = 'left';
+      g.fillText(mk.txt, x + 6, mk.up ? y - 34 : y + 34);
+      g.textAlign = 'center';
+    });
+    (sc.arrows || []).forEach((ar) => {
+      if (t < ar.t) return;
+      const x = this.x(ar.t), y1 = L[ar.f].y + (ar.to > ar.f ? 30 : -22), y2 = L[ar.to].y + (ar.to > ar.f ? -22 : 30);
+      g.strokeStyle = '#22d3ee'; g.lineWidth = 2.5;
+      g.beginPath(); g.moveTo(x, y1); g.lineTo(x, y2); g.stroke();
+      const d = y2 > y1 ? 1 : -1;
+      g.fillStyle = '#22d3ee';
+      g.beginPath(); g.moveTo(x, y2); g.lineTo(x - 7, y2 - d * 11); g.lineTo(x + 7, y2 - d * 11); g.closePath(); g.fill();
+      g.font = '600 15px ' + F; g.textAlign = 'left';
+      g.fillText(ar.txt, x + 10, (L[ar.f].y + L[ar.to].y) / 2);
+      g.textAlign = 'center';
+    });
+    if (sc.ticks) {
+      const y = L[1].y - 40;
+      let last = 0;
+      for (let tt = 0; tt <= t + 1e-6; tt += 0.25) { last = tt; g.fillStyle = 'rgba(192,132,252,0.45)'; g.fillRect(this.x(tt) - 1, y, 2, 7); }
+      g.fillStyle = '#f0abfc'; g.fillRect(this.x(last) - 2, y - 2, 4, 11);
+      g.font = '15px ' + F; g.textAlign = 'right'; g.fillStyle = 'rgba(240,171,252,0.85)';
+      g.fillText('微轮次：短音频块持续推进', this.X1 - 4, y + 4);
+      g.textAlign = 'center';
+    }
+    const xp = this.x(t);
+    g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(xp, 40); g.lineTo(xp, 384); g.stroke();
+    g.fillStyle = '#fff'; g.beginPath(); g.arc(xp, 40, 5, 0, 6.283); g.fill();
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(m);
+    this.hold = false;
+    const sc = this.SC[m];
+    s.querySelector('.dx-note').textContent = sc.note;
+    const list = s.querySelector('.dx-list');
+    list.innerHTML = '';
+    this.hl(s, -1);
+    this.t0 = performance.now();
+    this.di = 0;
+    if (!this.ctx) { this.draw(this.T); return; }
+  },
+  tick(s, now) {
+    const sc = this.SC[this.m], list = s.querySelector('.dx-list');
+    let t = (now - this.t0) / 1000;
+    if (t > this.T + 2.2) { this.t0 = now; this.di = 0; list.innerHTML = ''; t = 0; if (!this.hold) this.hl(s, -1); }
+    const tt = Math.min(t, this.T);
+    while (this.di < sc.dec.length && sc.dec[this.di].t <= tt) {
+      const d = sc.dec[this.di++];
+      list.insertAdjacentHTML('beforeend', `<div class="dx-it${d.bad ? ' bad' : ''}"><em>${d.t.toFixed(1)}s</em><span>${d.txt}</span></div>`);
+      while (list.children.length > 4) list.firstElementChild.remove();
+      if (!this.hold && d.c != null) this.hl(s, d.c);
+    }
+    this.draw(tt);
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.mode(s, ['turn', 'duplex', 'interp'][k] || 'turn');
+    ctx.raf((now) => this.tick(s, now));
+  },
+  step(s, ctx, k) { this.mode(s, ['turn', 'duplex', 'interp'][k] || 'turn'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.g.clearRect(0, 0, this.W, this.H);
+    s.querySelector('.dx-list').innerHTML = '';
+    this.hl(s, -1);
+  },
+};
+</script>
+
+<section class="slide" id="c06-fast1" data-part="4" data-steps="1" data-dur="12000" data-title="方案一：快思考回应，慢思考回答" data-notes="<b>“交互表现”和“智能上限”是两个维度</b>：前台模型要在用户仍然在线时回应，后台模型则可以花更多时间思考。下面三种方案是<b>设计取舍，不是线性迭代</b>；前两种可以套在级联或 Omni 上，第三种则把深度思考与实时表达统一在同一模型内部。<br><b>方案一：快思考回应，慢思考回答。</b>快思考可以在几百毫秒内先给出即时回应，慢思考则在后台完成更深的推导。它的问题是<b>简单问题会被重复处理</b>，复杂问题又可能出现<b>前后不一致</b>：快模型先建议购买，慢模型随后发现套餐缺少关键功能，用户在几秒内便听到相互冲突的答案。<b>根本原因是两个实例各自完成了一次独立思考。</b><br>图6-10 的例子：用户问“选哪个套餐？”，快思考约 500ms（思考关闭）回答“价格不错，建议购买”，慢思考约 8s（思考开启）得出“缺少国际漫游，不太适合”——自相矛盾，用户失去信任；而“今天星期几”这类问题，快思考已经答对，慢思考仍会运行 8s。时间轴为加速播放，第二个问题的回答内容为示意；按 → 或点击右上角切换两个问题。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">方案一：快思考回应，<em>慢思考回答</em></h2>
+  <p class="lead fx fx-up" style="--d:2">两个实例各自完成一次独立思考：简单问题被重复处理，复杂问题前后矛盾</p></div>
+    <div class="f1-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="hard">复杂：选哪个套餐？</button><button data-v="easy">简单：今天星期几？</button></div></header>
+  <div class="f1-top fx fx-up" style="--d:3">
+    <div class="f1-dim"><span class="lbl">认知时序 · 两个维度</span><div><span class="chip acc">交互表现 · 前台：用户仍在线时回应</span><span class="chip llm">智能上限 · 后台：可以花更多时间思考</span></div></div>
+    <div class="f1-sch">
+      <span class="f1-s on"><em>方案一</em>快思考回应，慢思考回答</span>
+      <span class="f1-s"><em>方案二</em>快思考交互，慢思考提醒</span>
+      <span class="f1-s"><em>方案三</em>端到端思考与表达统一</span>
+      <small>前两种可以套在级联或 Omni 上，第三种统一在同一模型内部 · 设计取舍，不是线性迭代</small>
+    </div>
+  </div>
+  <div class="f1-main fx fx-up" style="--d:4">
+    <div class="f1-user panel"><span class="lbl">用户输入</span><div class="f1-q"></div><svg class="ic f1-ar"><use href="#i-arrow"/></svg></div>
+    <div class="f1-par">
+      <b class="f1-pt">并行思考</b><span class="chip warn f1-acc">时间轴加速播放</span>
+      <div class="f1-lane" data-l="fast"><span class="f1-ll">快思考 ~500ms（思考关闭）</span><div class="f1-trk"><i class="f1-fill"></i></div><div class="f1-bub"></div></div>
+      <div class="f1-lane" data-l="slow"><span class="f1-ll">慢思考 ~8s（思考开启）</span><div class="f1-trk"><i class="f1-fill"></i></div><div class="f1-bub"></div></div>
+      <div class="f1-axis"></div>
+      <i class="f1-ph"></i>
+    </div>
+    <div class="f1-ux panel"><span class="lbl">用户体验</span><div class="f1-log"></div>
+      <div class="f1-mt"><span class="f1-mn"></span><div class="meter"><i class="f1-mv"></i></div></div></div>
+  </div>
+  <div class="f1-bot">
+    <div class="f1-pb fx fx-up" data-i="0" style="--d:5"><b>问题一：简单问题过度思考</b><p>“今天星期几”→ 快思考已对 → 慢思考仍运行 8s</p></div>
+    <div class="f1-pb fx fx-up" data-i="1" style="--d:6"><b>问题二：快慢不一致</b><p>独立思考路径，假设可能完全不同</p></div>
+    <div class="f1-root fx fx-up" style="--d:7"><svg class="ic"><use href="#i-target"/></svg><span>根本原因：<b>两个实例各自完成了一次独立思考</b></span></div>
+  </div>
+  <div class="src">第六章 ·「认知时序：实时交互与深度思考」·「方案一：快思考回应，慢思考回答」· 图6-10</div>
+</section>
+<style>
+#c06-fast1 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-fast1 .f1-top{display:flex;gap:24px;align-items:stretch;height:96px}
+#c06-fast1 .f1-dim{width:560px;flex:none;padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:10px}
+#c06-fast1 .f1-dim div{display:flex;gap:8px;flex-wrap:wrap}
+#c06-fast1 .f1-dim .chip{font-size:15px;padding:4px 12px}
+#c06-fast1 .f1-sch{flex:1;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+#c06-fast1 .f1-s{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:12px;font-size:16px;color:var(--text3);border:1px solid var(--line)}
+#c06-fast1 .f1-s em{font-style:normal;font-weight:700;font-size:15px}
+#c06-fast1 .f1-s.on{color:var(--text);border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+#c06-fast1 .f1-s.on em{color:var(--acc)}
+#c06-fast1 .f1-sch small{width:100%;font-size:15px;color:var(--text3)}
+#c06-fast1 .f1-main{display:flex;gap:26px;align-items:stretch;height:352px;margin-top:18px}
+#c06-fast1 .f1-user{position:relative;width:206px;flex:none;padding:16px;display:flex;flex-direction:column;gap:12px;justify-content:center}
+#c06-fast1 .f1-q{padding:12px 14px;border-radius:14px;font-size:20px;line-height:1.4;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.38)}
+#c06-fast1 .f1-ar{position:absolute;right:-24px;top:50%;margin-top:-11px;font-size:22px;color:var(--text3)}
+#c06-fast1 .f1-par{position:relative;width:860px;flex:none;padding:14px 24px;border-radius:20px;border:2px dashed var(--line2)}
+#c06-fast1 .f1-pt{font-size:18px;color:var(--text2)}
+#c06-fast1 .f1-acc{position:absolute;right:18px;top:12px;font-size:15px;padding:2px 10px}
+#c06-fast1 .f1-lane{position:relative;height:126px;margin-top:6px}
+#c06-fast1 .f1-ll{display:block;font-size:18px;font-weight:700}
+#c06-fast1 .f1-lane[data-l=fast] .f1-ll{color:var(--acc2)}
+#c06-fast1 .f1-lane[data-l=slow] .f1-ll{color:var(--llm)}
+#c06-fast1 .f1-trk{position:relative;height:22px;margin-top:8px;border-radius:8px;background:rgba(255,255,255,.06)}
+#c06-fast1 .f1-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:8px}
+#c06-fast1 .f1-lane[data-l=fast] .f1-fill{background:linear-gradient(90deg,var(--acc2),#f9a8d4)}
+#c06-fast1 .f1-lane[data-l=slow] .f1-fill{background:linear-gradient(90deg,#7c3aed,var(--llm))}
+#c06-fast1 .f1-bub{position:absolute;top:66px;padding:8px 14px;border-radius:14px;font-size:18px;white-space:nowrap;opacity:0;translate:0 8px;transition:opacity .4s,translate .4s var(--ease)}
+#c06-fast1 .f1-bub.on{opacity:1;translate:0 0}
+#c06-fast1 .f1-lane[data-l=fast] .f1-bub{left:20px;background:color-mix(in srgb,var(--acc2) 14%,transparent);border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent)}
+#c06-fast1 .f1-lane[data-l=slow] .f1-bub{right:66px;background:color-mix(in srgb,var(--llm) 14%,transparent);border:1px solid color-mix(in srgb,var(--llm) 45%,transparent)}
+#c06-fast1 .f1-axis{position:relative;height:26px;margin-top:4px;border-top:1px solid var(--line2)}
+#c06-fast1 .f1-axis span{position:absolute;top:4px;transform:translateX(-50%);font:15px var(--num);color:var(--text3)}
+#c06-fast1 .f1-ph{position:absolute;top:44px;bottom:30px;width:2px;background:#fff;box-shadow:0 0 10px #fff;opacity:.7}
+#c06-fast1 .f1-ux{flex:1;min-width:0;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+#c06-fast1 .f1-log{display:flex;flex-direction:column;gap:8px}
+#c06-fast1 .f1-log div{font-size:17px;line-height:1.5;animation:upIn .45s var(--spring) both}
+#c06-fast1 .f1-log .v{font-weight:700;color:var(--bad)}
+#c06-fast1 .f1-log .w{font-weight:700;color:var(--warn)}
+#c06-fast1 .f1-mt{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+#c06-fast1 .f1-mn{font-size:15px;color:var(--text3)}
+#c06-fast1 .f1-mv{transition:width .9s var(--ease)}
+#c06-fast1 .f1-bot{display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:18px;margin-top:18px}
+#c06-fast1 .f1-pb{padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:border-color .4s,background .4s}
+#c06-fast1 .f1-pb b{font-size:19px}
+#c06-fast1 .f1-pb p{font-size:16px;color:var(--text2);margin-top:6px}
+#c06-fast1 .f1-pb.on{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 9%,transparent)}
+#c06-fast1 .f1-pb.on b{color:#fecdd3}
+#c06-fast1 .f1-root{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 16%,transparent),transparent);border-left:4px solid var(--acc);font-size:18px;line-height:1.5}
+#c06-fast1 .f1-root .ic{font-size:28px;color:var(--acc);flex:none}
+#c06-fast1 .f1-root b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c06-fast1'] = {
+  PX: 90, SPEED: 0.6,
+  Q: {
+    hard: { q: '选哪个套餐？', fast: '“价格不错，建议购买”', slow: '“缺少国际漫游，不太适合”', ux: ['0.5s：“价格不错，建议购买”', '8.0s：“缺少国际漫游，不适合”'], v: [['v', '→ 自相矛盾！'], ['v', '→ 用户失去信任']], mn: '用户信任（示意）', m0: 100, m1: 22, p: 1 },
+    easy: { q: '今天星期几？', fast: '“今天是星期三”', slow: '“今天是星期三”', ux: ['0.5s：“今天是星期三”', '8.0s：“今天是星期三”（示意）'], v: [['w', '→ 快思考已经答对，慢思考仍运行 8s'], ['w', '→ 简单问题被重复处理']], mn: '白白消耗的思考（示意）', m0: 0, m1: 100, p: 0 },
+  },
+  init(s) {
+    s.querySelector('.f1-axis').innerHTML = Array.from({ length: 10 }, (_, i) => `<span style="left:${i * this.PX}px">${i}s</span>`).join('');
+    this.set = U.seg(s.querySelector('.f1-seg'), (v) => this.mode(s, v));
+    s.querySelectorAll('.f1-pb').forEach((b) => b.addEventListener('click', () => this.mode(s, +b.dataset.i === 0 ? 'easy' : 'hard')));
+  },
+  mode(s, m) {
+    const q = this.Q[m];
+    this.m = m;
+    this.set(m);
+    this.t0 = performance.now();
+    this.shown = 0;
+    s.querySelector('.f1-q').textContent = '“' + q.q + '”';
+    s.querySelector('[data-l=fast] .f1-bub').textContent = q.fast;
+    s.querySelector('[data-l=slow] .f1-bub').textContent = q.slow;
+    s.querySelectorAll('.f1-bub').forEach((b) => b.classList.remove('on'));
+    s.querySelector('.f1-log').innerHTML = '';
+    s.querySelector('.f1-mn').textContent = q.mn;
+    s.querySelector('.f1-mv').style.width = q.m0 + '%';
+    s.querySelector('.f1-mv').style.setProperty('--c', m === 'hard' ? 'var(--ok)' : 'var(--warn)');
+    s.querySelectorAll('.f1-pb').forEach((b) => b.classList.toggle('on', +b.dataset.i === q.p));
+  },
+  tick(s, now) {
+    const q = this.Q[this.m], log = s.querySelector('.f1-log'), PX = this.PX;
+    let t = (now - this.t0) / 1000 / this.SPEED;
+    if (t > 15) { this.mode(s, this.m); t = 0; }
+    const tt = Math.min(t, 9);
+    s.querySelector('[data-l=fast] .f1-fill').style.width = Math.min(tt, 0.5) * PX + 'px';
+    s.querySelector('[data-l=slow] .f1-fill').style.width = Math.min(tt, 8) * PX + 'px';
+    s.querySelector('.f1-ph').style.left = 24 + tt * PX + 'px';
+    const ev = [[0.5, () => { s.querySelector('[data-l=fast] .f1-bub').classList.add('on'); log.insertAdjacentHTML('beforeend', `<div>${q.ux[0]}</div>`); }],
+      [8.0, () => { s.querySelector('[data-l=slow] .f1-bub').classList.add('on'); log.insertAdjacentHTML('beforeend', `<div>${q.ux[1]}</div>`); s.querySelector('.f1-mv').style.width = q.m1 + '%'; }],
+      [8.4, () => log.insertAdjacentHTML('beforeend', `<div class="${q.v[0][0]}">${q.v[0][1]}</div>`)],
+      [8.9, () => log.insertAdjacentHTML('beforeend', `<div class="${q.v[1][0]}">${q.v[1][1]}</div>`)]];
+    while (this.shown < ev.length && ev[this.shown][0] <= tt) ev[this.shown++][1]();
+    if (this.m === 'easy' && tt > 0.5 && tt < 8) s.querySelector('.f1-mv').style.width = ((tt - 0.5) / 7.5) * 100 + '%';
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.mode(s, k >= 1 ? 'easy' : 'hard');
+    ctx.raf((now) => this.tick(s, now));
+  },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'easy' : 'hard'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    s.querySelectorAll('.f1-bub').forEach((b) => b.classList.remove('on'));
+    s.querySelector('.f1-log').innerHTML = '';
+    s.querySelectorAll('.f1-fill').forEach((f) => (f.style.width = 0));
+  },
+};
+</script>
+
+<section class="slide" id="c06-fast23" data-part="4" data-steps="1" data-trans="zoom" data-dur="14000" data-title="方案二与方案三：提醒式与端到端统一" data-notes="<b>方案二：快思考交互，慢思考提醒。</b>后台模型通过状态栏或专门接口向前台模型提供建议，前台继续维持话头并决定如何表达。它比方案一稳定，但通信仍然间接：<b>前台可能误解建议</b>（图6-10：把“确认价格”理解成“向用户确认”而非“重新计算”），<b>也看不到后台的中间思考</b>；在后台完成前，用户追问时前台仍只能依靠自己的能力应答。它可以自然地“等结果”，但<b>不能真正做到边想边说</b>。<br><b>方案三：端到端思考与表达统一。</b>把思考能力直接内化到端到端音频模型中。Step-Audio R1 用两个互补机制解决两个问题：<b>模态锚定思考蒸馏（MGRD）</b>让模型基于声学特征思考，<b>MPS 双脑架构</b>让构思与表达并行——前者保证“想得对”，后者解决“说得及时”。理想情况下，模型应该从音高、节奏和语调判断情绪，而不是只看转录文本：MGRD 筛选真正引用声学特征的思考过程，再用这些数据训练模型，并通过强化学习防止模型跳过思考直接猜答案。MPS 让构思脑持续产出思考片段，表达脑收到片段后结合已有回复立即生成语音；两者以流水线方式并行，因此不必等完整思考结束才让用户听到第一句话。<br>页面中的对话、候选思考与时间均为示意；按 → 或点击右上角切换两种方案。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">方案二与方案三：<em>提醒式</em>与<em>端到端统一</em></h2>
+  <p class="lead fx fx-up" style="--d:2">后台通过状态栏提醒前台，还是把思考直接内化进端到端音频模型</p></div>
+    <div class="f2-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="s2">方案二：慢思考提醒</button><button data-v="s3">方案三：端到端统一</button></div></header>
+  <div class="f2-stage fx fx-scale" style="--d:3">
+    <div class="f2-v f2-v2">
+      <div class="f2-l">
+        <div class="f2-dia">
+          <div class="f2-n" data-n="user" style="--c:var(--tool);left:0;width:170px"><svg class="ic"><use href="#i-user"/></svg><b>用户</b></div>
+          <div class="f2-n" data-n="front" style="--c:var(--acc2);left:250px;width:250px"><svg class="ic"><use href="#i-zap"/></svg><b>前台快模型</b><small>维持话头，决定如何表达</small></div>
+          <div class="f2-n f2-bar" data-n="bar" style="--c:var(--har);left:580px;width:210px"><span class="lbl">Agent 状态栏</span><p class="f2-bt">（空）</p></div>
+          <div class="f2-n" data-n="back" style="--c:var(--llm);left:860px;width:180px"><svg class="ic"><use href="#i-brain"/></svg><b>后台慢模型</b><div class="meter"><i class="f2-pg"></i></div></div>
+          <svg class="f2-svg" viewBox="0 0 1040 160" width="1040" height="160">
+            <path class="f2-p" data-p="uf" d="M172 70 H246"/><path class="f2-p" data-p="fu" d="M246 92 H172"/>
+            <path class="f2-p" data-p="bb" d="M858 80 H794"/><path class="f2-p" data-p="bf" d="M578 80 H504"/>
+          </svg>
+        </div>
+        <div class="f2-chat"></div>
+      </div>
+      <ul class="f2-ck panel">
+        <li data-k="ok0"><i class="y">✓</i>比方案一稳定：前台统一表达，不直接冲突</li>
+        <li data-k="ok1"><i class="y">✓</i>可以自然地“等结果”</li>
+        <li data-k="x0"><i class="n">✗</i>后台完成前，用户追问只能靠前台自己的能力</li>
+        <li data-k="x1"><i class="n">✗</i>通信仍然间接：前台可能误解建议</li>
+        <li data-k="x2"><i class="n">✗</i>看不到后台的中间思考</li>
+        <li data-k="x3"><i class="n">✗</i>不能真正做到边想边说</li>
+      </ul>
+    </div>
+    <div class="f2-v f2-v3">
+      <div class="f2-mg panel">
+        <div class="f2-mh"><b>模态锚定思考蒸馏（MGRD）</b><span>让模型基于声学特征思考 → <em>想得对</em></span></div>
+        <div class="f2-mz">
+          <span class="f2-zl" style="left:0">候选思考过程（示意）</span>
+          <span class="f2-zl" style="left:560px">筛选：是否引用声学特征</span>
+          <div class="f2-cds"></div>
+          <div class="f2-fun"><svg class="ic"><use href="#i-funnel"/></svg></div>
+          <i class="f2-dot"></i>
+          <div class="f2-tr"><div class="f2-trh"><svg class="ic"><use href="#i-db"/></svg>训练数据：只留下真正引用音高、节奏、语调的思考 → 训练模型</div><div class="f2-trl"></div></div>
+          <div class="f2-rl"><svg class="ic"><use href="#i-shield"/></svg>强化学习：防止模型跳过思考直接猜答案</div>
+        </div>
+      </div>
+      <div class="f2-mps panel">
+        <div class="f2-mh"><b>MPS 双脑架构</b><span>构思与表达以流水线方式并行 → <em>说得及时</em></span><span class="f2-uq">用户（语气迟疑）：“这个套餐……还行吧”<i class="chip warn">示意</i></span></div>
+        <div class="f2-lanes">
+          <span class="f2-ln" style="top:20px">构思脑</span><span class="f2-ln" style="top:96px">表达脑</span><span class="f2-ln g" style="top:172px">对照：等想完再说</span>
+          <div class="f2-trk"></div>
+          <i class="f2-ph"></i>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「方案二：快思考交互，慢思考提醒」·「方案三：端到端思考与表达统一」· 图6-10</div>
+</section>
+<style>
+#c06-fast23 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-fast23 .f2-stage{position:relative;height:664px}
+#c06-fast23 .f2-v{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .6s,visibility .6s}
+#c06-fast23[data-v=s2] .f2-v2,#c06-fast23[data-v=s3] .f2-v3{opacity:1;visibility:visible}
+#c06-fast23 .f2-v2{display:flex;gap:30px}
+#c06-fast23 .f2-l{width:1040px;flex:none;display:flex;flex-direction:column;gap:16px}
+#c06-fast23 .f2-dia{position:relative;height:160px}
+#c06-fast23 .f2-n{--c:var(--acc);position:absolute;top:10px;height:140px;padding:14px 16px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:rgba(12,18,40,.9);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;transition:box-shadow .4s,border-color .4s}
+#c06-fast23 .f2-n .ic{font-size:32px;color:var(--c)}
+#c06-fast23 .f2-n b{font-size:20px}
+#c06-fast23 .f2-n small{font-size:15px;color:var(--text3)}
+#c06-fast23 .f2-n.on{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-fast23 .f2-n .meter{width:120px;height:10px}
+#c06-fast23 .f2-pg{--c:var(--llm);transition:width .3s linear}
+#c06-fast23 .f2-bar{border-style:dashed}
+#c06-fast23 .f2-bt{font-size:16px;line-height:1.45;color:var(--text3);transition:color .4s}
+#c06-fast23 .f2-bar.on .f2-bt{color:var(--text)}
+#c06-fast23 .f2-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+#c06-fast23 .f2-p{fill:none;stroke:rgba(255,255,255,.18);stroke-width:3;stroke-dasharray:6 7}
+#c06-fast23 .f2-p.on{stroke:var(--acc);animation:flow 1s linear infinite}
+#c06-fast23 .f2-chat{flex:1;padding:16px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(255,255,255,.025);display:flex;flex-direction:column;gap:10px;overflow:hidden}
+#c06-fast23 .f2-m{max-width:80%;padding:10px 16px;border-radius:14px;font-size:18px;line-height:1.5;animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-m.u{align-self:flex-end;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.35)}
+#c06-fast23 .f2-m.f{align-self:flex-start;background:color-mix(in srgb,var(--acc2) 11%,transparent);border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent)}
+#c06-fast23 .f2-m.g{opacity:.78;border-style:dashed}
+#c06-fast23 .f2-m.x{border-color:var(--bad);box-shadow:0 0 18px color-mix(in srgb,var(--bad) 35%,transparent)}
+#c06-fast23 .f2-m small{display:block;font-size:15px;margin-top:4px;color:var(--text3)}
+#c06-fast23 .f2-m.x small{color:#fda4af}
+#c06-fast23 .f2-ck{flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-fast23 .f2-ck li{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;border-radius:12px;font-size:17px;line-height:1.5;color:var(--text3);border:1px solid transparent;transition:all .45s var(--ease)}
+#c06-fast23 .f2-ck li i{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 15px var(--num);font-style:normal;color:#06101f;background:var(--line2);transition:background .4s}
+#c06-fast23 .f2-ck li.on{color:var(--text);background:rgba(255,255,255,.04);border-color:var(--line)}
+#c06-fast23 .f2-ck li.on i.y{background:var(--ok)}
+#c06-fast23 .f2-ck li.on i.n{background:var(--bad)}
+#c06-fast23 .f2-v3{display:flex;flex-direction:column;gap:16px}
+#c06-fast23 .f2-mg{height:262px;padding:14px 22px}
+#c06-fast23 .f2-mh{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+#c06-fast23 .f2-mh b{font-size:21px;color:var(--acc)}
+#c06-fast23 .f2-mh>span{font-size:17px;color:var(--text2)}
+#c06-fast23 .f2-mh em{font-style:normal;font-weight:700;color:var(--acc2)}
+#c06-fast23 .f2-mz{position:relative;height:200px;margin-top:6px}
+#c06-fast23 .f2-zl{position:absolute;top:0;font-size:15px;color:var(--text3);letter-spacing:.06em}
+#c06-fast23 .f2-cds{position:absolute;left:0;top:26px;width:520px;height:170px}
+#c06-fast23 .f2-cd{position:absolute;left:0;width:520px;height:38px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-size:16px;color:var(--text);border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:opacity .5s,border-color .4s,background .4s,box-shadow .4s;animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-cd.scan{border-color:var(--acc);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-fast23 .f2-cd.pass{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 13%,rgba(12,18,40,.92))}
+#c06-fast23 .f2-cd.drop{border-color:color-mix(in srgb,var(--bad) 70%,transparent);background:color-mix(in srgb,var(--bad) 10%,rgba(12,18,40,.92));opacity:.55}
+#c06-fast23 .f2-cd em{font-style:normal;font-size:15px;margin-left:auto;padding-left:10px;white-space:nowrap}
+#c06-fast23 .f2-cd.pass em{color:var(--ok)}
+#c06-fast23 .f2-cd.drop em{color:#fda4af}
+#c06-fast23 .f2-fun{position:absolute;left:600px;top:58px;width:110px;height:110px;border-radius:50%;display:grid;place-items:center;font-size:48px;color:var(--acc);border:2px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c06-fast23 .f2-dot{position:absolute;left:520px;top:40px;width:16px;height:16px;border-radius:50%;translate:-50% -50%;background:#fff;box-shadow:0 0 14px var(--acc);opacity:0;transition:left .7s var(--ease),top .7s var(--ease),opacity .3s}
+#c06-fast23 .f2-tr{position:absolute;left:800px;top:6px;width:760px;height:118px;padding:10px 16px;border-radius:14px;display:flex;flex-direction:column;gap:8px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 7%,transparent)}
+#c06-fast23 .f2-trh{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text2)}
+#c06-fast23 .f2-trh .ic{font-size:24px;color:var(--ok);flex:none}
+#c06-fast23 .f2-trl{display:flex;flex-wrap:wrap;gap:8px}
+#c06-fast23 .f2-trl span{padding:4px 12px;border-radius:10px;font-size:15px;color:var(--text);border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 12%,transparent);animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-rl{position:absolute;left:800px;top:136px;width:760px;height:50px;padding:0 16px;border-radius:14px;display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text);border:1px solid color-mix(in srgb,var(--har) 50%,transparent);background:color-mix(in srgb,var(--har) 9%,transparent);transition:box-shadow .4s,border-color .4s}
+#c06-fast23 .f2-rl.on{border-color:var(--har);box-shadow:0 0 26px color-mix(in srgb,var(--har) 50%,transparent)}
+#c06-fast23 .f2-rl .ic{font-size:22px;color:var(--har)}
+#c06-fast23 .f2-mps{flex:1;padding:14px 22px}
+#c06-fast23 .f2-uq{margin-left:auto;font-size:16px;color:var(--tool)}
+#c06-fast23 .f2-uq .chip{font-size:15px;padding:1px 8px;margin-left:8px;font-style:normal}
+#c06-fast23 .f2-lanes{position:relative;height:250px;margin-top:10px}
+#c06-fast23 .f2-ln{position:absolute;left:0;width:150px;font-size:17px;font-weight:700;color:var(--text2)}
+#c06-fast23 .f2-ln.g{font-size:15px;font-weight:400;color:var(--text3)}
+#c06-fast23 .f2-trk{position:absolute;left:160px;right:0;top:0;bottom:0;border-left:1px solid var(--line)}
+#c06-fast23 .f2-fr{position:absolute;top:10px;height:46px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-size:16px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--llm) 50%,transparent);background:color-mix(in srgb,var(--llm) 14%,rgba(12,18,40,.92));animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-sp{position:absolute;top:86px;height:46px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-size:16px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--acc2) 50%,transparent);background:color-mix(in srgb,var(--acc2) 13%,rgba(12,18,40,.92));animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-gh{position:absolute;top:162px;height:46px;padding:0 14px;border-radius:12px;display:flex;align-items:center;font-size:16px;white-space:nowrap;color:var(--text3);border:1px dashed var(--line2);animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-ph{position:absolute;top:0;bottom:24px;width:2px;background:#fff;box-shadow:0 0 10px #fff;opacity:.7}
+#c06-fast23 .f2-gl{position:absolute;left:4px;top:184px;height:0;border-top:2px dashed var(--line2);animation:upIn .45s var(--spring) both}
+#c06-fast23 .f2-gl span{position:absolute;left:50%;top:-30px;transform:translateX(-50%);font-size:15px;color:var(--text3);white-space:nowrap}
+</style>
+<script>
+HOOKS['c06-fast23'] = {
+  CANDS: [
+    { t: '音高骤升、语速变快 → 判断：惊讶', ok: 1, why: '引用声学特征' },
+    { t: '转录里写着“没事” → 判断：平静', ok: 0, why: '只看转录文本' },
+    { t: '尾音下沉、停顿变长 → 判断：失落', ok: 1, why: '引用声学特征' },
+    { t: '跳过思考，直接猜：开心', ok: 0, why: '强化学习惩罚', rl: 1 },
+  ],
+  FR: [
+    ['语调下沉、停顿变长：并不满意', '听起来您还有些顾虑，'],
+    ['可能在意价格或漫游', '是价格还是漫游方面呢？'],
+    ['套餐 A 缺国际漫游', '如果常出国，A 可能不合适；'],
+    ['B 含漫游，贵一些', 'B 贵一点，但带国际漫游。'],
+  ],
+  PXS: 195,
+  init(s) { this.set = U.seg(s.querySelector('.f2-seg'), (v) => this.mode(s, v)); },
+  mode(s, v) {
+    const tk = (this.tk = (this.tk || 0) + 1);
+    s.dataset.v = v;
+    this.set(v);
+    this.clear(s);
+    if (!this.ctx) return;
+    if (v === 's2') this.runS2(s, tk); else this.runS3(s, tk);
+  },
+  clear(s) {
+    s.querySelectorAll('.f2-n,.f2-p,.f2-ck li,.f2-rl').forEach((e) => e.classList.remove('on'));
+    s.querySelector('.f2-chat').innerHTML = '';
+    s.querySelector('.f2-bt').textContent = '（空）';
+    s.querySelector('.f2-pg').style.width = '0%';
+    s.querySelector('.f2-cds').innerHTML = '';
+    s.querySelector('.f2-trl').innerHTML = '';
+    s.querySelector('.f2-dot').style.opacity = 0;
+    s.querySelector('.f2-trk').innerHTML = '';
+    s.querySelector('.f2-ph').style.left = '160px';
+  },
+  // 方案二：前台先稳住、后台慢慢想、状态栏传话，前台却可能误解
+  async runS2(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const N = (n) => s.querySelector(`.f2-n[data-n="${n}"]`), P = (p) => s.querySelector(`.f2-p[data-p="${p}"]`), K = (k) => s.querySelector(`.f2-ck [data-k="${k}"]`);
+    const chat = s.querySelector('.f2-chat'), pg = s.querySelector('.f2-pg');
+    const say = (cls, txt, note) => { chat.insertAdjacentHTML('beforeend', `<div class="f2-m ${cls}">${txt}${note ? `<small>${note}</small>` : ''}</div>`); while (chat.children.length > 5) chat.firstElementChild.remove(); };
+    const on = (el, v = true) => el.classList.toggle('on', v);
+    while (ok()) {
+      this.clear(s);
+      on(N('user')); on(P('uf'));
+      say('u', '“选哪个套餐？”');
+      await U.wait(ctx, 900); if (!ok()) return;
+      on(N('user'), false); on(P('uf'), false); on(N('front')); on(P('fu'));
+      say('f', '“我帮您对比一下，稍等。”', '前台维持话头，自然地“等结果”');
+      on(K('ok1'));
+      await U.wait(ctx, 900); if (!ok()) return;
+      on(P('fu'), false); on(N('front'), false); on(N('back'));
+      let p = 0;
+      const pid = ctx.every(() => { if (!ok()) { ctx.stop(pid); return; } p = Math.min(100, p + 4); pg.style.width = p + '%'; }, 120);
+      await U.wait(ctx, 1000); if (!ok()) return;
+      on(N('user')); on(P('uf'));
+      say('u', '“那 B 套餐贵多少？”');
+      await U.wait(ctx, 900); if (!ok()) return;
+      on(N('user'), false); on(P('uf'), false); on(N('front')); on(P('fu'));
+      say('f g', '“B 贵一些，具体我再核实一下。”', '后台还没想完：只能依靠前台自己的能力应答');
+      on(K('x0'));
+      await U.wait(ctx, 1300); if (!ok()) return;
+      on(N('front'), false); on(P('fu'), false);
+      ctx.stop(pid); pg.style.width = '100%';
+      on(P('bb')); on(N('bar'));
+      s.querySelector('.f2-bt').textContent = '建议：确认价格（A 缺国际漫游）';
+      await U.wait(ctx, 1200); if (!ok()) return;
+      on(N('back'), false); on(P('bb'), false); on(P('bf')); on(N('front'));
+      await U.wait(ctx, 800); if (!ok()) return;
+      on(P('bf'), false); on(P('fu'));
+      say('f x', '“您先确认一下价格可以吗？”', '把“确认价格”理解成了“向用户确认”，而非“重新计算”');
+      on(K('x1'));
+      await U.wait(ctx, 900); if (!ok()) return;
+      on(K('x2'));
+      await U.wait(ctx, 900); if (!ok()) return;
+      on(K('ok0')); on(K('x3'));
+      await U.wait(ctx, 3600); if (!ok()) return;
+    }
+  },
+  // 方案三：MGRD 逐条筛选候选思考；MPS 构思脑每出一个片段，表达脑立刻开口
+  async runS3(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const cds = s.querySelector('.f2-cds'), dot = s.querySelector('.f2-dot'), trl = s.querySelector('.f2-trl'), rl = s.querySelector('.f2-rl');
+    const trk = s.querySelector('.f2-trk'), ph = s.querySelector('.f2-ph'), PX = this.PXS;
+    while (ok()) {
+      this.clear(s);
+      cds.innerHTML = this.CANDS.map((c, i) => `<div class="f2-cd" style="top:${i * 42}px;animation-delay:${i * 90}ms"><span>${c.t}</span><em></em></div>`).join('');
+      const cards = [...cds.children], t0 = performance.now();
+      ctx.raf((now) => {
+        if (!ok()) return false;
+        const t = Math.min(7.2, (now - t0) / 1000 / 0.85);
+        ph.style.left = 160 + t * PX + 'px';
+        this.FR.forEach(([f, sp], i) => {
+          const tf = 0.4 + i * 1.5, tsp = tf + 0.35;
+          if (t >= tf && !trk.querySelector(`[data-f="${i}"]`)) trk.insertAdjacentHTML('beforeend', `<div class="f2-fr" data-f="${i}" style="left:${tf * PX}px">${f}</div>`);
+          if (t >= tsp && !trk.querySelector(`[data-s="${i}"]`)) trk.insertAdjacentHTML('beforeend', `<div class="f2-sp" data-s="${i}" style="left:${tsp * PX}px">${sp}</div>`);
+        });
+        if (t >= 5.9 && !trk.querySelector('.f2-gh')) trk.insertAdjacentHTML('beforeend', `<div class="f2-gh" style="left:${5.9 * PX}px">第一句话才开口</div><div class="f2-gl" style="width:${5.9 * PX - 8}px"><span>等完整思考结束</span></div>`);
+        return t < 7.2;
+      });
+      for (let i = 0; i < cards.length; i++) {
+        await U.wait(ctx, 650); if (!ok()) return;
+        const c = this.CANDS[i], el = cards[i];
+        el.classList.add('scan');
+        dot.style.transition = 'none';
+        dot.style.left = '520px';
+        dot.style.top = 26 + i * 42 + 19 + 'px';
+        dot.style.opacity = 1;
+        void dot.offsetWidth;
+        dot.style.transition = '';
+        dot.style.left = '655px';
+        dot.style.top = '113px';
+        await U.wait(ctx, 800); if (!ok()) return;
+        dot.style.opacity = 0;
+        el.classList.remove('scan');
+        el.classList.add(c.ok ? 'pass' : 'drop');
+        el.querySelector('em').textContent = (c.ok ? '✓ ' : '✗ ') + c.why;
+        if (c.ok) trl.insertAdjacentHTML('beforeend', `<span>${c.t}</span>`);
+        if (c.rl) rl.classList.add('on');
+      }
+      await U.wait(ctx, 3400); if (!ok()) return;
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 's3' : 's2'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 's3' : 's2'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.v = ''; this.clear(s); },
+};
+</script>
+<section class="slide" id="c06-tradeoff" data-part="4" data-steps="1" data-trans="iris" data-dur="14000" data-title="取舍：快慢分离还是端到端统一" data-notes="统一模型最紧密地实现了“边想边说”，代价是思考和实时表达需要一起重新训练；解耦路线更容易替换后台大脑。<b>两者是取舍，不是简单的替代关系。</b><br>在前沿思考模型快速演进的当下，快慢分离有一个重要的工程优势：<b>它能直接承接慢模型的迭代红利</b>。前台快模型只负责低延迟地倾听、应答和维持对话，后台慢模型负责推理、规划和工具调用；更强的思考模型发布后，只需替换后台模型，不必重新训练整套实时语音系统。统一路线则把推理与交互绑定在同一个训练周期中，每次升级都要重新兼顾智能水平、响应延迟和表达自然度。因此，<b>快慢分离并不只是对延迟的妥协，也是一种让交互能力与智能上限分别演进的模块化选择</b>。这种分离也不必然牺牲任务效果：截至 2026 年 8 月，采用快慢思考分离架构的 Pine AI 语音 Agent 在 τ³-Voice Leaderboard 上取得第一名，超过 Grok Voice、GPT-Realtime-2 等实时语音系统——至少说明在同时考察深度推理与实时对话的任务上，解耦架构并不天然落后于端到端模型。<br>按 → 看“端到端模型”常被赋予的两个含义：<b>语音通路的端到端</b>（模型直接接收音频、生成音频，不再由多个模型通过离散文本串接；Omni 和交互模型都属于此，但 Omni 通常仍按轮次推进，交互模型可以边听边说，二者在架构上差别很大）与<b>认知架构的端到端</b>（实时交互与深度思考是在同一模型内部共享状态、共同训练，还是拆成前台快模型与后台慢模型）。两条轴彼此独立：一个系统完全可以在语音通路上端到端，同时在认知架构上保持快慢分离——Thinking Machines Lab 把复杂任务委派给后台推理模型就是这种组合。左侧升级动画为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">取舍：<em>快慢分离</em>还是<em>端到端统一</em></h2>
+  <p class="lead fx fx-up" style="--d:2">两者是取舍，不是简单的替代关系；“端到端”本身还有两个彼此独立的含义</p></header>
+  <div class="to-body">
+    <div class="to-left">
+      <div class="to-cmp fx fx-left" style="--d:3">
+        <div class="to-cc" style="--c:var(--acc2)"><b>快慢分离（解耦）</b>
+          <p>前台快模型：低延迟地倾听、应答、维持对话</p><p>后台慢模型：推理、规划和工具调用</p>
+          <p class="y">更强的思考模型发布后，只需替换后台模型</p><p class="y">交互能力与智能上限分别演进</p></div>
+        <div class="to-cc" style="--c:var(--llm)"><b>端到端统一</b>
+          <p class="y">最紧密地实现“边想边说”</p><p class="n">思考和实时表达需要一起重新训练</p>
+          <p class="n">每次升级都要重新兼顾智能水平、响应延迟和表达自然度</p></div>
+      </div>
+      <div class="to-swap panel fx fx-left" style="--d:4">
+        <div class="to-sh"><b>每发布一个更强的思考模型</b><span class="chip warn">示意</span><button class="btn to-up"><svg class="ic"><use href="#i-rocket"/></svg>发布新模型</button></div>
+        <div class="to-sw">
+          <div class="to-dc">
+            <span class="lbl">快慢分离</span>
+            <div class="to-row"><div class="to-front">前台快模型<small>不变</small></div><i class="to-plug"></i><div class="to-slot" data-clip-ok><div class="to-bk">后台慢模型 · 第 <span>1</span> 代</div></div></div>
+            <p class="to-c">实时语音系统重训 <b class="to-n1">0</b> 次 · 直接承接慢模型的迭代红利</p>
+          </div>
+          <div class="to-uc">
+            <span class="lbl">端到端统一</span>
+            <div class="to-blk"><span>思考 + 实时表达 · 第 <b class="to-g2">1</b> 代</span><div class="meter"><i class="to-tr"></i></div></div>
+            <div class="to-dials"><span>智能水平<i><b></b></i></span><span>响应延迟<i><b></b></i></span><span>表达自然度<i><b></b></i></span></div>
+            <p class="to-c">整体重新训练 <b class="to-n2">0</b> 次 · 每次都要重新兼顾三者</p>
+          </div>
+        </div>
+      </div>
+      <div class="to-pine fx fx-up" style="--d:5"><div class="to-md"><svg class="ic"><use href="#i-medal"/></svg></div>
+        <div><b>τ³-Voice Leaderboard 第一名</b><p>截至 2026 年 8 月，采用快慢思考分离架构的 Pine AI 语音 Agent，超过 Grok Voice、GPT-Realtime-2 等实时语音系统</p><small>→ 解耦架构并不天然落后于端到端模型</small></div></div>
+    </div>
+    <div class="to-right fx fx-right" data-step="1">
+      <div class="to-mx">
+        <span class="to-ax">两条轴彼此独立</span>
+        <div class="to-chd"><b>语音通路：级联</b><small>多个模型通过离散文本串接</small></div>
+        <div class="to-chd e"><b>语音通路：端到端</b><small>模型直接接收音频、生成音频</small></div>
+        <div class="to-rhd"><b>认知架构：快慢分离</b><small>前台快模型 + 后台慢模型</small></div>
+        <div class="to-cell"><button class="to-it" data-i="0">级联 + 方案一 / 方案二</button></div>
+        <div class="to-cell e"><button class="to-it" data-i="1">Omni + 方案一 / 方案二<small>按轮次推进</small></button><button class="to-it" data-i="2">交互模型 + 后台推理模型<small>Thinking Machines Lab · 边听边说</small></button><button class="to-it" data-i="3">GPT-Live<small>复杂任务委派后台模型</small></button></div>
+        <div class="to-rhd"><b>认知架构：统一</b><small>同一模型内部共享状态、共同训练</small></div>
+        <div class="to-cell none"><span>原书未举例</span></div>
+        <div class="to-cell e"><button class="to-it" data-i="4">Step-Audio R1<small>方案三：MGRD + MPS</small></button></div>
+      </div>
+      <p class="to-cap"></p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「快慢思考分离与端到端思考的取舍」</div>
+</section>
+<style>
+#c06-tradeoff .to-body{display:flex;gap:30px;height:672px}
+#c06-tradeoff .to-left{width:790px;flex:none;display:flex;flex-direction:column;gap:14px}
+#c06-tradeoff .to-cmp{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#c06-tradeoff .to-cc{--c:var(--acc);padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.85));display:flex;flex-direction:column;gap:6px}
+#c06-tradeoff .to-cc b{font-size:20px;color:var(--c)}
+#c06-tradeoff .to-cc p{position:relative;padding-left:22px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c06-tradeoff .to-cc p::before{content:"·";position:absolute;left:6px;color:var(--text3)}
+#c06-tradeoff .to-cc p.y::before{content:"✓";left:2px;color:var(--ok);font-weight:800}
+#c06-tradeoff .to-cc p.n::before{content:"✗";left:2px;color:var(--bad);font-weight:800}
+#c06-tradeoff .to-swap{padding:12px 18px;display:flex;flex-direction:column;gap:10px}
+#c06-tradeoff .to-sh{display:flex;align-items:center;gap:12px}
+#c06-tradeoff .to-sh b{font-size:19px}
+#c06-tradeoff .to-sh .chip{font-size:15px;padding:2px 10px}
+#c06-tradeoff .to-up{margin-left:auto;font-size:16px;padding:6px 14px}
+#c06-tradeoff .to-sw{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+#c06-tradeoff .to-dc,#c06-tradeoff .to-uc{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#c06-tradeoff .to-row{display:flex;align-items:center;gap:0;height:70px}
+#c06-tradeoff .to-front{width:120px;height:62px;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--acc2);border:1px solid color-mix(in srgb,var(--acc2) 50%,transparent);background:color-mix(in srgb,var(--acc2) 10%,transparent)}
+#c06-tradeoff .to-front small{font-size:15px;font-weight:400;color:var(--text3)}
+#c06-tradeoff .to-plug{width:26px;height:4px;background:var(--line2)}
+#c06-tradeoff .to-slot{flex:1;height:62px;border-radius:12px;border:2px dashed var(--line2);overflow:hidden;position:relative}
+#c06-tradeoff .to-bk{position:absolute;inset:4px;border-radius:9px;display:grid;place-items:center;font-size:16px;font-weight:700;color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 50%,transparent);background:color-mix(in srgb,var(--llm) 12%,transparent)}
+#c06-tradeoff .to-bk.go{animation:c06to-swap .9s var(--ease)}
+@keyframes c06to-swap{0%{translate:0 0;opacity:1}45%{translate:0 -70px;opacity:0}46%{translate:0 70px;opacity:0}100%{translate:0 0;opacity:1}}
+#c06-tradeoff .to-c{font-size:15px;line-height:1.5;color:var(--text2)}
+#c06-tradeoff .to-c b{font:800 18px var(--num);color:var(--acc)}
+#c06-tradeoff .to-blk{height:70px;padding:8px 12px;border-radius:12px;display:flex;flex-direction:column;justify-content:center;gap:8px;font-size:16px;font-weight:700;color:var(--llm);border:1px solid color-mix(in srgb,var(--llm) 50%,transparent);background:color-mix(in srgb,var(--llm) 10%,transparent)}
+#c06-tradeoff .to-blk .meter{height:10px}
+#c06-tradeoff .to-tr{--c:var(--warn);width:100%}
+#c06-tradeoff .to-tr.run{transition:width 2.2s linear}
+#c06-tradeoff .to-dials{display:flex;flex-direction:column;gap:4px}
+#c06-tradeoff .to-dials span{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:8px;font-size:15px;color:var(--text3)}
+#c06-tradeoff .to-dials i{height:6px;border-radius:6px;background:rgba(255,255,255,.07);overflow:hidden}
+#c06-tradeoff .to-dials b{display:block;height:100%;width:var(--w,70%);background:var(--llm);transition:width .8s var(--ease)}
+#c06-tradeoff .to-pine{flex:1;display:flex;gap:18px;align-items:center;padding:14px 20px;border-radius:16px;border:1px solid color-mix(in srgb,var(--tool) 40%,transparent);background:linear-gradient(90deg,color-mix(in srgb,var(--tool) 12%,transparent),transparent)}
+#c06-tradeoff .to-md{flex:none;width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:40px;color:var(--tool);border:2px solid color-mix(in srgb,var(--tool) 60%,transparent);animation:c06to-glow 2.4s ease-in-out infinite}
+@keyframes c06to-glow{50%{box-shadow:0 0 28px color-mix(in srgb,var(--tool) 55%,transparent)}}
+#c06-tradeoff .to-pine b{font-size:21px;color:var(--tool)}
+#c06-tradeoff .to-pine p{font-size:16px;line-height:1.55;color:var(--text);margin-top:4px}
+#c06-tradeoff .to-pine small{display:block;font-size:15px;color:var(--text2);margin-top:4px}
+#c06-tradeoff .to-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-tradeoff .to-mx{position:relative;display:grid;grid-template-columns:160px 1fr 1fr;grid-template-rows:78px 1fr 1fr;gap:10px;height:520px}
+#c06-tradeoff .to-ax{display:flex;align-items:center;justify-content:center;text-align:center;font-size:15px;color:var(--acc);border:1px dashed color-mix(in srgb,var(--acc) 45%,transparent);border-radius:12px}
+#c06-tradeoff .to-chd,#c06-tradeoff .to-rhd{display:flex;flex-direction:column;justify-content:center;gap:4px;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-tradeoff .to-chd b,#c06-tradeoff .to-rhd b{font-size:17px}
+#c06-tradeoff .to-chd small,#c06-tradeoff .to-rhd small{font-size:15px;color:var(--text3)}
+#c06-tradeoff .to-chd.e b{color:var(--acc)}
+#c06-tradeoff .to-cell{display:flex;flex-direction:column;gap:8px;justify-content:center;padding:12px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.6)}
+#c06-tradeoff .to-cell.e{border-color:color-mix(in srgb,var(--acc) 25%,transparent)}
+#c06-tradeoff .to-cell.none{align-items:center;color:var(--text3);font-size:16px;border-style:dashed}
+#c06-tradeoff .to-it{text-align:left;padding:8px 12px;border-radius:12px;font-size:16px;font-weight:700;color:var(--text);border:1px solid var(--line2);background:rgba(255,255,255,.04);transition:all .35s var(--ease)}
+#c06-tradeoff .to-it small{display:block;font-size:15px;font-weight:400;color:var(--text3);margin-top:2px}
+#c06-tradeoff .to-it.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c06-tradeoff .to-cap{min-height:96px;padding:14px 18px;border-radius:14px;font-size:17px;line-height:1.6;color:var(--text);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent);border-left:4px solid var(--acc)}
+</style>
+<script>
+HOOKS['c06-tradeoff'] = {
+  CAP: [
+    '前两种方案可以套在级联上：语音通路由多个模型通过离散文本串接，前台快模型负责应答，后台慢模型负责深度思考。',
+    '也可以套在 Omni 上：语音通路是端到端的，但 Omni 通常仍按轮次推进；快慢两个实例在认知上仍是分开的。',
+    '语音通路端到端 + 认知架构快慢分离：交互模型边听边说，把复杂任务委派给后台推理模型——同为“端到端”，与 Omni 在架构上差别很大。',
+    'GPT-Live 与交互模型一样，把复杂任务委派给后台模型，前台继续维持对话。',
+    '认知架构的端到端：Step-Audio R1 把思考能力直接内化到端到端音频模型中，MGRD 保证“想得对”，MPS 解决“说得及时”。',
+  ],
+  DEF: '两条轴彼此独立：一个系统完全可以在语音通路上端到端，同时在认知架构上保持快慢分离。',
+  init(s) {
+    this.its = [...s.querySelectorAll('.to-it')];
+    this.its.forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+    s.querySelector('.to-up').addEventListener('click', () => { this.manual = true; this.upgrade(s); });
+  },
+  pick(s, i) {
+    this.i = i;
+    this.its.forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelector('.to-cap').textContent = i >= 0 ? this.CAP[i] : this.DEF;
+  },
+  // 一次升级：解耦路线只换后台；统一路线整体重训，三项指标重新平衡（示意）
+  upgrade(s) {
+    if (!this.ctx) return;
+    this.gen = (this.gen || 1) + 1;
+    this.n2 = (this.n2 || 0) + 1;
+    const bk = s.querySelector('.to-bk');
+    U.restart(bk, 'go');
+    this.ctx.later(() => { bk.querySelector('span').textContent = this.gen; }, 420);
+    s.querySelector('.to-n2').textContent = this.n2;
+    s.querySelector('.to-g2').textContent = this.gen;
+    const tr = s.querySelector('.to-tr');
+    tr.classList.remove('run');
+    tr.style.width = '0%';
+    void tr.offsetWidth;
+    tr.classList.add('run');
+    tr.style.width = '100%';
+    const r = U.rand(this.gen * 97);
+    s.querySelectorAll('.to-dials b').forEach((b) => b.style.setProperty('--w', 45 + Math.round(r() * 50) + '%'));
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.gen = 1; this.n2 = 0; this.auto = true; this.manual = false;
+    s.querySelector('.to-bk span').textContent = 1;
+    s.querySelector('.to-g2').textContent = 1;
+    s.querySelector('.to-n2').textContent = 0;
+    this.pick(s, -1);
+    ctx.later(() => this.upgrade(s), 1600);
+    ctx.every(() => { if (!this.manual) this.upgrade(s); }, 4200);
+    let j = -1;
+    ctx.every(() => { if (this.auto && DECK.step >= 1) { j = (j + 1) % 5; this.pick(s, j); } }, 2800);
+  },
+  step(s, ctx, k) { if (k < 1) this.pick(s, -1); },
+  leave() { this.ctx = null; },
+  reset(s) { this.its.forEach((b) => b.classList.remove('on')); s.querySelector('.to-cap').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c06-tts" data-part="4" data-steps="1" data-trans="rise" data-dur="13000" data-title="更像人的语音合成" data-notes="传统 TTS 过于流畅、零停顿，反而容易暴露机器身份。<b>停顿、填充词和偶尔的重复，是人类表达不确定性和思考状态的信号。</b><br>可以让主 LLM 在文本之外输出控制标记，例如 <b>THINKING</b>、<b>EMO:happy</b> 和 <b>SPEED:0.8x</b>，由 TTS 将它们映射为停顿、韵律、语速或笑声、叹气等非语言音频。实现上有两条路：可以<b>自研支持控制标记的 TTS</b>，也可以<b>用语音克隆准备不同情绪和风格的参考音频</b>——下一页的实验 6-7 走的就是后一条路。<br>页面中的句子、时长与语调曲线都是示意：按 → 或点击右上角，在“传统 TTS”与“带控制标记”之间切换；播放头经过时，上方对应的文字与映射卡片同步高亮。传统 TTS 把标记丢掉、一口气念完；带标记时，思考处先停顿再出现填充词“嗯……”，开心的句子语调上扬，0.8 倍速的句子明显拉长，句末还有一声轻笑。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">更像人的语音合成：<em>控制标记</em></h2>
+  <p class="lead fx fx-up" style="--d:2">停顿、填充词和偶尔的重复，是人类表达不确定性和思考状态的信号</p></div>
+    <div class="ts-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="plain">传统 TTS：零停顿</button><button data-v="mark">带控制标记</button></div></header>
+  <div class="ts-llm panel fx fx-up" style="--d:3"><span class="lbl">主 LLM 输出：文本 + 控制标记</span><span class="chip warn ts-sim">示意</span><p class="ts-txt"></p></div>
+  <div class="ts-map fx fx-up" style="--d:4">
+    <div class="ts-mc" data-m="EMO:happy"><code>EMO:happy</code><span>韵律上扬、语调更明亮</span></div>
+    <div class="ts-mc" data-m="THINKING"><code>THINKING</code><span>先停顿，再出现填充词“嗯……”</span></div>
+    <div class="ts-mc" data-m="SPEED:0.8x"><code>SPEED:0.8x</code><span>语速放慢到 0.8 倍</span></div>
+    <div class="ts-mc" data-m="LAUGH"><code>LAUGH</code><span>轻笑：非语言音频（也可以是叹气）</span></div>
+  </div>
+  <div class="ts-cvw panel fx fx-up" style="--d:5"><canvas class="ts-cv" width="3240" height="440"></canvas><span class="ts-st"></span></div>
+  <div class="ts-impl fx fx-up" style="--d:6">
+    <div><svg class="ic"><use href="#i-wrench"/></svg><b>自研支持控制标记的 TTS</b><span>把标记直接作为合成模型的输入条件</span></div>
+    <div><svg class="ic"><use href="#i-copy"/></svg><b>语音克隆：多情绪、多风格的参考音频</b><span>执行层按标记挑选参考音再合成 → 实验 6-7</span></div>
+  </div>
+  <div class="src">第六章 ·「更像人的语音合成」</div>
+</section>
+<style>
+#c06-tts .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-tts .ts-llm{position:relative;padding:12px 20px;height:102px}
+#c06-tts .ts-sim{position:absolute;right:16px;top:10px;font-size:15px;padding:2px 10px}
+#c06-tts .ts-txt{margin-top:8px;font-size:23px;line-height:1.7;display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+#c06-tts .ts-w{padding:0 4px;border-radius:6px;transition:background .25s,color .25s}
+#c06-tts .ts-w.on{background:color-mix(in srgb,var(--acc) 28%,transparent);color:#fff}
+#c06-tts .ts-w.f{color:var(--tool)}#c06-tts .ts-w.l{color:var(--env)}
+#c06-tts .ts-k{padding:1px 10px;border-radius:8px;font:600 16px var(--mono);color:var(--acc2);border:1px solid color-mix(in srgb,var(--acc2) 50%,transparent);background:color-mix(in srgb,var(--acc2) 10%,transparent);transition:all .3s}
+#c06-tts .ts-k.on{color:#06101f;background:var(--acc2);box-shadow:0 0 16px color-mix(in srgb,var(--acc2) 60%,transparent)}
+#c06-tts[data-v=plain] .ts-k{text-decoration:line-through;opacity:.4}
+#c06-tts[data-v=plain] .ts-w.f,#c06-tts[data-v=plain] .ts-w.l{display:none}
+#c06-tts .ts-map{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+#c06-tts .ts-mc{padding:12px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:6px;transition:all .35s var(--ease)}
+#c06-tts .ts-mc code{font:700 18px var(--mono);color:var(--acc2)}
+#c06-tts .ts-mc span{font-size:16px;color:var(--text2)}
+#c06-tts .ts-mc.on{border-color:color-mix(in srgb,var(--acc2) 60%,transparent);background:color-mix(in srgb,var(--acc2) 11%,transparent);box-shadow:0 0 26px -6px color-mix(in srgb,var(--acc2) 60%,transparent)}
+#c06-tts[data-v=plain] .ts-mc{opacity:.4}
+#c06-tts .ts-cvw{position:relative;margin-top:14px;height:240px;padding:10px 20px}
+#c06-tts .ts-cv{display:block;width:1620px;height:220px}
+#c06-tts .ts-st{position:absolute;right:20px;top:12px;font-size:16px;color:var(--text2)}
+#c06-tts .ts-impl{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+#c06-tts .ts-impl div{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+#c06-tts .ts-impl .ic{font-size:28px;color:var(--acc);flex:none}
+#c06-tts .ts-impl b{font-size:19px;white-space:nowrap}
+#c06-tts .ts-impl span{font-size:16px;color:var(--text2)}
+</style>
+<script>
+HOOKS['c06-tts'] = {
+  F: '"PingFang SC","Microsoft YaHei","Noto Sans SC",sans-serif',
+  X0: 30, PX: 150,
+  MARK: [
+    { k: 'mk', t: 'EMO:happy', at: 0 },
+    { k: 'sp', t: '太好了，您的订单已经确认。', a: 0.1, b: 2.2, p: 'up' },
+    { k: 'mk', t: 'THINKING', at: 2.2 },
+    { k: 'pa', a: 2.2, b: 2.9 },
+    { k: 'fl', t: '嗯……', a: 2.9, b: 3.5 },
+    { k: 'sp', t: '我看一下发货时间。', a: 3.6, b: 5.3, p: 'mid' },
+    { k: 'mk', t: 'SPEED:0.8x', at: 5.4 },
+    { k: 'sp', t: '预计明天下午送达，', a: 5.5, b: 7.8, p: 'low' },
+    { k: 'mk', t: 'LAUGH', at: 7.9 },
+    { k: 'lg', t: '（轻笑）', a: 7.9, b: 8.4 },
+    { k: 'sp', t: '不会耽误您周末用。', a: 8.5, b: 10.1, p: 'mid' },
+  ],
+  PLAIN: [
+    { k: 'sp', t: '太好了，您的订单已经确认。', a: 0.1, b: 1.9, p: 'flat' },
+    { k: 'sp', t: '我看一下发货时间。', a: 1.9, b: 3.3, p: 'flat' },
+    { k: 'sp', t: '预计明天下午送达，', a: 3.3, b: 4.7, p: 'flat' },
+    { k: 'sp', t: '不会耽误您周末用。', a: 4.7, b: 6.1, p: 'flat' },
+  ],
+  init(s) {
+    this.cv = s.querySelector('.ts-cv');
+    this.g = this.cv.getContext('2d');
+    this.g.setTransform(2, 0, 0, 2, 0, 0);
+    const r = U.rand(81);
+    this.N = Array.from({ length: 512 }, () => r());
+    s.querySelector('.ts-txt').innerHTML = this.MARK.map((x, i) => (x.k === 'mk' ? `<span class="ts-k" data-j="${i}">[${x.t}]</span>` : x.k === 'pa' ? '' : `<span class="ts-w${x.k === 'fl' ? ' f' : x.k === 'lg' ? ' l' : ''}" data-j="${i}">${x.t}</span>`)).join('');
+    this.set = U.seg(s.querySelector('.ts-seg'), (v) => this.mode(s, v));
+  },
+  x(t) { return this.X0 + t * this.PX; },
+  pitch(p, u) {
+    if (p === 'up') return 0.35 + 0.5 * u + 0.08 * Math.sin(u * 9);
+    if (p === 'low') return 0.3 + 0.06 * Math.sin(u * 5);
+    if (p === 'mid') return 0.45 + 0.12 * Math.sin(u * 6 + 1);
+    return 0.42;
+  },
+  // 一帧：波形、停顿框、语调曲线、标记小旗、播放头
+  draw(t) {
+    const g = this.g, F = this.F, Y = 120, list = this.m === 'mark' ? this.MARK : this.PLAIN;
+    g.clearRect(0, 0, 1620, 220);
+    g.textBaseline = 'middle';
+    g.strokeStyle = 'rgba(255,255,255,0.08)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(this.X0, Y); g.lineTo(this.x(10.5), Y); g.stroke();
+    g.textAlign = 'center'; g.font = '15px ' + F;
+    for (let k = 0; k <= 10; k++) { g.fillStyle = 'rgba(165,175,201,0.6)'; g.fillText(k + 's', this.x(k), 208); }
+    list.forEach((x) => {
+      if (x.k === 'mk') {
+        const xx = this.x(x.at), lit = t >= x.at;
+        g.strokeStyle = lit ? '#f472b6' : 'rgba(244,114,182,0.35)'; g.lineWidth = 2;
+        g.beginPath(); g.moveTo(xx, 22); g.lineTo(xx, 62); g.stroke();
+        g.fillStyle = lit ? '#f472b6' : 'rgba(244,114,182,0.35)';
+        g.beginPath(); g.moveTo(xx, 22); g.lineTo(xx + 12, 28); g.lineTo(xx, 34); g.fill();
+        g.font = '600 15px ' + F; g.textAlign = 'left'; g.fillText(x.t, xx + 16, 28); g.textAlign = 'center';
+        return;
+      }
+      if (x.k === 'pa') {
+        g.setLineDash([5, 5]); g.strokeStyle = 'rgba(251,191,36,0.7)'; g.lineWidth = 1.5;
+        g.strokeRect(this.x(x.a), Y - 34, this.x(x.b) - this.x(x.a), 68); g.setLineDash([]);
+        g.fillStyle = '#fbbf24'; g.font = '600 15px ' + F; g.fillText('停顿', (this.x(x.a) + this.x(x.b)) / 2, Y + 52);
+        return;
+      }
+      const xa = this.x(x.a), xb = this.x(x.b), col = x.k === 'fl' ? '#fbbf24' : x.k === 'lg' ? '#34d399' : '#c084fc';
+      for (let xx = xa; xx < xb; xx += 4) {
+        const u = (xx - xa) / (xb - xa), env = Math.pow(Math.sin(Math.PI * u), 0.4), n = this.N[Math.floor(xx) % 512];
+        let a = x.k === 'fl' ? 12 : x.k === 'lg' ? 20 * (0.4 + 0.6 * Math.abs(Math.sin(u * 18))) : 30 * (0.55 + 0.45 * Math.abs(Math.sin(xx * 0.13)));
+        a = Math.max(1.5, a * env * (0.45 + 0.55 * n));
+        g.globalAlpha = t >= x.a && xx <= this.x(t) ? 0.95 : 0.22;
+        g.fillStyle = col;
+        g.fillRect(xx, Y - a, 2.4, a * 2);
+      }
+      g.globalAlpha = 1;
+      if (x.k === 'sp') {
+        g.strokeStyle = 'rgba(240,171,252,0.95)'; g.lineWidth = 2.5;
+        g.beginPath();
+        for (let xx = xa; xx <= xb; xx += 6) { const u = (xx - xa) / (xb - xa), yy = Y - 40 - this.pitch(x.p, u) * 44; xx === xa ? g.moveTo(xx, yy) : g.lineTo(xx, yy); }
+        g.stroke();
+      }
+      g.fillStyle = 'rgba(233,237,248,0.9)'; g.font = '15px ' + F;
+      g.fillText(x.t, (xa + xb) / 2, Y + 52);
+    });
+    const xp = this.x(t);
+    g.strokeStyle = 'rgba(255,255,255,0.9)'; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(xp, 16); g.lineTo(xp, 190); g.stroke();
+  },
+  mode(s, v) {
+    this.m = v;
+    s.dataset.v = v;
+    this.set(v);
+    this.t0 = performance.now();
+    const end = v === 'mark' ? 10.1 : 6.1;
+    s.querySelector('.ts-st').textContent = v === 'mark' ? '带控制标记：停顿、填充词、语调与语速都在变化' : '传统 TTS：标记被忽略，一口气念完、零停顿';
+    this.end = end;
+    s.querySelectorAll('.ts-w,.ts-k,.ts-mc').forEach((e) => e.classList.remove('on'));
+    if (!this.ctx) this.draw(end);
+  },
+  tick(s, now) {
+    let t = (now - this.t0) / 1000;
+    if (t > this.end + 1.8) { this.t0 = now; t = 0; }
+    const tt = Math.min(t, this.end), list = this.m === 'mark' ? this.MARK : this.PLAIN;
+    s.querySelectorAll('.ts-w').forEach((e) => {
+      const x = this.MARK[+e.dataset.j], y = this.m === 'mark' ? x : list.find((p) => p.t === x.t);
+      e.classList.toggle('on', !!y && tt >= y.a && tt < y.b + 0.05);
+    });
+    if (this.m === 'mark') {
+      let cur = null;
+      this.MARK.forEach((x) => { if (x.k === 'mk' && tt >= x.at) cur = x.t; });
+      s.querySelectorAll('.ts-k').forEach((e) => e.classList.toggle('on', this.MARK[+e.dataset.j].t === cur && tt < this.end));
+      s.querySelectorAll('.ts-mc').forEach((e) => e.classList.toggle('on', e.dataset.m === cur));
+    }
+    this.draw(tt);
+  },
+  enter(s, ctx, k) {
+    this.ctx = ctx;
+    this.mode(s, k >= 1 ? 'mark' : 'plain');
+    ctx.raf((now) => this.tick(s, now));
+  },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'mark' : 'plain'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.g.clearRect(0, 0, 1620, 220);
+    s.querySelectorAll('.ts-w,.ts-k,.ts-mc').forEach((e) => e.classList.remove('on'));
+    s.dataset.v = '';
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp7" data-part="4" data-steps="1" data-trans="flip" data-dur="16000" data-title="实验 6-7 ★★：基于 Fish Audio 的控制标记驱动 TTS" data-notes="<b>实验 6-7 ★★</b> 使用 Fish Audio S1 构建多参考语音库，比较<b>无控制标记、单一参考音和多参考音</b>三种配置；执行层根据标记选择匹配的情绪、语速和风格。<br>配套仓库的实现：参考库是严格的笛卡尔积——情绪 neutral / happy / frustrated / thinking × 语速 normal / fast / slow × 风格 formal / casual，共 24 条同一说话人的参考音；运行时逐段解析标记，在 24 条参考音中切换，通过 S1 的零样本 ReferenceAudio 合成。左侧回放的是仓库里的真实输入与解析轨迹：THINKING 切换到思考 / 慢速 / 正式参考音，插入 1200ms 静音和 S1 原生的 (uncertain) 嗯……。三组输出时长：A 无控制标记 5.355 秒、B 单一参考音 5.904 秒、C 24 条参考库 8.305 秒。<br>按 → 看真实听测（2026-07-30，Mistral voxtral-small-latest，隐去配置名、三次轮换位置）：按自然度、情绪匹配、思考停顿、音色一致性和真人客服感五维评分，C 组总均分 4.60、真人客服感 4.67，均为三组最高，支持“多参考更接近真人客服”；但完整的 C > B > A 排序没有复现——无标记 A 为 3.93，单参考 B 为 3.20。正式结论因此是“<b>C 的主要优势复现，B 优于 A 未复现</b>”，而不是把部分正结果改写为全部成功。这是多模态模型听测，不冒充真人 MOS 面板。点击右侧 A / B / C 可查看各组的拼接方式。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-7 ★★：<em>控制标记</em>驱动 Fish Audio S1</h2>
+  <p class="lead fx fx-up" style="--d:2">执行层解析标记，从 24 条参考音里选出匹配的情绪、语速和风格，再零样本克隆合成同一说话人</p></header>
+  <div class="e7-body">
+    <div class="e7-left">
+      <div class="e7-in panel fx fx-left" style="--d:3"><span class="lbl">配套仓库的实际输入（逐个解析）</span><p class="e7-src"></p></div>
+      <div class="e7-lib panel fx fx-left" style="--d:4">
+        <div class="e7-lh"><b>参考音库</b><span>4 情绪 × 3 语速 × 2 风格 = 24 条，同一说话人</span><span class="e7-cur"></span></div>
+        <div class="e7-blocks"></div>
+      </div>
+      <div class="e7-out panel fx fx-left" style="--d:5"><div class="e7-oh"><span class="lbl e7-ot">C 组输出</span><span class="e7-od"></span></div><div class="e7-segs"></div></div>
+    </div>
+    <div class="e7-right">
+      <div class="e7-abc fx fx-right" style="--d:4">
+        <button class="e7-cf" data-i="0"><b>A</b><span class="e7-cn"><em>无控制标记</em><small>删除标记，直接用源参考音</small></span><span class="e7-du"><i style="--w:59.5%"></i><b>5.355 s</b></span></button>
+        <button class="e7-cf" data-i="1"><b>B</b><span class="e7-cn"><em>单一参考音</em><small>全程只用 neutral · normal · formal</small></span><span class="e7-du"><i style="--w:65.6%"></i><b>5.904 s</b></span></button>
+        <button class="e7-cf" data-i="2"><b>C</b><span class="e7-cn"><em>24 条参考库</em><small>逐段解析标记，在参考音之间切换</small></span><span class="e7-du"><i style="--w:92.3%"></i><b>8.305 s</b></span></button>
+      </div>
+      <div class="e7-ev panel fx fx-up" data-step="1">
+        <div class="e7-eh"><b>真实盲评</b><span>voxtral-small-latest · 三次位置平衡 · 多模态模型听测，不是真人 MOS</span></div>
+        <div class="e7-lg"><span class="a">A 无标记</span><span class="b">B 单参考</span><span class="c">C 24 条库</span></div>
+        <div class="e7-rows"></div>
+        <div class="e7-cc"><span class="y">✓ C 组总均分 4.60、真人客服感 4.67，三组最高</span><span class="n">✗ C &gt; B &gt; A 未复现：A 3.93 高于 B 3.20</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「更像人的语音合成」· 实验 6-7 · 数据：配套仓库 chapter6/controllable-tts 验收记录（2026-07-29 合成，2026-07-30 听测，Fish Audio S1）</div>
+</section>
+<style>
+#c06-exp7 .e7-body{display:flex;gap:28px;height:672px}
+#c06-exp7 .e7-left{width:940px;flex:none;display:flex;flex-direction:column;gap:14px}
+#c06-exp7 .e7-in{padding:12px 18px}
+#c06-exp7 .e7-src{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:19px;line-height:1.6}
+#c06-exp7 .e7-tk{padding:1px 8px;border-radius:8px;font:600 15px var(--mono);color:var(--acc2);border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent);transition:all .3s}
+#c06-exp7 .e7-tx{padding:0 4px;border-radius:6px;transition:all .3s}
+#c06-exp7 .e7-tk.on{color:#06101f;background:var(--acc2)}
+#c06-exp7 .e7-tx.on{background:color-mix(in srgb,var(--acc) 28%,transparent)}
+#c06-exp7 .e7-lib{padding:12px 18px;flex:1}
+#c06-exp7 .e7-lh{display:flex;align-items:baseline;gap:14px}
+#c06-exp7 .e7-lh b{font-size:19px}
+#c06-exp7 .e7-lh span{font-size:15px;color:var(--text3)}
+#c06-exp7 .e7-cur{margin-left:auto;font:600 15px var(--mono);color:var(--acc)!important}
+#c06-exp7 .e7-blocks{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px}
+#c06-exp7 .e7-blk{padding:10px 12px;border-radius:14px;border:1px solid var(--line);transition:border-color .4s,background .4s}
+#c06-exp7 .e7-blk.on{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+#c06-exp7 .e7-bt{display:block;font-size:16px;font-weight:700;color:var(--text2);margin-bottom:6px}
+#c06-exp7 .e7-g{display:grid;grid-template-columns:92px repeat(3,1fr);gap:6px;align-items:center}
+#c06-exp7 .e7-g>span{font:15px var(--mono);color:var(--text3);text-align:center}
+#c06-exp7 .e7-g>span.r{text-align:left}
+#c06-exp7 .e7-g>span.hl{color:var(--acc)}
+#c06-exp7 .e7-g i{height:34px;border-radius:9px;border:1px solid var(--line);background:repeating-linear-gradient(90deg,rgba(255,255,255,.07) 0 2px,transparent 2px 6px);transition:all .35s var(--ease)}
+#c06-exp7 .e7-g i.on{border-color:var(--acc);background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--acc) 80%,#fff) 0 2px,color-mix(in srgb,var(--acc) 20%,transparent) 2px 6px);box-shadow:0 0 18px color-mix(in srgb,var(--acc) 55%,transparent)}
+#c06-exp7 .e7-out{padding:12px 18px;height:156px}
+#c06-exp7 .e7-oh{display:flex;align-items:baseline;gap:14px}
+#c06-exp7 .e7-od{font-size:15px;color:var(--text2)}
+#c06-exp7 .e7-segs{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+#c06-exp7 .e7-sg{display:flex;flex-direction:column;gap:2px;padding:6px 12px;border-radius:12px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent);animation:upIn .45s var(--spring) both}
+#c06-exp7 .e7-sg b{font-size:16px}
+#c06-exp7 .e7-sg small{font:15px var(--mono);color:var(--acc)}
+#c06-exp7 .e7-sg.sil{border-style:dashed;border-color:var(--line2);background:none}
+#c06-exp7 .e7-sg.sil small{color:var(--text3)}
+#c06-exp7 .e7-right{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
+#c06-exp7 .e7-abc{display:flex;flex-direction:column;gap:10px}
+#c06-exp7 .e7-cf{display:grid;grid-template-columns:44px 1fr 200px;align-items:center;gap:12px;padding:10px 14px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s var(--ease)}
+#c06-exp7 .e7-cf>b{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font:800 22px var(--num);color:var(--text2);border:1px solid var(--line2)}
+#c06-exp7 .e7-cf em{display:block;font-style:normal;font-size:18px;font-weight:700;color:var(--text)}
+#c06-exp7 .e7-cf small{display:block;font-size:15px;color:var(--text3)}
+#c06-exp7 .e7-du{position:relative;height:30px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+#c06-exp7 .e7-du i{position:absolute;left:0;top:0;bottom:0;width:var(--w);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 40%,transparent),color-mix(in srgb,var(--acc) 75%,transparent))}
+#c06-exp7 .e7-du b{position:relative;display:block;padding:0 10px;line-height:30px;font:700 15px var(--num);color:var(--text)}
+#c06-exp7 .e7-cf.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-exp7 .e7-cf.on>b{color:#06101f;background:var(--acc);border-color:var(--acc)}
+#c06-exp7 .e7-ev{flex:1;padding:12px 18px;display:flex;flex-direction:column;gap:8px}
+#c06-exp7 .e7-eh{display:flex;flex-direction:column;gap:2px}
+#c06-exp7 .e7-eh b{font-size:19px}
+#c06-exp7 .e7-eh span{font-size:15px;color:var(--text3)}
+#c06-exp7 .e7-lg{display:flex;gap:16px;font-size:15px;color:var(--text2)}
+#c06-exp7 .e7-lg span::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px;background:var(--c)}
+#c06-exp7 .a{--c:#94a3b8}#c06-exp7 .b{--c:#60a5fa}#c06-exp7 .c{--c:var(--acc2)}
+#c06-exp7 .e7-rows{display:flex;flex-direction:column;gap:6px}
+#c06-exp7 .e7-r{display:grid;grid-template-columns:96px 1fr;align-items:center;gap:10px}
+#c06-exp7 .e7-r>span{font-size:15px;color:var(--text2)}
+#c06-exp7 .e7-r.t>span{font-weight:700;color:var(--text)}
+#c06-exp7 .e7-bs{display:flex;flex-direction:column;gap:2px}
+#c06-exp7 .e7-b{display:grid;grid-template-columns:1fr 40px;align-items:center;gap:6px}
+#c06-exp7 .e7-b i{display:block;height:7px;border-radius:4px;background:var(--c);width:calc(var(--v) / 5 * 100%);transform-origin:left;transform:scaleX(0);transition:transform 1s var(--ease)}
+#c06-exp7 .e7-ev.on .e7-b i{transform:scaleX(1)}
+#c06-exp7 .e7-b em{font:600 15px var(--num);font-style:normal;color:var(--text3);line-height:1}
+#c06-exp7 .e7-r.t .e7-b i{height:10px}
+#c06-exp7 .e7-cc{margin-top:auto;display:flex;flex-direction:column;gap:6px}
+#c06-exp7 .e7-cc span{padding:6px 12px;border-radius:10px;font-size:15px}
+#c06-exp7 .e7-cc .y{color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c06-exp7 .e7-cc .n{color:#fda4af;background:color-mix(in srgb,var(--bad) 10%,transparent)}
+</style>
+<script>
+HOOKS['c06-exp7'] = {
+  EMO: ['neutral', 'happy', 'frustrated', 'thinking'], SPD: ['normal', 'fast', 'slow'], STY: ['formal', 'casual'],
+  // 配套仓库 latest.json 的真实输入与解析轨迹
+  SRC: [
+    { k: 'tk', t: '[EMO:happy]' }, { k: 'tk', t: '[SPEED:fast]' }, { k: 'tk', t: '[STYLE:casual]', p: 'happy_fast_casual' },
+    { k: 'tx', t: '太好了！您的订单已确认。', seg: ['太好了！您的订单已确认。', 'happy_fast_casual'] },
+    { k: 'tk', t: '[THINKING]', p: 'thinking_slow_formal', seg2: [['静音 1200ms', '插入停顿', 1], ['(uncertain)嗯……', 'thinking_slow_formal']] },
+    { k: 'tx', t: '让我查一下发货时间。', seg: ['让我查一下发货时间。', 'thinking_slow_formal'] },
+    { k: 'tk', t: '[EMO:neutral]' }, { k: 'tk', t: '[SPEED:normal]' }, { k: 'tk', t: '[STYLE:formal]', p: 'neutral_normal_formal' },
+    { k: 'tx', t: '预计明天下午送达。', seg: ['预计明天下午送达。', 'neutral_normal_formal'] },
+  ],
+  CF: [
+    { n: 'A 组输出', d: '删除标记，直接使用源参考音 · 5.355 s', segs: [['太好了！您的订单已确认。让我查一下发货时间。预计明天下午送达。', '标记已删除 · 源参考音']] },
+    { n: 'B 组输出', d: '全程一条参考音零样本克隆 · 5.904 s', segs: [['太好了！您的订单已确认。让我查一下发货时间。预计明天下午送达。', 'neutral_normal_formal']] },
+    { n: 'C 组输出', d: '逐段切换参考音 · 8.305 s', segs: null },
+  ],
+  EV: [
+    ['自然度', [4.0, 3.33, 4.67]], ['情绪匹配', [4.0, 3.33, 4.67]], ['思考停顿', [3.67, 2.67, 4.33]],
+    ['音色一致性', [4.0, 3.33, 4.67]], ['真人客服感', [4.0, 3.33, 4.67]], ['总均分', [3.93, 3.2, 4.6], 1],
+  ],
+  init(s) {
+    s.querySelector('.e7-src').innerHTML = this.SRC.map((x, i) => `<span class="e7-${x.k}" data-j="${i}">${x.t}</span>`).join('');
+    s.querySelector('.e7-blocks').innerHTML = this.STY.map((st) => `<div class="e7-blk" data-st="${st}"><span class="e7-bt">${st} · ${st === 'formal' ? '正式' : '随意'}</span><div class="e7-g"><span></span>${this.SPD.map((sp) => `<span data-sp="${sp}">${sp}</span>`).join('')}${this.EMO.map((em) => `<span class="r" data-em="${em}">${em}</span>${this.SPD.map((sp) => `<i data-p="${em}_${sp}_${st}"></i>`).join('')}`).join('')}</div></div>`).join('');
+    s.querySelector('.e7-rows').innerHTML = this.EV.map(([n, v, t]) => `<div class="e7-r${t ? ' t' : ''}"><span>${n}</span><div class="e7-bs">${v.map((x, i) => `<div class="e7-b ${'abc'[i]}"><i style="--v:${x}"></i><em>${x.toFixed(2)}</em></div>`).join('')}</div></div>`).join('');
+    s.querySelectorAll('.e7-cf').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.tk = (this.tk || 0) + 1; this.showCf(s, +b.dataset.i); }));
+  },
+  sel(s, p) {
+    s.querySelectorAll('.e7-g i').forEach((c) => c.classList.toggle('on', c.dataset.p === p));
+    const [em, sp, st] = p ? p.split('_') : [];
+    s.querySelectorAll('.e7-blk').forEach((b) => b.classList.toggle('on', b.dataset.st === st));
+    s.querySelectorAll('.e7-g [data-em]').forEach((e) => e.classList.toggle('hl', e.dataset.em === em));
+    s.querySelectorAll('.e7-g [data-sp]').forEach((e) => e.classList.toggle('hl', e.dataset.sp === sp));
+    s.querySelector('.e7-cur').textContent = p ? '当前参考音：' + p : '';
+  },
+  addSeg(s, txt, prof, sil) {
+    s.querySelector('.e7-segs').insertAdjacentHTML('beforeend', `<div class="e7-sg${sil ? ' sil' : ''}"><b>${txt}</b><small>${prof}</small></div>`);
+  },
+  showCf(s, i) {
+    const c = this.CF[i];
+    s.querySelectorAll('.e7-cf').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelector('.e7-ot').textContent = c.n;
+    s.querySelector('.e7-od').textContent = c.d;
+    const box = s.querySelector('.e7-segs');
+    box.innerHTML = '';
+    if (c.segs) { c.segs.forEach(([t, p]) => this.addSeg(s, t, p)); this.sel(s, i === 1 ? 'neutral_normal_formal' : ''); s.querySelectorAll('.e7-src span').forEach((e) => e.classList.remove('on')); return; }
+    this.SRC.forEach((x) => { if (x.seg2) x.seg2.forEach(([t, p, sil]) => this.addSeg(s, t, p, sil)); if (x.seg) this.addSeg(s, x.seg[0], x.seg[1]); });
+    this.sel(s, '');
+  },
+  // 逐个解析标记：先定情绪、语速、风格，再在 24 条参考音里点亮对应的一条，并把这一段追加到输出
+  async run(s, tk) {
+    const ctx = this.ctx, ok = () => ctx.alive && tk === this.tk;
+    const toks = [...s.querySelectorAll('.e7-src span')];
+    while (ok()) {
+      toks.forEach((e) => e.classList.remove('on'));
+      s.querySelectorAll('.e7-cf').forEach((b) => b.classList.toggle('on', +b.dataset.i === 2));
+      s.querySelector('.e7-ot').textContent = 'C 组输出';
+      s.querySelector('.e7-od').textContent = '逐段切换参考音';
+      s.querySelector('.e7-segs').innerHTML = '';
+      this.sel(s, '');
+      for (let i = 0; i < this.SRC.length; i++) {
+        await U.wait(ctx, 620); if (!ok()) return;
+        const x = this.SRC[i];
+        toks.forEach((e, j) => e.classList.toggle('on', j === i));
+        if (x.p) this.sel(s, x.p);
+        if (x.seg2) x.seg2.forEach(([t, p, sil]) => this.addSeg(s, t, p, sil));
+        if (x.seg) this.addSeg(s, x.seg[0], x.seg[1]);
+      }
+      s.querySelector('.e7-od').textContent = '逐段切换参考音 · 总时长 8.305 s';
+      await U.wait(ctx, 2600); if (!ok()) return;
+      toks.forEach((e) => e.classList.remove('on'));
+      for (const i of [0, 1]) { this.showCf(s, i); await U.wait(ctx, 2200); if (!ok()) return; }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    const tk = (this.tk = (this.tk || 0) + 1);
+    this.run(s, tk);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.e7-segs').innerHTML = '';
+    s.querySelectorAll('.e7-src span,.e7-cf').forEach((e) => e.classList.remove('on'));
+    this.sel(s, '');
+  },
+};
+</script>

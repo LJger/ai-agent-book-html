@@ -1,0 +1,426 @@
+<!-- ================= PART 02 观察空间与动作空间 ================= -->
+<section class="slide chapter" id="c1-d2" data-part="2" data-title="PART 02 · 观察空间与动作空间" data-notes="<b>观察通道与动作接口共同构成了 Agent 与外部环境之间的边界</b>。Harness 把环境返回的观察转换为模型能够处理的上下文，再把模型选择的行动转换为对环境的工具调用。<br>因此，<b>在底层模型固定时，提升 Agent 任务表现最主要的系统工程手段，往往就是重新定义或扩展观察空间与动作空间</b>。用本书的术语说，就是扩展上下文和工具。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">观察空间<br>与动作空间</h1>
+  <div class="ch-s fx fx-up" style="--d:3">模型与世界的接口</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">在底层模型固定时，提升 Agent 任务表现最主要的系统工程手段，往往就是重新定义或扩展观察空间与动作空间。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c1-iface" data-part="2" data-steps="2" data-title="接口之外，对模型就像不存在" data-notes="Harness 把环境返回的观察转换为模型能够处理的上下文，再把模型选择的行动转换为对环境的工具调用。<b>没有通过观察通道进入上下文的信息，对模型来说就像不存在；没有被动作接口允许的操作，模型即使知道该怎么做，也只能停留在文字建议上。</b><br>许多看似需要“更聪明模型”的问题，其实只是接口问题：<b>把任务所需的数据纳入上下文，或把完成任务所需的操作封装成工具，原本不可解的任务就可能变得可解。</b><br>这一页用一个示意任务演示：按 → 先打开观察通道，再打开动作接口；也可以直接点右上角的两个开关，看模型的输出如何变化。模型自始至终没有换。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">接口之外的信息，对模型<em>就像不存在</em></h2></div>
+    <div class="if-tg fx fx-up" style="--d:2">
+      <button class="tgl" data-g="obs" style="--tc:var(--ctx)"><i></i>把报表数据纳入上下文</button>
+      <button class="tgl" data-g="act" style="--tc:var(--tool)"><i></i>把提交操作封装成工具</button>
+    </div></header>
+  <div class="if-task fx fx-up" style="--d:3"><svg class="ic"><use href="#i-clipboard"/></svg><b>任务</b><span>读取本季度的销售报表，汇总后提交到财务系统</span><em>示意</em></div>
+  <div class="if-stage fx fx-scale" style="--d:4">
+    <div class="if-col l">
+      <span class="lbl">环境中的信息</span>
+      <div class="if-it"><svg class="ic"><use href="#i-mail"/></svg>历史邮件</div>
+      <div class="if-it need" data-n="obs"><svg class="ic"><use href="#i-file"/></svg>季度销售报表</div>
+      <div class="if-it"><svg class="ic"><use href="#i-globe"/></svg>网页资料</div>
+    </div>
+    <div class="if-gate" data-g="obs" style="left:470px"><b>观察通道</b><i class="if-x">×</i></div>
+    <div class="if-model"><svg class="ic"><use href="#i-brain"/></svg><b>Model</b><small>底层模型固定</small></div>
+    <div class="if-gate" data-g="act" style="left:1120px"><b>动作接口</b><i class="if-x">×</i></div>
+    <div class="if-col r">
+      <span class="lbl">环境中的操作</span>
+      <div class="if-it"><svg class="ic"><use href="#i-send"/></svg>发送邮件</div>
+      <div class="if-it need" data-n="act"><svg class="ic"><use href="#i-upload"/></svg>提交到财务系统</div>
+      <div class="if-it"><svg class="ic"><use href="#i-edit"/></svg>修改文件</div>
+    </div>
+    <svg class="if-svg" viewBox="0 0 1660 360" width="1660" height="360">
+      <path class="if-p o1" d="M360 180 H470"/><path class="if-p o2" d="M540 180 H745"/>
+      <path class="if-p a1" d="M915 180 H1120"/><path class="if-p a2" d="M1190 180 H1300"/>
+      <circle class="pk if-ko" r="10" style="fill:#22d3ee"/><circle class="pk if-ka" r="10" style="fill:#fbbf24"/>
+    </svg>
+  </div>
+  <div class="if-out panel fx fx-up" style="--d:6"><div class="if-oh"><span class="lbl">模型的输出</span><span class="badge if-v"></span></div><p class="if-o"></p></div>
+  <div class="src">第一章 ·「观察空间与动作空间：模型与世界的接口」</div>
+</section>
+<style>
+#c1-iface .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+.if-tg{display:flex;gap:12px}
+.if-task{display:flex;align-items:center;gap:14px;padding:14px 22px;border-radius:14px;font-size:21px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.if-task .ic{font-size:24px;color:var(--acc)}
+.if-task b{color:var(--acc)}
+.if-task em{margin-left:auto;font-style:normal;font-size:15px;color:var(--text3)}
+.if-stage{position:relative;width:1660px;height:360px;margin-top:14px}
+.if-col{position:absolute;top:40px;width:360px;display:flex;flex-direction:column;gap:20px}
+.if-col.l{left:0}.if-col.r{left:1300px}
+.if-col .lbl{position:absolute;top:-26px}
+.if-it{height:80px;display:flex;align-items:center;gap:14px;padding:0 22px;border-radius:16px;font-size:21px;color:var(--text3);border:1px solid var(--line);background:rgba(255,255,255,.02);transition:all .45s var(--ease)}
+.if-it .ic{font-size:26px}
+.if-it.need{color:var(--text);border-color:var(--line2);background:rgba(255,255,255,.05)}
+.if-col.l .if-it.need .ic{color:var(--ctx)}.if-col.r .if-it.need .ic{color:var(--tool)}
+.if-it.hit{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent);box-shadow:0 0 30px color-mix(in srgb,var(--ok) 35%,transparent)}
+.if-gate{position:absolute;top:90px;width:70px;height:180px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border:2px solid var(--bad);background:color-mix(in srgb,var(--bad) 10%,rgba(10,16,36,.9));transition:all .5s var(--ease)}
+.if-gate b{writing-mode:vertical-rl;font-size:18px;letter-spacing:.3em;color:var(--bad)}
+.if-x{font:800 30px/1 var(--num);font-style:normal;color:var(--bad);transition:opacity .3s}
+.if-gate.open{border-color:var(--gc);background:color-mix(in srgb,var(--gc) 12%,rgba(10,16,36,.9));box-shadow:0 0 30px color-mix(in srgb,var(--gc) 35%,transparent)}
+.if-gate.open b{color:var(--gc)}.if-gate.open .if-x{opacity:0}
+.if-gate[data-g=obs]{--gc:var(--ctx)}.if-gate[data-g=act]{--gc:var(--tool)}
+.if-gate.deny{animation:shake .4s ease}
+.if-model{position:absolute;left:745px;top:95px;width:170px;height:170px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px solid var(--llm);background:radial-gradient(circle at 35% 30%,color-mix(in srgb,var(--llm) 30%,#0a1024),#0a1024 70%);box-shadow:0 0 50px color-mix(in srgb,var(--llm) 30%,transparent);transition:box-shadow .4s}
+.if-model .ic{font-size:44px;color:var(--llm)}
+.if-model b{font:800 24px var(--num)}.if-model small{font-size:14px;color:var(--text3)}
+.if-model.on{box-shadow:0 0 0 8px color-mix(in srgb,var(--llm) 16%,transparent),0 0 70px color-mix(in srgb,var(--llm) 55%,transparent)}
+.if-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.if-p{fill:none;stroke-width:3;stroke-dasharray:6 8;stroke:rgba(255,255,255,.18)}
+.if-p.on{animation:flow 1s linear infinite}
+.if-p.o1.on,.if-p.o2.on{stroke:var(--ctx)}.if-p.a1.on,.if-p.a2.on{stroke:var(--tool)}
+.if-out{margin-top:16px;padding:18px 26px}
+.if-oh{display:flex;align-items:center;justify-content:space-between}
+.if-o{margin-top:10px;font-size:22px;line-height:1.6;min-height:36px;font-family:var(--mono);color:#cbd5f5}
+</style>
+<script>
+HOOKS['c1-iface'] = {
+  OUT: {
+    none: ['我看不到报表里的数据，也没有办法提交。建议你先打开报表手动汇总，再登录财务系统提交。', '不可解', 'var(--bad)'],
+    obs: ['已读取报表：本季度销售额合计 1,284,600 元。请你把这个数字填进财务系统并提交。', '只能停留在文字建议上', 'var(--warn)'],
+    act: ['我可以调用 submit_report 提交，但看不到报表里的数据，不知道该提交什么。', '知道怎么做，却没有依据', 'var(--warn)'],
+    both: ['read_report() → 汇总 1,284,600 元 → submit_report(1284600) ✓ 已提交', '可解：模型没换，任务变得可解', 'var(--ok)'],
+  },
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.el = {
+      tg: [...s.querySelectorAll('.tgl')], gates: { obs: q('.if-gate[data-g=obs]'), act: q('.if-gate[data-g=act]') },
+      need: { obs: q('[data-n=obs]'), act: q('[data-n=act]') }, model: q('.if-model'),
+      p: { o1: q('.o1'), o2: q('.o2'), a1: q('.a1'), a2: q('.a2') }, ko: q('.if-ko'), ka: q('.if-ka'),
+      out: q('.if-o'), v: q('.if-v'),
+    };
+    this.el.tg.forEach((b) => b.addEventListener('click', () => { this.st[b.dataset.g] = !this.st[b.dataset.g]; this.apply(); }));
+  },
+  apply() {
+    const E = this.el, st = this.st;
+    E.tg.forEach((b) => b.classList.toggle('on', st[b.dataset.g]));
+    ['obs', 'act'].forEach((g) => E.gates[g].classList.toggle('open', st[g]));
+    E.p.o1.classList.add('on'); E.p.o2.classList.toggle('on', st.obs);
+    E.p.a1.classList.add('on'); E.p.a2.classList.toggle('on', st.act);
+    const key = st.obs && st.act ? 'both' : st.obs ? 'obs' : st.act ? 'act' : 'none';
+    const [txt, verdict, c] = this.OUT[key];
+    E.v.textContent = verdict;
+    E.v.style.setProperty('--c', c);
+    E.out.textContent = txt;
+    U.restart(E.out, 'sw');
+    this.run();
+  },
+  // 一次演示：观察从报表出发，通道关闭就被挡住；模型思考；行动从模型出发，接口关闭也被挡住
+  async run() {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, E = this.el, st = { ...this.st };
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    E.need.obs.classList.remove('hit'); E.need.act.classList.remove('hit');
+    await U.fly(E.ko, E.p.o1, 700, { ctx, keep: st.obs });
+    if (!ok()) return;
+    if (!st.obs) U.restart(E.gates.obs, 'deny');
+    else { await U.fly(E.ko, E.p.o2, 700, { ctx }); if (!ok()) return; }
+    E.model.classList.add('on');
+    await U.wait(ctx, 700);
+    if (!ok()) return;
+    E.model.classList.remove('on');
+    await U.fly(E.ka, E.p.a1, 700, { ctx, keep: st.act });
+    if (!ok()) return;
+    if (!st.act) U.restart(E.gates.act, 'deny');
+    else { await U.fly(E.ka, E.p.a2, 600, { ctx }); if (!ok()) return; if (st.obs) E.need.act.classList.add('hit'); }
+    await U.wait(ctx, 2200);
+    if (ok()) this.run();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.st = { obs: k >= 1, act: k >= 2 }; this.apply(); },
+  step(s, ctx, k) { this.st = { obs: k >= 1, act: k >= 2 }; this.apply(); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.on,.hit,.open').forEach((e) => e.classList.remove('on', 'hit', 'open')); },
+};
+</script>
+
+<section class="slide" id="c1-manus" data-part="2" data-steps="1" data-trans="rise" data-title="Manus：合并原本分离的空间" data-notes="在 Manus 出现之前，生产级 Agent 大多沿着 <b>Deep Research（深度调研）、Coding（代码生成）和 Computer Use（电脑操控）</b>三条相对独立的路线发展。Manus 的突破在于率先把三者放进同一个有广泛影响力的生产级 Agent：<b>虚拟浏览器扩大了观察空间，文件系统、代码执行与命令行执行扩大了动作空间</b>。<br>它没有仅靠替换一个更强的模型来成为通用 Agent，而是<b>取三类 Agent 观察空间与动作空间的并集</b>，使同一个 Agent 能跨越原有产品边界完成任务。按 → 看三条路线合并。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Manus：<em>合并原本分离的空间</em></h2>
+  <p class="lead fx fx-up" style="--d:2">不是换一个更强的模型，而是取三类 Agent 观察空间与动作空间的并集</p></header>
+  <div class="mn-stage">
+    <div class="mn-lanes"></div>
+    <div class="mn-union panel">
+      <div class="mn-uh"><svg class="ic"><use href="#i-layers"/></svg><b>Manus</b><span>同一个 Agent，跨越原有产品边界</span></div>
+      <div class="mn-row"><span class="mn-k c-ctx"><svg class="ic"><use href="#i-eye"/></svg>观察空间</span><div class="mn-cs" data-r="o"></div><span class="mn-plus" style="--c:var(--ctx)">＋ 虚拟浏览器</span></div>
+      <div class="mn-row"><span class="mn-k c-tool"><svg class="ic"><use href="#i-hand"/></svg>动作空间</span><div class="mn-cs" data-r="a"></div><span class="mn-plus" style="--c:var(--tool)">＋ 文件系统 · 代码执行 · 命令行执行</span></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:7">产品能力的演进，往往就是<b>观察空间和动作空间</b>的演进</p>
+  <div class="src">第一章 ·「观察空间与动作空间：模型与世界的接口」· Manus</div>
+</section>
+<style>
+.mn-stage{position:relative;height:520px}
+.mn-lanes{position:absolute;inset:0;display:grid;grid-template-columns:repeat(3,1fr);gap:36px}
+.mn-l{--c:var(--acc);padding:26px 28px;border-radius:22px;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9)),rgba(12,18,40,.9) 70%);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:translate .9s var(--ease),scale .9s var(--ease),opacity .7s var(--ease);opacity:0;translate:0 40px}
+.active .mn-l{opacity:1;translate:0 0;transition-delay:calc(var(--i)*120ms + 200ms)}
+.mn-l h3{display:flex;align-items:center;gap:12px;font-size:28px;color:var(--c)}
+.mn-l h3 .ic{font-size:32px}
+.mn-l .lbl{display:block;margin:22px 0 10px}
+.mn-l .mn-cs{display:flex;flex-wrap:wrap;gap:8px}
+.mn-c{padding:7px 14px;border-radius:10px;font-size:18px;background:rgba(255,255,255,.05);border:1px solid var(--line2)}
+#c1-manus[data-k="1"] .mn-l{opacity:0;scale:.8;transition-delay:0s}
+#c1-manus[data-k="1"] .mn-l[data-i="0"]{translate:520px 0}
+#c1-manus[data-k="1"] .mn-l[data-i="2"]{translate:-520px 0}
+.mn-union{position:absolute;left:120px;right:120px;top:40px;padding:32px 40px;border-color:color-mix(in srgb,var(--acc) 50%,transparent);box-shadow:0 0 80px -20px color-mix(in srgb,var(--acc) 60%,transparent);opacity:0;scale:.9;pointer-events:none;transition:opacity .8s var(--ease) .35s,scale .8s var(--spring) .35s}
+#c1-manus[data-k="1"] .mn-union{opacity:1;scale:1;pointer-events:auto}
+.mn-uh{display:flex;align-items:baseline;gap:16px}
+.mn-uh .ic{font-size:34px;color:var(--acc);align-self:center}
+.mn-uh b{font:800 44px var(--num)}
+.mn-uh span{font-size:22px;color:var(--text2)}
+.mn-row{display:grid;grid-template-columns:160px 1fr;gap:10px 20px;margin-top:28px;align-items:start}
+.mn-k{display:flex;align-items:center;gap:8px;font-size:22px;font-weight:700;padding-top:6px}
+.mn-row .mn-cs{display:flex;flex-wrap:wrap;gap:8px}
+.mn-row .mn-c{opacity:0;translate:0 12px;transition:all .5s var(--ease);border-color:color-mix(in srgb,var(--oc) 45%,transparent);background:color-mix(in srgb,var(--oc) 10%,transparent)}
+#c1-manus[data-k="1"] .mn-row .mn-c{opacity:1;translate:0 0;transition-delay:calc(var(--j)*45ms + 600ms)}
+.mn-plus{grid-column:2;justify-self:start;padding:9px 18px;border-radius:12px;font-size:20px;font-weight:700;color:var(--c);border:2px dashed color-mix(in srgb,var(--c) 70%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);opacity:0;transition:opacity .6s 1.6s}
+#c1-manus[data-k="1"] .mn-plus{opacity:1}
+</style>
+<script>
+HOOKS['c1-manus'] = {
+  L: [
+    { n: 'Deep Research', ic: 'search', c: '#22d3ee', o: ['搜索结果', '网页内容', '论文摘要与引用'], a: ['搜索查询', '网页读取', '生成报告'] },
+    { n: 'Coding', ic: 'code', c: '#a78bfa', o: ['需求', '读取到的代码片段', '目录列表', '终端输出'], a: ['代码搜索', '文件读写', '执行命令'] },
+    { n: 'Computer Use', ic: 'cursor', c: '#f472b6', o: ['屏幕截图', 'DOM 或无障碍树', '操作结果'], a: ['点击', '输入', '滚动', '截图', '执行代码'] },
+  ],
+  init(s) {
+    const chips = (arr) => arr.map((t) => `<span class="mn-c">${t}</span>`).join('');
+    s.querySelector('.mn-lanes').innerHTML = this.L.map((l, i) => `
+      <div class="mn-l" data-i="${i}" style="--c:${l.c};--i:${i}">
+        <h3><svg class="ic"><use href="#i-${l.ic}"/></svg>${l.n}</h3>
+        <span class="lbl">眼睛 · 观察</span><div class="mn-cs">${chips(l.o)}</div>
+        <span class="lbl">手脚 · 行动</span><div class="mn-cs">${chips(l.a)}</div>
+      </div>`).join('');
+    let j = 0;
+    const tagged = (key) => this.L.map((l) => l[key].map((t) => `<span class="mn-c" style="--oc:${l.c};--j:${j++}">${t}</span>`).join('')).join('');
+    s.querySelector('.mn-cs[data-r=o]').innerHTML = tagged('o');
+    s.querySelector('.mn-cs[data-r=a]').innerHTML = tagged('a');
+  },
+  enter(s, ctx, k) { s.dataset.k = k; },
+  step(s, ctx, k) { s.dataset.k = k; },
+  reset(s) { s.dataset.k = 0; },
+};
+</script>
+
+<section class="slide" id="c1-openclaw" data-part="2" data-steps="1" data-trans="zoom" data-title="OpenClaw：把接口延伸到数字生活" data-notes="OpenClaw 又把这两个空间向外推进了一层。它通过用户已经在使用的 <b>WhatsApp、Telegram、Slack、Discord、iMessage</b> 等消息渠道接收任务和返回结果，让 Agent 可以随时随地被触达；同时采用<b>本地 Gateway</b>，连接 Google Drive、Notion 等云应用以及本地文件系统。这样一来，分散在不同账号与设备中的数字文件都可以<b>在用户明确授权后</b>进入同一个 Agent 的观察空间，并被其工具处理。<br>相较于早期 Manus 以<b>隔离云端沙盒</b>为中心、往往需要上传文件或另行配置连接器的形态，本地优先的 OpenClaw 跨越了更大的数据边界。值得注意的是，Manus 后来也加入了 Google Drive 连接器和桌面端本地访问，这恰好再次说明：<b>产品能力的演进往往就是观察空间和动作空间的演进</b>。<br>按 → 或点击上方开关切换两种形态；OpenClaw 模式下可以点击右侧的锁，模拟用户授权或撤销授权。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">OpenClaw：把接口延伸到<em>用户的数字生活</em></h2></div>
+    <div class="oc-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="cloud">早期 Manus · 云端沙盒</button><button data-v="local">OpenClaw · 本地优先</button></div></header>
+  <div class="oc-stage fx fx-scale" style="--d:3">
+    <svg class="oc-svg" viewBox="0 0 1660 480" width="1660" height="480">
+      <ellipse class="oc-bd" cx="830" cy="230" rx="815" ry="236"/>
+      <g class="oc-paths"></g>
+      <path class="oc-up" d="M1495 395 C 1470 470, 1290 478, 1200 458 C 1080 432, 900 420, 830 312"/>
+      <g class="oc-dots"></g>
+    </svg>
+    <div class="oc-chs"></div>
+    <div class="oc-core"><svg class="ic"><use href="#i-server"/></svg><div><b class="oc-t0">云端沙盒</b><b class="oc-t1">本地 Gateway</b><small class="oc-s0">隔离的云端虚拟机</small><small class="oc-s1">本地优先 · 常驻个人助手</small></div></div>
+    <div class="oc-srcs"></div>
+    <div class="oc-user"><svg class="ic"><use href="#i-user"/></svg>用户手动上传 / 另配连接器</div>
+    <div class="oc-bl">观察空间边界</div>
+  </div>
+  <div class="src">第一章 ·「观察空间与动作空间：模型与世界的接口」· OpenClaw</div>
+</section>
+<style>
+#c1-openclaw .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.oc-stage{position:relative;width:1660px;height:480px;margin-top:6px}
+.oc-svg{position:absolute;inset:0;overflow:visible;pointer-events:none}
+.oc-bd{fill:color-mix(in srgb,var(--acc) 5%,transparent);stroke:var(--acc);stroke-width:2;stroke-dasharray:8 8;vector-effect:non-scaling-stroke;transform-box:fill-box;transform-origin:center;transition:transform 1.1s var(--spring)}
+#c1-openclaw[data-m=cloud] .oc-bd{transform:scale(.27,.52)}
+.oc-ln{fill:none;stroke:rgba(255,255,255,.12);stroke-width:2.5;stroke-dasharray:6 8;transition:stroke .5s,opacity .5s}
+#c1-openclaw[data-m=local] .oc-ln.ch{stroke:color-mix(in srgb,var(--acc) 70%,transparent);animation:flow 1.2s linear infinite}
+.oc-ln.src.auth{stroke:var(--env);animation:flow 1.2s linear infinite}
+#c1-openclaw[data-m=cloud] .oc-ln{opacity:.25}
+.oc-up{fill:none;stroke:var(--warn);stroke-width:2.5;stroke-dasharray:4 8;opacity:0;transition:opacity .6s}
+#c1-openclaw[data-m=cloud] .oc-up{opacity:.8;animation:flow 1.4s linear infinite}
+.oc-chs,.oc-srcs{position:absolute;top:0;width:250px}
+.oc-chs{left:40px}.oc-srcs{left:1370px}
+.oc-ch,.oc-src{position:absolute;left:0;width:250px;display:flex;align-items:center;gap:12px;padding:0 18px;border-radius:14px;border:1px solid var(--line2);background:rgba(12,18,40,.88);font-size:20px;transition:all .5s var(--ease)}
+.oc-ch{height:62px}.oc-src{height:70px}
+.oc-ch .ic,.oc-src .ic{font-size:24px;color:var(--acc)}
+.oc-src .ic{color:var(--env)}
+.oc-ch.hit{border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 40%,transparent)}
+#c1-openclaw[data-m=cloud] .oc-ch,#c1-openclaw[data-m=cloud] .oc-src{opacity:.35;filter:saturate(.3)}
+.oc-cap{position:absolute;left:0;top:432px;width:250px;text-align:center;font-size:16px;color:var(--text3)}
+.oc-lock{position:absolute;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;display:grid;place-items:center;font-size:22px;color:var(--warn);background:rgba(10,16,36,.95);border:2px solid var(--warn);pointer-events:auto;cursor:pointer;transition:all .4s var(--spring)}
+.oc-lock.auth{color:var(--env);border-color:var(--env);box-shadow:0 0 18px color-mix(in srgb,var(--env) 50%,transparent)}
+.oc-lock span{position:absolute;top:50px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:14px;color:var(--text3)}
+#c1-openclaw[data-m=cloud] .oc-lock{opacity:0;pointer-events:none}
+.oc-core{position:absolute;left:650px;top:150px;width:360px;height:160px;border-radius:22px;display:flex;align-items:center;justify-content:center;gap:16px;border:2px solid var(--acc);background:color-mix(in srgb,var(--acc) 12%,rgba(10,16,36,.92));box-shadow:0 0 50px color-mix(in srgb,var(--acc) 30%,transparent)}
+.oc-core>.ic{font-size:46px;color:var(--acc)}
+.oc-core b{display:block;font-size:30px}
+.oc-core small{display:block;font-size:16px;color:var(--text2);margin-top:4px}
+.oc-t1,.oc-s1{display:none!important}
+#c1-openclaw[data-m=local] .oc-t0,#c1-openclaw[data-m=local] .oc-s0{display:none!important}
+#c1-openclaw[data-m=local] .oc-t1,#c1-openclaw[data-m=local] .oc-s1{display:block!important}
+.oc-user{position:absolute;left:1050px;top:430px;display:flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;font-size:16px;color:var(--warn);border:1px dashed color-mix(in srgb,var(--warn) 60%,transparent);background:rgba(10,16,36,.9);opacity:0;transition:opacity .5s}
+#c1-openclaw[data-m=cloud] .oc-user{opacity:1}
+.oc-bl{position:absolute;left:50%;top:-6px;transform:translateX(-50%);padding:3px 12px;border-radius:999px;font-size:14px;color:var(--acc);background:var(--bg);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);transition:top 1s var(--spring)}
+#c1-openclaw[data-m=cloud] .oc-bl{top:100px}
+.oc-dot{opacity:0}
+</style>
+<script>
+HOOKS['c1-openclaw'] = {
+  CH: [['WhatsApp', 'chat'], ['Telegram', 'send'], ['Slack', 'msg'], ['Discord', 'users'], ['iMessage', 'mobile']],
+  SR: [['Google Drive', 'cloud'], ['Notion', 'book'], ['本地文件系统', 'folder']],
+  init(s) {
+    const cy = (i) => 61 + i * 82, sy = (j) => 105 + j * 125;
+    this.cy = cy; this.sy = sy;
+    s.querySelector('.oc-chs').innerHTML = this.CH.map(([n, ic], i) => `<div class="oc-ch" style="top:${cy(i) - 31}px"><svg class="ic"><use href="#i-${ic}"/></svg>${n}</div>`).join('') + '<div class="oc-cap">……二十余种消息渠道</div>';
+    s.querySelector('.oc-srcs').innerHTML = this.SR.map(([n, ic], j) => `<div class="oc-src" style="top:${sy(j) - 35}px"><svg class="ic"><use href="#i-${ic}"/></svg>${n}</div>`).join('');
+    let paths = '';
+    this.CH.forEach((_, i) => { paths += `<path class="oc-ln ch" d="M290 ${cy(i)} C 450 ${cy(i)}, 500 230, 650 230"/>`; });
+    this.SR.forEach((_, j) => { paths += `<path class="oc-ln src" data-j="${j}" d="M1010 230 C 1120 230, 1150 ${sy(j)}, 1370 ${sy(j)}"/>`; });
+    s.querySelector('.oc-paths').innerHTML = paths;
+    s.querySelector('.oc-dots').innerHTML = Array.from({ length: 6 }, () => '<circle class="oc-dot" r="8"/>').join('');
+    // 锁放在每条数据源连线上，点击切换授权
+    const stage = s.querySelector('.oc-stage');
+    this.locks = this.SR.map((_, j) => {
+      const b = document.createElement('button');
+      b.className = 'oc-lock';
+      b.style.left = '1230px';
+      b.style.top = sy(j) + (230 - sy(j)) * 0.22 + 'px';
+      b.innerHTML = '<svg class="ic"><use href="#i-lock"/></svg><span>需授权</span>';
+      b.addEventListener('click', () => { this.manual = true; this.auth(j, !this.ok[j]); });
+      stage.appendChild(b);
+      return b;
+    });
+    this.set = U.seg(s.querySelector('.oc-seg'), (v) => this.mode(s, v));
+  },
+  auth(j, v) {
+    this.ok[j] = v;
+    const b = this.locks[j];
+    b.classList.toggle('auth', v);
+    b.querySelector('use').setAttribute('href', v ? '#i-unlock' : '#i-lock');
+    b.querySelector('span').textContent = v ? '已授权' : '需授权';
+    this.s.querySelector(`.oc-ln.src[data-j="${j}"]`).classList.toggle('auth', v);
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    s.dataset.m = m;
+    this.set(m);
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    const dots = [...s.querySelectorAll('.oc-dot')], chs = [...s.querySelectorAll('.oc-ln.ch')], srcs = [...s.querySelectorAll('.oc-ln.src')];
+    const chEl = [...s.querySelectorAll('.oc-ch')];
+    if (m === 'cloud') {
+      // 云端沙盒：用户得手动把文件搬进去
+      const up = s.querySelector('.oc-up');
+      const loop = async () => {
+        while (ok()) {
+          dots[0].style.fill = '#fb923c';
+          await U.fly(dots[0], up, 2600, { ctx, alive: ok });
+          await U.wait(ctx, 900);
+        }
+      };
+      loop();
+      return;
+    }
+    // 本地优先：自动依次授权三处数据源（手动操作过就不再自动）
+    if (!this.manual) this.SR.forEach((_, j) => ctx.later(() => ok() && !this.manual && this.auth(j, true), 900 + j * 1100));
+    const msg = async (d) => {
+      while (ok()) {
+        const i = Math.floor(Math.random() * chs.length);
+        d.style.fill = '#22d3ee';
+        chEl[i].classList.add('hit');
+        await U.fly(d, chs[i], 1300, { ctx, alive: ok });
+        chEl[i].classList.remove('hit');
+        if (!ok()) return;
+        if (!ok()) return;
+        await U.fly(d, chs[i], 1300, { ctx, reverse: true, alive: ok });
+        await U.wait(ctx, 400 + Math.random() * 900);
+      }
+    };
+    const data = async (d, j) => {
+      while (ok()) {
+        if (this.ok[j]) { d.style.fill = '#34d399'; await U.fly(d, srcs[j], 1500, { ctx, reverse: true, alive: ok }); }
+        await U.wait(ctx, 800 + j * 500);
+      }
+    };
+    msg(dots[0]); ctx.later(() => msg(dots[1]), 700);
+    this.SR.forEach((_, j) => data(dots[2 + j], j));
+  },
+  enter(s, ctx, k) { this.s = s; this.ctx = ctx; this.manual = false; this.ok = [false, false, false]; this.SR.forEach((_, j) => this.auth(j, false)); this.mode(s, k >= 1 ? 'local' : 'cloud'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'local' : 'cloud'); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.dataset.m = ''; },
+};
+</script>
+
+<section class="slide" id="c1-ptable" data-part="2" data-trans="flip" data-title="五类 Agent 产品的三个维度" data-notes="不同类型的 Agent 如何在眼睛（感知）、手脚（行动）、策略三个维度上展开？原书用一张表对比了五类产品：<b>Cursor 等 Coding Agent、Deep Research 等搜索 Agent、Browser Use 等电脑操控 Agent、豆包等手机助手 Agent、Pine AI 等个人办事 Agent</b>。上方标签会自动轮换，也可以点击切换，策略一栏会按步骤动起来。<br>这些 Agent 系统有几个共同特征：它们都使用<b>开放式的动作空间</b>——不是从有限的几个按钮中选择，而是能生成任意自然语言和代码；它们都能<b>内部思考</b>——在采取行动前先思考和规划；它们都能<b>持续交互</b>——根据环境反馈不断调整策略。这些能力正是来自大脑、眼睛和手脚——即 LLM、上下文和工具——的协同作用。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">五类 Agent 产品，<em>三个维度</em></h2></header>
+  <div class="pt-tabs tabs fx fx-up" style="--d:2"></div>
+  <div class="pt-panel panel fx fx-up" style="--d:3">
+    <div class="pt-col"><span class="pt-h c-ctx"><svg class="ic"><use href="#i-eye"/></svg>眼睛（感知）</span><div class="pt-v" data-f="o"></div></div>
+    <div class="pt-col"><span class="pt-h c-tool"><svg class="ic"><use href="#i-hand"/></svg>手脚（行动）</span><div class="pt-v" data-f="a"></div></div>
+    <div class="pt-col pt-wide"><span class="pt-h c-llm"><svg class="ic"><use href="#i-route"/></svg>策略<em class="pt-sn"></em></span><div class="pt-chain"></div></div>
+    <div class="runbar pt-bar"><i></i></div>
+  </div>
+  <div class="pt-common">
+    <div class="pt-tr fx fx-up" style="--d:5"><b>开放式的动作空间</b><p>不是从有限的几个按钮中选择，而是能生成任意自然语言和代码</p></div>
+    <div class="pt-tr fx fx-up" style="--d:6"><b>内部思考</b><p>在采取行动前先思考和规划</p></div>
+    <div class="pt-tr fx fx-up" style="--d:7"><b>持续交互</b><p>根据环境反馈不断调整策略</p></div>
+  </div>
+  <div class="src">第一章 ·「观察空间与动作空间：模型与世界的接口」· Agent 产品 / 眼睛（感知） / 手脚（行动） / 策略 对照表</div>
+</section>
+<style>
+.pt-tabs{margin-top:-6px}
+.pt-panel{margin-top:20px;padding:28px 34px 22px;display:grid;grid-template-columns:1fr 1fr 1.5fr;gap:26px;min-height:330px}
+.pt-col{display:flex;flex-direction:column;gap:14px}
+.pt-h{display:flex;align-items:center;gap:10px;font-size:22px;font-weight:700}
+.pt-sn{font-style:normal;font-size:17px;font-weight:500;color:var(--text2);margin-left:8px}
+.pt-v{display:flex;flex-wrap:wrap;gap:8px}
+.pt-v span{padding:8px 14px;border-radius:12px;font-size:19px;background:rgba(255,255,255,.05);border:1px solid var(--line2)}
+.pt-v .pt-open{width:100%;font-size:16px;color:var(--text3);background:none;border:0;padding:0}
+.pt-chain{position:relative;display:flex;flex-direction:column;gap:10px}
+.pt-step{position:relative;display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;font-size:19px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .4s var(--ease)}
+.pt-step em{font-style:normal;font:700 15px var(--num);width:26px;height:26px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line2)}
+.pt-step.on{color:var(--text);border-color:color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 12%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--llm) 25%,transparent)}
+.pt-step.on em{color:#06101f;background:var(--llm);border-color:var(--llm)}
+.pt-loop{font-size:16px;color:var(--llm)}
+.pt-bar{grid-column:1/-1;margin-top:auto}
+.pt-panel.sw .pt-col{animation:swIn .5s var(--ease) both}
+.pt-common{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:22px}
+.pt-tr{padding:18px 24px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.pt-tr b{font-size:22px;color:var(--acc)}
+.pt-tr p{font-size:18px;color:var(--text2);margin-top:6px;line-height:1.55}
+</style>
+<script>
+HOOKS['c1-ptable'] = {
+  P: [
+    { n: 'Cursor 等 Coding Agent', o: ['需求', '读取到的代码片段', '目录列表', '终端输出'], a: ['代码搜索', '文件读写', '执行命令'], sn: '增量开发', st: ['理解需求', '搜索相关代码', '编辑代码', '测试验证', '调试修复'] },
+    { n: 'Deep Research 等搜索 Agent', o: ['搜索结果', '网页内容', '论文摘要与引用'], a: ['搜索查询', '网页读取', '生成报告'], sn: '迭代深化', st: ['搜索', '阅读', '根据已有信息调整搜索方向', '逐步综合出完整报告'], loop: '↺ 调整方向后再次搜索' },
+    { n: 'Browser Use 等电脑操控 Agent', o: ['屏幕截图', 'DOM 或无障碍树', '操作结果'], a: ['点击', '输入', '滚动', '截图', '执行代码'], sn: '视觉感知 + 操作', st: ['观察屏幕', '识别目标元素', '执行操作', '验证结果'] },
+    { n: '豆包等手机助手 Agent', o: ['手机截图', 'App 界面状态', '系统反馈'], a: ['点击', '滑动', '输入', '打开 App'], sn: '意图理解 + App 操控', st: ['理解用户需求', '定位目标 App', '执行操作', '确认完成'] },
+    { n: 'Pine AI 等个人办事 Agent', o: ['经授权读取的账户记录', '账单结果', '服务商资料'], a: ['打电话', '发邮件', '填表单', '与用户确认'], sn: '多步骤任务执行', st: ['收集信息', '制定协商策略', '联系服务商', '谈判', '汇报结果'] },
+  ],
+  init(s) {
+    const tabs = s.querySelector('.pt-tabs');
+    tabs.innerHTML = this.P.map((p, i) => `<button data-i="${i}">${p.n}</button>`).join('');
+    tabs.addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, i) {
+    const p = this.P[i], ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1);
+    this.i = i;
+    s.querySelectorAll('.pt-tabs button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelector('[data-f=o]').innerHTML = p.o.map((t) => `<span>${t}</span>`).join('');
+    s.querySelector('[data-f=a]').innerHTML = p.a.map((t) => `<span>${t}</span>`).join('') + '<span class="pt-open">开放式动作空间：以上只是举例</span>';
+    s.querySelector('.pt-sn').textContent = p.sn;
+    const ch = s.querySelector('.pt-chain');
+    ch.innerHTML = p.st.map((t, j) => `<div class="pt-step"><em>${j + 1}</em>${t}</div>`).join('') + (p.loop ? `<div class="pt-loop">${p.loop}</div>` : '');
+    const panel = s.querySelector('.pt-panel');
+    U.restart(panel, 'sw');
+    const bar = s.querySelector('.pt-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) bar.classList.add('run');
+    const steps = [...ch.querySelectorAll('.pt-step')];
+    steps.forEach((el, j) => ctx.later(() => { if (tk === this.tk) { steps.forEach((x) => x.classList.remove('on')); el.classList.add('on'); } }, 500 + j * 700));
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.P.length); }, 4200);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.pt-tabs button').forEach((b) => b.classList.remove('on')); },
+};
+</script>

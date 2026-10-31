@@ -1,0 +1,595 @@
+<!-- ================= PART 06 管理者模式 ================= -->
+<section class="slide chapter" id="c10-d6" data-part="6" data-title="PART 06 · 管理者模式" data-notes="「管理者模式：中心化协调」：当任务涉及大量子任务、需要动态调度或子任务之间存在复杂依赖时，对等协作就力不从心了，需要引入管理者模式。Manager Agent 的职责就像一个<b>项目经理</b>：先理解整体任务，再拆解为可分配的子任务，选择合适的 Agent 去执行，跟踪进度并处理异常，最后把各 Agent 的输出整合为最终结果。<br>本部分先讲管理者模式的统一抽象（把 Agent 当作工具）与固有挑战（弱规划者是最关键的瓶颈、并行结算要以“已验证”为准）；再看两种协调形态——顺序协调（书籍翻译 Agent，实验 10-2）与并行协调（消息总线、灵台、电话 + 电脑 Agent 实验 10-3、多网站并行搜索实验 10-4）；最后是让管理者先把工作流写成代码、交给确定性运行时执行的做法。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">管理者模式：<br>中心化协调</h1>
+  <div class="ch-s fx fx-up" style="--d:3">像项目经理一样：理解、拆解、调度、跟踪、整合</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">从 Manager 的视角看，调用一个 Agent 和调用一个普通工具没有本质区别。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<section class="slide" id="c10-mgr" data-part="6" data-trans="zoom" data-dur="16000" data-title="Manager：把 Agent 当作工具调用" data-notes="当任务涉及大量子任务、需要动态调度或子任务之间存在复杂依赖时，对等协作就力不从心了，需要引入管理者模式。Manager Agent 的职责就像一个<b>项目经理</b>：先理解整体任务，再拆解为可分配的子任务，选择合适的 Agent 去执行，跟踪进度并处理异常（重试、换 Agent、调整计划），最后把各 Agent 的输出整合为最终结果。<br>从系统设计角度看，管理者模式<b>把每个专门 Agent 建模为 Manager 可调用的工具</b>。Manager 的工具集中不仅有传统的外部工具（如搜索、文件操作），还包含其他 Agent 的调用接口。Manager 通过工具调用机制启动相应 Agent，传递任务参数和必要上下文，等待完成后接收返回结果。<b>从 Manager 的视角看，调用一个 Agent 和调用一个普通工具没有本质区别。</b><br>这种统一抽象赋予了管理者模式良好的<b>可扩展性</b>：新增能力只需开发对应 Agent 并注册为工具，Manager 的核心逻辑无需修改。同时它天然支持<b>异构性</b>：不同 Agent 可以用不同的模型、提示词、工具集，甚至运行在不同的硬件环境上。<br>中间的调用过程是示意动画：上方五个阶段随调用依次点亮；右侧按钮可以把一个新 Agent 注册为工具。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Manager：调用一个 Agent，<em>就像调用一个工具</em></h2></header>
+  <div class="mg-flow fx fx-up" style="--d:2"><span data-k="0">理解整体任务</span><i>→</i><span data-k="1">拆解为子任务</span><i>→</i><span data-k="2">选择合适的 Agent 执行</span><i>→</i><span data-k="3">跟踪进度 · 处理异常</span><i>→</i><span data-k="4">整合为最终结果</span></div>
+  <div class="mg-st fx fx-up" style="--d:3">
+    <div class="mg-mgr">
+      <div class="mg-h"><span class="k10-av" style="--c:#818cf8"><svg class="ic"><use href="#i-crown"/></svg></span><div><b>Manager Agent</b><small>像项目经理一样调度</small></div></div>
+      <div class="mg-tools"><span class="mg-tl">工具集</span></div>
+      <div class="mg-call"><span class="mg-ss">等待任务</span><code class="mg-cc"></code></div>
+    </div>
+    <span class="mg-gl" style="top:0">传统外部工具</span><span class="mg-gl" style="top:182px">其他 Agent 的调用接口</span>
+    <svg class="mg-svg" viewBox="0 0 1110 560" width="1110" height="560"></svg>
+    <div class="mg-tg"></div>
+    <div class="mg-side">
+      <div class="mg-c"><b><svg class="ic"><use href="#i-plug"/></svg>可扩展性</b><p>新增能力只需开发对应 Agent 并<b>注册为工具</b>，Manager 的核心逻辑无需修改</p><button class="btn mg-reg"><svg class="ic"><use href="#i-plug"/></svg><span>注册新 Agent 为工具</span></button></div>
+      <div class="mg-c"><b><svg class="ic"><use href="#i-layers"/></svg>异构性</b><p>不同 Agent 可以用不同的模型、提示词、工具集，甚至运行在不同的硬件环境上</p></div>
+      <div class="mg-c hl"><b><svg class="ic"><use href="#i-swap"/></svg>统一抽象</b><p>调用 Agent = 调用工具：<b>发请求 → 获响应</b></p><span class="k10-sim">调用参数与模型标签为示意</span></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」</div>
+</section>
+<style>
+.mg-flow{display:flex;align-items:center;gap:10px;margin-top:-10px}
+.mg-flow span{padding:9px 18px;border-radius:12px;font-size:19px;border:1px solid var(--line2);background:rgba(255,255,255,.04);color:var(--text2);transition:all .4s var(--ease);white-space:nowrap}
+.mg-flow span.on{color:#06101f;font-weight:700;background:var(--acc);border-color:var(--acc);box-shadow:0 0 22px color-mix(in srgb,var(--acc) 50%,transparent)}
+.mg-flow i{font-style:normal;color:var(--text3)}
+.mg-st{position:relative;height:570px;margin-top:22px}
+.mg-mgr{position:absolute;left:0;top:30px;width:450px;height:520px;padding:20px 22px;border-radius:20px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:rgba(12,18,40,.82);display:flex;flex-direction:column;gap:16px}
+.mg-h{display:flex;align-items:center;gap:16px}
+.mg-h b{display:block;font-size:24px}
+.mg-h small{display:block;font-size:16px;color:var(--text3);margin-top:2px}
+.mg-tools{display:flex;flex-direction:column;gap:8px}
+.mg-tl{font-size:16px;color:var(--text3);letter-spacing:.1em}
+.mg-tools code{padding:6px 12px;border-radius:10px;font:16px var(--mono);color:#cbd5f5;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.mg-tools code.ag{color:color-mix(in srgb,var(--acc) 80%,#fff)}
+.mg-tools code.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 16%,transparent);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 35%,transparent)}
+.mg-tools code.mg-new{display:none}
+.mg-st.reg .mg-tools code.mg-new{display:block;animation:upIn .5s var(--spring) both}
+.mg-call{margin-top:auto;padding:12px 14px;border-radius:12px;background:rgba(5,9,22,.8);border:1px solid var(--line);min-height:84px}
+.mg-ss{display:block;font-size:17px;color:var(--text2)}
+.mg-cc{display:block;margin-top:6px;font:15px var(--mono);color:var(--acc);word-break:break-all}
+.mg-gl{position:absolute;left:640px;font-size:16px;color:var(--text3);letter-spacing:.1em}
+.mg-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.mg-e{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2;stroke-dasharray:5 7}
+.mg-pk{opacity:0;filter:drop-shadow(0 0 8px currentColor)}
+.mg-t{position:absolute;left:640px;width:470px;height:72px;padding:10px 16px 10px 62px;border-radius:14px;border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:border-color .35s,box-shadow .35s,background .35s,opacity .5s,scale .5s var(--spring)}
+.mg-t>.ic{position:absolute;left:18px;top:20px;font-size:28px;color:var(--text2)}
+.mg-t code{display:block;font:600 17px var(--mono);color:var(--text)}
+.mg-t small{display:flex;gap:8px;align-items:center;font-size:15px;color:var(--text3);margin-top:4px}
+.mg-t small i{font-style:normal;padding:0 8px;border-radius:6px;border:1px solid var(--line2);color:var(--text2)}
+.mg-t.ag>.ic{color:var(--acc)}
+.mg-t.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,rgba(12,18,40,.9));box-shadow:0 0 22px color-mix(in srgb,var(--ok) 35%,transparent)}
+.mg-t.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 12%,rgba(12,18,40,.9));box-shadow:0 0 22px color-mix(in srgb,var(--bad) 35%,transparent)}
+.mg-t.mg-x{opacity:0;scale:.85;border-style:dashed}
+.mg-st.reg .mg-t.mg-x{opacity:1;scale:1}
+.mg-side{position:absolute;left:1150px;top:30px;width:510px;display:flex;flex-direction:column;gap:14px}
+.mg-c{padding:16px 20px;border-radius:16px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.mg-c>b{display:flex;align-items:center;gap:10px;font-size:20px;color:var(--acc)}
+.mg-c p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+.mg-c p b{color:var(--text)}
+.mg-c .btn{margin-top:10px}
+.mg-c.hl{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.8))}
+.mg-c .k10-sim{margin-top:8px}
+</style>
+<script>
+HOOKS['c10-mgr'] = {
+  // [名称, 类型, 图标, 说明, 标签]；最后一个是“新注册”的 Agent
+  T: [['search', 'tool', 'search', '外部工具 · 搜索', []], ['write_file', 'tool', 'file', '外部工具 · 文件操作', []],
+    ['call_research_agent', 'agent', 'robot', '子 Agent', ['模型 A', '检索工具集']], ['call_coding_agent', 'agent', 'code', '子 Agent', ['模型 B', '代码沙箱']],
+    ['call_review_agent', 'agent', 'eye', '子 Agent', ['模型 C', '另一台机器']], ['call_translate_agent', 'agent', 'lang', '新注册的 Agent', ['新提示词', '新工具集']]],
+  Y: [30, 108, 212, 290, 368, 446],
+  init(s) {
+    const T = this.T, Y = this.Y;
+    s.querySelector('.mg-tools').insertAdjacentHTML('beforeend', T.map(([n, k], i) => `<code data-t="${i}" class="${k === 'agent' ? 'ag' : ''}${i === 5 ? ' mg-new' : ''}">${n}</code>`).join(''));
+    s.querySelector('.mg-tg').innerHTML = T.map(([n, k, ic, sub, ch], i) => `<div class="mg-t${k === 'agent' ? ' ag' : ''}${i === 5 ? ' mg-x' : ''}" data-t="${i}" style="top:${Y[i]}px"><svg class="ic"><use href="#i-${ic}"/></svg><code>${n}</code><small>${sub}${ch.map((c) => `<i>${c}</i>`).join('')}</small></div>`).join('');
+    let h = '';
+    Y.forEach((y, i) => { h += `<path class="mg-e" id="mg-p${i}" d="M450 300C540 300 550 ${y + 36} 640 ${y + 36}"/>`; });
+    h += '<circle class="mg-pk" r="9" fill="#e9edf8" style="color:#e9edf8"/><circle class="mg-pk" r="9" fill="#34d399" style="color:#34d399"/>';
+    s.querySelector('.mg-svg').innerHTML = h;
+    [this.k1, this.k2] = s.querySelectorAll('.mg-pk');
+    s.querySelector('.mg-reg').addEventListener('click', () => { this.auto = false; this.reg(s, !this.isReg); });
+  },
+  reg(s, v) {
+    this.isReg = v;
+    s.querySelector('.mg-st').classList.toggle('reg', v);
+    s.querySelector('.mg-reg span').textContent = v ? '撤销注册' : '注册新 Agent 为工具';
+  },
+  hi(s, k) { s.querySelectorAll('.mg-flow span').forEach((x) => x.classList.toggle('on', +x.dataset.k === k)); },
+  // 一次调用：请求沿连线过去，结果沿原路返回——工具与 Agent 走的是同一条路
+  async call(s, t, txt, fail) {
+    const ctx = this.ctx, tk = this.tk;
+    const tool = s.querySelector(`.mg-tools code[data-t="${t}"]`), tg = s.querySelector(`.mg-t[data-t="${t}"]`), p = s.querySelector('#mg-p' + t);
+    s.querySelector('.mg-cc').textContent = txt;
+    tool.classList.add('on');
+    await U.fly(this.k1, p, 850, { ctx });
+    if (tk !== this.tk) return false;
+    tg.classList.add(fail ? 'bad' : 'on');
+    await U.wait(ctx, 450);
+    if (tk !== this.tk) return false;
+    this.k2.setAttribute('fill', fail ? '#fb7185' : '#34d399');
+    await U.fly(this.k2, p, 850, { ctx, reverse: true });
+    tg.classList.remove('on', 'bad');
+    tool.classList.remove('on');
+    return tk === this.tk;
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk, ss = s.querySelector('.mg-ss');
+    while (ok()) {
+      this.hi(s, 0); ss.textContent = '理解整体任务'; s.querySelector('.mg-cc').textContent = '';
+      await U.wait(ctx, 1000); if (!ok()) return;
+      this.hi(s, 1); ss.textContent = '拆解为子任务：① 收集资料 ② 编写代码 ③ 审查结果';
+      await U.wait(ctx, 1400); if (!ok()) return;
+      this.hi(s, 2); ss.textContent = '启动子 Agent：传递任务参数和必要上下文';
+      if (!(await this.call(s, 2, 'call_research_agent(task="收集资料", context=…)'))) return;
+      ss.textContent = '调用普通工具：同样是发请求 → 获响应';
+      if (!(await this.call(s, 0, 'search(query="…")'))) return;
+      ss.textContent = '启动子 Agent：编写代码';
+      if (!(await this.call(s, 3, 'call_coding_agent(task="编写代码")', true))) return;
+      this.hi(s, 3); ss.textContent = '子 Agent 返回失败 → 处理异常：重试';
+      await U.wait(ctx, 700); if (!ok()) return;
+      if (!(await this.call(s, 3, 'call_coding_agent(task="编写代码", retry=1)'))) return;
+      ss.textContent = '跟踪进度：交给审查';
+      if (!(await this.call(s, 4, 'call_review_agent(task="审查结果")'))) return;
+      if (this.isReg) { ss.textContent = '新注册的 Agent：Manager 的核心逻辑无需修改'; if (!(await this.call(s, 5, 'call_translate_agent(task="翻译说明")'))) return; }
+      this.hi(s, 4); ss.textContent = '整合各 Agent 的输出 → 最终结果';
+      if (!(await this.call(s, 1, 'write_file("result.md")'))) return;
+      await U.wait(ctx, 1200); if (!ok()) return;
+      if (this.auto) this.reg(s, !this.isReg);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.reg(s, false);
+    ctx.later(() => this.run(s), 800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.reg(s, false);
+    this.hi(s, -1);
+    s.querySelectorAll('.mg-t,.mg-tools code').forEach((x) => x.classList.remove('on', 'bad'));
+    s.querySelector('.mg-ss').textContent = '等待任务';
+    s.querySelector('.mg-cc').textContent = '';
+  },
+};
+</script>
+
+<section class="slide" id="c10-planner" data-part="6" data-trans="rise" data-dur="14000" data-title="弱规划者是整个系统最关键的瓶颈" data-notes="但管理者模式也有固有的挑战。Manager 成为系统的<b>单点瓶颈</b>——它必须理解所有子任务的性质，选择正确的 Agent，准确传递上下文，任何决策偏差都会影响整体流程。此外，Manager 需要维护整个任务的全局上下文，随着任务推进和 Agent 调用增多，上下文可能快速膨胀。因此需要特别注意 Manager 的<b>提示词质量、上下文管理策略和合理的任务分解粒度</b>。<br>2025 年的 Plan-and-Act 论文对此做了实证分析：在 Planner-Executor 双 Agent 架构中，<b>弱规划者是整个系统最关键的瓶颈</b>。当 Planner 的规划质量足够高时，即使 Executor 比较简单也能取得好结果；反之，如果 Planner 的任务分解有误，后续所有 Executor 的工作都建立在错误的前提上。该研究在 WebArena-Lite 基准上取得了 57.58% 的成功率，核心贡献正是改善了 Planner 的规划能力，而非 Executor 的执行能力。<br>这一发现的启示是：应当将<b>最强的模型和最精心设计的提示词分配给 Manager（规划者）</b>，而不是将资源平均分配给所有 Agent。<br>左侧切换“规划质量高 / 任务分解有误”，看错误前提如何传到每一个 Executor（示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>弱规划者</em>是整个系统最关键的瓶颈</h2></div>
+    <div class="seg pn-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="good">规划质量高</button><button data-v="bad">任务分解有误</button></div></header>
+  <div class="pn-body">
+    <div class="pn-st panel fx fx-left" style="--d:3">
+      <svg class="pn-svg" viewBox="0 0 960 620" width="960" height="620">
+        <path class="pn-e" data-l="0" d="M480 110C480 160 180 160 180 210"/><path class="pn-e" data-l="0" d="M480 110V210"/><path class="pn-e" data-l="0" d="M480 110C480 160 780 160 780 210"/>
+        <path class="pn-e" data-l="1" d="M180 290V372"/><path class="pn-e" data-l="1" d="M480 290V372"/><path class="pn-e" data-l="1" d="M780 290V372"/>
+        <path class="pn-e" data-l="2" d="M180 448C180 500 480 480 480 524"/><path class="pn-e" data-l="2" d="M480 448V524"/><path class="pn-e" data-l="2" d="M780 448C780 500 480 480 480 524"/>
+      </svg>
+      <div class="pn-n pn-pl" style="left:350px;top:24px;width:260px"><b>Planner · Manager</b><small>任务分解</small></div>
+      <div class="pn-frame"><span class="pn-ft">分解有误：后续工作都建立在错误的前提上</span></div>
+      <div class="pn-n pn-sub" data-i="0" style="left:65px;top:210px"><b>子任务 1</b><small></small></div>
+      <div class="pn-n pn-sub" data-i="1" style="left:365px;top:210px"><b>子任务 2</b><small></small></div>
+      <div class="pn-n pn-sub" data-i="2" style="left:665px;top:210px"><b>子任务 3</b><small></small></div>
+      <div class="pn-n pn-ex" data-i="0" style="left:80px;top:372px"><b>Executor</b><small>比较简单</small><div class="meter"><i></i></div></div>
+      <div class="pn-n pn-ex" data-i="1" style="left:380px;top:372px"><b>Executor</b><small>比较简单</small><div class="meter"><i></i></div></div>
+      <div class="pn-n pn-ex" data-i="2" style="left:680px;top:372px"><b>Executor</b><small>比较简单</small><div class="meter"><i></i></div></div>
+      <div class="pn-n pn-res" style="left:320px;top:524px;width:320px"><b class="pn-rt">最终结果</b></div>
+      <span class="k10-sim pn-sim">示意</span>
+    </div>
+    <div class="pn-side">
+      <div class="pn-c fx fx-right" style="--d:4"><b><svg class="ic"><use href="#i-alert"/></svg>单点瓶颈</b><p>必须理解所有子任务的性质、选择正确的 Agent、准确传递上下文——任何决策偏差都会影响整体流程</p></div>
+      <div class="pn-c fx fx-right" style="--d:5"><b><svg class="ic"><use href="#i-stack"/></svg>全局上下文膨胀</b><div class="meter pn-m"><i></i></div><p>随任务推进和 Agent 调用增多，Manager 的全局上下文可能快速膨胀</p></div>
+      <div class="pn-c fx fx-right" style="--d:6"><b><svg class="ic"><use href="#i-sliders"/></svg>因此要特别注意</b><div class="pn-tags"><span>提示词质量</span><span>上下文管理策略</span><span>合理的任务分解粒度</span></div></div>
+      <div class="pn-pa fx fx-right" style="--d:7"><b>Plan-and-Act（2025）</b><div class="pn-num"><em data-count="57.58" data-dec="2" data-suffix="%">0</em><span>WebArena-Lite 成功率</span></div><p>核心贡献是改善 <b>Planner 的规划能力</b>，而非 Executor 的执行能力。启示：最强的模型和最精心设计的提示词给 Manager，而不是平均分配</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 脚注：Erdogan et al., Plan-and-Act, arXiv:2503.09572, 2025</div>
+</section>
+<style>
+#c10-planner .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.pn-body{display:grid;grid-template-columns:960px 1fr;gap:28px}
+.pn-st{position:relative;height:640px;padding:0}
+.pn-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.pn-e{fill:none;stroke:rgba(255,255,255,.16);stroke-width:2.4;stroke-dasharray:6 7;transition:stroke .4s}
+.pn-e.on{stroke:var(--ok);animation:flow 1s linear infinite}
+.pn-e.bad{stroke:var(--bad);animation:flow 1s linear infinite}
+.pn-n{position:absolute;width:230px;padding:12px 16px;border-radius:14px;text-align:center;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:border-color .4s,background .4s,box-shadow .4s,opacity .4s}
+.pn-n b{display:block;font-size:20px}
+.pn-n small{display:block;font-size:15px;color:var(--text3);margin-top:3px;min-height:21px}
+.pn-n .meter{margin-top:8px;height:8px}
+.pn-pl{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}
+.pn-pl.on{background:color-mix(in srgb,var(--acc) 18%,rgba(12,18,40,.92));box-shadow:0 0 30px color-mix(in srgb,var(--acc) 45%,transparent)}
+.pn-sub,.pn-ex,.pn-res{opacity:.35}
+.pn-n.ok,.pn-n.bad{opacity:1}
+.pn-n.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,rgba(12,18,40,.92))}
+.pn-n.ok small{color:var(--ok)}
+.pn-n.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,rgba(12,18,40,.92))}
+.pn-n.bad small{color:var(--bad)}
+.pn-ex.ok .meter i{--c:var(--ok)}.pn-ex.bad .meter i{--c:var(--bad)}
+.pn-frame{position:absolute;left:40px;top:190px;width:880px;height:124px;border-radius:20px;border:2px dashed transparent;transition:border-color .4s}
+.pn-ft{position:absolute;left:50%;top:-16px;translate:-50% 0;padding:3px 14px;border-radius:999px;font-size:16px;font-weight:700;color:var(--bad);background:var(--bg);border:1px solid var(--bad);white-space:nowrap;opacity:0;transition:opacity .4s}
+.pn-st.bad .pn-frame{border-color:color-mix(in srgb,var(--bad) 60%,transparent)}
+.pn-st.bad .pn-frame.on .pn-ft{opacity:1}
+.pn-sim{position:absolute;right:18px;top:14px}
+.pn-side{display:flex;flex-direction:column;gap:12px}
+.pn-c{padding:14px 18px;border-radius:16px;background:rgba(12,18,40,.75);border:1px solid var(--line)}
+.pn-c>b{display:flex;align-items:center;gap:10px;font-size:19px;color:var(--acc)}
+.pn-c p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:6px}
+.pn-m{margin-top:8px}
+.pn-m i{animation:pnGrow 4s var(--ease) infinite}
+@keyframes pnGrow{0%{width:12%}80%,100%{width:92%}}
+.pn-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pn-tags span{padding:5px 12px;border-radius:10px;font-size:16px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.pn-pa{padding:14px 18px;border-radius:16px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.8))}
+.pn-pa>b{font-size:19px}
+.pn-num{display:flex;align-items:baseline;gap:12px;margin-top:4px}
+.pn-num em{font:800 42px var(--num);font-style:normal;color:var(--acc)}
+.pn-num span{font-size:16px;color:var(--text2)}
+.pn-pa p{font-size:16px;line-height:1.55;color:var(--text2)}
+.pn-pa p b{color:var(--text)}
+</style>
+<script>
+HOOKS['c10-planner'] = {
+  init(s) { this.set = U.seg(s.querySelector('.pn-seg'), (v) => { this.auto = false; this.run(s, v); }); },
+  run(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, st = s.querySelector('.pn-st'), bad = m === 'bad';
+    this.m = m;
+    this.set(m);
+    st.classList.toggle('bad', bad);
+    const pl = s.querySelector('.pn-pl'), fr = s.querySelector('.pn-frame');
+    const subs = [...s.querySelectorAll('.pn-sub')], exs = [...s.querySelectorAll('.pn-ex')], res = s.querySelector('.pn-res'), rt = s.querySelector('.pn-rt');
+    [pl, fr, ...subs, ...exs, res].forEach((x) => x.classList.remove('on', 'ok', 'bad'));
+    s.querySelectorAll('.pn-e').forEach((e) => e.classList.remove('on', 'bad'));
+    subs.forEach((x) => (x.querySelector('small').textContent = ''));
+    exs.forEach((x) => { x.querySelector('small').textContent = '比较简单'; x.querySelector('.meter i').style.setProperty('--v', '0%'); });
+    rt.textContent = '最终结果';
+    if (!ctx) return;
+    const at = (ms, fn) => ctx.later(() => tk === this.tk && fn(), ms);
+    const cls = bad ? 'bad' : 'on';
+    at(200, () => pl.classList.add('on'));
+    at(700, () => s.querySelectorAll('.pn-e[data-l="0"]').forEach((e) => e.classList.add(cls)));
+    subs.forEach((x, i) => at(1000 + i * 260, () => { x.classList.add(bad ? 'bad' : 'ok'); x.querySelector('small').textContent = bad ? '前提错误' : '分解合理'; }));
+    at(1900, () => { fr.classList.add('on'); s.querySelectorAll('.pn-e[data-l="1"]').forEach((e) => e.classList.add(cls)); });
+    exs.forEach((x, i) => at(2300 + i * 200, () => { x.classList.add(bad ? 'bad' : 'ok'); x.querySelector('.meter i').style.setProperty('--v', '100%'); }));
+    at(3300, () => exs.forEach((x) => (x.querySelector('small').textContent = bad ? '建立在错误前提上' : '照计划完成')));
+    at(3700, () => { s.querySelectorAll('.pn-e[data-l="2"]').forEach((e) => e.classList.add(cls)); res.classList.add(bad ? 'bad' : 'ok'); rt.textContent = bad ? '整体出错：子 Agent 再强也无用' : '好结果：即使 Executor 比较简单'; });
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.run(s, 'good');
+    ctx.every(() => { if (this.auto) this.run(s, this.m === 'good' ? 'bad' : 'good'); }, 6000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.pn-st').classList.remove('bad'); s.querySelectorAll('.pn-n,.pn-frame,.pn-e').forEach((x) => x.classList.remove('on', 'ok', 'bad')); },
+};
+</script>
+
+<section class="slide" id="c10-settle" data-part="6" data-trans="flip" data-dur="15000" data-title="第一个已验证成功，而不是第一个声称成功" data-notes="并行管理器还要定义“第一个<b>已验证</b>成功”而不是“第一个声称成功”的结算点。原书给出的骨架是：launch_independent_workers 启动彼此独立的 worker；只要还有 worker 在运行，就取下一个事件；如果是结果事件，先用隐藏检查（hidden_checks）验证产物——验证通过才去结算：settle_once 原子地认领胜者，认领失败（已经有胜者）就 continue 忽略；认领成功则向其余 worker 广播取消，等待所有确认或超时，再用胜者的产物与证据汇总返回；验证不通过则 record_failure 记下失败。所有 worker 都结束仍无胜者时，返回失败汇总。<br><b>settle_once 必须是幂等的（通常由锁或事务保护），否则两个几乎同时到达的成功事件会触发两次汇总。</b><br>右侧是示意模拟：W2 声称成功却没通过隐藏检查；W1 与 W3 几乎同时通过验证。切换“去掉锁”，看非幂等的结算如何把同一件事汇总两次；左侧代码随事件逐行高亮。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">结算点：第一个<em>已验证</em>成功，而不是第一个声称成功</h2></div>
+    <div class="seg se-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="lock">settle_once 幂等</button><button data-v="nolock">去掉锁</button></div></header>
+  <div class="se-body">
+    <div class="win se-code fx fx-left" style="--d:3"><div class="win-bar"><i></i><i></i><i></i><span>并行管理器的结算骨架 · Python 伪代码（原书）</span></div>
+<div class="code"><span class="ln">workers = launch_independent_workers(subtasks)</span><span class="ln"><span class="t-k">while</span> workers.any_running:</span><span class="ln">    event = next_event()</span><span class="ln">    <span class="t-k">if</span> event.type == RESULT:</span><span class="ln">        <span class="t-k">if</span> verify(event.artifact, hidden_checks):</span><span class="ln">            <span class="t-k">if not</span> settle_once(event):       <span class="t-c"># atomically claim the winner</span></span><span class="ln">                <span class="t-k">continue</span></span><span class="ln">            broadcast_cancel(to = workers - {event.worker_id})</span><span class="ln">            await_all_ack_or_timeout()</span><span class="ln">            <span class="t-k">return</span> assemble(event.artifact, evidence = event.evidence)</span><span class="ln">        <span class="t-k">else</span>:</span><span class="ln">            record_failure(event)</span><span class="ln"><span class="t-k">return</span> summarize_failures(workers)</span></div></div>
+    <div class="se-sim panel fx fx-right" style="--d:4">
+      <div class="se-lanes"></div>
+      <div class="se-row">
+        <div class="se-lock"><svg class="ic"><use href="#i-lock"/></svg><div><b>settle_once</b><small class="se-ls">等待第一个已验证的结果</small></div></div>
+        <div class="se-asm"><span>assemble 汇总次数</span><b class="se-n">0</b></div>
+      </div>
+      <div class="se-log"></div>
+      <span class="k10-sim se-sim2">示意</span>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」</div>
+</section>
+<style>
+#c10-settle .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.se-body{display:grid;grid-template-columns:860px 1fr;gap:26px}
+.se-code .code{font-size:17px;line-height:1.85;padding:14px 18px}
+.se-code .ln{padding:0 8px}
+.se-sim{position:relative;height:620px;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.se-lanes{display:flex;flex-direction:column;gap:10px}
+.se-ln{display:grid;grid-template-columns:54px 1fr 230px;gap:12px;align-items:center;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:border-color .35s,background .35s,opacity .35s}
+.se-ln b{font:800 18px var(--num);color:var(--acc)}
+.se-ln .meter{height:10px}
+.se-ln span{font-size:15px;color:var(--text3);text-align:right}
+.se-ln.win{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.se-ln.win span{color:var(--ok)}
+.se-ln.fail{border-color:var(--warn)}
+.se-ln.fail span{color:var(--warn)}
+.se-ln.dup span{color:var(--text2)}
+.se-ln.cxl{opacity:.5}
+.se-ln.cxl span{color:var(--text2)}
+.se-ln.bad{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+.se-ln.bad span{color:var(--bad)}
+.se-row{display:grid;grid-template-columns:1fr 220px;gap:14px}
+.se-lock{display:flex;align-items:center;gap:14px;padding:12px 16px;border-radius:14px;border:1px solid var(--line2);background:rgba(5,9,22,.7);transition:border-color .35s,box-shadow .35s}
+.se-lock>.ic{font-size:30px;color:var(--text2)}
+.se-lock b{font:700 18px var(--mono)}
+.se-lock small{display:block;font-size:15px;color:var(--text3);margin-top:2px}
+.se-lock.on{border-color:var(--ok);box-shadow:0 0 22px color-mix(in srgb,var(--ok) 35%,transparent)}
+.se-lock.on>.ic{color:var(--ok)}
+.se-lock.off>.ic{color:var(--bad)}
+.se-asm{padding:10px 14px;border-radius:14px;text-align:center;border:1px solid var(--line2);background:rgba(5,9,22,.7)}
+.se-asm span{display:block;font-size:15px;color:var(--text3)}
+.se-asm b{font:800 34px var(--num);color:var(--acc)}
+.se-asm.bad{border-color:var(--bad)}
+.se-asm.bad b{color:var(--bad)}
+.se-log{flex:1;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.se-log div{font-size:16px;line-height:1.45;color:var(--text2);animation:upIn .35s var(--spring) both}
+.se-log div::before{content:"› ";color:var(--acc)}
+.se-log div.bad{color:var(--bad)}
+.se-sim2{position:absolute;right:16px;bottom:14px}
+</style>
+<script>
+HOOKS['c10-settle'] = {
+  init(s) {
+    s.querySelector('.se-lanes').innerHTML = [1, 2, 3, 4].map((i) => `<div class="se-ln" data-w="${i}"><b>W${i}</b><div class="meter"><i></i></div><span>运行中</span></div>`).join('');
+    this.set = U.seg(s.querySelector('.se-seg'), (v) => { this.auto = false; this.run(s, v); });
+  },
+  hl(s, n) { s.querySelectorAll('.se-code .ln').forEach((l, i) => l.classList.toggle('hl', (Array.isArray(n) ? n : [n]).includes(i))); },
+  run(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, lock = m === 'lock';
+    this.m = m;
+    this.set(m);
+    const L = (w) => s.querySelector(`.se-ln[data-w="${w}"]`), P = (w, v) => L(w).querySelector('.meter i').style.setProperty('--v', v + '%');
+    const tag = (w, t, c) => { const l = L(w); l.className = 'se-ln' + (c ? ' ' + c : ''); l.querySelector('span').textContent = t; };
+    const log = s.querySelector('.se-log'), say = (t, bad) => { log.insertAdjacentHTML('beforeend', `<div class="${bad ? 'bad' : ''}">${t}</div>`); while (log.children.length > 6) log.firstElementChild.remove(); };
+    const lk = s.querySelector('.se-lock'), ls = s.querySelector('.se-ls'), asm = s.querySelector('.se-asm'), n = s.querySelector('.se-n');
+    [1, 2, 3, 4].forEach((w) => { tag(w, '运行中'); P(w, 0); });
+    log.innerHTML = '';
+    lk.className = 'se-lock'; ls.textContent = lock ? '有锁保护：只认领一次' : '没有锁：每个成功事件都能认领';
+    asm.className = 'se-asm'; n.textContent = 0;
+    this.hl(s, -1);
+    if (!ctx) return;
+    const at = (ms, fn) => ctx.later(() => tk === this.tk && fn(), ms);
+    at(300, () => { this.hl(s, 0); say('launch_independent_workers：4 个彼此独立的 worker 并行开工'); [70, 55, 62, 40].forEach((v, i) => P(i + 1, v)); });
+    at(1500, () => { this.hl(s, [2, 3, 4]); P(2, 100); tag(2, '声称成功 → 验证中'); say('W2 报告结果 → 用 hidden_checks 验证'); });
+    at(2600, () => { this.hl(s, [10, 11]); tag(2, '声称成功 · 未通过验证', 'fail'); say('W2 未通过隐藏检查 → record_failure，不结算'); });
+    at(3800, () => { this.hl(s, [2, 3, 4]); P(1, 100); P(3, 100); tag(1, '已验证 → 结算'); tag(3, '已验证 → 结算'); say('W1 与 W3 几乎同时到达，都通过了验证'); });
+    if (lock) {
+      at(5000, () => { this.hl(s, 5); lk.classList.add('on'); ls.textContent = '原子认领：胜者 W1'; tag(1, '胜者', 'win'); say('settle_once(W1) 成功：锁定状态'); });
+      at(6100, () => { this.hl(s, [5, 6]); tag(3, '重复事件 → 忽略', 'dup'); say('settle_once(W3) 返回 False → continue'); });
+      at(7200, () => { this.hl(s, [7, 8]); tag(3, '已取消 · ack', 'cxl'); tag(4, '已取消 · ack', 'cxl'); say('broadcast_cancel 给其余 worker，等待 ack 或超时'); });
+      at(8400, () => { this.hl(s, 9); n.textContent = 1; say('assemble：用胜者的产物与证据汇总，只汇总一次'); });
+    } else {
+      at(5000, () => { this.hl(s, 5); lk.classList.add('off'); ls.textContent = '非幂等：W1、W3 都认领成功'; tag(1, '认领成功', 'bad'); tag(3, '认领成功', 'bad'); say('没有锁：两个成功事件都通过了 settle_once', true); });
+      at(6300, () => { this.hl(s, 9); n.textContent = 1; say('assemble（第 1 次）'); });
+      at(7200, () => { this.hl(s, 9); n.textContent = 2; asm.classList.add('bad'); say('assemble（第 2 次）：重复的结果或互相矛盾的状态', true); });
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.run(s, 'lock');
+    ctx.every(() => { if (this.auto) this.run(s, this.m === 'lock' ? 'nolock' : 'lock'); }, 10500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.hl(s, -1); s.querySelector('.se-log').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-seq" data-part="6" data-trans="slide" data-dur="12000" data-title="顺序协调形态" data-notes="<b>顺序协调形态。</b>Manager 按顺序依次调用专门 Agent，每个 Agent 完成后返回结果，Manager 再决定下一步。控制流是线性的，简单明了，适合子任务之间有清晰先后依赖的场景。<br>图10-4：Manager Agent 负责任务理解 → 分解 → 调度 → 综合，它的工具集是 [call_agent_A, call_agent_B, call_agent_C, search, write_file]。Sub-Agent A 负责数据收集（搜索技术文档、提取关键信息，Step 1），Sub-Agent B 负责分析处理（对比分析数据、生成统计报告，Step 2），Sub-Agent C 负责报告生成（撰写最终报告、格式化输出，Step 3）。顺序执行流是：Manager 调用 A → A 返回数据 → Manager 传给 B → B 返回分析 → Manager 传给 C → C 返回报告。<br>Manager 视角：调用 Agent = 调用工具（发请求 → 获响应）。右侧时间线随数据包推进，点击任一步可以停在那一步。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">顺序协调形态：<em>一个接一个</em>，Manager 决定下一步</h2></header>
+  <div class="sq-body">
+    <div class="sq-st fx fx-scale" style="--d:2">
+      <div class="sq-m"><b>Manager Agent</b><span class="sq-ms">任务理解 → 分解 → 调度 → 综合</span><code>工具集: [call_agent_A, call_agent_B, call_agent_C, search, write_file]</code><div class="sq-got"></div></div>
+      <div class="sq-a" data-a="0" style="left:0"><em>Step 1</em><b>Sub-Agent A</b><small>角色：数据收集</small><ul><li>搜索技术文档</li><li>提取关键信息</li></ul></div>
+      <div class="sq-a" data-a="1" style="left:380px"><em>Step 2</em><b>Sub-Agent B</b><small>角色：分析处理</small><ul><li>对比分析数据</li><li>生成统计报告</li></ul></div>
+      <div class="sq-a" data-a="2" style="left:760px"><em>Step 3</em><b>Sub-Agent C</b><small>角色：报告生成</small><ul><li>撰写最终报告</li><li>格式化输出</li></ul></div>
+      <svg class="sq-svg" viewBox="0 0 1100 560" width="1100" height="560">
+        <path id="sq-p0" class="sq-e" d="M380 150C380 230 170 230 170 300"/><path id="sq-p1" class="sq-e" d="M550 150V300"/><path id="sq-p2" class="sq-e" d="M720 150C720 230 930 230 930 300"/>
+        <circle class="sq-k" r="10"/>
+      </svg>
+    </div>
+    <div class="sq-side fx fx-right" style="--d:3">
+      <b class="sq-th">顺序执行流</b>
+      <ol class="sq-tl"><li data-k="0">Manager 调用 A</li><li data-k="1">A 返回数据</li><li data-k="2">Manager 传给 B</li><li data-k="3">B 返回分析</li><li data-k="4">Manager 传给 C</li><li data-k="5">C 返回报告</li></ol>
+      <p class="sq-cap">Manager 视角：调用 Agent = 调用工具<br><b>发请求 → 获响应</b></p>
+      <p class="sq-fit">控制流是线性的，简单明了，适合子任务之间有<b>清晰先后依赖</b>的场景</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 图10-4</div>
+</section>
+<style>
+.sq-body{display:grid;grid-template-columns:1100px 1fr;gap:34px}
+.sq-st{position:relative;height:600px}
+.sq-m{position:absolute;left:170px;top:0;width:760px;height:150px;padding:14px 22px;border-radius:18px;text-align:center;border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.92))}
+.sq-m b{display:block;font-size:24px;color:var(--acc)}
+.sq-ms{display:block;font-size:17px;color:var(--text2);margin-top:4px}
+.sq-m code{display:block;font:15px var(--mono);color:var(--text3);margin-top:6px}
+.sq-got{display:flex;justify-content:center;gap:8px;margin-top:8px;min-height:28px}
+.sq-got span{padding:2px 10px;border-radius:8px;font-size:15px;color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 55%,transparent);animation:upIn .4s var(--spring) both}
+.sq-a{position:absolute;top:300px;width:340px;height:230px;padding:18px 22px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:border-color .35s,box-shadow .35s,background .35s}
+.sq-a em{float:right;font:700 16px var(--num);font-style:normal;color:var(--text3)}
+.sq-a b{display:block;font-size:22px}
+.sq-a small{display:block;font-size:17px;color:var(--text2);margin-top:4px}
+.sq-a ul{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.sq-a li{font-size:17px;color:var(--text2);padding-left:18px;position:relative}
+.sq-a li::before{content:"";position:absolute;left:2px;top:.6em;width:7px;height:7px;border-radius:50%;background:var(--acc2)}
+.sq-a.on{border-color:var(--acc2);background:color-mix(in srgb,var(--acc2) 10%,rgba(12,18,40,.9));box-shadow:0 0 30px color-mix(in srgb,var(--acc2) 35%,transparent)}
+.sq-a.on em{color:var(--acc2)}
+.sq-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}
+.sq-e{fill:none;stroke:rgba(255,255,255,.18);stroke-width:2.4;stroke-dasharray:6 7}
+.sq-k{opacity:0;fill:#fff;filter:drop-shadow(0 0 9px #fff)}
+.sq-side{display:flex;flex-direction:column;gap:16px}
+.sq-th{font-size:22px;color:var(--acc)}
+.sq-tl{display:flex;flex-direction:column;gap:8px}
+.sq-tl li{position:relative;padding:10px 16px 10px 46px;border-radius:12px;font-size:19px;color:var(--text3);border:1px solid var(--line);background:rgba(255,255,255,.03);cursor:pointer;transition:all .35s var(--ease);counter-increment:sq}
+.sq-tl li::before{content:counter(sq);position:absolute;left:14px;top:50%;width:22px;height:22px;margin-top:-11px;border-radius:50%;display:grid;place-items:center;font:700 15px var(--num);border:1px solid var(--line2)}
+.sq-tl li.done{color:var(--text2)}
+.sq-tl li.cur{color:var(--text);border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.sq-tl li.cur::before{background:var(--acc);color:#06101f;border-color:var(--acc)}
+.sq-cap{font-size:19px;line-height:1.6;color:var(--text2);padding:12px 16px;border-radius:14px;border-left:4px solid var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+.sq-cap b{color:var(--acc)}
+.sq-fit{font-size:17px;line-height:1.6;color:var(--text2)}
+.sq-fit b{color:var(--text)}
+</style>
+<script>
+HOOKS['c10-seq'] = {
+  OUT: ['关键信息', '统计报告', '最终报告'],
+  init(s) {
+    s.querySelector('.sq-tl').addEventListener('click', (e) => { const li = e.target.closest('[data-k]'); if (li) { this.auto = false; this.tk = (this.tk || 0) + 1; this.show(s, +li.dataset.k); } });
+  },
+  // 静态停在第 k 步
+  show(s, k) {
+    s.querySelectorAll('.sq-tl li').forEach((li, i) => { li.classList.toggle('cur', i === k); li.classList.toggle('done', i < k); });
+    s.querySelectorAll('.sq-a').forEach((a, i) => a.classList.toggle('on', i === Math.floor(k / 2)));
+    s.querySelector('.sq-got').innerHTML = this.OUT.slice(0, Math.floor((k + 1) / 2)).map((o) => `<span>${o}</span>`).join('');
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, k = s.querySelector('.sq-k'), ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      s.querySelector('.sq-got').innerHTML = '';
+      for (let i = 0; i < 3 && ok(); i++) {
+        const p = s.querySelector('#sq-p' + i);
+        this.show(s, i * 2);
+        await U.fly(k, p, 1100, { ctx }); if (!ok()) return;
+        await U.wait(ctx, 700); if (!ok()) return;
+        this.show(s, i * 2 + 1);
+        await U.fly(k, p, 1100, { ctx, reverse: true }); if (!ok()) return;
+        await U.wait(ctx, 300);
+      }
+      await U.wait(ctx, 1500);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; ctx.later(() => this.run(s), 700); },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.sq-tl li,.sq-a').forEach((x) => x.classList.remove('cur', 'done', 'on')); s.querySelector('.sq-got').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c10-exp2" data-part="6" data-trans="iris" data-dur="18000" data-title="实验 10-2 ★★：书籍翻译 Agent" data-notes="书籍翻译是一项典型的、需要多 Agent 协作的复杂任务：不仅要把文字从一种语言转换为另一种语言，更要保证专业术语全书一致、语境准确、整体阅读流畅。比如翻译一本大语言模型相关的英文书，第一章把 agent 译为“智能体”，后面就不能改成“代理”。<br>如果用单一 Agent 来做，会面临严重的上下文问题：随着逐章处理，上下文不断累积——全书术语表、已翻译章节、当前段落、翻译思考过程、工具调用结果，几百页的书加上中间产物很容易超出上下文窗口。更严重的是，在过长的上下文中 Agent 容易“迷失”：忘记之前的术语约定，到第九章用了与第二章不一致的译法；审校阶段重复检查浪费资源；甚至因注意力分散产生幻觉，“记起”实际上并不存在的术语规则。<br>管理者模式通过任务分解和责任分离来解决：<b>Glossary Agent</b> 接收全书内容，识别重复出现的专业术语，搜索专业词典和翻译规范，生成结构化术语对照表（JSON / CSV：英文术语、中文翻译、词性、使用语境），写入共享文件系统后即可销毁释放资源；<b>Translation Agent</b> 接收当前章节、术语对照表和翻译指南，遇到表中术语严格使用规定译法，遇到新术语推断翻译并标记待审查，每个实例在独立上下文中工作，译文写入文件系统（如 chapter1_zh.md），Manager 可并行或串行启动多个实例；<b>Proofreading Agent</b> 接收所有译文和术语表，逐一验证术语是否统一、识别前后不一致、检查流畅性和可读性，生成审校报告；<b>Manager Agent</b> 只保存任务描述、执行计划、各 Agent 的调用记录和进度状态，不保存完整翻译内容，只维护文件索引，并可根据审校报告把特定章节发回修订。<br>关键优势在于<b>上下文隔离</b>：每个 Agent 都在精简、专注的上下文中工作，效率更高、出错可能更低。<br><b>实验要求</b>：1. 选择一本图文并茂、包含代码的技术书籍作为翻译对象；2. 实现 Manager、Glossary、Translation、Proofreading 四种 Agent；3. 记录每个 Agent 的上下文消耗，验证管理者模式控制上下文膨胀的有效性；4. 对比单 Agent vs 管理者模式在翻译质量、执行效率、资源消耗方面的差异。<br>右上角切换“单 Agent 的困境 / 管理者模式”（图10-5），两边动画中的内容均为示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-2<i>★★</i></span> 书籍翻译 Agent</h2></div>
+    <div class="seg e2-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="single">单 Agent 的困境</button><button data-v="mgr">管理者模式</button></div></header>
+  <div class="e2-st fx fx-up" style="--d:3">
+    <div class="e2-v e2-sv" data-v="single">
+      <div class="e2-win"><span class="e2-lim">上下文窗口上限</span><div class="e2-stack"></div></div>
+      <div class="e2-leg"><span style="--c:#a78bfa">全书术语表</span><span style="--c:#60a5fa">已翻译章节</span><span style="--c:#22d3ee">当前段落</span><span style="--c:#fbbf24">翻译思考过程</span><span style="--c:#34d399">工具调用结果</span></div>
+      <div class="e2-sd"><b class="e2-ch">正在翻译：第 1 章</b><div class="e2-warns"></div></div>
+    </div>
+    <div class="e2-v e2-mv" data-v="mgr">
+      <div class="e2-mgr"><b>Manager Agent</b><span>任务规划 · 进度监控 · 异常处理 · 结果综合</span><small>上下文只有：任务描述 · 执行计划 · 调用记录 · 进度状态 · 文件索引（不存译文）</small></div>
+      <div class="e2-ag" data-a="g" style="left:0"><b>Glossary Agent</b><small>术语对照表</small><ul><li>接收全书 → 识别专业术语</li><li>搜索专业词典 + 翻译规范</li></ul><code>{"attention": "注意力",<br> "transformer": "Transformer",<br> "backprop": "反向传播"}</code><span class="e2-gone">已写入 glossary.json · 销毁释放资源</span></div>
+      <div class="e2-ag e2-tr" data-a="t" style="left:540px"><b>Translation Agent ×N</b><small>章节翻译 · 每个实例独立上下文</small><div class="e2-ins"><span data-c="1">第 1 章</span><span data-c="2">第 2 章</span><span data-c="3">第 3 章</span></div><p>输入：章节 + 术语表 + 指南 → 术语严格按表翻译，新术语标记待审查</p><code>"…注意力机制通过计算<br> Query·Key^T 的相似度…"</code></div>
+      <div class="e2-ag" data-a="p" style="left:1140px"><b>Proofreading Agent</b><small>全文审校</small><ul><li>扫描验证术语一致性</li><li>检查流畅性和可读性</li></ul><code>P3: “注意力”→“关注”不一致<br>P8: 长句建议拆分</code></div>
+      <div class="e2-fs"><b>共享文件系统</b><span data-f="g">glossary.json<small>术语对照表</small></span><span data-f="t">chapter{1..10}_zh.md<small>章节译文</small></span><span data-f="p">review_report.md<small>审校报告</small></span><span data-f="x">translation_guide.md<small>翻译指南</small></span></div>
+      <div class="e2-iso">上下文隔离：<span>Glossary 仅看术语</span><span>Translation 仅看当前章节 + 术语表</span><span>Proofreading 看全文但只查一致性</span><span>Manager 仅维护文件索引</span></div>
+      <div class="e2-msg"></div>
+    </div>
+    <span class="k10-sim e2-sim">示意</span>
+  </div>
+  <div class="e2-req fx fx-up" style="--d:5"><b>实验要求</b><span>① 选择图文并茂、包含代码的技术书籍</span><span>② 实现 Manager / Glossary / Translation / Proofreading 四种 Agent</span><span>③ 记录每个 Agent 的上下文消耗</span><span>④ 对比单 Agent 与管理者模式的质量、效率、资源消耗</span></div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-2 · 图10-5</div>
+</section>
+<style>
+#c10-exp2 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-exp2 .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+.e2-st{position:relative;height:600px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+.e2-v{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .5s,visibility .5s}
+.e2-st[data-v=single] .e2-sv,.e2-st[data-v=mgr] .e2-mv{opacity:1;visibility:visible}
+.e2-sim{position:absolute;right:16px;top:12px}
+.e2-win{position:absolute;left:40px;top:40px;width:760px;height:520px;border-radius:16px;border:2px solid var(--line2);background:rgba(5,9,22,.6)}
+.e2-lim{position:absolute;left:-2px;right:-2px;top:120px;border-top:3px dashed var(--bad);font-size:16px;color:var(--bad);padding:4px 12px;text-align:right}
+.e2-stack{position:absolute;left:18px;right:18px;bottom:14px;display:flex;flex-direction:column-reverse;gap:4px}
+.e2-b{height:20px;border-radius:5px;background:color-mix(in srgb,var(--c) 55%,transparent);border:1px solid var(--c);animation:upIn .35s var(--spring) both}
+.e2-b.over{background:color-mix(in srgb,var(--bad) 35%,transparent);border-color:var(--bad);opacity:.8}
+.e2-leg{position:absolute;left:840px;top:40px;display:flex;flex-direction:column;gap:8px}
+.e2-leg span{display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text2)}
+.e2-leg span::before{content:"";width:22px;height:14px;border-radius:4px;background:color-mix(in srgb,var(--c) 55%,transparent);border:1px solid var(--c)}
+.e2-sd{position:absolute;left:840px;right:30px;top:250px;display:flex;flex-direction:column;gap:12px}
+.e2-ch{font-size:24px;color:var(--acc)}
+.e2-warns{display:flex;flex-direction:column;gap:10px}
+.e2-warns div{padding:10px 14px;border-radius:12px;font-size:18px;line-height:1.5;color:#fecdd3;border:1px solid color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 10%,transparent);animation:upIn .4s var(--spring) both}
+.e2-mgr{position:absolute;left:400px;top:18px;width:860px;height:96px;padding:10px 20px;border-radius:16px;text-align:center;border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,rgba(12,18,40,.92))}
+.e2-mgr b{font-size:21px;color:var(--acc);margin-right:14px}
+.e2-mgr span{font-size:17px;color:var(--text2)}
+.e2-mgr small{display:block;font-size:15px;color:var(--text3);margin-top:8px}
+.e2-ag{position:absolute;top:140px;width:520px;height:250px;padding:14px 18px;border-radius:16px;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:border-color .35s,box-shadow .35s,opacity .5s}
+.e2-tr{width:580px}
+.e2-ag[data-a=p]{width:500px}
+.e2-ag>b{font-size:20px}
+.e2-ag>small{margin-left:10px;font-size:15px;color:var(--text3)}
+.e2-ag ul{margin-top:8px;display:flex;flex-direction:column;gap:4px}
+.e2-ag li{font-size:16px;color:var(--text2)}
+.e2-ag p{font-size:16px;line-height:1.5;color:var(--text2);margin-top:6px}
+.e2-ag code{display:block;margin-top:8px;padding:8px 12px;border-radius:10px;font:15px/1.5 var(--mono);color:#cbd5f5;background:rgba(5,9,22,.85);border:1px solid var(--line)}
+.e2-ag.on{border-color:var(--acc2);box-shadow:0 0 26px color-mix(in srgb,var(--acc2) 35%,transparent)}
+.e2-ag.gone{opacity:.35}
+.e2-gone{position:absolute;left:18px;bottom:10px;font-size:15px;color:var(--ok);opacity:0;transition:opacity .4s}
+.e2-ag.gone .e2-gone{opacity:1}
+.e2-ins{display:flex;gap:8px;margin-top:8px}
+.e2-ins span{flex:1;text-align:center;padding:5px 0;border-radius:10px;font-size:15px;border:1px dashed var(--line2);color:var(--text3);transition:all .35s}
+.e2-ins span.on{color:var(--text);border-style:solid;border-color:var(--acc2);background:color-mix(in srgb,var(--acc2) 14%,transparent)}
+.e2-ins span.re{border-color:var(--warn);color:var(--warn)}
+.e2-fs{position:absolute;left:0;right:0;top:416px;margin:0 20px;padding:12px 16px;border-radius:16px;display:flex;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 6%,rgba(12,18,40,.9))}
+.e2-fs>b{font-size:18px;color:var(--ok);white-space:nowrap}
+.e2-fs span{flex:1;padding:6px 10px;border-radius:10px;font:600 15px var(--mono);color:var(--text2);border:1px solid var(--line);background:rgba(5,9,22,.6);transition:all .35s}
+.e2-fs span small{display:block;font:15px var(--font);color:var(--text3)}
+.e2-fs span.on{color:var(--text);border-color:var(--ok);box-shadow:0 0 16px color-mix(in srgb,var(--ok) 40%,transparent)}
+.e2-iso{position:absolute;left:20px;right:20px;top:510px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:17px;color:var(--acc)}
+.e2-iso span{padding:4px 12px;border-radius:999px;font-size:16px;color:var(--text2);border:1px solid var(--line2)}
+.e2-msg{position:absolute;left:20px;right:20px;bottom:10px;font-size:17px;color:var(--text);min-height:26px}
+.e2-req{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap}
+.e2-req b{font-size:18px;color:var(--acc);margin-right:6px}
+.e2-req span{padding:5px 12px;border-radius:10px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03)}
+</style>
+<script>
+HOOKS['c10-exp2'] = {
+  C: ['#a78bfa', '#60a5fa', '#22d3ee', '#fbbf24', '#34d399'],
+  init(s) { this.set = U.seg(s.querySelector('.e2-seg'), (v) => { this.auto = false; this.mode(s, v); }); },
+  mode(s, v) {
+    this.v = v;
+    this.set(v);
+    s.querySelector('.e2-st').dataset.v = v;
+    if (v === 'single') this.single(s); else this.mgr(s);
+  },
+  // 单 Agent：每翻一章，上下文里就多一层；超过窗口后开始“迷失”
+  single(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, st = s.querySelector('.e2-stack'), w = s.querySelector('.e2-warns'), ch = s.querySelector('.e2-ch');
+    st.innerHTML = ''; w.innerHTML = '';
+    if (!ctx) return;
+    const W = ['第九章用了与第二章不一致的译法：agent 从“智能体”变成了“代理”', '审校阶段重复检查，浪费资源', '注意力分散产生幻觉：“记起”实际上并不存在的术语规则'];
+    let n = 0;
+    for (let c = 1; c <= 9; c++) ctx.later(() => {
+      if (tk !== this.tk) return;
+      ch.textContent = `正在翻译：第 ${c} 章`;
+      const add = (k) => { n++; st.insertAdjacentHTML('beforeend', `<div class="e2-b${n > 15 ? ' over' : ''}" style="--c:${this.C[k]}"></div>`); };
+      if (c === 1) add(0);
+      add(1); add(2); add(3); if (c % 2) add(4);
+      if (c === 6) w.insertAdjacentHTML('beforeend', '<div>上下文超出窗口上限</div>');
+      if (c >= 7) w.insertAdjacentHTML('beforeend', `<div>${W[c - 7]}</div>`);
+    }, 300 + (c - 1) * 900);
+  },
+  async mgr(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    const A = (a) => s.querySelector(`.e2-ag[data-a="${a}"]`), F = (f) => s.querySelector(`.e2-fs [data-f="${f}"]`), msg = s.querySelector('.e2-msg');
+    const ins = [...s.querySelectorAll('.e2-ins span')];
+    s.querySelectorAll('.e2-ag').forEach((x) => x.classList.remove('on', 'gone'));
+    s.querySelectorAll('.e2-fs span').forEach((x) => x.classList.remove('on'));
+    ins.forEach((x) => x.classList.remove('on', 're'));
+    msg.textContent = '';
+    if (!ctx) return;
+    const step = async (fn, ms) => { fn(); await U.wait(ctx, ms); return ok(); };
+    F('x').classList.add('on');
+    if (!(await step(() => { A('g').classList.add('on'); msg.textContent = 'Manager 调度 Glossary Agent：读全书，抽取术语'; }, 1600))) return;
+    if (!(await step(() => { F('g').classList.add('on'); msg.textContent = '术语表写入共享文件系统 glossary.json'; }, 1100))) return;
+    if (!(await step(() => { A('g').classList.remove('on'); A('g').classList.add('gone'); msg.textContent = 'Glossary Agent 完成即销毁，释放资源'; }, 1100))) return;
+    if (!(await step(() => { A('t').classList.add('on'); ins.forEach((x) => x.classList.add('on')); msg.textContent = '并行启动 Translation ×N：每个实例只看当前章节 + 术语表 + 指南'; }, 1800))) return;
+    if (!(await step(() => { F('t').classList.add('on'); A('t').classList.remove('on'); msg.textContent = '译文逐章写入 chapter{n}_zh.md，Manager 只记下文件路径'; }, 1300))) return;
+    if (!(await step(() => { A('p').classList.add('on'); msg.textContent = 'Proofreading Agent 读全部译文 + 术语表，只查一致性与流畅性'; }, 1600))) return;
+    if (!(await step(() => { F('p').classList.add('on'); A('p').classList.remove('on'); msg.textContent = '审校报告写入 review_report.md'; }, 1100))) return;
+    if (!(await step(() => { A('t').classList.add('on'); ins.forEach((x) => x.classList.remove('on')); ins[2].classList.add('re'); msg.textContent = 'Manager 依据审校报告，把第 3 章发回 Translation Agent 修订'; }, 1900))) return;
+    A('t').classList.remove('on');
+    msg.textContent = '完成：Manager 的上下文始终只有任务、计划、调用记录、进度与文件索引';
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'single');
+    ctx.every(() => { if (this.auto) this.mode(s, this.v === 'single' ? 'mgr' : 'single'); }, 13000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.e2-st').dataset.v = ''; s.querySelector('.e2-stack').innerHTML = ''; s.querySelector('.e2-warns').innerHTML = ''; },
+};
+</script>

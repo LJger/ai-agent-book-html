@@ -1,0 +1,543 @@
+<!-- ================= 第 6 部分分隔页 ================= -->
+<section class="slide chapter" id="c07-d6" data-part="6" data-title="PART 06 · 归因、回归与排名" data-notes="「失败归因：从整条轨迹定位首个错误」。端到端评估通常只给出“成功”或“失败”，却没有回答“为什么失败、从哪一步开始失败”。这一部分先讲失败归因：定位首个错误、Coding Agent 的初始错误分类表、结构化的归因记录；再看三类典型错误——“做对了但说错了”、作用域敏感的文档格式错误、精确复制错误，实验 7-6 用 AndroidWorld 的真实失败轨迹练习归因。随后把归因结果写成端到端回归任务与轨迹前缀回归任务（实验 7-7），最后讨论配对比较与模型排名：Elo、Bradley-Terry、位置偏差（图7-6、实验 7-8）。">
+  <div class="ch-k fx fx-up">PART 06</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">归因、回归与排名</h1>
+  <div class="ch-s fx fx-up" style="--d:3">从“失败了”走到“从哪一步开始失败”，再把它固化成可重复执行的测试</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">归因对象是轨迹中的首个导致任务偏离的错误，后续错误往往只是连锁反应。</blockquote>
+  <div class="ch-loop" data-node="5" data-num="06"></div>
+</section>
+
+<!-- ================= 定位首个错误 ================= -->
+<section class="slide" id="c07-attr" data-part="6" data-trans="zoom" data-dur="22000" data-title="失败归因：定位首个错误" data-notes="端到端评估通常只给出“成功”或“失败”，却没有回答“为什么失败、从哪一步开始失败”。要让评估结果真正驱动修复，必须对每条失败轨迹进行<b>失败归因（failure attribution）</b>：标出主要错误类别、首次出现不可接受行为的步骤、对应的工具调用或模型输出，并附上可复核的证据。归因对象是轨迹中的<b>首个导致任务偏离的错误</b>，后续错误往往只是连锁反应，不能把最后一个报错简单当成根因。<br>生产 Agent 的问题案例通常来自三类信号：<b>用户明确纠正（“不要这么做”）、用户点踩或给出负面反馈，以及事后通过状态检查、规则验证器或 LLM 评审发现 Agent 做了不该做的事情</b>。<br>构建失败归因系统需要开发者耐心阅读并分析生产 Agent 的问题轨迹。这个过程可以借助 LLM，但不能完全依赖 LLM，因为<b>失败归因往往反映了产品问题</b>，不止是技术问题。随着产品不断完善，错误分类可能包含多个大类，每个大类下又有多个小类，最终多达数百种。这些错误类别和归因方式可以作为归因标注 Agent 的提示词或 Skill。<br>左侧动画是一条示意轨迹：扫描器从最后一个报错出发向前回溯，每一步判断“它是不是被更早的步骤导致的”，直到找到第一处偏离。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不要把最后一个报错当成根因：<em>回溯到首个错误</em></h2></header>
+  <div class="c7at-body">
+    <div class="c7at-l panel fx fx-left" style="--d:2">
+      <div class="c7at-h"><b>一条失败轨迹</b><span class="c7-tag">示意</span><span class="c7at-st">扫描中…</span></div>
+      <div class="c7at-tl"></div>
+      <div class="c7at-out"><svg class="ic"><use href="#i-target"/></svg><span>首错：<b>—</b></span></div>
+    </div>
+    <div class="c7at-r fx fx-right" style="--d:3">
+      <div class="c7-card"><b class="c7at-k">一条归因要标出</b><div class="c7at-four"><span>主要错误类别</span><span>首次出现不可接受行为的步骤</span><span>对应的工具调用或模型输出</span><span>可复核的证据</span></div></div>
+      <div class="c7-card"><b class="c7at-k">问题案例从哪里来：三类信号</b>
+        <div class="c7at-sig"><div><svg class="ic"><use href="#i-hand"/></svg><b>用户明确纠正</b><span>“不要这么做”</span></div><div><svg class="ic"><use href="#i-thumb"/></svg><b>点踩 / 负面反馈</b><span>用户不满意</span></div><div><svg class="ic"><use href="#i-search"/></svg><b>事后发现</b><span>状态检查、规则验证器、LLM 评审</span></div></div></div>
+      <div class="c7-card c7at-pd"><p>可以借助 LLM，但<b>不能完全依赖 LLM</b>：失败归因往往反映了<b>产品问题</b>，不止是技术问题</p><p>错误分类会长到<b>数百种</b>：大类 → 小类，本身就能成为归因标注 Agent 的提示词或 Skill</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「失败归因：从整条轨迹定位首个错误」</div>
+</section>
+<style>
+.c7at-body{display:grid;grid-template-columns:1.1fr 1fr;gap:24px;flex:1;min-height:0}
+.c7at-l{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c7at-h{display:flex;align-items:center;gap:12px}
+.c7at-h b{font-size:19px}
+.c7at-st{margin-left:auto;font-size:15px;color:var(--text3)}
+.c7at-tl{display:flex;flex-direction:column;gap:6px}
+.c7at-s{display:grid;grid-template-columns:44px 74px 1fr auto;gap:10px;align-items:center;padding:7px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.02);font-size:16px;transition:border-color .35s,background .35s,opacity .35s}
+.c7at-s em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.c7at-s i{font-style:normal;font-size:15px;color:var(--text3)}
+.c7at-s span{color:var(--text2)}
+.c7at-s small{font-size:15px;font-weight:700;opacity:0;transition:opacity .3s}
+.c7at-s.err span{color:#fecdd3}
+.c7at-s.scan{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c7at-s.cons{opacity:.6}.c7at-s.cons small{opacity:1;color:var(--warn)}
+.c7at-s.first{border-color:#fb7185;background:rgba(251,113,133,.12)}.c7at-s.first small{opacity:1;color:#fb7185}
+.c7at-out{margin-top:auto;display:flex;align-items:center;gap:10px;font-size:18px;padding:10px 14px;border-radius:12px;border:1px dashed var(--line2)}
+.c7at-out .ic{width:22px;height:22px;color:#fb7185}
+.c7at-r{display:flex;flex-direction:column;gap:14px}
+.c7at-k{display:block;font-size:17px;margin-bottom:10px;color:var(--acc)}
+.c7at-four{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.c7at-four span{font-size:16px;padding:7px 12px;border-radius:10px;border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+.c7at-sig{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.c7at-sig div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03)}
+.c7at-sig .ic{width:22px;height:22px;color:var(--acc2)}
+.c7at-sig b{font-size:16px}
+.c7at-sig span{font-size:15px;color:var(--text3);line-height:1.45}
+.c7at-pd p{font-size:16px;line-height:1.6;color:var(--text2)}
+.c7at-pd p+p{margin-top:6px}
+.c7at-pd b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-attr'] = {
+  // [步号, 类型, 内容, 是否报错, 回溯结论 c=后果 f=首错 n=正常]
+  T: [['1', '用户', '“把 config 里的超时改成 30 秒”', 0, 'n'], ['2', '工具', 'search → 找到两个 config.yaml', 0, 'n'], ['3', 'Agent', '直接选了 tests/ 下那个，既不说明也不追问', 0, 'f'], ['4', '工具', 'edit_file → 修改成功', 0, 'c'], ['5', '工具', 'run_tests → 2 个用例失败', 1, 'c'], ['6', 'Agent', '为让测试通过，改了测试里的期望值', 0, 'c'], ['7', '工具', 'deploy → 线上超时仍是 10 秒', 1, 'c']],
+  init(s) {
+    s.querySelector('.c7at-tl').innerHTML = this.T.map(([n, k, t, e]) => `<div class="c7at-s${e ? ' err' : ''}"><em>#${n}</em><i>${k}</i><span>${t}</span><small></small></div>`).join('');
+  },
+  clear(s) {
+    s.querySelectorAll('.c7at-s').forEach((r) => { r.classList.remove('scan', 'cons', 'first'); r.querySelector('small').textContent = ''; });
+    s.querySelector('.c7at-out b').textContent = '—';
+    s.querySelector('.c7at-st').textContent = '扫描中…';
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    const rs = [...s.querySelectorAll('.c7at-s')];
+    while (ok()) {
+      this.clear(s);
+      s.querySelector('.c7at-st').textContent = '从最后一个报错（#7）开始回溯';
+      await U.wait(ctx, 900); if (!ok()) return;
+      for (let i = rs.length - 1; i >= 0; i--) {
+        const r = rs[i], v = this.T[i][4];
+        if (v === 'n') continue;
+        rs.forEach((x) => x.classList.remove('scan')); r.classList.add('scan');
+        await U.wait(ctx, 900); if (!ok()) return;
+        r.classList.remove('scan');
+        if (v === 'c') { r.classList.add('cons'); r.querySelector('small').textContent = '后果'; }
+        else {
+          r.classList.add('first'); r.querySelector('small').textContent = '首错';
+          s.querySelector('.c7at-out b').textContent = '第 3 步 · 需求理解与歧义处理 · 一条 assistant 答复，没有任何报错';
+          s.querySelector('.c7at-st').textContent = '更早的步骤都能解释，回溯停止';
+          break;
+        }
+      }
+      await U.wait(ctx, 5200); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.clear(s); },
+};
+</script>
+
+<!-- ================= 错误分类表 ================= -->
+<section class="slide" id="c07-taxonomy" data-part="6" data-trans="flip" data-dur="30000" data-title="Coding Agent 的初始错误分类" data-notes="以 Coding Agent 为例，一个实用的初始分类有九类：<br>① <b>需求理解与歧义处理</b>：做出来的不是用户要的——漏掉需求里的一个条件、把范围理解宽了或窄了；仓库里有两个同名配置文件时直接选一个，既不说明也不追问。定位：用 LLM 把原始需求与 Agent <b>实际做的事</b>（动作序列）逐条对照，先定位第一处偏离，再回溯到造成它的那次工具调用或那句答复。<br>② <b>流程与规范缺失</b>：未执行单元测试就提交；未写 Plan 就开始改代码；引入外部依赖而仓库已有内部等价物；绕过既定架构约定。定位：找到第一次违反软件开发流程约定的动作，例如首次 git commit、首次写文件；回看它之前有没有读过约定来源。<br>③ <b>工具调用错误</b>：同一文件反复编辑失败；JSON/schema 或参数格式错误；特殊字符导致抄写、转义或写入错误。定位：记录第一次失败的编辑/工具及原始请求、错误返回；重复失败属于后续症状。<br>④ <b>hack 验证环境</b>：直接改断言、加 skip、mock 掉被测逻辑；声称“测试已通过”但根本没跑。定位：取第一次改动测试或验证逻辑的 message；再把完成声明与轨迹里真实执行过的命令交叉核对。<br>⑤ <b>修改不完整</b>：改了函数签名和三处调用方，漏了第四处的动态调用、另一语言的绑定或 schema。定位：把 Agent 声称的影响面与真实影响面做集合差，取第一个遗漏项，回看它检索时用了什么关键词。<br>⑥ <b>对用户的信息反馈错误</b>：工具调用和环境状态全对，最终告诉用户的信息却错了。定位：把答复里的每个事实断言与工具返回值逐条对齐，取第一条无法溯源或矛盾的断言。<br>⑦ <b>非功能性回归</b>：改了公开 API、schema 而无数据库迁移脚本；为让校验通过而删掉校验。<br>⑧ <b>模型执行异常</b>：输出中途截断、无故停止、超时，或没有完成收尾动作就结束；要区分模型停止、Harness 超时和工具服务故障。<br>⑨ <b>过早停止任务</b>：多目标任务只完成一部分；未穷尽合理方案就宣布不可能；与最终验证失败分开记录。<br>上表中至少有三类可以先用规则筛出嫌疑轨迹、再交给 LLM 定位首错：完成声明与实际执行命令的交叉核对、diff 是否触及测试断言与 skip 标记、diff 是否改动公开 API 或 schema 而无迁移文件。<b>规则先筛、LLM 再定位</b>，比把全部轨迹喂给 LLM 更便宜也更准。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Coding Agent 的<em>初始错误分类</em></h2></div>
+    <div class="c7tx-rules fx fx-up" style="--d:2"><span class="lbl">规则先筛</span><button data-r="0">完成声明 vs 实际执行的命令</button><button data-r="1">diff 触及断言 / skip</button><button data-r="2">改公开 API / schema 无迁移</button></div></header>
+  <div class="c7tx-tb fx fx-up" style="--d:3" data-clip-ok>
+    <div class="c7tx-hd"><span>错误类别</span><span>典型表现</span><span>首个错误的定位方式</span></div>
+    <div class="c7tx-rows"></div>
+  </div>
+  <p class="c7tx-nt fx fx-up" style="--d:4"><b>规则先筛、LLM 再定位</b>，比把全部轨迹喂给 LLM 更便宜也更准 · 点击行可查看，点击右上角规则看它能筛出哪一类</p>
+  <div class="src">第七章 ·「失败归因：从整条轨迹定位首个错误」· 错误分类表（错误类别 / 典型表现 / 首个错误的定位方式）</div>
+</section>
+<style>
+.c7tx-rules{display:flex;align-items:center;gap:8px}
+.c7tx-rules button{font-size:15px;padding:7px 12px;border-radius:10px;border:1px solid var(--line2);color:var(--text2);transition:all .3s}
+.c7tx-rules button.on{color:var(--text);border-color:var(--warn);background:color-mix(in srgb,var(--warn) 14%,transparent)}
+.c7tx-tb{display:flex;flex-direction:column;gap:4px}
+.c7tx-hd,.c7tx-r{display:grid;grid-template-columns:230px 1fr 1fr;gap:18px;padding:0 16px}
+.c7tx-hd span{font-size:15px;font-weight:700;letter-spacing:.08em;color:var(--text3);padding:4px 0}
+.c7tx-r{align-items:start;padding:8px 16px;border-radius:12px;border:1px solid transparent;cursor:pointer;transition:background .35s,border-color .35s,opacity .35s}
+.c7tx-r b{font-size:17px;display:flex;gap:8px}
+.c7tx-r b em{font:700 15px var(--num);font-style:normal;color:var(--acc)}
+.c7tx-r span{font-size:15px;line-height:1.5;color:var(--text3);display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.c7tx-r.on{background:color-mix(in srgb,var(--acc) 10%,transparent);border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+.c7tx-r.on span{color:var(--text2);-webkit-line-clamp:4}
+.c7tx-r.rule{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}
+.c7tx-r.rule span{-webkit-line-clamp:4;color:var(--text2)}
+.c7tx-tb.ruling .c7tx-r:not(.rule){opacity:.4}
+.c7tx-nt{margin-top:10px;font-size:16px;color:var(--text3)}
+.c7tx-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-taxonomy'] = {
+  R: [
+    ['需求理解与歧义处理', '做出来的不是用户要的：漏掉需求里的一个条件、把范围理解宽了或窄了；仓库里有两个同名配置文件时直接选一个，既不说明也不追问', '用 LLM 把原始需求与 Agent 实际做的事（动作序列）逐条对照，先定位第一处偏离，再回溯到造成它的那次工具调用或那句答复'],
+    ['流程与规范缺失', '未执行单元测试就提交；未写 Plan 就开始改代码；引入外部依赖而仓库已有内部等价物；绕过既定架构约定', '找到第一次违反软件开发流程约定的动作，例如首次 git commit、首次写文件；回看它之前有没有读过约定来源'],
+    ['工具调用错误', '同一文件反复编辑失败；JSON/schema 或参数格式错误；特殊字符导致抄写、转义或写入错误', '记录第一次失败的编辑/工具及原始请求、错误返回；重复失败属于后续症状'],
+    ['hack 验证环境', '直接改断言、加 skip、mock 掉被测逻辑；声称“测试已通过”但根本没跑', '取第一次改动测试或验证逻辑的 message；再把完成声明与轨迹里真实执行过的命令交叉核对，确认它是否真的跑过'],
+    ['修改不完整', '改了函数签名，改了三处调用方，漏了第四处的动态调用、另一语言的绑定或 schema', '把 Agent 声称的影响面与真实影响面做集合差，取第一个遗漏项，回看它检索时用了什么关键词'],
+    ['对用户的信息反馈错误', '工具调用和环境状态全对，最终告诉用户的信息却错了：金额、状态、时间说错；把部分做完说成全部做完；漏掉必须告知的事项', '把答复里的每个事实断言与工具返回值逐条对齐，取第一条无法溯源或与工具返回矛盾的断言'],
+    ['非功能性回归', '改了公开 API、schema 而无数据库迁移脚本；为让校验通过而删掉校验', '取第一次做出该改动的 message，看它是否意识到自己动的是公开接口或需要迁移的结构'],
+    ['模型执行异常', '输出中途截断、无故停止、超时，或没有完成收尾动作就结束', '定位第一个异常终止的位置，区分模型停止、Harness 超时和工具服务故障'],
+    ['过早停止任务', '多目标任务只完成一部分；未穷尽合理方案就宣布不可能', '定位第一次遗漏目标或放弃探索的决策，并与最终验证失败分开记录'],
+  ],
+  RULE: [[3], [3], [6]],
+  init(s) {
+    s.querySelector('.c7tx-rows').innerHTML = this.R.map(([a, b, c], i) => `<div class="c7tx-r" data-i="${i}"><b><em>0${i + 1}</em>${a}</b><span>${b}</span><span>${c}</span></div>`).join('');
+    s.querySelectorAll('.c7tx-r').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.rule(s, null); this.pick(s, +r.dataset.i); }));
+    s.querySelectorAll('.c7tx-rules button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, null); this.rule(s, +b.dataset.r); }));
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c7tx-r').forEach((r, j) => r.classList.toggle('on', j === i)); },
+  rule(s, k) {
+    s.querySelectorAll('.c7tx-rules button').forEach((b, j) => b.classList.toggle('on', j === k));
+    s.querySelector('.c7tx-tb').classList.toggle('ruling', k != null);
+    s.querySelectorAll('.c7tx-r').forEach((r, j) => r.classList.toggle('rule', k != null && this.RULE[k].includes(j)));
+  },
+  enter(s, ctx) {
+    this.auto = true; let n = -1;
+    // 九行逐一展开，之后演示三条规则
+    const seq = [...this.R.keys()].map((i) => ['r', i]).concat([['u', 0], ['u', 1], ['u', 2]]);
+    const show = () => { n = (n + 1) % seq.length; const [t, v] = seq[n]; if (t === 'r') { this.rule(s, null); this.pick(s, v); } else { this.pick(s, null); this.rule(s, v); } };
+    ctx.later(() => { if (this.auto) show(); }, 700);
+    ctx.every(() => { if (this.auto) show(); }, 2400);
+  },
+  reset(s) { this.pick(s, null); this.rule(s, null); },
+};
+</script>
+
+<!-- ================= 结构化归因记录 ================= -->
+<section class="slide" id="c07-record" data-part="6" data-steps="3" data-trans="rise" data-title="归因记录需要结构化" data-notes="<b>归因标注 Agent 可以利用 LLM 规模化完成大量生产轨迹的根因分析</b>，但不能只输出一句“失败原因”。<b>归因记录需要结构化</b>，可以采用 JSON 或 YAML 文档格式，并引用具体的步骤号、工具名和观察证据；同时还要区分根因与后果、判断是否可恢复并给出置信度。<br>例如，edit_file 返回 old_string 匹配失败，之后 Agent 连续三次重试仍未写入文件：主因是“文件编辑与工具调用错误”，三次重试是后果，而不是三个独立根因。若多个类别同时出现，按<b>“最早且能解释后续失败”</b>的原则选主因，其余保留为次因。<br>规则先筛、LLM 再定位：完成声明与实际执行命令的交叉核对、diff 是否触及测试断言与 skip 标记、diff 是否改动公开 API 或 schema 而无迁移文件，这三条规则可以先把嫌疑轨迹筛出来。<br>在保存归因记录时，除了 LLM 输出的记录，还应把<b>任务目标、环境状态、Agent 版本、工具集版本和完整的 Agent 轨迹</b>一起保存，以便进行回归测试。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">一句“失败原因”不够：<em>归因记录需要结构化</em></h2></header>
+  <div class="c7rc-body">
+    <div class="c7rc-l panel fx fx-left" style="--d:2">
+      <div class="c7rc-h"><b>轨迹片段</b><span class="c7-tag">示意</span></div>
+      <div class="c7rc-tr">
+        <div class="c7rc-s m"><em>#12</em><span>edit_file(old_string=…) → <b>old_string 匹配失败</b></span><i>主因</i></div>
+        <div class="c7rc-s"><em>#13</em><span>edit_file 重试 → 匹配失败</span><i>后果</i></div>
+        <div class="c7rc-s"><em>#14</em><span>edit_file 重试 → 匹配失败</span><i>后果</i></div>
+        <div class="c7rc-s"><em>#15</em><span>edit_file 重试 → 匹配失败，文件未写入</span><i>后果</i></div>
+      </div>
+      <div class="c7rc-naive" data-step="0"><span class="lbl">错误的记法</span><div><s>根因 1：编辑失败</s><s>根因 2：编辑失败</s><s>根因 3：编辑失败</s><s>根因 4：编辑失败</s></div></div>
+      <div class="c7rc-rule fx fx-up" data-step="1"><b>多个类别同时出现时</b>：按“<em>最早且能解释后续失败</em>”的原则选主因，其余保留为次因</div>
+    </div>
+    <div class="c7rc-r">
+      <div class="win fx fx-right" data-step="1"><div class="win-bar"><i></i><i></i><i></i><span>attribution.yaml</span></div>
+        <pre class="code c7rc-y"><span class="ln"><span class="t-k">task</span>: fix-timeout-config</span><span class="ln hl"><span class="t-k">primary_cause</span>: <span class="t-s">文件编辑与工具调用错误</span></span><span class="ln"><span class="t-k">first_error_step</span>: <span class="t-n">12</span>   <span class="t-c"># 工具调用</span></span><span class="ln"><span class="t-k">evidence</span>:</span><span class="ln">  <span class="t-k">tool</span>: edit_file</span><span class="ln">  <span class="t-k">observation</span>: <span class="t-s">old_string 匹配失败</span></span><span class="ln hl"><span class="t-k">consequences</span>: [<span class="t-n">13</span>, <span class="t-n">14</span>, <span class="t-n">15</span>]  <span class="t-c"># 重试是后果</span></span><span class="ln"><span class="t-k">secondary_causes</span>: []</span><span class="ln"><span class="t-k">recoverable</span>: <span class="t-r">true</span></span><span class="ln"><span class="t-k">confidence</span>: <span class="t-s">high</span></span></pre></div>
+      <div class="c7-card c7rc-save fx fx-up" data-step="2"><b>一起保存，以便回归测试</b><div><span><svg class="ic"><use href="#i-target"/></svg>任务目标</span><span><svg class="ic"><use href="#i-db"/></svg>环境状态</span><span><svg class="ic"><use href="#i-robot"/></svg>Agent 版本</span><span><svg class="ic"><use href="#i-wrench"/></svg>工具集版本</span><span><svg class="ic"><use href="#i-history"/></svg>完整 Agent 轨迹</span></div></div>
+      <div class="c7-card c7rc-sc fx fx-up" data-step="3"><b>规模化：归因标注 Agent</b><p>规则先筛出嫌疑轨迹 → LLM 定位首错 → 输出带步骤号、工具名、观察证据的记录，区分根因与后果，判断可否恢复并给出置信度</p></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「失败归因：从整条轨迹定位首个错误」</div>
+</section>
+<style>
+.c7rc-body{display:grid;grid-template-columns:1fr 1.05fr;gap:24px;flex:1;min-height:0}
+.c7rc-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7rc-h{display:flex;gap:12px;align-items:center}.c7rc-h b{font-size:19px}
+.c7rc-tr{display:flex;flex-direction:column;gap:6px}
+.c7rc-s{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:9px 14px;border-radius:10px;border:1px solid var(--line);font-size:16px}
+.c7rc-s em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.c7rc-s span{color:var(--text2)}.c7rc-s span b{color:#fda4af}
+.c7rc-s i{font-style:normal;font-size:15px;font-weight:700;opacity:0;transition:opacity .4s}
+#c07-record.k1 .c7rc-s i{opacity:1}
+#c07-record.k1 .c7rc-s:not(.m){opacity:.55;margin-left:28px}
+#c07-record.k1 .c7rc-s:not(.m) i{color:var(--warn)}
+#c07-record.k1 .c7rc-s.m{border-color:#fb7185;background:rgba(251,113,133,.1)}
+#c07-record.k1 .c7rc-s.m i{color:#fb7185}
+.c7rc-naive{padding:10px 14px;border-radius:12px;border:1px dashed rgba(251,113,133,.5);transition:opacity .4s}
+.c7rc-naive div{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.c7rc-naive s{font-size:15px;color:#fda4af;text-decoration:none;padding:3px 10px;border-radius:8px;background:rgba(251,113,133,.1)}
+#c07-record.k1 .c7rc-naive{opacity:.35}
+#c07-record.k1 .c7rc-naive s{text-decoration:line-through}
+.c7rc-rule{margin-top:auto;font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}
+.c7rc-rule em{font-style:normal;color:var(--text);font-weight:700}
+.c7rc-r{display:flex;flex-direction:column;gap:14px}
+.c7rc-y{font-size:16px;line-height:1.55}
+.c7rc-save>b,.c7rc-sc>b{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7rc-save div{display:flex;flex-wrap:wrap;gap:8px}
+.c7rc-save span{display:inline-flex;align-items:center;gap:6px;font-size:15px;padding:5px 12px;border-radius:10px;border:1px solid var(--line2)}
+.c7rc-save .ic{width:18px;height:18px;color:var(--acc2)}
+.c7rc-sc p{font-size:16px;line-height:1.55;color:var(--text2)}
+</style>
+<script>
+HOOKS['c07-record'] = {
+  step(s, ctx, k) { s.classList.toggle('k1', k >= 1); },
+  enter(s, ctx, k) { s.classList.toggle('k1', k >= 1); },
+  reset(s) { s.classList.remove('k1'); },
+};
+</script>
+
+<!-- ================= 做对了但说错了 ================= -->
+<section class="slide" id="c07-said" data-part="6" data-trans="iris" data-dur="30000" data-title="“做对了但说错了”问题" data-notes="下面以三类典型错误为例进行介绍。第一类：<b>“做对了但说错了”问题</b>容易被整体成功率掩盖，因为多数评估只检查环境状态。在 τ²-bench 公开的基线结果中，带有信息告知要求的 704 次运行共失败 240 次，其中 162 次的信息告知出错；有 80 次（占全部失败的三分之一）的环境状态正确，但信息告知错误。<br>配套仓库的 AndroidWorld T3A 运行记录里有一个典型例子。任务是把图库中 expenses.jpg 里的开销录入记账应用。Agent 用 32 步完成了授权、搜索、打开图片、逐条填写和保存，<b>没有任何一步返回错误</b>，最后自行宣告完成，验收却报告应当写入的记录不存在。日志给出的那条是 Dress、¥436.35，与它写进去的四条毫无关系。逐步回看会发现，第 8 步的思考里写着“I cannot actually see the content/details of the expenses in the image”，它自己已经知道没拿到数据，却既没有停下也没有报告，而是继续推进；到第 11 步，四条开销数据“Coffee $4.50、Lunch $12.75……”凭空出现在它的记录里；此后的每一次输入和保存，都基于这四条幻觉编造的数据。<b>首个错误落在第 8 步，而那一步既没有报错，也不是一次工具调用。</b><br>它的根因归属容易分析错：T3A 是纯文本 Agent，观察空间里只有元素树、根本没有图像像素，所以根因不是“模型不会 OCR”，而是 <b>Harness 的观察通道缺失</b>。如果记成模型能力问题，接下来就会去换模型或做 OCR 训练；但真正该做的是补观察通道。<br>右侧时间线来自配套仓库 chapter7/android-world/failure-attribution/trajectories.json 的真实 32 步记录（动作与思考摘录、译述）；切换两种根因归属，看后续修复方向如何分岔。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">“做对了但<em>说错了</em>”：环境状态全对，信息却错了</h2></div></header>
+  <div class="c7sd-body">
+    <div class="c7sd-l panel fx fx-left" style="--d:2">
+      <b class="c7sd-k">τ²-bench 公开基线 · 带信息告知要求的运行</b>
+      <div class="c7sd-grid"></div>
+      <div class="c7sd-lg">
+        <span data-g="0"><i></i>704 次运行</span><span data-g="1"><i></i>失败 240 次</span><span data-g="2"><i></i>其中信息告知出错 162 次</span><span data-g="3"><i></i>环境状态正确、信息告知错误 80 次 · 占失败的 1/3</span>
+      </div>
+      <p class="c7sd-nt">多数评估<b>只检查环境状态</b>，这 80 次在那种口径下全部算“通过”（每格 = 8 次运行）</p>
+    </div>
+    <div class="c7sd-r panel fx fx-right" style="--d:3">
+      <div class="c7sd-rh"><b>T3A · ExpenseAddMultipleFromGallery · 32 步，零报错</b><span class="c7sd-pos">第 <b>0</b> / 32 步</span></div>
+      <div class="c7sd-bar"></div>
+      <div class="c7sd-cap"><em>—</em><span>回放开始</span></div>
+      <div class="c7sd-vd"><span>Agent：<b>status: complete</b></span><span>验证器：<b class="bad">记录不存在</b>（应写入 Dress · ¥436.35）</span></div>
+      <div class="c7sd-root">
+        <div class="c7sd-seg seg"><i class="knob"></i><button data-v="m">记成“模型不会 OCR”</button><button data-v="h">记成“观察通道缺失”</button></div>
+        <p class="c7sd-fix"></p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「“做对了但说错了” 问题」· 数据：τ²-bench 公开基线；配套仓库 chapter7/android-world T3A 运行记录</div>
+</section>
+<style>
+.c7sd-body{display:grid;grid-template-columns:.9fr 1.1fr;gap:24px;flex:1;min-height:0}
+.c7sd-l,.c7sd-r{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.c7sd-k{font-size:17px}
+.c7sd-grid{display:grid;grid-template-columns:repeat(11,1fr);gap:5px}
+.c7sd-grid i{aspect-ratio:1;border-radius:4px;background:rgba(255,255,255,.08);transition:background .5s,box-shadow .5s}
+.c7sd-grid i.g1{background:rgba(251,146,60,.5)}
+.c7sd-grid i.g2{background:rgba(251,113,133,.6)}
+.c7sd-grid i.g3{background:#fb7185;box-shadow:0 0 10px rgba(251,113,133,.6)}
+.c7sd-lg{display:flex;flex-direction:column;gap:5px}
+.c7sd-lg span{display:flex;align-items:center;gap:8px;font-size:15px;color:var(--text3);transition:color .4s}
+.c7sd-lg span.on{color:var(--text)}
+.c7sd-lg i{width:14px;height:14px;border-radius:3px;background:rgba(255,255,255,.12)}
+.c7sd-lg [data-g="1"] i{background:rgba(251,146,60,.5)}.c7sd-lg [data-g="2"] i{background:rgba(251,113,133,.6)}.c7sd-lg [data-g="3"] i{background:#fb7185}
+.c7sd-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}
+.c7sd-nt b{color:var(--text)}
+.c7sd-rh{display:flex;justify-content:space-between;align-items:center}
+.c7sd-rh>b{font-size:17px}
+.c7sd-pos{font-size:15px;color:var(--text3)}.c7sd-pos b{font:700 18px var(--num);color:var(--text)}
+.c7sd-bar{display:grid;grid-template-columns:repeat(32,1fr);gap:3px}
+.c7sd-bar i{height:34px;border-radius:4px;background:rgba(255,255,255,.06);border:1px solid var(--line);transition:background .3s,border-color .3s}
+.c7sd-bar i.ok{background:rgba(52,211,153,.35);border-color:transparent}
+.c7sd-bar i.first{background:#fb7185;border-color:#fff}
+.c7sd-bar i.fab{background:rgba(251,113,133,.45);border-color:transparent}
+.c7sd-bar i.cur{outline:2px solid var(--acc);outline-offset:1px}
+.c7sd-cap{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:start;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.03);min-height:110px}
+.c7sd-cap em{font:800 22px var(--num);font-style:normal;color:var(--acc)}
+.c7sd-cap span{font-size:16px;line-height:1.55;color:var(--text2)}
+.c7sd-cap q{color:#fde68a}
+.c7sd-vd{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c7sd-vd span{font-size:15px;padding:8px 12px;border-radius:10px;border:1px solid var(--line)}
+.c7sd-vd b{color:#a7f3d0}.c7sd-vd b.bad{color:#fda4af}
+.c7sd-root{margin-top:auto;display:flex;flex-direction:column;gap:8px}
+.c7sd-fix{font-size:16px;line-height:1.55;color:var(--text2);min-height:50px}
+.c7sd-fix b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-said'] = {
+  // 关键步：[步号, 说明]，其余步为常规操作
+  K: {
+    1: '打开 Simple Gallery Pro，去找 expenses.jpg',
+    3: '授予“管理所有文件”权限',
+    6: '搜索 “expenses.jpg”',
+    7: '打开图片，全屏查看——观察里只有元素树和文件名',
+    8: '思考：<q>“I cannot actually see the content/details of the expenses in the image”</q>——它知道没拿到数据，却没有停下也没有报告，回到桌面继续推进',
+    11: '打开 Pro Expense 时的总结里，四条开销凭空出现：<q>“Coffee $4.50, Lunch $12.75, Gas $35.20, Groceries $68.90”</q>',
+    13: '输入 “Coffee”、4.50——此后每一次输入和保存都基于这四条编造的数据',
+    20: '录入 Lunch 12.75',
+    25: '录入 Gas 35.20',
+    29: '录入 Groceries 68.90',
+    32: '<q>“I have successfully added all four expenses”</q> → status: complete。32 步没有任何一步返回错误',
+  },
+  FIX: { m: '后续动作：<b>换模型、做 OCR 训练</b>——但 T3A 的观察空间里根本没有图像像素，换哪个模型都看不到这张图', h: '后续动作：<b>补观察通道</b>（让 Agent 拿到像素或可读的图像内容），并给它“缺数据就停下报告”的合法出口——<b>这才是正确的根因</b>' },
+  init(s) {
+    s.querySelector('.c7sd-grid').innerHTML = Array.from({ length: 88 }, () => '<i></i>').join('');
+    s.querySelector('.c7sd-bar').innerHTML = Array.from({ length: 32 }, () => '<i></i>').join('');
+    this.seg = U.seg(s.querySelector('.c7sd-seg'), (v) => { this.manual = true; this.root(s, v); });
+  },
+  root(s, v) { s.querySelector('.c7sd-fix').innerHTML = this.FIX[v]; },
+  grid(s, g) {
+    const cells = s.querySelectorAll('.c7sd-grid i'), cnt = [88, 30, 20, 10];
+    cells.forEach((c, i) => { c.className = ''; if (g >= 3 && i < cnt[3]) c.className = 'g3'; else if (g >= 2 && i < cnt[2]) c.className = 'g2'; else if (g >= 1 && i < cnt[1]) c.className = 'g1'; });
+    s.querySelectorAll('.c7sd-lg span').forEach((e) => e.classList.toggle('on', +e.dataset.g <= g));
+  },
+  show(s, n) {
+    s.querySelector('.c7sd-pos b').textContent = n;
+    s.querySelectorAll('.c7sd-bar i').forEach((b, i) => { const st = i + 1; b.className = st > n ? '' : st === 8 ? 'first' : st >= 11 ? 'fab' : 'ok'; if (st === n) b.classList.add('cur'); });
+    const keys = Object.keys(this.K).map(Number).filter((x) => x <= n);
+    const k = keys.length ? keys[keys.length - 1] : 0;
+    s.querySelector('.c7sd-cap em').textContent = k ? '#' + k : '—';
+    s.querySelector('.c7sd-cap span').innerHTML = k ? this.K[k] : '回放开始';
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    while (ok()) {
+      this.grid(s, 0); this.show(s, 0);
+      if (!this.manual) { this.seg('m'); this.root(s, 'm'); }
+      for (let g = 1; g <= 3; g++) { await U.wait(ctx, 900); if (!ok()) return; this.grid(s, g); }
+      for (let n = 1; n <= 32; n++) {
+        await U.wait(ctx, this.K[n] ? 1700 : 260); if (!ok()) return;
+        this.show(s, n);
+      }
+      if (!this.manual) { await U.wait(ctx, 1800); if (!ok()) return; this.seg('h'); this.root(s, 'h'); }
+      await U.wait(ctx, 5000);
+    }
+  },
+  enter(s, ctx) { this.manual = false; this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.grid(s, 0); this.show(s, 0); s.querySelector('.c7sd-fix').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 实验 7-6 ================= -->
+<section class="slide" id="c07-exp76" data-part="6" data-trans="slide" data-dur="30000" data-title="实验 7-6 ★★：对 AndroidWorld 失败轨迹做失败归因" data-notes="<b>实验 7-6 ★★：对 AndroidWorld 失败轨迹做失败归因。</b>本实验用真实轨迹练习归因方法，不需要模拟器，也不需要调用模型 API。素材是 chapter7/android-world 中已保存的 T3A 运行记录：t3a.md 是全部任务的逐步 Action/Reason/Summary，t3a_failed.md 集中收录了 50 余条失败轨迹，每条末尾都带验证器给出的客观判定。<br>第一步，抽样分层：抽取至少 10 条全程没有工具报错的静默失败。第二步，定位首个错误：为每条轨迹标出首错步号，并注明它是一次工具调用还是一条 assistant message；静默失败要靠两种办法定位——一是<b>事实锚点比对</b>，把 Agent 的陈述与工具返回值逐步对齐，取首次背离；二是<b>轨迹前缀二分</b>，把轨迹截到第 k 步交给人接手，能救回来说明错误在 k 之后；不能用搜索报错关键字代替。第三步，写成结构化记录：任务名、首错步号、错误类别、根因责任方、原文证据，并区分主因与后果。第四步，与现成笔记 t3a_failed_analysis.md 对照并记录分歧——这份笔记不是标准答案，它把图片转录失败记成“视觉模型缺乏 OCR 能力”，而 T3A 的观察空间里根本没有图像像素，真正的根因是观察通道缺失。第五步，挑出 3 条首错发生在 assistant message 上的轨迹，截取首错之前的前缀，写出可接受动作集合与禁止动作，形成轨迹前缀回归任务。<br>配套仓库的结果：日志有 53 个任务块，其中 SimpleSmsReplyMostRecent 因环境初始化的 list index out of range 被跳过——这不是 Agent 的失败，是评测系统自身的问题；剩下 52 个失败轨迹中，24 个由 Agent 自称完成而结束，28 个耗尽步数。十条标注覆盖九个静默失败和一个有可见错误的案例，<b>七个首错发生在 assistant 消息，而不是工具调用</b>，搜索报错关键字一个也找不到。第一轮标注反复把错误输出出现的步骤当成首错；第二轮复核有七条首错位置前移，第三轮又修正了两项统计和一条错误幅度描述。全体 52 个失败中，九个需要当前日期，七个从未取得日期；“无可见效果”的表述出现 55 次、涉及 18 个任务。点击表格行查看修订说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 7-6 <span class="c7-star">★★</span>：AndroidWorld 静默失败的<em>首错在哪</em></h2></header>
+  <div class="c7e6-body">
+    <div class="c7e6-l fx fx-left" style="--d:2">
+      <div class="c7e6-flow"><span><em>1</em>抽样分层<small>≥ 10 条静默失败</small></span><span><em>2</em>定位首错<small>事实锚点比对 · 前缀二分</small></span><span><em>3</em>结构化记录<small>主因 / 后果 / 责任方</small></span><span><em>4</em>对照现成笔记<small>它不是标准答案</small></span><span><em>5</em>转成前缀回归<small>3 条 assistant 首错</small></span></div>
+      <div class="c7e6-tb panel">
+        <div class="c7e6-hd"><span>任务</span><span>步数</span><span>首轮</span><span>复核</span><span>类型</span><span>置信度</span></div>
+        <div class="c7e6-rows"></div>
+      </div>
+      <div class="c7e6-why"><b>—</b><p>点击一行查看复核时为什么改了首错位置</p></div>
+    </div>
+    <div class="c7e6-r fx fx-right" style="--d:3">
+      <div class="c7-card c7e6-pop"><b class="c7e6-k">全体 52 条失败（重新从原始日志统计）</b>
+        <div class="c7e6-n"><div><b data-count="53">0</b><span>任务块</span></div><div><b data-count="1">0</b><span>评测系统初始化失败被跳过</span></div><div><b data-count="24">0</b><span>Agent 自称完成</span></div><div><b data-count="28">0</b><span>耗尽步数</span></div></div>
+        <div class="c7e6-bars"><div><span>需要当前日期的任务</span><i style="--v:.778"><em>7 / 9 从未取得日期</em></i></div><div><span>“无可见效果”表述</span><i style="--v:.346"><em>55 次 · 18 / 52 个任务</em></i></div></div>
+        <div class="c7e6-nx"><span>其后：重试同类控件 <b>18</b></span><span>转向其他控件 <b>33</b></span><span>结束 / 最后一步 <b>4</b></span></div>
+      </div>
+      <div class="c7-card c7e6-lsn"><b class="c7e6-k">三个结论</b><ul><li><b>7 / 10</b> 首错是 assistant 消息，搜报错关键字一个也找不到</li><li>首轮标注反复把“错误输出出现的那步”当首错——<b>7 条在复核时前移</b>，第三轮又修正了统计与一条幅度描述</li><li>编造是“自己宣布”的：同一个 <b>Coffee $4.50</b> 出现在两条无关轨迹里，来自模型先验而非看错屏幕</li></ul></div>
+      <p class="c7-data">数据：配套仓库 chapter7/android-world/failure-attribution 的 attribution_records.json 与 README（10 条记录、3 条前缀回归任务）</p>
+    </div>
+  </div>
+  <div class="src">第七章 ·「“做对了但说错了” 问题」· 实验 7-6</div>
+</section>
+<style>
+.c7e6-body{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;flex:1;min-height:0}
+.c7e6-l{display:flex;flex-direction:column;gap:10px;min-height:0}
+.c7e6-flow{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.c7e6-flow span{display:flex;flex-direction:column;gap:2px;padding:7px 10px;border-radius:10px;border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);font-size:15px;font-weight:700}
+.c7e6-flow em{font:800 15px var(--num);font-style:normal;color:var(--acc)}
+.c7e6-flow small{font-size:15px;font-weight:400;color:var(--text3);line-height:1.35}
+.c7e6-tb{padding:8px 10px}
+.c7e6-hd,.c7e6-r0{display:grid;grid-template-columns:1fr 48px 52px 52px 104px 72px;gap:8px;align-items:center;padding:3px 8px}
+.c7e6-hd span{font-size:15px;font-weight:700;color:var(--text3)}
+.c7e6-r0{border-radius:8px;cursor:pointer;font-size:15px;transition:background .3s}
+.c7e6-r0 b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.c7e6-r0 span{font-family:var(--num);color:var(--text2)}
+.c7e6-r0 s{text-decoration:line-through;color:var(--text3);font-family:var(--num)}
+.c7e6-r0 .mv{color:#fb7185;font-weight:800}
+.c7e6-r0 .ty{font-family:var(--font);font-size:15px}
+.c7e6-r0 .ty.a{color:var(--llm)}.c7e6-r0 .ty.t{color:var(--tool)}
+.c7e6-r0 .cf{font-family:var(--font)}
+.c7e6-r0.on{background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.c7e6-why{padding:10px 14px;border-radius:12px;border:1px solid var(--line);min-height:96px}
+.c7e6-why b{font-size:16px;color:var(--acc)}
+.c7e6-why p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}
+.c7e6-r{display:flex;flex-direction:column;gap:12px}
+.c7e6-k{display:block;font-size:17px;color:var(--acc);margin-bottom:8px}
+.c7e6-n{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.c7e6-n div{display:flex;flex-direction:column;gap:2px}
+.c7e6-n b{font:800 30px var(--num)}
+.c7e6-n span{font-size:15px;color:var(--text3);line-height:1.35}
+.c7e6-bars{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.c7e6-bars div{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;font-size:15px;color:var(--text2)}
+.c7e6-bars i{position:relative;height:26px;border-radius:8px;background:rgba(255,255,255,.06);overflow:hidden}
+.c7e6-bars i::before{content:"";position:absolute;inset:0;width:calc(var(--v)*100%);background:linear-gradient(90deg,var(--acc),var(--acc2));opacity:.55;transform-origin:left;transform:scaleX(0);transition:transform 1.2s var(--ease)}
+#c07-exp76.go .c7e6-bars i::before{transform:scaleX(1)}
+.c7e6-bars em{position:relative;font-style:normal;font-size:15px;line-height:26px;padding-left:10px;color:var(--text)}
+.c7e6-nx{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.c7e6-nx span{font-size:15px;padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.04);color:var(--text2)}
+.c7e6-nx b{font-family:var(--num);color:var(--text)}
+.c7e6-lsn ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:5px;font-size:15px;line-height:1.5;color:var(--text2)}
+.c7e6-lsn b{color:var(--text)}
+</style>
+<script>
+HOOKS['c07-exp76'] = {
+  // [任务, 步数, 首轮, 复核, a/t, 置信度, 修订说明]
+  R: [
+    ['MarkorTranscribeReceipt', 18, 17, 4, 'a', '高', '第 17 步把编造的 CSV 写进文件，还自己宣布“I’ll enter sample CSV data”；但第 4 步已经写着“无法读取收据里的具体交易”，却照样离开图库——早了十三步'],
+    ['ExpenseAddMultipleFromGallery', 32, '—', 8, 'a', '高', '第 8 步思考承认看不到图片内容，仍继续推进；第 11 步四条开销凭空出现（见上一页）'],
+    ['SimpleCalendarNextMeetingWithPerson', 4, 3, 2, 'a', '高', '回答那一步是第二个缺陷；第一个是第 2 步的总结声称“appears to be the next meeting”，没有任何依据。答案 October 27 2024 的年份从未观察到，还与它自己读到的星期几矛盾'],
+    ['SportsTrackerActivitiesOnDate', 5, 4, 3, 'a', '高', '第 3 步总结声称“confirming I have identified all activities”，没有依据；回答是后果'],
+    ['SimpleCalendarEventsInNextWeek', 6, 5, 4, 'a', '高', '第 4 步在同一句话里既说视图是 week 43（Oct 22–28），又说这就是“从周一 Oct 23 开始的目标周”。第三轮还修正了幅度：这不是差一天，Oct 22–28 是以周日开始的一周，和周一开始的“下周”两种可能都不相符'],
+    ['SimpleCalendarEventOnDateAtTime', 6, '—', 5, 'a', '中', '工具调用都正常，告诉用户的信息错了：对用户的信息反馈错误'],
+    ['SimpleCalendarDeleteEventsOnRelativeDay', 3, '—', 2, 't', '中', '相对时间从未落地：没有取得当前日期就去操作'],
+    ['SimpleSmsSend', 8, 8, 5, 't', '中', '首轮断言第 6–7 步的 Not sent 是 Agent 无法控制的环境故障，日志并不支持。第 4 步自己的总结说确认收件人后“the screen remained unchanged”，第 5 步却直接输入正文。是收件人没提交还是模拟器没有短信服务，日志无法区分——记录如实写明'],
+    ['SportsTrackerActivitiesCountForWeek', 10, 4, 3, 't', '中', '来回滚动是症状不是原因：没有落地的周边界，Agent 就没有停止条件，只能一直扫'],
+    ['SimpleCalendarAddOneEvent', 14, 14, 13, 'a', '低', '仍是低置信度：日志不能说明验证器拒绝了哪个字段，日期格式问题可定位，四个事件时间是否准确仍无法确认'],
+  ],
+  init(s) {
+    s.querySelector('.c7e6-rows').innerHTML = this.R.map(([t, n, f, r, k, c], i) => `<div class="c7e6-r0" data-i="${i}"><b title="${t}">${t}</b><span>${n}</span>${f === '—' ? '<span>—</span>' : f === r ? `<span>${f}</span>` : `<s>${f}</s>`}<span class="${f !== '—' && f !== r ? 'mv' : ''}">${r}</span><span class="ty ${k}">${k === 'a' ? 'assistant' : '工具调用'}</span><span class="cf">${c}</span></div>`).join('');
+    s.querySelectorAll('.c7e6-r0').forEach((r) => r.addEventListener('click', () => { this.auto = false; this.pick(s, +r.dataset.i); }));
+  },
+  pick(s, i) {
+    this.i = i;
+    s.querySelectorAll('.c7e6-r0').forEach((r, j) => r.classList.toggle('on', j === i));
+    const r = this.R[i];
+    s.querySelector('.c7e6-why b').textContent = `${r[0]} · 首错第 ${r[3]} 步`;
+    s.querySelector('.c7e6-why p').textContent = r[6];
+  },
+  enter(s, ctx) {
+    ctx.later(() => s.classList.add('go'), 600);
+    s.querySelectorAll('.c7e6-n b').forEach((b, j) => U.count(b, +b.dataset.count, { dur: 1200, delay: 400 + j * 150, ctx }));
+    C7.auto(this, ctx, this.R.length, 2800, (i) => this.pick(s, i), 900);
+  },
+  reset(s) { this.i = null; s.classList.remove('go'); s.querySelectorAll('.c7e6-r0').forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<!-- ================= 作用域与精确复制 ================= -->
+<section class="slide" id="c07-scope" data-part="6" data-trans="zoom" data-dur="26000" data-title="作用域敏感的格式错误与精确复制错误" data-notes="第二类：<b>作用域敏感的文档格式错误</b>。用户说“引号格式不对”时，不能直接把它转成全局字符替换。至少要区分 ASCII 直引号、中文弯引号和 Markdown 反引号。同一字符在中文自然语言、英文原文、行内代码、代码块、代码注释、JSON 和路径中承担的语法角色不同。评估数据应先把文档解析为带作用域的片段，例如 ZH_PROSE、EN_PROSE、QUOTED_SOURCE、INLINE_CODE、CODE_BLOCK、CODE_COMMENT 和 JSON_OR_SCHEMA。每个片段保存允许变换集合、必须保护的字符以及修改后的验证器结果。轨迹前缀回归应要求模型做最小修改，并同时检查中文文档风格、英文原文保持率、代码和 JSON 语法，以及非目标文本的编辑距离。<b>规则无法确定作用域时，应允许模型保留原文并请求澄清</b>，而不是把猜测性修改算作通过。<br>第三类：<b>精确复制错误：从 old_string mismatch 到逐层定位</b>。old_string 失败也不能只归因于“模型抄错了”。应对同一个字符串保存原始字节哈希、Unicode code point 序列和 tokenizer token ID 序列，沿“文件原始字节 → 工具返回 → Harness 序列化 → 模型上下文 → 模型 token 输出 → 解码字符串 → JSON/tool-call 解析 → 工具匹配”这条链路寻找首个差异。最小化评估探针覆盖直接复述、从长上下文抽取、放入工具参数、相似字符串选择，以及空格、换行、反斜杠、Unicode 组合字符和低频 token。指标使用 byte-exact match、code-point-exact match、token-exact match、首次分歧位置和真实工具成功率。<b>若模型在直接探针测试中输出正确而工具调用失败，应修复 tokenizer、序列化、Harness 或工具协议；只有首个差异出现在模型输出时，才把该案例转成第八章的复制训练数据。</b>">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">另外两类典型错误：<em>作用域</em>与<em>精确复制</em></h2></div>
+    <div class="c7sp-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="g">全局替换引号</button><button data-v="s">按作用域处理</button></div></header>
+  <div class="c7sp-body">
+    <div class="c7sp-l panel fx fx-left" style="--d:3">
+      <div class="c7sp-h"><b>“引号格式不对”</b><span class="c7sp-st"></span></div>
+      <div class="c7sp-doc"></div>
+      <p class="c7sp-nt">规则无法确定作用域时，<b>允许保留原文并请求澄清</b>；检查中文风格、英文原文保持率、代码与 JSON 语法、非目标文本的编辑距离</p>
+    </div>
+    <div class="c7sp-r panel fx fx-right" style="--d:4">
+      <div class="c7sp-h"><b>old_string mismatch：沿链路找首个差异</b><span class="c7-tag">示意</span></div>
+      <div class="c7sp-chain"></div>
+      <div class="c7sp-res"><span>首个差异：<b>—</b></span><p></p></div>
+      <div class="c7sp-m"><span>byte-exact</span><span>code-point-exact</span><span>token-exact</span><span>首次分歧位置</span><span>真实工具成功率</span></div>
+    </div>
+  </div>
+  <div class="src">第七章 ·「作用域敏感的文档格式错误」「精确复制错误：从 `old_string` mismatch 到逐层定位」</div>
+</section>
+<style>
+.c7sp-seg button{font-size:16px}
+.c7sp-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+.c7sp-l,.c7sp-r{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c7sp-h{display:flex;align-items:center;gap:12px}
+.c7sp-h b{font-size:18px}
+.c7sp-st{margin-left:auto;font-size:15px;font-weight:700}
+.c7sp-doc{display:flex;flex-direction:column;gap:6px}
+.c7sp-f{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center;padding:7px 12px;border-radius:10px;border:1px solid var(--line);transition:border-color .4s,background .4s}
+.c7sp-f code{font:600 15px var(--num);color:var(--acc2)}
+.c7sp-f span{font:16px var(--mono,monospace);color:var(--text2);white-space:pre}
+.c7sp-f span mark{background:none;color:var(--text);border-bottom:2px solid var(--warn)}
+.c7sp-f.bad{border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.09)}
+.c7sp-f.bad span mark{border-color:#fb7185;color:#fda4af}
+.c7sp-f.ok{border-color:rgba(52,211,153,.5);background:rgba(52,211,153,.06)}
+.c7sp-nt{margin-top:auto;font-size:15px;line-height:1.55;color:var(--text2)}.c7sp-nt b{color:var(--text)}
+.c7sp-chain{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.c7sp-c{display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);font-size:15px;transition:border-color .3s,background .3s}
+.c7sp-c em{font:700 15px var(--num);font-style:normal;color:var(--text3)}
+.c7sp-c b{font-size:15px}
+.c7sp-c.pass{border-color:rgba(52,211,153,.5)}.c7sp-c.pass em{color:#34d399}
+.c7sp-c.diff{border-color:#fb7185;background:rgba(251,113,133,.12)}.c7sp-c.diff em{color:#fb7185}
+.c7sp-res{padding:10px 14px;border-radius:12px;background:rgba(255,255,255,.03);min-height:118px}
+.c7sp-res span{font-size:16px}.c7sp-res span b{color:#fda4af}
+.c7sp-res p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}
+.c7sp-res p b{color:var(--text)}
+.c7sp-m{margin-top:auto;display:flex;flex-wrap:wrap;gap:6px}
+.c7sp-m span{font-size:15px;padding:4px 10px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+</style>
+<script>
+HOOKS['c07-scope'] = {
+  // [作用域, 原文, 全局替换后, 按作用域处理后, 全局替换是否出错]
+  F: [
+    ['ZH_PROSE', '中文说明：调用 <mark>`</mark>reset()<mark>`</mark> 方法。', '中文说明：调用 <mark>“</mark>reset()<mark>”</mark> 方法。', '中文说明：调用 `reset()` 方法。', 1],
+    ['QUOTED_SOURCE', '英文原文：<mark>“</mark>Please restart the service.<mark>”</mark>', '英文原文：<mark>“</mark>Please restart the service.<mark>”</mark>', '英文原文：“Please restart the service.”', 0],
+    ['CODE_COMMENT', '# 中文注释：显示 <mark>"</mark>当前状态<mark>"</mark>', '# 中文注释：显示 <mark>“</mark>当前状态<mark>”</mark>', '# 中文注释：显示 "当前状态"  （保留原文 · 请求澄清）', 0],
+    ['CODE_BLOCK', 'name = <mark>"</mark>status<mark>"</mark>', 'name = <mark>“</mark>status<mark>”</mark>', 'name = "status"', 1],
+  ],
+  C: ['文件原始字节', '工具返回', 'Harness 序列化', '模型上下文', '模型 token 输出', '解码字符串', 'JSON / tool-call 解析', '工具匹配'],
+  // 两个示意案例：首个差异所在层与结论
+  CASE: [[2, 'Harness 把制表符序列化成了空格', '直接探针里模型输出正确，工具调用却失败 → <b>修 Harness 序列化</b>，不是模型的错'], [4, '模型把低频 token 抄成了形近字符', '首个差异出现在模型输出 → <b>才转成第八章的复制训练数据</b>']],
+  init(s) {
+    s.querySelector('.c7sp-chain').innerHTML = this.C.map((c, i) => `<div class="c7sp-c"><em>${i + 1}</em><b>${c}</b></div>`).join('');
+    this.seg = U.seg(s.querySelector('.c7sp-seg'), (v) => { this.manual = true; this.doc(s, v); });
+  },
+  doc(s, v) {
+    s.querySelector('.c7sp-doc').innerHTML = this.F.map(([sc, o, g, k, bad]) => `<div class="c7sp-f ${v === 'o' ? '' : v === 'g' ? (bad ? 'bad' : '') : 'ok'}"><code>${sc}</code><span>${v === 'o' ? o : v === 'g' ? g : k}</span></div>`).join('');
+    const st = s.querySelector('.c7sp-st');
+    st.textContent = v === 'o' ? '原文' : v === 'g' ? '行内代码、代码被破坏' : '每个片段按允许变换集合处理';
+    st.style.color = v === 'g' ? '#fb7185' : v === 's' ? '#34d399' : 'var(--text3)';
+  },
+  async chain(s, ctx, tk) {
+    const ok = () => tk === this.tk && ctx.alive, cs = [...s.querySelectorAll('.c7sp-c')];
+    for (let c = 0; ok(); c = 1 - c) {
+      const [d, what, con] = this.CASE[c];
+      cs.forEach((x) => x.classList.remove('pass', 'diff'));
+      s.querySelector('.c7sp-res b').textContent = '比对中…'; s.querySelector('.c7sp-res p').innerHTML = '每层保存原始字节哈希、Unicode code point 序列和 token ID 序列';
+      for (let i = 0; i <= d; i++) {
+        await U.wait(ctx, 600); if (!ok()) return;
+        cs[i].classList.add(i === d ? 'diff' : 'pass');
+      }
+      s.querySelector('.c7sp-res b').textContent = `第 ${d + 1} 层 · ${this.C[d]}：${what}`;
+      s.querySelector('.c7sp-res p').innerHTML = con;
+      await U.wait(ctx, 4200);
+    }
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive;
+    this.chain(s, ctx, tk);
+    while (ok() && !this.manual) {
+      for (const v of ['o', 'g', 's']) {
+        if (this.manual || !ok()) return;
+        if (v !== 'o') this.seg(v);
+        this.doc(s, v);
+        await U.wait(ctx, 3400);
+      }
+    }
+  },
+  enter(s, ctx) { this.manual = false; this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.doc(s, 'o'); s.querySelectorAll('.c7sp-c').forEach((x) => x.classList.remove('pass', 'diff')); },
+};
+</script>

@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 11000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#fb923c", "acc2": "#fbbf24" },
+    { "n": "Coding 内核", "k": "PART 01", "short": "内核", "acc": "#fbbf24", "acc2": "#fb923c" },
+    { "n": "整体流程", "k": "PART 02", "short": "流程", "acc": "#34d399", "acc2": "#fbbf24" },
+    { "n": "Harness 工程", "k": "PART 03", "short": "Harness", "acc": "#60a5fa", "acc2": "#fb923c" },
+    { "n": "故障与错误恢复", "k": "PART 04", "short": "恢复", "acc": "#fb7185", "acc2": "#fb923c" },
+    { "n": "实现技巧与工具", "k": "PART 05", "short": "技巧", "acc": "#22d3ee", "acc2": "#fbbf24" },
+    { "n": "Coding Agent 的安全", "k": "PART 06", "short": "安全", "acc": "#f87171", "acc2": "#fb923c" },
+    { "n": "元能力：思考与规则", "k": "PART 07", "short": "思考", "acc": "#a78bfa", "acc2": "#fb923c" },
+    { "n": "元能力：多媒体与适配器", "k": "PART 08", "short": "多媒体", "acc": "#f472b6", "acc2": "#fbbf24" },
+    { "n": "元能力：生成式 UI 与自举", "k": "PART 09", "short": "UI·自举", "acc": "#2dd4bf", "acc2": "#fb923c" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#fb923c", "acc2": "#fbbf24" }
+  ]
+}

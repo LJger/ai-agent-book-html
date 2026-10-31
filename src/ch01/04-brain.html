@@ -1,0 +1,473 @@
+<!-- ================= PART 04 LLM：Agent 的大脑 ================= -->
+<section class="slide chapter" id="c1-d4" data-part="4" data-title="PART 04 · LLM：Agent 的大脑" data-notes="大语言模型（Large Language Model, LLM）是 Agent 的决策核心。收到用户的请求后，它需要先解析真实意图（用户说的往往不是他真正想要的），再将模糊或复杂的任务拆解成可执行的步骤。执行过程中它还要持续做出判断：下一步该做什么、要不要调用工具、调哪个工具、传什么参数。这种<b>“理解-规划-执行”</b>的能力来自预训练所积累的知识，是工作流和自主 Agent 都依赖的基础。">
+  <div class="ch-k fx fx-up">PART 04</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">LLM：<br>Agent 的大脑</h1>
+  <div class="ch-s fx fx-up" style="--d:3">理解 · 规划 · 执行</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">模型越强大，围绕模型构建的 Harness 就越关键。</blockquote>
+  <div class="ch-loop" data-node="3" data-num="04"></div>
+</section>
+
+<section class="slide" id="c1-think" data-part="4" data-steps="1" data-title="内部思考：在知识体系上展开" data-notes="LLM 的决策链条是“理解-规划-执行”：先<b>解析真实意图</b>（用户说的往往不是他真正想要的），再把模糊或复杂的任务<b>拆解成可执行的步骤</b>，执行中持续判断下一步做什么、要不要调用工具、调哪个、传什么参数。<br>LLM Agent 的一个独特能力是<b>内部思考</b>——在采取实际行动之前，Agent 可以先进行规划与推演。这一过程<b>不改变外部环境，却能显著提升后续行动的质量</b>。LLM 之所以能够进行有效的内部推演，得益于预训练阶段习得的能力——模型在推演时所遵循的是人类知识中已经沉淀下来的逻辑规则，包括数学定律、因果关系、问题分解策略等。因此与传统强化学习 Agent 不同，<b>今天基于 LLM 的 Agent 不是盲目的随机探索，而是在结构化的知识体系上展开</b>。<br>左侧网格是示意：按 → 或点上方按钮，在“盲目随机探索”和“先推演、再行动”之间切换。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不是盲目探索，而是<em>先推演、再行动</em></h2></div>
+    <div class="th-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="rl">传统 RL：随机探索</button><button data-v="llm">LLM Agent：内部思考</button></div></header>
+  <div class="th-body">
+    <div class="th-left fx fx-scale" style="--d:2">
+      <canvas class="th-cv" width="1800" height="1100"></canvas>
+      <div class="th-st"><span class="th-a"></span><span class="th-b"></span></div>
+      <span class="th-sx cap">示意</span>
+    </div>
+    <div class="th-right">
+      <div class="th-chain fx fx-right" style="--d:3">
+        <div class="th-k"><em>理解</em><p>解析真实意图——用户说的往往不是他真正想要的</p></div>
+        <div class="th-k"><em>规划</em><p>把模糊或复杂的任务拆解成可执行的步骤</p></div>
+        <div class="th-k"><em>执行</em><p>持续判断：下一步做什么、要不要调用工具、调哪个、传什么参数</p></div>
+      </div>
+      <div class="th-note panel fx fx-right" style="--d:4">
+        <b><svg class="ic"><use href="#i-brain"/></svg>内部思考</b>
+        <p>在行动之前先规划与推演：<span class="c-acc">不改变外部环境</span>，却能显著提升后续行动的质量</p>
+        <p class="dim">推演遵循人类知识中沉淀的逻辑规则——数学定律、因果关系、问题分解策略——来自预训练</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「LLM：Agent 的大脑」</div>
+</section>
+<style>
+#c1-think .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.th-body{display:flex;gap:36px;flex:1;min-height:0}
+.th-left{position:relative;width:900px;height:620px;flex:none;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:rgba(5,9,22,.6)}
+.th-cv{position:absolute;left:0;top:0;width:900px;height:550px}
+.th-st{position:absolute;left:0;right:0;bottom:0;height:70px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;font-size:20px;border-top:1px solid var(--line);background:rgba(255,255,255,.03)}
+.th-a{color:var(--text)}.th-b{font-family:var(--num);color:var(--acc)}
+.th-sx{position:absolute;right:14px;top:10px}
+.th-right{flex:1;display:flex;flex-direction:column;gap:22px}
+.th-chain{display:flex;flex-direction:column;gap:12px}
+.th-k{display:flex;gap:18px;align-items:center;padding:16px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.th-k em{flex:none;font-style:normal;width:72px;height:72px;border-radius:20px;display:grid;place-items:center;font-size:24px;font-weight:800;color:var(--llm);background:color-mix(in srgb,var(--llm) 13%,transparent);border:1px solid color-mix(in srgb,var(--llm) 40%,transparent)}
+.th-k p{font-size:20px;line-height:1.55}
+.th-note{padding:22px 26px;display:flex;flex-direction:column;gap:10px;border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+.th-note b{display:flex;align-items:center;gap:10px;font-size:24px;color:var(--acc)}
+.th-note p{font-size:19px;line-height:1.65}
+</style>
+<script>
+HOOKS['c1-think'] = {
+  C: 18, R: 11, S: 50,
+  init(s) {
+    this.cv = s.querySelector('.th-cv');
+    this.g = this.cv.getContext('2d');
+    // 固定的迷宫：带少量墙体的网格，保证起点到终点可达
+    const rnd = U.rand(7), C = this.C, R = this.R;
+    this.wall = Array.from({ length: R }, (_, y) => Array.from({ length: C }, (_, x) => x > 1 && x < C - 2 && rnd() < 0.24));
+    [[3, 1, 3, 7], [7, 3, 7, 10], [11, 0, 11, 6], [14, 4, 14, 9]].forEach(([x1, y1, , y2]) => { for (let y = y1; y <= y2; y++) this.wall[y][x1] = true; });
+    this.start = [1, 5]; this.goal = [C - 2, 5];
+    this.wall[5][1] = this.wall[5][C - 2] = false;
+    this.path = this.bfs();
+    if (!this.path) { this.wall.forEach((row) => row.fill(false)); this.path = this.bfs(); }
+    this.set = U.seg(s.querySelector('.th-seg'), (v) => this.mode(s, v));
+  },
+  bfs() {
+    const [sx, sy] = this.start, [gx, gy] = this.goal, prev = new Map(), q = [[sx, sy]], key = (x, y) => y * 100 + x;
+    prev.set(key(sx, sy), null);
+    while (q.length) {
+      const [x, y] = q.shift();
+      if (x === gx && y === gy) break;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = x + dx, ny = y + dy;
+        if (nx < 0 || ny < 0 || nx >= this.C || ny >= this.R || this.wall[ny][nx] || prev.has(key(nx, ny))) continue;
+        prev.set(key(nx, ny), [x, y]);
+        q.push([nx, ny]);
+      }
+    }
+    if (!prev.has(key(gx, gy))) return null;
+    const out = [];
+    for (let p = [gx, gy]; p; p = prev.get(key(p[0], p[1]))) out.unshift(p);
+    return out;
+  },
+  draw(heat, plan, pos, planLen) {
+    const g = this.g, S = this.S;
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, 900, 550);
+    for (let y = 0; y < this.R; y++) for (let x = 0; x < this.C; x++) {
+      g.fillStyle = this.wall[y][x] ? 'rgba(148,163,184,.28)' : 'rgba(255,255,255,.025)';
+      g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4);
+      const h = heat && heat[y][x];
+      if (h > 0) { g.fillStyle = `rgba(251,113,133,${Math.min(0.55, h * 0.08)})`; g.fillRect(x * S + 2, y * S + 2, S - 4, S - 4); }
+    }
+    if (plan && planLen > 0) {
+      g.strokeStyle = '#22d3ee'; g.lineWidth = 4; g.setLineDash([10, 8]); g.beginPath();
+      plan.slice(0, planLen).forEach(([x, y], i) => (i ? g.lineTo(x * S + S / 2, y * S + S / 2) : g.moveTo(x * S + S / 2, y * S + S / 2)));
+      g.stroke(); g.setLineDash([]);
+    }
+    const mark = ([x, y], c, t) => { g.fillStyle = c; g.beginPath(); g.arc(x * S + S / 2, y * S + S / 2, 19, 0, 6.283); g.fill(); g.fillStyle = '#06101f'; g.font = '700 18px Segoe UI, Arial'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(t, x * S + S / 2, y * S + S / 2 + 1); };
+    mark(this.start, '#94a3b8', 'S'); mark(this.goal, '#34d399', 'G');
+    if (pos) { g.shadowColor = '#a78bfa'; g.shadowBlur = 18; g.fillStyle = '#c4b5fd'; g.beginPath(); g.arc(pos[0] * S + S / 2, pos[1] * S + S / 2, 13, 0, 6.283); g.fill(); g.shadowBlur = 0; }
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.set(m);
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, A = s.querySelector('.th-a'), B = s.querySelector('.th-b');
+    if (m === 'rl') {
+      // 随机游走：没有先验知识，只能一步步撞墙试错
+      let pos = [...this.start], steps = 0, ep = 1, last = 0, heat = this.wall.map((r) => r.map(() => 0));
+      ctx.raf((t) => {
+        if (!ok()) return false;
+        if (t - last < 45) return;
+        last = t;
+        const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => [pos[0] + dx, pos[1] + dy]).filter(([x, y]) => x >= 0 && y >= 0 && x < this.C && y < this.R && !this.wall[y][x]);
+        pos = nb[Math.floor(Math.random() * nb.length)];
+        heat[pos[1]][pos[0]]++;
+        steps++;
+        const hit = pos[0] === this.goal[0] && pos[1] === this.goal[1];
+        A.textContent = hit ? '偶然撞到了终点' : '随机选择动作，撞墙、绕回、重复走过的路';
+        B.textContent = `第 ${ep} 回合 · 第 ${steps} 步`;
+        if (hit || steps >= 420) { ep++; steps = 0; pos = [...this.start]; heat = this.wall.map((r) => r.map(() => 0)); }
+        this.draw(heat, null, pos, 0);
+      });
+      return;
+    }
+    // LLM Agent：先在内部画出计划（环境不变），再沿计划行动
+    const run = async () => {
+      while (ok()) {
+        this.draw(null, this.path, this.start, 0);
+        A.textContent = '内部推演：在脑中规划路线（环境没有任何变化）';
+        for (let i = 1; i <= this.path.length && ok(); i++) { B.textContent = `推演中 · ${i} 步`; this.draw(null, this.path, this.start, i); await U.wait(ctx, 60); }
+        if (!ok()) return;
+        A.textContent = '按计划行动';
+        for (let i = 0; i < this.path.length && ok(); i++) { B.textContent = `行动 · 第 ${i} 步`; this.draw(null, this.path, this.path[i], this.path.length); await U.wait(ctx, 110); }
+        if (!ok()) return;
+        A.textContent = '一次到达终点';
+        B.textContent = `共 ${this.path.length - 1} 步`;
+        await U.wait(ctx, 2200);
+      }
+    };
+    run();
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.mode(s, k >= 1 ? 'llm' : 'rl'); },
+  step(s, ctx, k) { this.mode(s, k >= 1 ? 'llm' : 'rl'); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c1-horse" data-part="4" data-steps="1" data-trans="zoom" data-title="模型即 Agent：Harness 更关键" data-notes="<b>“模型即 Agent”（Model as Agent）</b>这一新范式代表了 AI Agent 发展的最新方向。先进模型通过后训练（特别是强化学习）将工具调用能力内化为原生能力：何时调用工具、调哪个、传什么参数，都由模型自己决定，无需人工编排。<br>但这并不意味着框架层变得不重要了。恰恰相反，<b>模型越强大，围绕模型构建的 Harness 就越关键</b>。Harness 这个词原指马具，即套在马身上的缰绳与挽具，不是为了限制马的奔跑能力，而是把这种力量引导到正确的方向上。换到 Agent 语境里，模型是那匹强大但不可预测的马，Harness 则是把它的能力引导成可靠任务执行的工程外壳——包括上下文管理、工具接口、安全约束、验证与纠正等基础设施。<br><b>模型自主决策的空间越大，出错时的影响面也越大</b>，因此需要更精细的约束、验证和纠正机制来确保可靠性。模型厂商的真正优势不是“让框架变薄”，而是能对模型与外围 Harness 进行协同优化，持续迭代。<br>左侧粒子是示意：按 → 或点击开关给模型“套上 Harness”。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">模型越强，<em>Harness 越关键</em></h2></div>
+    <button class="tgl hs-tg fx fx-up" style="--d:2;--tc:var(--har)"><i></i>套上 Harness</button></header>
+  <div class="hs-body">
+    <div class="hs-left fx fx-scale" style="--d:2">
+      <canvas class="hs-cv" width="2000" height="1080"></canvas>
+      <div class="hs-goal"><svg class="ic"><use href="#i-target"/></svg>可靠完成任务</div>
+      <div class="hs-src"><svg class="ic"><use href="#i-brain"/></svg>模型的能力</div>
+      <div class="hs-cnt"><span>到达目标 <b class="hs-ok">0</b></span><span>偏离失控 <b class="hs-bad">0</b></span><span>成功率 <b class="hs-rt">—</b></span></div>
+      <span class="hs-sx cap">示意</span>
+    </div>
+    <div class="hs-right">
+      <div class="hs-c panel fx fx-right" style="--d:3"><b>模型即 Agent</b><p>后训练（特别是强化学习）把工具调用内化为原生能力：<span class="c-llm">何时调用、调哪个、传什么参数</span>，由模型自己决定，无需人工编排</p></div>
+      <div class="hs-c panel fx fx-right" style="--d:4"><b>Harness：马具</b><p>不是限制马的奔跑能力，而是把这种力量<span class="c-har">引导到正确的方向上</span></p>
+        <div class="hs-chips"><span class="chip har">上下文管理</span><span class="chip har">工具接口</span><span class="chip har">安全约束</span><span class="chip har">验证与纠正</span></div></div>
+      <div class="hs-c panel fx fx-right" style="--d:5"><b>为什么更关键</b><p>模型自主决策的空间越大，出错时的影响面也越大；厂商的优势在于<span class="c-acc">模型与 Harness 协同优化</span>，而不是让框架变薄</p></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「模型即 Agent：当模型本身成为产品」</div>
+</section>
+<style>
+#c1-horse .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.hs-body{display:flex;gap:32px;flex:1;min-height:0}
+.hs-left{position:relative;width:1000px;height:640px;flex:none;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:rgba(5,9,22,.6)}
+.hs-cv{position:absolute;left:0;top:0;width:1000px;height:540px}
+.hs-goal{position:absolute;right:14px;top:212px;width:120px;height:116px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:16px;text-align:center;color:var(--ok);border:2px solid var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+.hs-goal .ic{font-size:30px}
+.hs-src{position:absolute;left:14px;top:226px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:15px;color:var(--llm)}
+.hs-src .ic{font-size:34px}
+.hs-cnt{position:absolute;left:0;right:0;bottom:0;height:100px;display:flex;align-items:center;justify-content:space-around;font-size:20px;color:var(--text2);border-top:1px solid var(--line);background:rgba(255,255,255,.03)}
+.hs-cnt b{font:800 34px var(--num);margin-left:8px;color:var(--text)}
+.hs-ok{color:var(--ok)!important}.hs-bad{color:var(--bad)!important}.hs-rt{color:var(--acc)!important}
+.hs-sx{position:absolute;right:14px;top:10px}
+.hs-right{flex:1;display:flex;flex-direction:column;gap:16px}
+.hs-c{padding:20px 24px}
+.hs-c b{font-size:23px;color:var(--acc)}
+.hs-c p{font-size:19px;line-height:1.65;margin-top:8px}
+.hs-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.hs-chips .chip{font-size:16px}
+</style>
+<script>
+HOOKS['c1-horse'] = {
+  init(s) {
+    this.g = s.querySelector('.hs-cv').getContext('2d');
+    this.tg = s.querySelector('.hs-tg');
+    this.tg.addEventListener('click', () => this.setH(s, !this.h));
+  },
+  setH(s, v) {
+    this.h = v;
+    this.tg.classList.toggle('on', v);
+    this.stat = { ok: 0, bad: 0 };
+    this.ps = [];
+  },
+  enter(s, ctx, k) {
+    this.setH(s, k >= 1);
+    const g = this.g, W = 1000, H = 540, cy = 270;
+    const rail = (x) => 70 + (x / W) * 30; // 通道半宽随 x 略微变化
+    const oks = s.querySelector('.hs-ok'), bads = s.querySelector('.hs-bad'), rt = s.querySelector('.hs-rt');
+    let last = 0, spawn = 0;
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    ctx.raf((t) => {
+      const dt = last ? Math.min(40, t - last) / 16.7 : 1;
+      last = t;
+      if ((spawn -= dt) <= 0) { spawn = 3; this.ps.push({ x: 70, y: cy + (Math.random() - 0.5) * 30, a: (Math.random() - 0.5) * 1.4, v: 4.2 + Math.random() * 2, life: 0 }); }
+      g.clearRect(0, 0, W, H);
+      if (this.h) {
+        // Harness：两条导轨把力量引导到目标
+        g.strokeStyle = 'rgba(96,165,250,.85)'; g.lineWidth = 3; g.shadowColor = '#60a5fa'; g.shadowBlur = 12;
+        [-1, 1].forEach((sg) => { g.beginPath(); for (let x = 90; x <= 860; x += 10) { const y = cy + sg * rail(x); x === 90 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke(); });
+        g.shadowBlur = 0;
+      }
+      for (let i = this.ps.length - 1; i >= 0; i--) {
+        const p = this.ps[i];
+        p.a += (Math.random() - 0.5) * 0.5 * dt; // 强大但不可预测：方向持续随机扰动
+        if (this.h && p.x > 90 && p.x < 860) {
+          const off = p.y - cy, lim = rail(p.x) - 6;
+          p.a += (-off / lim) * 0.06 * dt - p.a * 0.05 * dt; // 向通道中线、向前引导
+          if (Math.abs(off) > lim) { p.y = cy + Math.sign(off) * lim; p.a *= -0.5; }
+        }
+        p.x += Math.cos(p.a) * p.v * dt;
+        p.y += Math.sin(p.a) * p.v * dt;
+        p.life += dt;
+        const inGoal = p.x > 866 && Math.abs(p.y - cy) < 58;
+        if (inGoal) { this.stat.ok++; this.ps.splice(i, 1); continue; }
+        if (p.x < 0 || p.x > W || p.y < 0 || p.y > H || p.life > 600) { this.stat.bad++; this.ps.splice(i, 1); continue; }
+        g.fillStyle = 'rgba(196,181,253,.9)'; g.shadowColor = '#a78bfa'; g.shadowBlur = 10;
+        g.beginPath(); g.arc(p.x, p.y, 4.2, 0, 6.283); g.fill(); g.shadowBlur = 0;
+      }
+      oks.textContent = this.stat.ok;
+      bads.textContent = this.stat.bad;
+      const n = this.stat.ok + this.stat.bad;
+      rt.textContent = n ? Math.round((this.stat.ok / n) * 100) + '%' : '—';
+    });
+  },
+  step(s, ctx, k) { this.setH(s, k >= 1); },
+  reset() { this.ps = []; },
+};
+</script>
+
+<section class="slide" id="c1-bitter" data-part="4" data-title="苦涩的教训：方向认同，节奏务实" data-dur="14000" data-notes="这里悬着一个更深的问题：如果模型持续变强，今天这些 Harness 会不会最终被模型“吃掉”？Rich Sutton 在<b>《苦涩的教训》（The Bitter Lesson）</b>中回顾了 AI 研究七十年间反复上演的一幕：研究者一次次把自己对领域的理解编码进系统，短期见效，长期却总是输给能随算力与数据规模持续扩展的通用方法——<b>搜索与学习</b>。<br>以此衡量，Harness 里的约束、验证与纠正，有多少属于“人类先验”，注定会被模型内化？本书的立场是：<b>方向认同，节奏务实</b>。方向上，本书不怀疑模型会持续吃掉 Harness——工具调用、长程规划都曾靠外部编排，如今已是模型的原生能力；但在节奏上，这个“吃”的过程远比想象中慢：训练以月计，模型也无法一次内化真实业务中所有的约束与偏好，<b>模型此刻的能力边界，就是 Harness 此刻的价值所在</b>。因此 Harness 工程不是对苦涩的教训的抵抗，而是这一教训在工程时间尺度上的实践：模型还做不稳的，Harness 先补上；模型每内化一层，Harness 就卸下一层，转而兜底新的能力前沿。<br>右侧图会自动播放：拖动时间滑块，看模型能力上升时哪些 Harness 被内化（被内化的条目取自本章原文，先后顺序是示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">苦涩的教训：<em>方向认同，节奏务实</em></h2></header>
+  <div class="bl-body">
+    <div class="bl-left">
+      <div class="bl-q panel fx fx-left" style="--d:2"><span class="lbl">Rich Sutton · The Bitter Lesson</span>
+        <p>研究者一次次把对领域的理解编码进系统——<b>短期见效</b>，长期却总是输给能随算力与数据规模持续扩展的通用方法：<b class="c-acc">搜索与学习</b></p></div>
+      <div class="bl-two fx fx-left" style="--d:3">
+        <div><em>方向认同</em><p>模型会持续吃掉 Harness：工具调用、长程规划都曾靠外部编排，如今已是原生能力</p></div>
+        <div><em>节奏务实</em><p>训练以月计；模型无法一次内化真实业务中所有的约束与偏好</p></div>
+      </div>
+      <p class="tagline bl-tag fx fx-up" style="--d:5">模型此刻的能力边界，就是 <b>Harness 此刻的价值</b>所在</p>
+    </div>
+    <div class="bl-chart panel fx fx-right" style="--d:3">
+      <svg class="bl-svg" viewBox="0 0 860 520" width="860" height="520">
+        <defs><linearGradient id="blg" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#a78bfa" stop-opacity=".05"/><stop offset="1" stop-color="#a78bfa" stop-opacity=".35"/></linearGradient></defs>
+        <path class="bl-ax" d="M60 20V470H840"/>
+        <text class="bl-al" x="70" y="34">能力</text><text class="bl-al" x="830" y="500" text-anchor="end">时间（训练以月计）</text>
+        <line class="bl-req" x1="60" y1="60" x2="840" y2="60"/><text class="bl-rl" x="70" y="52">真实业务要求</text>
+        <path class="bl-area" d=""/><path class="bl-cv" d=""/>
+        <line class="bl-now" x1="60" y1="20" x2="60" y2="470"/>
+      </svg>
+      <div class="bl-blocks"></div>
+      <div class="bl-ctl"><button class="btn bl-play"><svg class="ic"><use href="#i-pause"/></svg></button><input class="rng bl-rng" type="range" min="0" max="1000" value="0"><span class="cap">示意</span></div>
+    </div>
+  </div>
+  <div class="src">第一章 ·「模型即 Agent：当模型本身成为产品」·《苦涩的教训》</div>
+</section>
+<style>
+.bl-body{display:flex;gap:34px;flex:1;min-height:0}
+.bl-left{width:640px;flex:none;display:flex;flex-direction:column;gap:20px}
+.bl-q{padding:24px 28px}
+.bl-q p{font-size:22px;line-height:1.7;margin-top:10px}
+.bl-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bl-two div{padding:18px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.bl-two em{font-style:normal;font-size:24px;font-weight:800;color:var(--acc)}
+.bl-two p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:8px}
+.bl-tag{font-size:23px}
+.bl-chart{position:relative;flex:1;padding:16px 20px 12px}
+.bl-svg{display:block;overflow:visible}
+.bl-ax{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2}
+.bl-al{fill:var(--text3);font-size:15px}
+.bl-req{stroke:var(--warn);stroke-width:2;stroke-dasharray:8 6}
+.bl-rl{fill:var(--warn);font-size:15px}
+.bl-cv{fill:none;stroke:#a78bfa;stroke-width:4;filter:drop-shadow(0 0 8px #a78bfa)}
+.bl-area{fill:url(#blg)}
+.bl-now{stroke:var(--acc);stroke-width:2;stroke-dasharray:4 5}
+.bl-blocks{position:absolute;left:20px;top:16px;width:860px;height:520px;pointer-events:none}
+.bl-b{position:absolute;right:30px;height:38px;padding:0 14px;border-radius:10px;display:flex;align-items:center;gap:10px;font-size:16px;white-space:nowrap;color:var(--har);border:1px solid color-mix(in srgb,var(--har) 55%,transparent);background:color-mix(in srgb,var(--har) 14%,rgba(10,16,36,.92));transition:all .7s var(--ease)}
+.bl-b small{font-size:14px;color:var(--llm);opacity:0;transition:opacity .5s;max-width:0;overflow:hidden}
+.bl-b.eaten{color:var(--text3);border-color:color-mix(in srgb,var(--llm) 40%,transparent);background:color-mix(in srgb,var(--llm) 8%,rgba(10,16,36,.85));opacity:.6}
+.bl-b.eaten small{opacity:1;max-width:400px}
+.bl-b.keep{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 55%,transparent);background:color-mix(in srgb,var(--warn) 12%,rgba(10,16,36,.92))}
+.bl-ctl{display:flex;align-items:center;gap:14px;padding:4px 6px 0}
+.bl-ctl .btn{padding:8px 12px}
+</style>
+<script>
+HOOKS['c1-bitter'] = {
+  // lv：模型能力超过这一高度时，这一层 Harness 被内化；keep 为“当前仍需 Harness 兜底”
+  B: [
+    { t: 'few-shot 示例 · “让我们一步一步思考”', to: '→ 指令微调与推理模型', lv: 0.18 },
+    { t: '输出格式修复 · JSON 解析容错', to: '→ 结构化输出与原生工具调用', lv: 0.32 },
+    { t: '工具调用的外部编排', to: '→ 模型原生的工具调用', lv: 0.46 },
+    { t: '长程规划的外部编排', to: '→ 模型原生能力', lv: 0.58 },
+    { t: '文生图的提示词改写', to: '→ 原生多模态理解与生成', lv: 0.68 },
+    { t: '真实业务中的约束与偏好', to: '', lv: 2, keep: true },
+    { t: '约束 · 验证 · 纠正：兜底新的能力前沿', to: '', lv: 2, keep: true },
+  ],
+  X0: 60, X1: 840, Y0: 470, Y1: 60,
+  cap(u) { return 0.06 + 0.72 * (1 - Math.exp(-2.4 * u)); },
+  y(c) { return this.Y0 - c * (this.Y0 - this.Y1); },
+  init(s) {
+    s.querySelector('.bl-blocks').innerHTML = this.B.map((b, i) => `<div class="bl-b${b.keep ? ' keep' : ''}" data-i="${i}">${b.t}<small>${b.to}</small></div>`).join('');
+    this.rng = s.querySelector('.bl-rng');
+    this.play = s.querySelector('.bl-play');
+    this.rng.addEventListener('input', () => { this.setPlay(false); this.u = this.rng.value / 1000; this.draw(s); });
+    this.rng.addEventListener('change', () => this.rng.blur());
+    this.play.addEventListener('click', () => this.setPlay(!this.playing));
+  },
+  setPlay(v) { this.playing = v; this.play.querySelector('use').setAttribute('href', v ? '#i-pause' : '#i-play'); },
+  draw(s) {
+    const u = this.u, N = 60, pts = [];
+    for (let i = 0; i <= N; i++) { const uu = (i / N) * u; pts.push([this.X0 + uu * (this.X1 - this.X0), this.y(this.cap(uu))]); }
+    const d = pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join('');
+    s.querySelector('.bl-cv').setAttribute('d', d);
+    s.querySelector('.bl-area').setAttribute('d', d + `L${pts[N][0].toFixed(1)} ${this.Y0}L${this.X0} ${this.Y0}Z`);
+    const x = this.X0 + u * (this.X1 - this.X0);
+    s.querySelectorAll('.bl-now').forEach((l) => { l.setAttribute('x1', x); l.setAttribute('x2', x); });
+    const c = this.cap(u);
+    // 未被内化的 Harness 层叠在模型能力曲线之上、业务要求之下；被内化的沉到曲线之下
+    let top = 0, bottom = 0;
+    s.querySelectorAll('.bl-b').forEach((el) => {
+      const b = this.B[+el.dataset.i], isEaten = b.lv <= c;
+      el.classList.toggle('eaten', isEaten);
+      let yy;
+      if (isEaten) { yy = this.y(c) + 14 + bottom * 44; bottom++; } else { yy = this.y(1) + 10 + top * 44; top++; }
+      el.style.top = Math.min(this.Y0 - 40, yy) + 'px';
+    });
+    this.rng.value = Math.round(u * 1000);
+    this.rng.style.setProperty('--p', u * 100 + '%');
+  },
+  enter(s, ctx) {
+    this.u = 0;
+    this.setPlay(true);
+    this.draw(s);
+    let last = 0;
+    ctx.raf((t) => {
+      const dt = last ? t - last : 0;
+      last = t;
+      if (!this.playing) return;
+      this.u += dt / 11000;
+      if (this.u > 1) { this.u = 1; this.draw(s); this.setPlay(false); ctx.later(() => { this.u = 0; this.setPlay(true); }, 2600); return; }
+      this.draw(s);
+    });
+  },
+  reset() { this.u = 0; },
+};
+</script>
+
+<section class="slide" id="c1-learn" data-part="4" data-trans="rise" data-title="Agent 能力更新的三个层次" data-notes="前面讨论了模型可以通过强化学习将工具调用策略内化为原生能力。但 Agent 的行为改变不只发生在训练阶段。按照更新发生的位置和持续时间，可以把它理解为<b>三条互补路径</b>（图1-2）：任务内的上下文适应、跨任务的外部产物（artifact）更新，以及训练周期中的参数更新。<br><b>上下文适应</b>发生在当前任务中：示例、状态和检索结果进入上下文后，模型可以立即调整行为，却不会因此改变下一次会话的持久状态。优势是快速、低成本，局限是受上下文窗口和信息组织方式约束（第二章）。<br>要让变化跨越任务保留下来，可以更新<b>外部产物</b>：把事实和经验整理为知识文档，把可语言化的策略写进 Prompt 或 Skill，把确定性流程与约束写成程序和 Harness。这些产物可审计、可修订，执行时仍需通过上下文或工具接口被 Agent 使用（第三至五章给出基础，第九章讨论如何从已评价的运行轨迹中生成这些更新）。<br>当目标是医疗影像理解、自然语言风格或隐式决策策略等高维能力时，外部规则难以完整表达，就需要通过后训练更新<b>模型参数</b>。部署成本较高，却能形成自然、广泛的泛化能力（第八章）。<br>三条路径不是互斥分类，而是不同时间尺度上的协同机制：<b>上下文负责临场适应，外部产物负责可控积累，参数负责内化难以显式表达的能力</b>。点击任一层查看演示。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">能力更新的<em>三个层次</em></h2>
+  <p class="lead fx fx-up" style="--d:2">不同时间尺度上的协同机制：临场适应 · 可控积累 · 内化难以显式表达的能力</p></header>
+  <div class="ln-stage fx fx-up" style="--d:3">
+    <div class="ln-lanes"></div>
+    <div class="ln-rb"><span>可回滚程度</span><b class="hi">高</b><i></i><b class="lo">低</b></div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6">上下文负责<b>临场适应</b>，外部产物负责<b>可控积累</b>，参数负责<b>内化难以显式表达的能力</b></p>
+  <div class="src">第一章 ·「Agent 的学习机制：从上下文适应到持久更新」· 图1-2</div>
+</section>
+<style>
+.ln-stage{position:relative;padding-right:130px}
+.ln-lanes{display:flex;flex-direction:column;gap:16px}
+.ln-l{--c:var(--acc);position:relative;display:grid;grid-template-columns:330px 1fr;gap:0;height:150px;border-radius:20px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:linear-gradient(90deg,color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.9)),rgba(12,18,40,.75) 40%);cursor:pointer;transition:opacity .45s,box-shadow .45s,border-color .45s}
+.ln-l.dim{opacity:.4}
+.ln-l.on{border-color:var(--c);box-shadow:0 0 40px -10px color-mix(in srgb,var(--c) 70%,transparent)}
+.ln-h{padding:20px 24px;display:flex;flex-direction:column;gap:6px;border-right:1px solid var(--line)}
+.ln-h b{display:flex;align-items:center;gap:10px;font-size:26px;color:var(--c)}
+.ln-h p{font-size:16px;line-height:1.5;color:var(--text2)}
+.ln-h small{font-size:14px;color:var(--text3)}
+.ln-v{position:relative;overflow:hidden}
+.ln-v svg{position:absolute;inset:0;width:100%;height:100%}
+.ln-tok{opacity:0}
+.ln-box{position:absolute;top:30px;height:90px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--c) 55%,transparent);display:flex;align-items:center;justify-content:center;gap:8px;font-size:16px;color:var(--text2);background:rgba(255,255,255,.02);transition:all .4s}
+.ln-box.lit{border-style:solid;border-color:var(--c);color:var(--text);background:color-mix(in srgb,var(--c) 14%,transparent);box-shadow:0 0 22px color-mix(in srgb,var(--c) 35%,transparent)}
+.ln-box .ic{color:var(--c);font-size:22px}
+.ln-sep{position:absolute;top:8px;bottom:8px;width:0;border-left:2px dashed color-mix(in srgb,var(--warn) 60%,transparent)}
+.ln-sep::before{content:"会话结束";position:absolute;left:8px;top:0;font-size:14px;color:var(--warn);white-space:nowrap}
+.ln-art{position:absolute;top:44px;display:flex;gap:6px}
+.ln-art span{padding:6px 10px;border-radius:9px;font-size:14px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);opacity:.25;transition:opacity .4s}
+.ln-art span.lit{opacity:1}
+.ln-rb{position:absolute;right:0;top:0;bottom:0;width:110px;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:15px;color:var(--text3)}
+.ln-rb i{flex:1;width:6px;border-radius:6px;background:linear-gradient(var(--ok),var(--warn),var(--bad))}
+.ln-rb b{font-size:16px}
+.ln-rb .hi{color:var(--ok)}.ln-rb .lo{color:var(--bad)}
+</style>
+<script>
+HOOKS['c1-learn'] = {
+  L: [
+    { n: '上下文适应', ic: 'eye', c: '#22d3ee', d: '示例、状态、检索结果进入上下文，模型立即调整行为', p: '快速、低成本 · 受上下文窗口约束 · 第二章' },
+    { n: '外部产物更新', ic: 'docs', c: '#fbbf24', d: '知识文档 · Prompt / Skill · 程序与 Harness：可审计、可修订', p: '执行时仍经上下文或工具被使用 · 第三至五章、第九章' },
+    { n: '参数更新', ic: 'cpu', c: '#a78bfa', d: '后训练更新模型参数：医疗影像理解、自然语言风格、隐式决策策略等高维能力', p: '部署成本较高 · 泛化自然而广泛 · 第八章' },
+  ],
+  init(s) {
+    s.querySelector('.ln-lanes').innerHTML = this.L.map((l, i) => `
+      <div class="ln-l" data-i="${i}" style="--c:${l.c}">
+        <div class="ln-h"><b><svg class="ic"><use href="#i-${l.ic}"/></svg>${l.n}</b><p>${l.d}</p><small>${l.p}</small></div>
+        <div class="ln-v" data-v="${i}"></div>
+      </div>`).join('');
+    // 每条泳道：左边是本次会话，中间虚线是“会话结束”，右边是之后
+    const v = [...s.querySelectorAll('.ln-v')];
+    v[0].innerHTML = `<div class="ln-box" style="left:40px;width:300px"><svg class="ic"><use href="#i-layers"/></svg>当前会话的上下文</div><div class="ln-sep" style="left:420px"></div><div class="ln-box" style="left:500px;width:300px"><svg class="ic"><use href="#i-layers"/></svg>下一次会话：从零开始</div>
+      <svg viewBox="0 0 1198 150" preserveAspectRatio="xMinYMin meet"><path class="lnp" d="M0 75 H190"/><circle class="ln-tok" r="10" fill="#22d3ee"/></svg>`;
+    v[1].innerHTML = `<div class="ln-box" style="left:40px;width:230px"><svg class="ic"><use href="#i-layers"/></svg>本次运行</div><div class="ln-art" style="left:300px"><span>知识文档</span><span>Prompt / Skill</span><span>程序 / Harness</span></div><div class="ln-sep" style="left:620px"></div><div class="ln-box" style="left:680px;width:300px"><svg class="ic"><use href="#i-layers"/></svg>下一次：经上下文 / 工具加载</div>
+      <svg viewBox="0 0 1198 150" preserveAspectRatio="xMinYMin meet"><path class="lnp" d="M0 75 H150"/><path class="lnq" d="M270 75 H420"/><path class="lnr" d="M520 70 C 600 30, 700 30, 830 60"/><circle class="ln-tok" r="10" fill="#fbbf24"/></svg>`;
+    v[2].innerHTML = `<div class="ln-box" style="left:40px;width:230px"><svg class="ic"><use href="#i-history"/></svg>大量运行轨迹</div><div class="ln-box" style="left:360px;width:220px"><svg class="ic"><use href="#i-dumbbell"/></svg>后训练</div><div class="ln-sep" style="left:640px"></div><div class="ln-box" style="left:700px;width:300px"><svg class="ic"><use href="#i-brain"/></svg>模型参数：之后每次都生效</div>
+      <svg viewBox="0 0 1198 150" preserveAspectRatio="xMinYMin meet"><path class="lnp" d="M150 75 H470"/><path class="lnq" d="M470 75 H850"/><circle class="ln-tok" r="10" fill="#a78bfa"/></svg>`;
+    s.querySelectorAll('.ln-l').forEach((l) => l.addEventListener('click', () => { this.auto = false; this.show(s, +l.dataset.i); }));
+  },
+  async show(s, i) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    this.i = i;
+    s.querySelectorAll('.ln-l').forEach((l) => { const on = +l.dataset.i === i; l.classList.toggle('on', on); l.classList.toggle('dim', !on); });
+    const v = s.querySelectorAll('.ln-v')[i], boxes = [...v.querySelectorAll('.ln-box')], tok = v.querySelector('.ln-tok'), arts = [...v.querySelectorAll('.ln-art span')];
+    boxes.forEach((b) => b.classList.remove('lit'));
+    arts.forEach((a) => a.classList.remove('lit'));
+    const P = (c) => v.querySelector(c);
+    if (i === 0) {
+      await U.fly(tok, P('.lnp'), 800, { ctx, alive: ok });
+      if (!ok()) return;
+      boxes[0].classList.add('lit');
+      await U.wait(ctx, 1600);
+      if (!ok()) return;
+      boxes[0].classList.remove('lit');
+      boxes[1].classList.add('lit');
+    } else if (i === 1) {
+      await U.fly(tok, P('.lnp'), 700, { ctx, alive: ok });
+      if (!ok()) return;
+      boxes[0].classList.add('lit');
+      await U.fly(tok, P('.lnq'), 700, { ctx, alive: ok });
+      if (!ok()) return;
+      for (const a of arts) { a.classList.add('lit'); await U.wait(ctx, 260); if (!ok()) return; }
+      await U.fly(tok, P('.lnr'), 900, { ctx, alive: ok });
+      if (!ok()) return;
+      boxes[1].classList.add('lit');
+    } else {
+      boxes[0].classList.add('lit');
+      await U.fly(tok, P('.lnp'), 900, { ctx, alive: ok });
+      if (!ok()) return;
+      boxes[1].classList.add('lit');
+      await U.fly(tok, P('.lnq'), 1000, { ctx, alive: ok });
+      if (!ok()) return;
+      boxes[2].classList.add('lit');
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 4800);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelectorAll('.on,.dim,.lit').forEach((e) => e.classList.remove('on', 'dim', 'lit')); },
+};
+</script>

@@ -1,0 +1,191 @@
+<!-- ================= 开篇 ================= -->
+<script>
+// 本章共用的小工具：跳到某个部分的第一页
+window.C11 = {
+  jump(p) {
+    const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => +x.dataset.part === +p);
+    if (idx >= 0) DECK.go(idx, 0);
+  },
+};
+</script>
+
+<section class="slide" id="c11-cover" data-part="0" data-title="封面" data-notes="这是全书的<b>后记：回到 Agent = LLM + 上下文 + 工具</b>。本书开篇提出了一个公式：Agent = LLM + 上下文 + 工具；全书十章，都在这三个词里展开。后记做三件事：回到这个公式，看十章如何围绕它展开、又如何在第九章汇合；指出今天 Agent 天空上的两朵乌云——流式实时的交互，以及从成功与失败中持续积累经验；最后讨论模型与 Agent 的共同演进：一个自我强化的飞轮，以及“模型会不会最终吃掉 Harness”。<br>右侧外圈的十颗珠子是全书十章，光点不断从各章飞回公式里的三个组件和中心的 Agent（对应关系取自引言的图0-1）。">
+  <div class="c1cv-art fx fx-scale" style="--d:4"></div>
+  <div class="c1cv-text">
+    <div class="c1cv-tag fx fx-up"><i></i>深入理解 AI Agent · 后记</div>
+    <h1 class="c1cv-title"><span class="split">后记</span><span class="split c1cv-t2" data-off="2" data-grad="#a5b4fc,#7dd3fc,#5eead4">回到 Agent = LLM + 上下文 + 工具</span></h1>
+    <p class="c1cv-sub fx fx-up" style="--d:16">全书十章，都在这三个词里展开；<br>两朵乌云；模型与 Agent 的共同演进</p>
+    <div class="c1cv-meta fx fx-up" style="--d:18"><span>《深入理解 AI Agent：设计原理与工程实践》</span><i></i><span>李博杰 著</span><i></i><span>非官方动画版</span></div>
+  </div>
+  <div class="c1cv-hint fx fx-up" style="--d:20"><kbd>→</kbd><kbd>空格</kbd> 下一步<span>·</span><kbd>P</kbd> 自动播放<span>·</span><kbd>N</kbd> 讲解<span>·</span><kbd>O</kbd> 目录<span>·</span><kbd>F</kbd> 全屏</div>
+</section>
+<style>
+#c11-cover{justify-content:center;padding-left:150px}
+.c1cv-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.c1cv-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.c1cv-title{margin-top:30px;font-size:150px;line-height:1.08;font-weight:800;letter-spacing:.04em}
+.c1cv-title .c1cv-t2{font-size:54px;letter-spacing:.01em;margin-top:22px}
+.c1cv-sub{margin-top:32px;font-size:30px;color:var(--text2);line-height:1.6}
+.c1cv-meta{margin-top:40px;display:flex;align-items:center;gap:16px;font-size:21px;color:var(--text3)}
+.c1cv-meta i{width:5px;height:5px;border-radius:50%;background:var(--text3)}
+.c1cv-art{position:absolute;right:120px;top:50%;width:720px;height:720px;margin-top:-372px}
+.c1cv-hint{position:absolute;left:150px;bottom:78px;display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text3)}
+.c1cv-hint span{margin:0 4px}
+.c1cv-svg{width:100%;height:100%;overflow:visible}
+.c1cv-r0{fill:none;stroke:rgba(255,255,255,.1);stroke-width:1.4;stroke-dasharray:2 10;transform-box:fill-box;transform-origin:center;animation:spin 140s linear infinite}
+.c1cv-r1{fill:none;stroke:rgba(255,255,255,.08);stroke-width:1.2}
+.c1cv-ln{stroke:rgba(255,255,255,.18);stroke-width:2;stroke-dasharray:4 7}
+.c1cv-bd circle{fill:#0a1024;stroke:var(--c);stroke-width:2.4}
+.c1cv-bd text{fill:var(--c);font:700 17px var(--num);text-anchor:middle;dominant-baseline:central}
+.c1cv-nd circle.k{fill:rgba(8,12,30,.94);stroke:var(--c);stroke-width:3;transition:fill .3s}
+.c1cv-nd circle.h{fill:var(--c);opacity:0;transform-box:fill-box;transform-origin:center}
+.c1cv-nd.hit circle.h{animation:pulse 1s ease-out}
+.c1cv-nd text{fill:var(--c);font-size:19px;font-weight:700;text-anchor:middle;dominant-baseline:central}
+.c1cv-core circle{fill:#0a1024;stroke:var(--acc);stroke-width:3}
+.c1cv-core text{fill:var(--text);font:800 30px var(--num);text-anchor:middle;dominant-baseline:central}
+.c1cv-core.hit circle{animation:c11coreHit 1s ease-out}
+@keyframes c11coreHit{0%{filter:drop-shadow(0 0 26px #a5b4fc)}100%{filter:drop-shadow(0 0 0 transparent)}}
+.c1cv-sp{opacity:0;filter:drop-shadow(0 0 8px currentColor)}
+.c1cv-lg{fill:var(--text3);font-size:15px;text-anchor:middle;letter-spacing:.1em}
+</style>
+<script>
+HOOKS['c11-cover'] = {
+  // 各章光点飞回的位置：取自引言图0-1 的对应关系（-1 表示中心的 Agent）
+  MAP: [-1, 1, 1, 2, 2, -1, 0, 0, -1, -1],
+  NODES: [['LLM', '#a78bfa', -90], ['上下文', '#22d3ee', 150], ['工具', '#fbbf24', 30]],
+  init(s) {
+    const c = 360, f = (n) => n.toFixed(1), P = (a, r) => [c + r * Math.cos((a * Math.PI) / 180), c + r * Math.sin((a * Math.PI) / 180)];
+    let h = `<svg class="c1cv-svg" viewBox="0 0 720 720" width="720" height="720"><circle class="c1cv-r0" cx="${c}" cy="${c}" r="338"/><circle class="c1cv-r1" cx="${c}" cy="${c}" r="290"/>`;
+    this.NODES.forEach(([, , a]) => { const [x, y] = P(a, 150); h += `<line class="c1cv-ln" x1="${c}" y1="${c}" x2="${f(x)}" y2="${f(y)}"/>`; });
+    for (let i = 0; i < 10; i++) h += `<g class="c1cv-bd" style="--c:${i < 6 ? '#22d3ee' : '#a78bfa'}"><circle r="22"/><text>${String(i + 1).padStart(2, '0')}</text></g>`;
+    h += `<g class="c1cv-core"><circle cx="${c}" cy="${c}" r="72"/><text x="${c}" y="${c}">Agent</text></g>`;
+    this.NODES.forEach(([t, col, a]) => { const [x, y] = P(a, 150); h += `<g class="c1cv-nd" style="--c:${col}" transform="translate(${f(x)} ${f(y)})"><circle class="h" r="44"/><circle class="k" r="44"/><text>${t}</text></g>`; });
+    for (let i = 0; i < 5; i++) h += `<circle class="c1cv-sp" r="7"/>`;
+    h += `<text class="c1cv-lg" x="${c}" y="752">外圈：全书十章　内圈：公式的三个组件</text>`;
+    s.querySelector('.c1cv-art').innerHTML = h + '</svg>';
+    this.bds = [...s.querySelectorAll('.c1cv-bd')];
+    this.nds = [...s.querySelectorAll('.c1cv-nd')];
+    this.core = s.querySelector('.c1cv-core');
+    this.sps = [...s.querySelectorAll('.c1cv-sp')].map((el) => ({ el, on: false }));
+    this.P = P;
+  },
+  enter(s, ctx) {
+    let t0 = null, next = 0, ci = 0;
+    ctx.raf((t) => {
+      if (t0 === null) t0 = t;
+      const e = (t - t0) / 1000, rot = e * 5;
+      const pos = this.bds.map((b, i) => { const [x, y] = this.P(-90 + i * 36 + rot, 290); b.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`); return [x, y]; });
+      // 每隔一会儿，从下一章发出一个光点，飞回它对应的组件
+      if (t > next) {
+        next = t + 650;
+        const sp = this.sps.find((p) => !p.on);
+        if (sp) {
+          const i = ci++ % 10, m = this.MAP[i], to = m < 0 ? [360, 360] : this.P(this.NODES[m][2], 150), col = m < 0 ? '#c7d2fe' : this.NODES[m][1];
+          Object.assign(sp, { on: true, t0: t, from: pos[i], to, m, col });
+          sp.el.style.fill = col; sp.el.style.color = col;
+        }
+      }
+      this.sps.forEach((p) => {
+        if (!p.on) return;
+        const u = Math.min(1, (t - p.t0) / 1100), k = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+        p.el.setAttribute('cx', (p.from[0] + (p.to[0] - p.from[0]) * k).toFixed(1));
+        p.el.setAttribute('cy', (p.from[1] + (p.to[1] - p.from[1]) * k).toFixed(1));
+        p.el.style.opacity = u < 0.1 ? u * 10 : u > 0.9 ? (1 - u) * 10 : 1;
+        if (u >= 1) {
+          p.on = false;
+          p.el.style.opacity = 0;
+          const tgt = p.m < 0 ? this.core : this.nds[p.m];
+          U.restart(tgt, 'hit');
+        }
+      });
+    });
+  },
+  reset() { this.sps.forEach((p) => { p.on = false; p.el.style.opacity = 0; }); },
+};
+</script>
+
+<section class="slide" id="c11-map" data-part="0" data-title="后记导览" data-notes="后记分三段，最后是收束：<br>① <b>回到公式</b>：全书十章都在 Agent = LLM + 上下文 + 工具这三个词里展开——第一章建立公式的三层理解和编排光谱，随后沿“构建—评估与进化—协作”逐步展开；这三个层次不是相互独立的书架，第九章是全书从“怎样构建 Agent”转向“怎样让 Agent 长期变好”的汇合点。<br>② <b>两朵乌云</b>：Agent 如何流式地、实时地与环境交互；Agent 如何像人一样，从与环境交互的成功与失败中持续积累经验。<br>③ <b>模型与 Agent 的共同演进</b>：两朵乌云都不是靠某一次模型升级就能凭空吹散的；模型和 Agent 从来不是上下游，而是一起往前走的——一个自我强化的飞轮、一层层被吃却吃不完的 Harness、以及飞轮带来的护城河。<br>④ <b>收束</b>：“看到什么、能做什么、如何验证做得对不对”这三个问题不会过时；接下来，去造点什么吧。<br>四站会自动轮流高亮，点击任一站直接跳到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">后记<em>导览</em></h2>
+  <p class="lead fx fx-up" style="--d:2">从公式出发，看清天空上的两朵乌云，再看模型与 Agent 如何一起往前走</p></header>
+  <div class="mp1-stage fx fx-scale" style="--d:3">
+    <svg class="mp1-svg" viewBox="0 0 1660 600" width="1660" height="600">
+      <defs>
+        <radialGradient id="mp1-sun"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#c4b5fd"/><stop offset="1" stop-color="#c4b5fd" stop-opacity="0"/></radialGradient>
+        <linearGradient id="mp1-hz" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc" stop-opacity=".18"/><stop offset="1" stop-color="#7dd3fc" stop-opacity="0"/></linearGradient>
+        <linearGradient id="mp1-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#94a3b8"/><stop offset="1" stop-color="#475569"/></linearGradient>
+      </defs>
+      <rect x="0" y="360" width="1660" height="80" fill="url(#mp1-hz)"/>
+      <path id="mp1-p" class="mp1-route" d="M210 230 C 400 120, 520 330, 690 230 S 980 140, 1110 230 S 1360 320, 1470 220"/>
+      <circle class="mp1-comet" r="7"><animateMotion dur="9s" repeatCount="indefinite"><mpath href="#mp1-p"/></animateMotion></circle>
+      <g class="mp1-st" data-s="0"><circle cx="210" cy="230" r="120" fill="url(#mp1-sun)" class="mp1-glow"/><circle cx="210" cy="230" r="52" class="mp1-sun"/>
+        <g class="mp1-orb"><circle cx="210" cy="140" r="11" fill="#a78bfa"/><circle cx="288" cy="275" r="11" fill="#fbbf24"/><circle cx="132" cy="275" r="11" fill="#22d3ee"/></g>
+        <text x="210" y="230" class="mp1-t">公式</text></g>
+      <g class="mp1-st" data-s="1"><g class="mp1-cloud c1"><circle cx="610" cy="210" r="42"/><circle cx="650" cy="186" r="50"/><circle cx="700" cy="206" r="40"/><rect x="580" y="206" width="150" height="40" rx="20"/></g>
+        <g class="mp1-cloud c2"><circle cx="740" cy="282" r="34"/><circle cx="772" cy="262" r="42"/><circle cx="812" cy="280" r="32"/><rect x="716" y="278" width="122" height="32" rx="16"/></g></g>
+      <g class="mp1-st" data-s="2"><g class="mp1-fw"><circle cx="1110" cy="230" r="64" class="mp1-ring"/>
+        <path d="M1110 166 A64 64 0 0 1 1174 230" class="mp1-arc"/><path d="M1174 230 A64 64 0 0 1 1110 294" class="mp1-arc"/><path d="M1110 294 A64 64 0 0 1 1046 230" class="mp1-arc"/><path d="M1046 230 A64 64 0 0 1 1110 166" class="mp1-arc"/></g>
+        <text x="1110" y="232" class="mp1-t s">飞轮</text></g>
+      <g class="mp1-st" data-s="3"><circle cx="1470" cy="220" r="62" class="mp1-go"/><use href="#i-rocket" x="1436" y="186" width="68" height="68" class="mp1-rk"/></g>
+    </svg>
+    <div class="mp1-cards"></div>
+  </div>
+  <div class="src">后记：回到 Agent = LLM + 上下文 + 工具 · 全篇导览</div>
+</section>
+<style>
+.mp1-stage{position:relative;width:1660px;height:600px}
+.mp1-svg{position:absolute;inset:0;overflow:visible}
+.mp1-route{fill:none;stroke:rgba(255,255,255,.22);stroke-width:2.5;stroke-dasharray:6 10;animation:flow 1.6s linear infinite}
+.mp1-comet{fill:#fff;filter:drop-shadow(0 0 10px #fff)}
+.mp1-glow{opacity:.5}
+.mp1-sun{fill:#0a1024;stroke:#c4b5fd;stroke-width:3}
+.mp1-orb{transform-box:view-box;transform-origin:210px 230px;animation:spin 14s linear infinite}
+.mp1-t{fill:var(--text);font-size:24px;font-weight:800;text-anchor:middle;dominant-baseline:central}
+.mp1-t.s{font-size:22px}
+.mp1-cloud{fill:url(#mp1-cl);opacity:.85}
+.mp1-cloud.c1{animation:c11drift 7s ease-in-out infinite alternate}
+.mp1-cloud.c2{animation:c11drift 9s ease-in-out infinite alternate-reverse;opacity:.7}
+@keyframes c11drift{to{transform:translateX(18px)}}
+.mp1-ring{fill:none;stroke:rgba(94,234,212,.25);stroke-width:14}
+.mp1-arc{fill:none;stroke:#5eead4;stroke-width:5;stroke-linecap:round;stroke-dasharray:70 40}
+.mp1-fw{transform-box:view-box;transform-origin:1110px 230px;animation:spin 6s linear infinite}
+.mp1-go{fill:rgba(125,211,252,.1);stroke:#7dd3fc;stroke-width:2.5;stroke-dasharray:4 6}
+.mp1-rk{color:#7dd3fc;stroke:#7dd3fc;fill:none;stroke-width:1.6;animation:floaty 3s ease-in-out infinite}
+.mp1-st{transition:opacity .5s,filter .5s}
+.mp1-st.dim{opacity:.45}
+.mp1-st.on{filter:drop-shadow(0 0 14px rgba(255,255,255,.35))}
+.mp1-cards{position:absolute;left:0;right:0;top:390px}
+.mp1-c{--c:var(--acc);position:absolute;width:310px;margin-left:-155px;padding:18px 20px;border-radius:18px;text-align:center;cursor:pointer;border:1px solid var(--line);background:rgba(10,16,36,.82);transition:border-color .45s,box-shadow .45s,translate .45s var(--ease)}
+.mp1-c em{display:block;font:700 15px var(--num);font-style:normal;letter-spacing:.3em;color:var(--c)}
+.mp1-c b{display:block;font-size:25px;margin-top:6px}
+.mp1-c p{font-size:17px;line-height:1.5;color:var(--text2);margin-top:6px}
+.mp1-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 0 40px -6px color-mix(in srgb,var(--c) 60%,transparent);translate:0 -8px}
+</style>
+<script>
+HOOKS['c11-map'] = {
+  S: [
+    { x: 210, p: 1, c: '#c4b5fd', k: 'PART 01', b: '回到公式', d: '十章都在三个词里展开；第九章是汇合点' },
+    { x: 700, p: 2, c: '#cbd5e1', k: 'PART 02', b: '两朵乌云', d: '流式实时地交互；从成功与失败中积累经验' },
+    { x: 1110, p: 3, c: '#5eead4', k: 'PART 03', b: '模型与 Agent 的共同演进', d: '飞轮 · 一层层吃掉 Harness · 护城河' },
+    { x: 1470, p: 4, c: '#7dd3fc', k: 'CLOSING', b: '去造点什么吧', d: '三个问题不会过时' },
+  ],
+  init(s) {
+    s.querySelector('.mp1-cards').innerHTML = this.S.map((t, i) => `<div class="mp1-c" data-i="${i}" style="left:${t.x}px;--c:${t.c}"><em>${t.k}</em><b>${t.b}</b><p>${t.d}</p></div>`).join('');
+    s.querySelectorAll('.mp1-c').forEach((c) => {
+      c.addEventListener('click', () => C11.jump(this.S[+c.dataset.i].p));
+      c.addEventListener('mouseenter', () => { this.auto = false; this.show(s, +c.dataset.i); });
+    });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.mp1-c').forEach((c, j) => c.classList.toggle('on', j === i));
+    s.querySelectorAll('.mp1-st').forEach((g, j) => { g.classList.toggle('on', j === i); g.classList.toggle('dim', j !== i); });
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.i = -1;
+    ctx.later(() => this.auto && this.show(s, 0), 1200);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 2800);
+  },
+  reset(s) { s.querySelectorAll('.mp1-c,.mp1-st').forEach((c) => c.classList.remove('on', 'dim')); },
+};
+</script>

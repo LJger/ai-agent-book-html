@@ -1,0 +1,399 @@
+<!-- ================= 第 3 部分分隔页 ================= -->
+<section class="slide chapter" id="c08-d3" data-part="3" data-title="PART 03 · 预训练基础与 Mid-training" data-notes="「模型预训练基础」（原书标注可选阅读）与「Mid-training：补知识与基础能力」。要理解后续训练技术为什么有效，需要先明白预训练建立了什么：<b>SFT 与 RL 本质上是在基础模型已有的表征空间内进行优化——预训练奠定的知识结构决定了后续阶段的上限</b>。这一部分先看下一个 token 预测（图8-8）和两个辅助实验：从头训练 MiniMind（实验 8-3）、自己训练 VLM（实验 8-4，图8-9）；再讲 Mid-training 解决的两类缺口、数据如何构造、长上下文基础能力的检验，以及实验 8-5 用继续预训练让 Mistral 7B 学韩语。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:88px">预训练基础与 Mid-training</h1>
+  <div class="ch-s fx fx-up" style="--d:3">底座里没有的东西，SFT 和 RL 都补不出来</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">预训练奠定的知识结构决定了后续阶段的上限。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<!-- ================= 图8-8 ================= -->
+<section class="slide" id="c08-fig88" data-part="3" data-trans="zoom" data-dur="24000" data-title="图8-8 预训练的下一个 Token 预测" data-notes="语言模型训练一般遵循“<b>词元化 — 预训练（含按需 Mid-training）— 后训练</b>”的流程。词元化（Tokenization）将文本切分为离散单元，比如“我喜欢编程”可能被切分为“我”“喜欢”“编程”三个 token——这些 token 就是模型处理文本的最小单位。预训练的任务在概念上很简单：给模型看一段文本的前半部分，让它预测下一个 token 是什么。模型通过比较自己的预测与正确答案的差距（这个差距叫作损失（Loss），损失越小说明预测越准），不断调整自身参数。在海量文本上反复训练后，模型逐渐学会了语言规律、世界知识与基本推理能力。预训练完成后，模型能生成流畅文本，但输出缺乏结构、难以遵循指令。后训练通过 SFT（用标注好的输入—输出对训练）与偏好优化（如 DPO，让模型学会生成人类更偏好的回答）将其转化为实用助手。<br>图8-8：输入“Agent 需要在真实环境中执行任务”，在“在”之后，模型给出概率分布 P(x_t | x_&lt;t)：中 42%、里 28%、下 15%、其他 15%；损失 = −Σ log P(x_t | x_1…x_{t−1})，最小化交叉熵。看似简单的目标驱动模型学习：语言规律 → 世界知识 → 基本推理。<br>动画中扫描线逐个位置预测，右侧累加每一步的 −log p（除图中这一位置外，其余位置的概率为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-8 看似简单的目标：<em>猜下一个 token</em></h2></header>
+  <div class="c8f8-flow fx fx-up" style="--d:2"><span class="on">词元化</span><i></i><span class="on">预训练<small>含按需 Mid-training</small></span><i></i><span>后训练<small>SFT + 偏好优化（如 DPO）</small></span><em>“我喜欢编程” → <b>我</b> | <b>喜欢</b> | <b>编程</b></em></div>
+  <div class="c8f8-body">
+    <div class="c8f8-l panel fx fx-left" style="--d:3">
+      <div class="c8f8-toks"></div>
+      <div class="c8f8-dist"><span class="lbl">P(x<sub style="font-size:14px">t</sub> | x<sub style="font-size:14px">&lt;t</sub>)</span><div class="c8f8-bars"></div></div>
+    </div>
+    <div class="c8f8-r fx fx-right" style="--d:4">
+      <div class="c8f8-loss"><span class="c8-m">损失 = −Σ log <i>P</i>(<i>x<sub>t</sub></i> | <i>x</i><sub>1</sub>…<i>x</i><sub><i>t</i>−1</sub>)</span><b class="c8f8-lv">0.00</b><small>最小化交叉熵 · 除“在 → 中”外为示意值</small></div>
+      <div class="c8f8-gain"><span>语言规律</span><i></i><span>世界知识</span><i></i><span>基本推理</span></div>
+      <p class="c8f8-nt">预训练之后：能生成流畅文本，但<b>缺乏结构、难以遵循指令</b>——后训练把它转化为实用助手</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「模型预训练基础 [可选阅读]」· 图8-8 预训练的下一个 Token 预测</div>
+</section>
+<style>
+.c8f8-flow{display:flex;align-items:center;gap:10px}
+.c8f8-flow span{display:flex;flex-direction:column;font-size:18px;font-weight:700;padding:8px 16px;border-radius:12px;border:1px solid var(--line2)}
+.c8f8-flow span.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.c8f8-flow small{font-size:15px;font-weight:400;color:var(--text3)}
+.c8f8-flow i{width:36px;height:2px;background:var(--acc)}
+.c8f8-flow em{margin-left:auto;font-style:normal;font-size:17px;color:var(--text2)}.c8f8-flow em b{color:var(--acc);padding:0 4px}
+.c8f8-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0;margin-top:16px}
+.c8f8-l{padding:18px 22px;display:flex;flex-direction:column;gap:20px}
+.c8f8-toks{display:flex;gap:6px;flex-wrap:wrap}
+.c8f8-toks span{font-size:24px;font-weight:700;padding:8px 14px;border-radius:10px;border:1px solid var(--line);opacity:.3;transition:all .3s}
+.c8f8-toks span.seen{opacity:1}
+.c8f8-toks span.cur{border-color:var(--warn);color:var(--warn);opacity:1;box-shadow:0 0 18px rgba(251,191,36,.3)}
+.c8f8-dist{display:flex;flex-direction:column;gap:10px}
+.c8f8-bars{display:flex;flex-direction:column;gap:8px}
+.c8f8-bars div{display:grid;grid-template-columns:70px 1fr 70px;gap:12px;align-items:center;font-size:20px}
+.c8f8-bars i{height:30px;border-radius:7px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c8f8-bars i::after{content:"";position:absolute;inset:0;width:var(--v);background:color-mix(in srgb,var(--acc) 70%,transparent);transition:width .5s var(--ease)}
+.c8f8-bars div.ok i::after{background:#34d399}
+.c8f8-bars b{font:700 18px var(--num);text-align:right}
+.c8f8-r{display:flex;flex-direction:column;gap:14px}
+.c8f8-loss{display:flex;flex-direction:column;gap:6px;padding:18px 20px;border-radius:18px;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent)}
+.c8f8-loss .c8-m{font-size:24px}.c8f8-loss b{font:800 48px var(--num);color:var(--acc)}.c8f8-loss small{font-size:15px;color:var(--text3)}
+.c8f8-gain{display:flex;align-items:center;gap:8px}
+.c8f8-gain span{font-size:17px;padding:8px 14px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c8f8-gain i{flex:1;height:2px;background:var(--acc)}
+.c8f8-nt{font-size:17px;line-height:1.6;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8f8-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-fig88'] = {
+  T: ['Agent', '需要', '在', '真实', '环境', '中', '执行', '任务'],
+  // 预测第 i+1 个 token 时的分布（第 3 个位置“在 → ?”取图8-8 数据，其余为示意）
+  D: [[['需要', 0.31], ['可以', 0.22], ['会', 0.12]], [['在', 0.18], ['理解', 0.15], ['调用', 0.1]], [['真实', 0.12], ['多个', 0.08], ['复杂', 0.07]], [['环境', 0.55], ['世界', 0.21], ['场景', 0.09]], [['中', 0.42], ['里', 0.28], ['下', 0.15]], [['执行', 0.24], ['完成', 0.2], ['运行', 0.11]], [['任务', 0.61], ['操作', 0.12], ['命令', 0.07]]],
+  init(s) { s.querySelector('.c8f8-toks').innerHTML = this.T.map((t) => `<span>${t}</span>`).join(''); },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, ts = s.querySelectorAll('.c8f8-toks span'), bars = s.querySelector('.c8f8-bars'), lv = s.querySelector('.c8f8-lv');
+    while (ok()) {
+      let L = 0; lv.textContent = '0.00';
+      ts.forEach((t) => t.classList.remove('seen', 'cur')); ts[0].classList.add('seen');
+      for (let i = 0; i < this.D.length; i++) {
+        const d = this.D[i], rest = 1 - d.reduce((a, b) => a + b[1], 0), gold = this.T[i + 1];
+        ts.forEach((t, j) => t.classList.toggle('cur', j === i + 1));
+        bars.innerHTML = d.concat([['…', rest]]).map(([w, p]) => `<div class="${w === gold ? 'ok' : ''}"><span>${w}</span><i style="--v:0%"></i><b>${Math.round(p * 100)}%</b></div>`).join('');
+        requestAnimationFrame(() => bars.querySelectorAll('i').forEach((x, j) => (x.style.setProperty('--v', (d.concat([['', rest]])[j][1] * 100) + '%'))));
+        await U.wait(ctx, i === 4 ? 2600 : 1400); if (!ok()) return;
+        const p = d.find(([w]) => w === gold)[1]; L += -Math.log(p); lv.textContent = L.toFixed(2);
+        ts[i + 1].classList.remove('cur'); ts[i + 1].classList.add('seen');
+      }
+      await U.wait(ctx, 2500);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 实验 8-3 ================= -->
+<section class="slide" id="c08-exp83" data-part="3" data-trans="rise" data-dur="26000" data-title="实验 8-3 ★★：从头训练 LLM——算法改进的威力" data-notes="<b>实验 8-3 ★★：从头训练 LLM——算法改进的威力。</b>以 MiniMind 2（一亿参数）为案例，在消费级 GPU 上完成完整训练流程。通过引入两项算法优化（QK Norm 和 Muon 优化器），收敛速度提升 3 倍，生成质量显著改善——实现成本极低，总训练约 14 小时，成本约 34 美元。<br>各训练阶段的效果：预训练后模型可以回答“世界上最高的山峰”等事实性问题，但格式不规范；SFT 后指令遵循与输出格式显著改善，能按期望方式组织答案；偏好优化进一步减少了事实错误与不自然表达。一亿参数的模型仍有明显局限（复杂问题容易出错），但启示是：<b>在固定的小规模预算下，算法改进比单纯堆规模更具性价比</b>。<br>配套仓库：loss 降到 3.0 的步数从 36 降到 12、最终 loss 2.0 → 1.7 是作者报告值（历史逐步日志未保存，审计未独立复算），左侧曲线据此画成示意；8 卡 × 14 小时 × $0.3/小时 = $33.6。2026-07-31 的独立盲评：原版 2.0417、QK Norm + Muon 3.6250（+1.5833），八组配对 7 胜 1 平；流畅度 3.00 → 3.75、指令遵循 1.75 → 3.00、事实性 1.375 → 4.125。右下是仓库保留的“世界上最高的山峰是”的真实输出。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-3 <span class="c8-star">★★</span>：一亿参数，<em>14 小时、约 34 美元</em></h2></header>
+  <div class="c8e3-body">
+    <div class="c8e3-l panel fx fx-left" style="--d:2"><span class="c8-sx">按作者报告值画的示意曲线</span>
+      <b class="c8e3-k">QK Norm + Muon：loss 到 3.0 由 36 降到 12 steps</b>
+      <svg class="c8e3-svg" viewBox="0 0 760 330"></svg>
+      <div class="c8e3-lg"><span class="o"><i></i>原版（最终 loss ≈ 2.0）</span><span class="n"><i></i>QK Norm + Muon（≈ 1.7）</span></div>
+    </div>
+    <div class="c8e3-r fx fx-right" style="--d:3">
+      <div class="c8-card c8e3-bl"><b class="c8e3-k">配套仓库独立盲评（0–5 分）</b><div class="c8e3-rows"></div><p>总分 <b>2.0417 → 3.6250（+1.5833）</b>，八组配对 7 胜 1 平</p></div>
+      <div class="c8e3-st"><span data-i="0"><b>预训练</b>能回答事实问题，格式不规范</span><span data-i="1"><b>SFT</b>指令遵循与格式显著改善</span><span data-i="2"><b>偏好优化</b>减少事实错误与不自然表达</span></div>
+      <div class="c8e3-out"><span class="lbl">保留输出 · “世界上最高的山峰是”</span><p>珠穆朗玛峰，位于喜马拉雅山脉中，海拔8848米。……</p></div>
+      <p class="c8-data">chapter8/MiniMind-pretrain 与 validation/runs/exp8-3-training-report-20260731-v1；成本 8 卡 × 14 小时 × $0.3 = $33.6</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「模型预训练基础」· 实验 8-3</div>
+</section>
+<style>
+.c8e3-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8e3-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:8px}
+.c8e3-k{display:block;font-size:17px;color:var(--acc)}
+.c8e3-svg{width:100%;height:330px}
+.c8e3-svg .ax{stroke:var(--line2)}.c8e3-svg text{fill:var(--text3);font-size:15px}
+.c8e3-svg .o{fill:none;stroke:#94a3b8;stroke-width:3.5}.c8e3-svg .n{fill:none;stroke:var(--acc);stroke-width:3.5}
+.c8e3-svg .th{stroke:var(--warn);stroke-dasharray:6 6}
+.c8e3-lg{display:flex;gap:16px}.c8e3-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c8e3-lg i{width:18px;height:4px}.c8e3-lg .o i{background:#94a3b8}.c8e3-lg .n i{background:var(--acc)}
+.c8e3-r{display:flex;flex-direction:column;gap:10px}
+.c8e3-rows{display:flex;flex-direction:column;gap:6px}
+.c8e3-rows div{display:grid;grid-template-columns:90px 1fr 120px;gap:10px;align-items:center;font-size:15px}
+.c8e3-rows i{position:relative;height:22px;border-radius:5px;background:rgba(255,255,255,.04)}
+.c8e3-rows i em,.c8e3-rows i u{position:absolute;left:0;height:9px;border-radius:3px;transition:width 1s var(--ease)}
+.c8e3-rows i em{top:2px;background:#94a3b8}.c8e3-rows i u{bottom:2px;background:var(--acc)}
+.c8e3-rows b{font:15px var(--num);text-align:right}
+.c8e3-bl p{font-size:15px;color:var(--text2);margin-top:8px}.c8e3-bl p b{color:var(--text)}
+.c8e3-st{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.c8e3-st span{display:flex;flex-direction:column;font-size:15px;line-height:1.4;color:var(--text2);padding:8px 10px;border-radius:10px;border:1px solid var(--line);transition:border-color .3s,background .3s}
+.c8e3-st span.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+.c8e3-st b{font-size:16px;color:var(--text)}
+.c8e3-out{padding:10px 14px;border-radius:12px;background:rgba(0,0,0,.25)}
+.c8e3-out p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:4px}
+</style>
+<script>
+HOOKS['c08-exp83'] = {
+  R: [['流畅度', 3.0, 3.75], ['指令遵循', 1.75, 3.0], ['事实性', 1.375, 4.125], ['总分', 2.0417, 3.625]],
+  init(s) {
+    const svg = s.querySelector('.c8e3-svg'), S = C7S, X = (st) => 50 + (st / 60) * 690, Y = (l) => 300 - ((l - 1.5) / 6) * 280;
+    S('line', { x1: 50, y1: 300, x2: 740, y2: 300, class: 'ax' }, svg); S('line', { x1: 50, y1: 300, x2: 50, y2: 10, class: 'ax' }, svg);
+    S('line', { x1: 50, y1: Y(3), x2: 740, y2: Y(3), class: 'th' }, svg);
+    const t = S('text', { x: 56, y: Y(3) - 8 }, svg); t.textContent = 'loss = 3.0';
+    const cv = (k, f) => Array.from({ length: 61 }, (_, st) => `${X(st).toFixed(1)},${Y(f(st)).toFixed(1)}`).join(' L');
+    // 两条示意曲线：分别在 36 / 12 步到达 3.0，终点约 2.0 / 1.7
+    const o = (st) => 2.0 + 5.2 * Math.exp(-st / 24.6), n = (st) => 1.7 + 5.5 * Math.exp(-st / 8.1);
+    this.po = S('path', { d: 'M' + cv('o', o), class: 'o' }, svg); this.pn = S('path', { d: 'M' + cv('n', n), class: 'n' }, svg);
+    [[36, '36'], [12, '12']].forEach(([st, l]) => { const tt = S('text', { x: X(st) - 8, y: Y(3) + 26 }, svg); tt.textContent = l; S('circle', { cx: X(st), cy: Y(3), r: 6, fill: '#fbbf24' }, svg); });
+    const xl = S('text', { x: 690, y: 322 }, svg); xl.textContent = 'step';
+    s.querySelector('.c8e3-rows').innerHTML = this.R.map(([n, a, b]) => `<div><span>${n}</span><i><em style="width:0"></em><u style="width:0"></u></i><b>${a.toFixed(2)} → ${b.toFixed(2)}</b></div>`).join('');
+    [this.po, this.pn].forEach((p) => { p.style.strokeDasharray = 1200; p.style.strokeDashoffset = 1200; });
+  },
+  enter(s, ctx) {
+    [this.po, this.pn].forEach((p, j) => { p.style.transition = `stroke-dashoffset 2s ${0.3 + j * 0.3}s`; requestAnimationFrame(() => (p.style.strokeDashoffset = 0)); });
+    ctx.later(() => s.querySelectorAll('.c8e3-rows div').forEach((d, i) => { d.querySelector('em').style.width = (this.R[i][1] / 5) * 100 + '%'; d.querySelector('u').style.width = (this.R[i][2] / 5) * 100 + '%'; }), 700);
+    let k = 0; const st = s.querySelectorAll('.c8e3-st span');
+    ctx.every(() => { st.forEach((x, j) => x.classList.toggle('on', j === k)); k = (k + 1) % 3; }, 2400);
+  },
+  reset(s) { [this.po, this.pn].forEach((p) => { p.style.transition = 'none'; p.style.strokeDashoffset = 1200; }); s.querySelectorAll('.c8e3-rows em,.c8e3-rows u').forEach((x) => (x.style.width = 0)); },
+};
+</script>
+
+<!-- ================= 实验 8-4 ================= -->
+<section class="slide" id="c08-exp84" data-part="3" data-steps="1" data-trans="flip" data-dur="14000" data-title="实验 8-4 ★★：自己训练 VLM · 图8-9" data-notes="<b>实验 8-4 ★★：自己训练 VLM。</b>VLM 将视觉感知与语言理解统一在一个模型中，核心挑战在于<b>跨模态对齐</b>——让“看到的”和“说出来的”对应起来。架构由三个组件构成：<b>视觉编码器</b>（如 CLIP，参数固定）提取图像的语义特征；<b>投影层</b>（轻量级，唯一从头训练的部分）充当视觉特征与语言模型之间的“翻译官”，将视觉特征映射到语言模型能理解的表示空间；<b>语言模型</b>生成描述文本。训练采用“冻结 LLM + 只训练投影层”的策略，以避免灾难性遗忘（Catastrophic Forgetting，即学了新技能后把旧技能忘了）；预训练对齐后再解冻 LLM，用高质量图像-描述对做 SFT，描述的详细程度与准确性显著改善。<br>本实验揭示了多模态模型训练的基本范式：复用单模态预训练成果，通过训练一个轻量投影层实现跨模态对齐——高效且可扩展，但<b>投影层的表达能力有限，可能成为跨模态深层理解的瓶颈</b>。同样的“视觉编码器 + 投影层 + LLM”骨架再向前延伸一步、让模型输出动作，就是第六章介绍的 VLA 模型。<br>图8-9：CLIP ViT 输入 224×224 图像，输出 196 个视觉 token、维度 768；投影层 Linear(768, 512)，约 400K 参数；语言模型 MiniMind 100M，hidden_dim = 512，SFT 阶段解冻。<br>两个预训练实验共同揭示了一个规律：<b>在预算受限时，算法改进与架构创新比单纯扩大规模更具性价比</b>。更重要的是，预训练赋予模型的是描述性知识与语言建模能力，缺乏结构化的指令遵循和任务导向行为。可是，如果通用预训练本身没有覆盖目标语言或领域，直接进入 SFT/RL 也无法绕过这个缺口——这正是 Mid-training 要解决的问题。<br>配套仓库的盲评是一个负结果：原版 SFT 得分最高（1.9062/5），同样换成 QK-Norm + Muon 的版本，在只训练投影层后低 0.1876、完整 VLM SFT 后低 0.6250；两项改动一起变化，无法拆开归因。按 → 切到 SFT 阶段（解冻 LLM）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">图8-9 视觉编码器 + <em>投影层</em> + 语言模型</h2></header>
+  <div class="c8e4-arch fx fx-up" style="--d:2">
+    <div class="c8e4-b img"><span class="lbl">输入图像</span><b>瀑布 / 城市 / 自然</b><small>224 × 224</small></div><i></i>
+    <div class="c8e4-b fz"><span class="lbl">视觉编码器</span><b>CLIP ViT</b><small>参数固定（不训练）</small><small>196 个视觉 token · 768 维</small><em class="lk">冻结</em></div><i></i>
+    <div class="c8e4-b tr"><span class="lbl">投影层</span><b>Linear(768, 512)</b><small>唯一从头训练 · 约 400K 参数</small><em class="lk">训练</em></div><i></i>
+    <div class="c8e4-b lm"><span class="lbl">语言模型</span><b>MiniMind 100M</b><small>hidden_dim = 512</small><em class="lk c8e4-lm">冻结</em></div><i></i>
+    <div class="c8e4-b out"><span class="lbl">输出描述</span><b>“巨大的瀑布旁悬挂着彩虹”</b></div>
+  </div>
+  <div class="c8e4-ph fx fx-up" style="--d:3"><span class="a">阶段一：冻结 LLM，只训练投影层 → 跨模态对齐，避免灾难性遗忘</span><span class="b" data-step="1">阶段二：解冻 LLM，用高质量图像—描述对做 SFT → 描述更详细、更准确</span></div>
+  <div class="c8e4-ft fx fx-up" style="--d:4">
+    <div class="c8-card"><b>范式与瓶颈</b><p>复用单模态预训练成果，只训一个轻量投影层——高效可扩展，但<b>投影层表达能力有限</b>，可能成为深层理解的瓶颈。再让模型输出动作，就是第六章的 VLA</p></div>
+    <div class="c8-card c8e4-neg"><b>配套仓库盲评：负结果</b><p>原版 SFT 最高 <b>1.9062 / 5</b>；QK-Norm + Muon 版在只训投影层后低 0.1876，完整 SFT 后低 <b>0.6250</b>——两项改动一起变化，无法拆开归因</p></div>
+  </div>
+  <div class="src">第八章 ·「模型预训练基础」· 实验 8-4 · 图8-9 视觉语言模型（VLM）架构</div>
+</section>
+<style>
+.c8e4-arch{display:flex;align-items:stretch;gap:8px}
+.c8e4-arch>i{width:30px;align-self:center;height:3px;background:linear-gradient(90deg,var(--acc),transparent);animation:c8e4F 1.4s linear infinite}
+@keyframes c8e4F{0%{background-position:0}100%{background-position:30px}}
+.c8e4-b{position:relative;flex:1;display:flex;flex-direction:column;gap:4px;padding:16px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.8)}
+.c8e4-b b{font-size:19px}.c8e4-b small{font-size:15px;color:var(--text3)}
+.c8e4-b .lk{position:absolute;top:10px;right:10px;font-style:normal;font-size:15px;padding:2px 9px;border-radius:7px;border:1px solid var(--line2);color:var(--text3)}
+.c8e4-b.tr{border-color:var(--warn);box-shadow:0 0 26px rgba(251,191,36,.18)}.c8e4-b.tr .lk{color:var(--warn);border-color:var(--warn)}
+#c08-exp84.k1 .c8e4-b.lm{border-color:var(--warn)}#c08-exp84.k1 .c8e4-lm{color:var(--warn);border-color:var(--warn)}
+.c8e4-ph{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.c8e4-ph span{font-size:17px;padding:12px 16px;border-radius:12px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+.c8e4-ft{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}
+.c8e4-ft b{font-size:17px;color:var(--acc)}.c8e4-ft p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c8e4-ft p b{font-size:15px;color:var(--text)}
+.c8e4-neg{border-color:rgba(251,113,133,.45)}.c8e4-neg>b{color:#fda4af}
+</style>
+<script>
+HOOKS['c08-exp84'] = {
+  step(s, ctx, k) { s.classList.toggle('k1', k >= 1); s.querySelector('.c8e4-lm').textContent = k >= 1 ? '解冻' : '冻结'; },
+  enter(s, ctx, k) { this.step(s, ctx, k); },
+  reset(s) { s.classList.remove('k1'); s.querySelector('.c8e4-lm').textContent = '冻结'; },
+};
+</script>
+
+<!-- ================= Mid-training 两类缺口 ================= -->
+<section class="slide" id="c08-gaps" data-part="3" data-trans="iris" data-dur="22000" data-title="Mid-training：补知识与基础能力" data-notes="本章所说的 <b>Mid-training</b>，是指从已有基础模型出发，在目标数据分布上继续开展一个阶段的语言模型训练。它通常仍采用与预训练相同的预测下一个词任务，对文档、代码或推导的全部 token 计算损失。经典的 DAPT/TAPT 研究已经表明，在领域语料或任务相关的无标注语料上做第二阶段预训练，可以继续改善下游任务表现。名称里的“Mid”描述的是它在能力开发流水线中的位置，其数据格式和损失函数与预训练相同。<br>Mid-training 主要解决两类缺口：<b>知识缺口</b>——通用预训练没有充分覆盖目标语言、金融 / 医疗 / 法律领域、企业内部文档或某类代码库，模型连概念与术语都不能理解；<b>基础能力缺口</b>——目标任务要求基础模型尚未形成的长上下文、代码模式、数学推导或跨模态表征，此时不只是回答格式不对，而是模型在足够多次采样下也几乎得不到正确解。<br>这也说明为什么<b>不应把 SFT 当成主要的知识注入工具</b>。SFT 当然可以记住少量事实，也常被放在 Mid-training 之后教模型如何回答领域问题；但少量 QA 对只覆盖有限问法，更擅长训练“如何访问与表达”，不适合承载大规模、相互关联的原始知识。反过来，Mid-training 降低了领域文本的语言模型损失，也不保证模型会自动按用户问题取出知识；已有研究发现，继续预训练与指令训练的顺序和数据组织会显著影响知识能否被问答形式访问。<b>稳健配方通常是 Mid-training 吸收知识与能力 → 小规模 SFT 建立输出格式 → 有非零成功率后再 RL 提升成功率和泛化性。</b><br>画布是示意：灰色是基座模型的“有效支持”区域，红框是目标任务需要的区域；三步依次是 Mid-training 扩展支持、SFT 建立格式、RL 推高成功概率。">
+  <header class="sh" style="display:flex;justify-content:space-between;align-items:flex-end"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">先补<em>底座</em>，再立格式，最后推高概率</h2></div>
+    <div class="c8gp-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">基座</button><button data-v="1">+ Mid-training</button><button data-v="2">+ SFT</button><button data-v="3">+ RL</button></div></header>
+  <div class="c8gp-body">
+    <div class="c8gp-l panel fx fx-left" style="--d:3"><span class="c8-sx">示意</span><canvas class="c8gp-cv"></canvas><p class="c8gp-cap"></p></div>
+    <div class="c8gp-r fx fx-right" style="--d:4">
+      <div class="c8-card"><b class="c8gp-k">知识缺口</b><p>目标语言、金融 / 医疗 / 法律、企业内部文档、某类代码库——连概念与术语都不能理解</p></div>
+      <div class="c8-card"><b class="c8gp-k">基础能力缺口</b><p>长上下文、代码模式、数学推导、跨模态表征——<b>足够多次采样也几乎得不到正确解</b></p></div>
+      <div class="c8-card"><b class="c8gp-k">为什么不用 SFT 注入知识</b><p>少量 QA 只覆盖有限问法，擅长训练“<b>如何访问与表达</b>”；反过来，Mid-training 降了领域 loss，也不保证按问题取得出知识——顺序与数据组织很关键</p></div>
+      <p class="c8gp-src">同预训练的目标与损失，对全部 token 计损；DAPT / TAPT 已证明有效</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「Mid-training：补知识与基础能力」</div>
+</section>
+<style>
+.c8gp-seg button{font-size:15px}
+.c8gp-body{display:grid;grid-template-columns:1.15fr 1fr;gap:22px;flex:1;min-height:0}
+.c8gp-l{position:relative;padding:14px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.c8gp-cap{font-size:17px;color:var(--text2);text-align:center}
+.c8gp-r{display:flex;flex-direction:column;gap:10px}
+.c8gp-k{display:block;font-size:17px;color:var(--acc)}
+.c8gp-r p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}.c8gp-r p b{color:var(--text)}
+.c8gp-src{font-size:15px!important;color:var(--text3)!important}
+</style>
+<script>
+HOOKS['c08-gaps'] = {
+  CAP: ['基座的有效支持（灰）几乎没盖住目标任务（红框）：RL 只能收到全零奖励', 'Mid-training：在目标分布上继续预测下一个词，支持区域扩展到目标任务', 'SFT：在已有支持内立起输出格式与协议（紫色带），奖励可计算', 'RL：有了非零成功率，把概率质量推向高奖励区域（亮点）'],
+  init(s) { this.g = C8.cv(s.querySelector('.c8gp-cv'), 780, 470); this.seg = U.seg(s.querySelector('.c8gp-seg'), (v) => { this.auto = false; this.k = +v; this.t0 = performance.now(); s.querySelector('.c8gp-cap').textContent = this.CAP[+v]; }); },
+  draw(now) {
+    const g = this.g, k = this.k || 0, t = Math.min(1, (now - (this.t0 || 0)) / 1200);
+    g.clearRect(0, 0, 780, 470);
+    const blob = (cx, cy, r, c) => { g.fillStyle = c; g.beginPath(); for (let a = 0; a <= 64; a++) { const th = (a / 64) * Math.PI * 2, rr = r * (1 + 0.08 * Math.sin(th * 5 + now / 900)); g.lineTo(cx + rr * Math.cos(th) * 1.4, cy + rr * Math.sin(th)); } g.fill(); };
+    const ext = k >= 1 ? (k === 1 ? t : 1) : 0;
+    blob(280 + ext * 120, 235, 130 + ext * 60, 'rgba(148,163,184,.25)');
+    g.strokeStyle = '#fb7185'; g.lineWidth = 3; g.setLineDash([10, 8]); g.strokeRect(470, 150, 220, 170); g.setLineDash([]);
+    g.fillStyle = '#fda4af'; g.font = '700 17px sans-serif'; g.fillText('目标任务需要的能力', 490, 140);
+    g.fillStyle = 'rgba(255,255,255,.7)'; g.fillText('基座的有效支持', 160, 235);
+    if (k >= 2) { const a = k === 2 ? t : 1; g.fillStyle = `rgba(129,140,248,${0.45 * a})`; g.fillRect(470, 215, 220 * a, 40); g.fillStyle = '#fff'; g.fillText('格式 / 协议', 520, 241); }
+    if (k >= 3) { const a = k === 3 ? t : 1; for (let i = 0; i < 18; i++) { const x = 600 + Math.cos(i * 1.7 + now / 600) * 40 * (1 - a * 0.6), y = 190 + Math.sin(i * 2.3 + now / 700) * 30 * (1 - a * 0.6); g.fillStyle = 'rgba(251,191,36,.85)'; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); } }
+  },
+  enter(s, ctx) {
+    C8.auto(this, ctx, 4, 3400, (i) => { this.i = i; this.k = i; this.t0 = performance.now(); this.seg(String(i)); s.querySelector('.c8gp-cap').textContent = this.CAP[i]; }, 300);
+    ctx.raf((n) => { this.draw(n); return true; });
+  },
+  reset() { this.i = null; this.k = 0; },
+};
+</script>
+
+<!-- ================= Mid-training 数据构造 ================= -->
+<section class="slide" id="c08-middata" data-part="3" data-trans="rise" data-dur="30000" data-title="Mid-training 数据如何构造" data-notes="<b>Mid-training 数据如何构造</b>，原书给出五步：<br>1. <b>从失败分布反推数据。</b>先按主题、语言、文档类型、代码模式与上下文长度切分评估，确认低 pass@k 来自哪类底座缺口；只针对知识和能力缺口补数据，避免把输出格式错误误诊成知识不足。<br>2. <b>构造高密度目标语料。</b>原始文档适合建立术语和事实关联，代码仓库适合学习结构与依赖，教材式推导、合成释义和跨文档关联样本适合把隐含关系写得更明确。数据要做去重、质量过滤和评估集污染检查。<br>3. <b>按能力进行数据配比。</b>数据需要包括书籍、长文档和代码仓库等自然长文本；体现长文本检索、多跳推理、指令遵循、信息聚合与统计等长文本原子能力的思维链数据；体现规划、工具选择与调用、长程状态跟踪和错误恢复等 Agent 必需能力的 Agent 执行轨迹。其中思维链和 Agent 执行轨迹数据可以从较强的开源模型蒸馏，也可以使用现有数据集。<br>4. <b>在每个阶段做“双重回放”。</b>一类是原始短文本和通用数据，用来保留语言、知识与短上下文能力；另一类是“长度提升后的旧任务”：把模型已经会做的短任务放进当前长度的上下文，在不同位置加入相关信息和干扰项，检验同一能力在更长窗口中是否仍然成立。通用数据最好来自基模的原始预训练集；无法取得时，可以用 FineWeb-2 等开源预训练语料替代。<br>5. <b>用多维门禁决定何时停止。</b>除训练 loss 外，同时跟踪留出领域任务、通用能力、原有指令遵循和目标任务的 pass@1 / pass@k。<b>领域指标上升但通用保留集下降，说明混合或学习率过激；loss 下降而 pass@k 不动，则要检查数据是否真正覆盖所需能力，以及后续是否缺少访问知识的 SFT。</b><br>页面的配比环形图只示意类别，不代表推荐比例。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Mid-training 数据：<em>从失败分布反推</em>，用门禁决定何时停</h2></header>
+  <div class="c8mdt-body">
+    <div class="c8mdt-steps fx fx-left" style="--d:2"></div>
+    <div class="c8mdt-r panel fx fx-right" style="--d:3"><div class="c8mdt-vis"></div></div>
+  </div>
+  <div class="src">第八章 ·「Mid-training 数据如何构造」</div>
+</section>
+<style>
+.c8mdt-body{display:grid;grid-template-columns:1fr 1fr;gap:22px;flex:1;min-height:0}
+.c8mdt-steps{display:flex;flex-direction:column;gap:8px}
+.c8mdt-s{display:grid;grid-template-columns:44px 1fr;gap:12px;padding:11px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);cursor:pointer;text-align:left;transition:border-color .35s,background .35s}
+.c8mdt-s em{font:800 24px var(--num);font-style:normal;color:var(--acc)}
+.c8mdt-s b{font-size:18px}
+.c8mdt-s p{grid-column:2;font-size:15px;line-height:1.5;color:var(--text2);max-height:0;overflow:hidden;transition:max-height .45s}
+.c8mdt-s.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,rgba(12,18,40,.85))}
+.c8mdt-s.on p{max-height:110px}
+.c8mdt-r{padding:18px 22px}
+.c8mdt-vis{height:100%;display:flex;flex-direction:column;gap:12px;justify-content:center}
+.c8mdt-vis .row{display:flex;gap:8px;flex-wrap:wrap}
+.c8mdt-vis .pill{font-size:16px;padding:8px 14px;border-radius:10px;border:1px solid var(--line2);animation:c8mdIn .4s var(--ease) both}
+.c8mdt-vis .pill.r{border-color:rgba(251,113,133,.5);color:#fda4af}.c8mdt-vis .pill.g{border-color:rgba(52,211,153,.5);color:#6ee7b7}
+@keyframes c8mdIn{from{opacity:0;translate:0 10px}}
+.c8mdt-vis h4{font-size:18px;color:var(--acc)}
+.c8mdt-vis .ctx{display:flex;gap:3px;height:40px}
+.c8mdt-vis .ctx i{flex:1;border-radius:3px;background:rgba(255,255,255,.07)}
+.c8mdt-vis .ctx i.k{background:#34d399}.c8mdt-vis .ctx i.d{background:rgba(251,113,133,.6)}
+.c8mdt-vis .gate{display:grid;grid-template-columns:150px 1fr 60px;gap:10px;align-items:center;font-size:15px}
+.c8mdt-vis .gate i{height:16px;border-radius:5px;background:rgba(255,255,255,.05);position:relative;overflow:hidden}
+.c8mdt-vis .gate i::after{content:"";position:absolute;inset:0;width:var(--v);background:var(--c)}
+.c8mdt-vis .warn{font-size:15px;line-height:1.5;color:var(--text2);padding:10px 12px;border-radius:10px;background:rgba(251,191,36,.07);border:1px solid rgba(251,191,36,.35)}
+</style>
+<script>
+HOOKS['c08-middata'] = {
+  S: [['从失败分布反推数据', '按主题、语言、文档类型、代码模式、上下文长度切分评估，确认低 pass@k 来自哪类底座缺口；别把格式错误误诊成知识不足'], ['构造高密度目标语料', '原始文档建立术语与事实关联；代码仓库学结构与依赖；教材式推导、合成释义、跨文档关联把隐含关系写明。去重、质量过滤、评估集污染检查'], ['按能力进行数据配比', '自然长文本（书籍、长文档、代码仓库）+ 长文本原子能力的思维链数据 + Agent 执行轨迹；后两者可从较强开源模型蒸馏或用现有数据集'], ['每个阶段做“双重回放”', '原始短文本与通用数据保留旧能力；把会做的短任务放进当前长度的上下文，在不同位置加入相关信息与干扰项。通用数据最好来自基模原始预训练集，否则用 FineWeb-2 等替代'], ['用多维门禁决定何时停', '同时跟踪 loss、留出领域任务、通用能力、原有指令遵循、目标任务 pass@1 / pass@k']],
+  V: [
+    '<h4>按维度切分失败</h4><div class="row"><span class="pill">主题</span><span class="pill">语言</span><span class="pill">文档类型</span><span class="pill">代码模式</span><span class="pill">上下文长度</span></div><div class="row"><span class="pill r">知识缺口 → 补数据</span><span class="pill r">能力缺口 → 补数据</span><span class="pill g">格式错误 → 交给 SFT</span></div>',
+    '<h4>高密度目标语料</h4><div class="row"><span class="pill">原始文档：术语与事实关联</span><span class="pill">代码仓库：结构与依赖</span><span class="pill">教材式推导 / 合成释义 / 跨文档关联</span></div><div class="row"><span class="pill g">去重</span><span class="pill g">质量过滤</span><span class="pill g">评估集污染检查</span></div>',
+    '<h4>三类数据（比例示意）</h4><div class="row"><span class="pill">自然长文本</span><span class="pill">长文本原子能力的思维链</span><span class="pill">Agent 执行轨迹</span></div><div class="row"><span class="pill">长文本检索</span><span class="pill">多跳推理</span><span class="pill">指令遵循</span><span class="pill">聚合与统计</span><span class="pill">规划</span><span class="pill">工具调用</span><span class="pill">长程状态跟踪</span><span class="pill">错误恢复</span></div>',
+    '<h4>“长度提升后的旧任务”</h4><div class="ctx">' + Array.from({ length: 40 }, (_, i) => `<i class="${i === 27 ? 'k' : [6, 15, 33].includes(i) ? 'd' : ''}"></i>`).join('') + '</div><div class="row"><span class="pill g">绿：相关信息（位置可变）</span><span class="pill r">红：干扰项</span></div><div class="row"><span class="pill">+ 原始短文本与通用数据</span></div>',
+    '<h4>多维门禁</h4><div class="gate"><span>训练 loss</span><i style="--v:80%;--c:#34d399"></i><b>↓</b></div><div class="gate"><span>留出领域任务</span><i style="--v:70%;--c:#34d399"></i><b>↑</b></div><div class="gate"><span>通用保留集</span><i style="--v:40%;--c:#fb7185"></i><b>↓</b></div><div class="gate"><span>目标 pass@k</span><i style="--v:30%;--c:#94a3b8"></i><b>—</b></div><div class="warn">领域↑ 通用↓ → 混合或学习率过激；loss↓ 而 pass@k 不动 → 检查数据是否覆盖所需能力、是否缺少访问知识的 SFT</div>',
+  ],
+  init(s) {
+    s.querySelector('.c8mdt-steps').innerHTML = this.S.map(([b, p], i) => `<button class="c8mdt-s" data-i="${i}"><em>${i + 1}</em><b>${b}</b><p>${p}</p></button>`).join('');
+    s.querySelectorAll('.c8mdt-s').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  pick(s, i) { this.i = i; s.querySelectorAll('.c8mdt-s').forEach((b, j) => b.classList.toggle('on', j === i)); s.querySelector('.c8mdt-vis').innerHTML = this.V[i]; },
+  enter(s, ctx) { C8.auto(this, ctx, 5, 5200, (i) => this.pick(s, i), 500); },
+  reset(s) { this.i = null; s.querySelectorAll('.c8mdt-s').forEach((b) => b.classList.remove('on')); s.querySelector('.c8mdt-vis').innerHTML = ''; },
+};
+</script>
+
+<!-- ================= 长上下文基础能力 ================= -->
+<section class="slide" id="c08-longctx" data-part="3" data-trans="zoom" data-dur="22000" data-title="不同上下文长度下的长上下文基础能力" data-notes="在 Mid-training 后，需要使用 LongBench v2、IFEval、第七章所述的端到端 Agent 等评估数据集，验证模型在<b>不同上下文长度下的长上下文基础能力</b>没有丢失。<b>长上下文能力是长思维链能力和指令遵循能力的基础，而这些能力又是 Agent 工具调用等多项高阶能力的基础。</b>需要检验的六类能力：<br><b>位置与检索</b>：单针、多针、不同位置的关键信息提取；<b>关系与推理</b>：跨段落、多文档、多跳关系追踪，矛盾消解和证据组合；<b>聚合与统计</b>：从长表格或长日志中汇总信息，如计数、分组、排序、比较、趋势归纳；<b>指令遵循</b>：多指令遵循、矛盾消解、思考流程遵循、输出格式遵循；<b>长链思考</b>：复杂的数学、逻辑推理、代码生成问题；<b>Agent 原子能力</b>：任务分解、计划生成、工具选择、参数构造、状态记忆和失败后的恢复。<br>如果事实需要频繁更新或必须给出原始出处，<b>RAG 仍优于把知识写进权重</b>；Mid-training 更适合稳定、规模较大、需要形成内部表征的领域知识与能力。对大模型做全参数 Mid-training 的计算和遗忘风险都明显高于小规模 SFT，因此要先用小规模实验验证数据配比，再扩大训练预算。<br>左侧矩阵是示意：每列是一种上下文长度，逐列检验，颜色越红表示该能力在这个长度上掉得越多——“标称窗口”不等于“有效窗口”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">标称窗口 ≠ <em>有效窗口</em>：逐个长度检验</h2></header>
+  <div class="c8lc-body">
+    <div class="c8lc-l panel fx fx-left" style="--d:2"><span class="c8-sx">示意</span><div class="c8lc-mx"></div><p class="c8lc-nt">评估集：LongBench v2 · IFEval · 第七章的端到端 Agent 评估</p></div>
+    <div class="c8lc-r fx fx-right" style="--d:3">
+      <div class="c8lc-pyr"><span>Agent 工具调用等高阶能力</span><span>长思维链 · 指令遵循</span><span>长上下文能力</span></div>
+      <div class="c8-card c8lc-rag"><b>RAG 还是 Mid-training？</b><div><span class="a">频繁更新 / 必须给出处 → <b>RAG</b></span><span class="b">稳定、规模大、需要内部表征 → <b>Mid-training</b></span></div><p>全参 Mid-training 的计算与遗忘风险都高于小规模 SFT：先小规模验证数据配比，再扩大预算</p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「Mid-training 数据如何构造」（不同上下文长度下的长上下文基础能力）</div>
+</section>
+<style>
+.c8lc-body{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;flex:1;min-height:0}
+.c8lc-l{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.c8lc-mx{display:grid;grid-template-columns:200px repeat(5,1fr);gap:6px;margin-top:20px}
+.c8lc-mx span{font-size:15px;color:var(--text3);text-align:center;align-self:center}
+.c8lc-mx b{font-size:16px;align-self:center}
+.c8lc-mx i{height:50px;border-radius:8px;background:rgba(255,255,255,.04);transition:background .5s}
+.c8lc-nt{margin-top:auto;font-size:15px;color:var(--text3)}
+.c8lc-r{display:flex;flex-direction:column;gap:14px}
+.c8lc-pyr{display:flex;flex-direction:column;align-items:center;gap:6px}
+.c8lc-pyr span{font-size:17px;padding:10px;border-radius:10px;text-align:center;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+.c8lc-pyr span:nth-child(1){width:60%}.c8lc-pyr span:nth-child(2){width:80%}.c8lc-pyr span:nth-child(3){width:100%;background:color-mix(in srgb,var(--acc) 15%,transparent)}
+.c8lc-rag>b{font-size:17px;color:var(--acc)}
+.c8lc-rag div{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.c8lc-rag div span{font-size:15px;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,.04)}
+.c8lc-rag p{font-size:15px;color:var(--text2);line-height:1.5}
+</style>
+<script>
+HOOKS['c08-longctx'] = {
+  C: [['位置与检索', '单针 / 多针 / 不同位置'], ['关系与推理', '多文档、多跳、矛盾消解'], ['聚合与统计', '计数、分组、排序、趋势'], ['指令遵循', '多指令、格式、思考流程'], ['长链思考', '数学、逻辑、代码'], ['Agent 原子能力', '分解、计划、工具、状态、恢复']],
+  L: ['8K', '32K', '64K', '128K', '256K'],
+  init(s) {
+    const mx = s.querySelector('.c8lc-mx');
+    mx.innerHTML = '<span></span>' + this.L.map((l) => `<span>${l}</span>`).join('') + this.C.map(([a, b]) => `<b title="${b}">${a}</b>` + this.L.map(() => '<i></i>').join('')).join('');
+    const r = U.rand(2);
+    this.v = this.C.map((_, i) => this.L.map((_, j) => Math.max(0.15, 1 - j * (0.08 + i * 0.03) - r() * 0.12)));
+  },
+  async run(s, ctx) {
+    const tk = (this.tk = (this.tk || 0) + 1), ok = () => tk === this.tk && ctx.alive, cells = s.querySelectorAll('.c8lc-mx i');
+    while (ok()) {
+      cells.forEach((c) => (c.style.background = ''));
+      for (let j = 0; j < this.L.length; j++) {
+        await U.wait(ctx, 1100); if (!ok()) return;
+        this.C.forEach((_, i) => { const v = this.v[i][j]; cells[i * this.L.length + j].style.background = `color-mix(in srgb, #34d399 ${Math.round(v * 100)}%, #fb7185)`; });
+      }
+      await U.wait(ctx, 4000);
+    }
+  },
+  enter(s, ctx) { this.run(s, ctx); },
+  reset(s) { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<!-- ================= 实验 8-5 ================= -->
+<section class="slide" id="c08-exp85" data-part="3" data-trans="flip" data-dur="24000" data-title="实验 8-5 ★★：继续预训练学习新语言" data-notes="<b>实验 8-5 ★★：继续预训练学习新语言。</b>以 Mistral 7B v0.3 为基础（主要用英语预训练，对韩语几乎没有理解能力），通过韩语维基百科继续预训练来注入韩语能力——在已完成预训练的模型上用新语言数据继续做语言模型训练，模型已具备通用表征，只需适应新的数据分布，成本远低于从头训练。该实验使用约 80% 韩语 + 20% 英语的数据配比来缓解灾难性遗忘；<b>这只是该实验的选择，不是通用默认值</b>。最后用韩语指令数据做 SFT，获得实用的韩语对话能力。它把两种职责分得很清楚：<b>Mid-training 先补韩语知识与语言能力，SFT 再教模型如何用韩语接受指令和组织回答</b>。<br>本实验也说明继续预训练可能带来的灾难性遗忘问题：韩语最终阶段的盲评分改善，英语能力却有下降。<b>继续预训练可以把目标分布写进参数，但不能免除保留集、事实评估和数据质量审计。</b><br>配套仓库的盲评（0–5 分）：韩语 基座 1.6667 → 继续预训练后 1.3333 → SFT 后 3.4444（+1.7777）；英语 5.0000 → 3.1667 → 4.1667（下降 0.8333，在声明的容差 1.0 之内）。一个实质性的负结果：最终模型的韩语更流畅，但泡菜的回答仍有事实错误（说要把蔬菜煮熟、用酱油调味；传统泡菜是用盐腌、用辣椒粉和鱼露等调味）。另外，配套实现改用了 LoRA 并训练 embed_tokens / lm_head，与正文描述有差异。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 8-5 <span class="c8-star">★★</span>：韩语变好了，<em>英语掉了一截</em></h2></header>
+  <div class="c8e5-flow fx fx-up" style="--d:2"><span><b>Mistral 7B v0.3</b><small>主要英语预训练，几乎不懂韩语</small></span><i></i><span class="m"><b>继续预训练（Mid-training）</b><small>韩语维基 · 约 80% 韩语 + 20% 英语（该实验的选择，不是通用默认值）</small></span><i></i><span class="s"><b>韩语指令 SFT</b><small>教它用韩语接受指令、组织回答</small></span></div>
+  <div class="c8e5-body">
+    <div class="c8e5-ch panel fx fx-left" style="--d:3"><b class="c8e5-k">配套仓库盲评（0–5 分）</b><div class="c8e5-bars"></div><div class="c8e5-lg"><span class="k"><i></i>韩语</span><span class="e"><i></i>英语</span></div></div>
+    <div class="c8e5-r fx fx-right" style="--d:4">
+      <div class="c8e5-n"><div><b class="g">+1.7777</b><span>韩语：基座 → 最终</span></div><div><b class="r">−0.8333</b><span>英语（容差 1.0 之内）</span></div></div>
+      <div class="c8-card c8e5-neg"><b>实质性负结果：泡菜</b><p>韩语更流畅了，但回答仍说要<b>把蔬菜煮熟、用酱油调味</b>——传统泡菜是用盐腌、用辣椒粉和鱼露等调味</p></div>
+      <p class="c8e5-nt">继续预训练能把目标分布写进参数，<b>但不能免除保留集、事实评估和数据质量审计</b></p>
+      <p class="c8-data">chapter8/continued-pretraining/validation/runs/exp8-5-training-report-20260731-v1；配套实现用 LoRA 并训练 embed_tokens / lm_head，与正文有差异</p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「Mid-training 数据如何构造」· 实验 8-5</div>
+</section>
+<style>
+.c8e5-flow{display:flex;align-items:stretch;gap:10px}
+.c8e5-flow span{flex:1;display:flex;flex-direction:column;gap:4px;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c8e5-flow span.m{border-color:color-mix(in srgb,var(--acc) 55%,transparent)}.c8e5-flow span.s{border-color:rgba(56,189,248,.5)}
+.c8e5-flow b{font-size:18px}.c8e5-flow small{font-size:15px;color:var(--text3);line-height:1.4}
+.c8e5-flow i{width:30px;align-self:center;height:3px;background:var(--acc)}
+.c8e5-body{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;flex:1;min-height:0;margin-top:16px}
+.c8e5-ch{padding:14px 20px;display:flex;flex-direction:column;gap:8px}
+.c8e5-k{font-size:17px;color:var(--acc)}
+.c8e5-bars{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:30px;align-items:end;border-bottom:1px solid var(--line2);padding:0 20px}
+.c8e5-g{display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end}
+.c8e5-g div{display:flex;gap:8px;align-items:flex-end;height:100%}
+.c8e5-g i{width:50px;border-radius:6px 6px 0 0;height:0;transition:height 1s var(--ease);position:relative}
+.c8e5-g i.k{background:#38bdf8}.c8e5-g i.e{background:#a78bfa}
+.c8e5-g i b{position:absolute;top:-24px;left:50%;translate:-50% 0;font:700 15px var(--num);white-space:nowrap}
+.c8e5-g span{font-size:15px;color:var(--text2)}
+.c8e5-lg{display:flex;gap:14px}.c8e5-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+.c8e5-lg i{width:14px;height:14px;border-radius:3px}.c8e5-lg .k i{background:#38bdf8}.c8e5-lg .e i{background:#a78bfa}
+.c8e5-r{display:flex;flex-direction:column;gap:12px}
+.c8e5-n{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.c8e5-n div{display:flex;flex-direction:column;padding:12px 16px;border-radius:14px;border:1px solid var(--line)}
+.c8e5-n b{font:800 34px var(--num)}.c8e5-n b.g{color:#6ee7b7}.c8e5-n b.r{color:#fda4af}
+.c8e5-n span{font-size:15px;color:var(--text3)}
+.c8e5-neg{border-color:rgba(251,113,133,.45)}.c8e5-neg>b{font-size:17px;color:#fda4af}
+.c8e5-neg p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:6px}.c8e5-neg p b{color:var(--text)}
+.c8e5-nt{font-size:16px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:4px solid var(--acc)}.c8e5-nt b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-exp85'] = {
+  D: [['基座', 1.6667, 5.0], ['继续预训练后', 1.3333, 3.1667], ['SFT 后', 3.4444, 4.1667]],
+  init(s) { s.querySelector('.c8e5-bars').innerHTML = this.D.map(([n, k, e]) => `<div class="c8e5-g"><div><i class="k"><b>${k.toFixed(2)}</b></i><i class="e"><b>${e.toFixed(2)}</b></i></div><span>${n}</span></div>`).join(''); },
+  enter(s, ctx) { ctx.later(() => s.querySelectorAll('.c8e5-g').forEach((g, i) => { const [k, e] = g.querySelectorAll('i'); const H = g.querySelector('div').clientHeight - 30; k.style.height = (this.D[i][1] / 5) * H + 'px'; e.style.height = (this.D[i][2] / 5) * H + 'px'; }), 500); },
+  reset(s) { s.querySelectorAll('.c8e5-g i').forEach((i) => (i.style.height = 0)); },
+};
+</script>

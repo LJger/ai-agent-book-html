@@ -1,0 +1,1023 @@
+<!-- ================= PART 01 四阶段全景 ================= -->
+<section class="slide chapter" id="c08-d1" data-part="1" data-title="PART 01 · 四阶段全景" data-notes="引言给出了四个环节的地图，这一节先把每一步的机制讲透。它们使用的<b>数据</b>、<b>优化目标</b>、<b>代价</b>各不相同，理解这些差异，是读懂整章的钥匙。表8-1 先作总体介绍，随后逐项展开：预训练在做什么、Mid-training 的本质、SFT 的本质（以及贯穿后训练的工程默认项 LoRA）、什么时候需要先补底座，最后是 SFT 与 RL 的本质区别。">
+  <div class="ch-k fx fx-up">PART 01</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">从预训练到 RL：<br>四阶段全景</h1>
+  <div class="ch-s fx fx-up" style="--d:3">数据、优化目标、代价各不相同——理解这些差异，是读懂整章的钥匙</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">所谓“训练”，归根结底就是调整模型输出的概率分布。四个环节的区别，只在于“想要什么”，以及“用什么信号来定义想要”。</blockquote>
+  <div class="ch-loop" data-node="0" data-num="01"></div>
+</section>
+
+<section class="slide" id="c08-t81" data-part="1" data-dur="14000" data-title="表8-1 模型能力开发的四个环节" data-notes="表8-1 把四个环节放在一起比较：<br><b>预训练</b>：海量原始互联网文本，目标是预测下一个词，学到语言规律、世界知识、基本推理，代价极高（数百万～数千万美元）。<br><b>Mid-training</b>：目标语言 / 领域 / 能力语料与保留数据，目标是继续预测下一个词（通常对全部 token 计算损失），补齐领域知识、语言和基础能力，代价中到高，取决于 token 规模与是否全参训练。<br><b>SFT</b>：几千～几万条“输入—输出”示范对，目标仍是预测下一个词（只在回答上算损失），学到指令遵循、输出格式、风格、流程协议，代价低（几小时～几天）。<br><b>RL</b>：任务、环境 + 奖励信号（参考答案可选），目标是最大化期望奖励，学到可迁移的决策策略、探索出的新解法，代价高（常是 SFT 的几十～上百倍）。<br>上方标签可以切换聚焦的列；列下方的解读自动轮换。代价一列的刻度只是按原书文字画的定性示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">四个环节：数据、目标、代价<em>各不相同</em></h2></div>
+    <div class="t81-tabs tabs fx fx-up" style="--d:2"><button data-v="0">用什么数据</button><button data-v="1">优化目标</button><button data-v="2">学到什么</button><button data-v="3">典型代价</button></div></header>
+  <div class="t81-tb c8-tb fx fx-up" style="--d:3">
+    <div class="c8-tr c8-th t81-r"><span>阶段</span><span data-c="0">用什么数据</span><span data-c="1">优化目标</span><span data-c="2">学到什么</span><span data-c="3">典型代价</span></div>
+  </div>
+  <div class="t81-lens panel fx fx-up" style="--d:6"><span class="t81-lk"></span><p class="t81-lt"></p></div>
+  <div class="src">第八章 ·「从预训练到 RL：四阶段全景」· 表8-1</div>
+</section>
+<style>
+#c08-t81 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.t81-r{grid-template-columns:200px repeat(4,1fr)}
+.t81-r>span,.t81-r>div{font-size:19px;line-height:1.5;color:var(--text2);padding:6px 10px;border-radius:10px;transition:background .45s,color .45s,opacity .45s}
+.t81-r>b{display:flex;align-items:center;gap:10px;font-size:24px;color:var(--c)}
+.t81-r>b .ic{font-size:28px}
+.t81-tb[data-f] .t81-r:not(.c8-th)>[data-c]{opacity:.5}
+.t81-tb[data-f="0"] [data-c="0"],.t81-tb[data-f="1"] [data-c="1"],.t81-tb[data-f="2"] [data-c="2"],.t81-tb[data-f="3"] [data-c="3"]{opacity:1!important;color:var(--text)!important;background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.t81-tb .c8-th>[data-c]{opacity:1!important;background:none!important}
+.t81-tb[data-f="0"] .c8-th [data-c="0"],.t81-tb[data-f="1"] .c8-th [data-c="1"],.t81-tb[data-f="2"] .c8-th [data-c="2"],.t81-tb[data-f="3"] .c8-th [data-c="3"]{color:var(--acc)!important}
+.t81-cost{display:flex;gap:5px;margin-top:8px}
+.t81-cost i{width:26px;height:9px;border-radius:5px;background:rgba(255,255,255,.1)}
+.t81-cost i.on{background:linear-gradient(90deg,var(--warn),var(--bad))}
+.t81-lens{margin-top:22px;padding:20px 28px;display:flex;align-items:center;gap:22px;min-height:96px}
+.t81-lk{flex:none;padding:8px 18px;border-radius:12px;font-size:20px;font-weight:700;color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.t81-lt{font-size:21px;line-height:1.6}
+.t81-lens.sw .t81-lt{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c08-t81'] = {
+  R: [
+    ['预训练', 'book', '#60a5fa', '海量原始互联网文本', '预测下一个词', '语言规律、世界知识、基本推理', '极高（数百万～数千万美元）', 5],
+    ['Mid-training', 'layers', '#2dd4bf', '目标语言 / 领域 / 能力语料与保留数据', '继续预测下一个词（通常对全部 token 计算损失）', '补齐领域知识、语言和基础能力', '中到高，取决于 token 规模与是否全参训练', 3],
+    ['SFT', 'clipboard', '#a78bfa', '几千～几万条“输入—输出”示范对', '预测下一个词（只在回答上算损失）', '指令遵循、输出格式、风格、流程协议', '低（几小时～几天）', 1],
+    ['RL', 'dumbbell', '#f472b6', '任务、环境 + 奖励信号（参考答案可选）', '最大化期望奖励', '可迁移的决策策略、探索出的新解法', '高（常是 SFT 的几十～上百倍）', 4],
+  ],
+  L: [
+    ['用什么数据', '预训练读原始文本；Mid-training 把分布收窄到目标领域并混入保留数据；SFT 改用示范对；RL 不再需要标准回答，而需要任务、环境与奖励信号'],
+    ['优化目标', '前三个环节都在“预测下一个词”，区别只在数据和在哪些 token 上算损失；到了 RL，目标换成了最大化期望奖励'],
+    ['学到什么', '地基 → 补底座 → 立协议 → 学策略：四个环节分别处理语言与世界知识、领域缺口、输出协议和决策策略'],
+    ['典型代价', '预训练最贵；SFT 最便宜，几小时到几天；RL 常是 SFT 的几十到上百倍（刻度为定性示意）'],
+  ],
+  init(s) {
+    s.querySelector('.t81-tb').insertAdjacentHTML('beforeend', this.R.map(([n, ic, c, d, o, l, cost, lv]) => `
+      <div class="c8-tr t81-r" style="--c:${c}"><b><svg class="ic"><use href="#i-${ic}"/></svg>${n}</b>
+        <span data-c="0">${d}</span><span data-c="1">${o}</span><span data-c="2">${l}</span>
+        <div data-c="3">${cost}<div class="t81-cost">${[1, 2, 3, 4, 5].map((k) => `<i class="${k <= lv ? 'on' : ''}"></i>`).join('')}</div></div></div>`).join(''));
+    this.rows = [...s.querySelectorAll('.t81-r:not(.c8-th)')];
+    this.rows.forEach((r) => r.addEventListener('mouseenter', () => this.rows.forEach((x) => x.classList.toggle('on', x === r))));
+    s.querySelector('.t81-tb').addEventListener('mouseleave', () => this.rows.forEach((x) => x.classList.remove('on')));
+    s.querySelectorAll('.t81-tabs button').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.show(s, +b.dataset.v); }));
+  },
+  show(s, f) {
+    this.f = f;
+    s.querySelector('.t81-tb').dataset.f = f;
+    s.querySelectorAll('.t81-tabs button').forEach((b) => b.classList.toggle('on', +b.dataset.v === f));
+    s.querySelector('.t81-lk').textContent = this.L[f][0];
+    s.querySelector('.t81-lt').textContent = this.L[f][1];
+    U.restart(s.querySelector('.t81-lens'), 'sw');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.f + 1) % 4); }, 3400);
+  },
+  reset(s) { delete s.querySelector('.t81-tb').dataset.f; this.rows.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c08-ntp" data-part="1" data-steps="1" data-trans="zoom" data-title="预训练在做什么：预测下一个词" data-notes="现代大模型的全部“智能”，都建立在一个简单到令人意外的任务上：<b>预测下一个词（Next Token Prediction，NTP）</b>。给模型看一段文本的前半部分，让它猜下一个 token 是什么。比如输入“中国的首都是”，模型应该给“北京”很高的概率。模型每猜一次，就把自己的预测和真实的下一个 token 比较，差距（称为损失 Loss）越大，就越用力地调整参数，让下次在类似上下文里猜得更准。在几万亿 token 的互联网文本上反复做这件事，模型被迫学会了语法、事实、逻辑乃至基本推理——因为要在海量语境里持续猜对下一个词，没有捷径，只能真正“消化”文本里的规律。<br>有一个关键点要记住，它会一路贯穿到 Mid-training、SFT 和 RL：<b>模型的输出本质上是一个概率分布</b>。给定前文，模型对词表里每一个可能的 token 都给出一个概率。所谓“训练”，归根结底就是<b>调整这个概率分布</b>——让我们想要的 token 概率更高、不想要的更低。四个环节的区别，只在于“想要什么”，以及“用什么信号来定义想要”。<br>预训练之后，模型博学却不好用：你问它问题，它可能续写出更多问题，而不是回答——因为互联网文本里，一个问题后面常常跟着的是另一个问题。它还没学会“被提问时应该回答”这个协议。<br>左侧的概率与损失都是示意数值：每做一步训练，“北京”的概率上升，损失 −log p 随之下降。按 → 看基座模型被提问时的反应（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">预训练在做什么：<em>预测下一个词</em></h2></header>
+  <div class="ntp-body">
+    <div class="ntp-l panel fx fx-left" style="--d:2">
+      <div class="ntp-in"><span class="lbl">前文</span><b>中国的首都是</b><i class="ntp-cur">▍</i><span class="ntp-arr">下一个 token 的概率分布</span></div>
+      <div class="ntp-bars"></div>
+      <div class="ntp-foot">
+        <div class="ntp-loss"><span class="c8-m">损失 = −log <i>p</i>(北京 | 中国的首都是)</span><b class="ntp-lv">—</b></div>
+        <svg class="ntp-spark" viewBox="0 0 300 70" width="300" height="70"><path class="ntp-sp" d=""/></svg>
+        <span class="ntp-step">训练步 <b>0</b></span>
+      </div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="ntp-r">
+      <div class="ntp-k panel fx fx-right" style="--d:3">
+        <b><svg class="ic"><use href="#i-sliders"/></svg>训练 = 调整这个概率分布</b>
+        <p>四个环节的区别，只在于<em>“想要什么”</em>，以及<em>“用什么信号来定义想要”</em></p>
+        <ul class="ntp-ul">
+          <li style="--c:#60a5fa"><span>预训练</span>真实文本里的下一个词</li>
+          <li style="--c:#2dd4bf"><span>Mid-training</span>目标领域文本里的下一个词</li>
+          <li style="--c:#a78bfa"><span>SFT</span>标注回答里的下一个词</li>
+          <li style="--c:#f472b6"><span>RL</span>能拿到高奖励的输出</li>
+        </ul>
+      </div>
+      <div class="ntp-chat panel fx fx-up" data-step="1">
+        <b><svg class="ic"><use href="#i-alert"/></svg>预训练之后：博学，却不好用</b>
+        <div class="ntp-q">怎样才能学好强化学习？</div>
+        <div class="ntp-a"><span class="ntp-at" data-type data-speed="55">怎样才能学好深度学习？怎样才能学好机器学习？有没有推荐的入门书？</span></div>
+        <p>互联网文本里，一个问题后面常常跟着另一个问题——它还没学会“被提问时应该回答”这个协议</p>
+        <span class="c8-sx">示意</span>
+      </div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「预训练在做什么：预测下一个词」</div>
+</section>
+<style>
+.ntp-body{display:flex;gap:30px;flex:1;min-height:0;margin-bottom:24px}
+.ntp-l{position:relative;width:900px;flex:none;padding:26px 30px;display:flex;flex-direction:column;gap:18px}
+.ntp-in{display:flex;align-items:center;gap:14px;font-size:30px}
+.ntp-in b{font-size:34px}
+.ntp-cur{font-style:normal;color:var(--acc);animation:blink 1s steps(1) infinite}
+.ntp-arr{margin-left:auto;font-size:17px;color:var(--text3)}
+.ntp-bars{display:flex;flex-direction:column;gap:12px}
+.ntp-br{display:grid;grid-template-columns:110px 1fr 86px;align-items:center;gap:14px;font-size:22px}
+.ntp-br span{text-align:right;color:var(--text2)}
+.ntp-br i{display:block;height:30px;border-radius:8px;width:0;background:linear-gradient(90deg,rgba(148,163,184,.45),rgba(148,163,184,.25));transition:width .55s var(--ease)}
+.ntp-br.tg span{color:var(--text);font-weight:700}
+.ntp-br.tg i{background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 18px color-mix(in srgb,var(--acc) 50%,transparent)}
+.ntp-br em{font:600 20px var(--num);font-style:normal;color:var(--text2)}
+.ntp-br.tg em{color:var(--acc)}
+.ntp-foot{margin-top:auto;display:flex;align-items:center;gap:22px;padding-top:14px;border-top:1px solid var(--line)}
+.ntp-loss{display:flex;flex-direction:column;gap:4px;font-size:21px}
+.ntp-lv{font:800 34px var(--num);color:var(--warn)}
+.ntp-spark{overflow:visible}
+.ntp-sp{fill:none;stroke:var(--warn);stroke-width:3;filter:drop-shadow(0 0 6px var(--warn))}
+.ntp-step{margin-left:auto;font-size:18px;color:var(--text3)}
+.ntp-step b{font:800 28px var(--num);color:var(--text)}
+.ntp-r{flex:1;display:flex;flex-direction:column;gap:20px;min-width:0}
+.ntp-k{padding:22px 26px}
+.ntp-k>b,.ntp-chat>b{display:flex;align-items:center;gap:10px;font-size:24px;color:var(--acc)}
+.ntp-k>p{font-size:19px;line-height:1.6;color:var(--text2);margin:10px 0 14px}
+.ntp-k em{font-style:normal;color:var(--text)}
+.ntp-ul{display:flex;flex-direction:column;gap:9px}
+.ntp-ul li{display:flex;align-items:center;gap:14px;font-size:19px;padding:8px 14px;border-radius:12px;background:color-mix(in srgb,var(--c) 8%,transparent);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.ntp-ul span{width:118px;flex:none;font-weight:700;color:var(--c)}
+.ntp-chat{position:relative;padding:20px 26px;display:flex;flex-direction:column;gap:12px;border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.ntp-chat>b{color:var(--warn)}
+.ntp-q{align-self:flex-end;padding:10px 16px;border-radius:14px 14px 4px 14px;font-size:19px;background:rgba(251,191,36,.12);border:1px solid rgba(251,191,36,.32)}
+.ntp-a{align-self:flex-start;max-width:92%;padding:10px 16px;border-radius:14px 14px 14px 4px;font-size:19px;line-height:1.55;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.3);min-height:48px}
+.ntp-chat p{font-size:17px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c08-ntp'] = {
+  W: ['北京', '哪里', '一座', '南京', '什么', '其他'],
+  init(s) {
+    s.querySelector('.ntp-bars').innerHTML = this.W.map((w, i) => `<div class="ntp-br${i === 0 ? ' tg' : ''}"><span>${w}</span><i></i><em>0%</em></div>`).join('');
+    this.bars = [...s.querySelectorAll('.ntp-br')];
+  },
+  soft(l) { const m = Math.max(...l), e = l.map((v) => Math.exp(v - m)), z = e.reduce((a, b) => a + b, 0); return e.map((v) => v / z); },
+  draw(s, l, k, hist) {
+    const p = this.soft(l);
+    this.bars.forEach((b, i) => { b.querySelector('i').style.width = (p[i] * 100).toFixed(1) + '%'; b.querySelector('em').textContent = (p[i] * 100).toFixed(0) + '%'; });
+    const loss = -Math.log(p[0]);
+    s.querySelector('.ntp-lv').textContent = loss.toFixed(2);
+    s.querySelector('.ntp-step b').textContent = k;
+    hist.push(loss);
+    const mx = Math.max(3.2, ...hist);
+    s.querySelector('.ntp-sp').setAttribute('d', C8.path(hist.map((v, i) => [i * (300 / 11), 66 - (v / mx) * 62])));
+  },
+  async run(s, ctx, tk) {
+    const ok = () => ctx.alive && tk === this.tk;
+    while (ok()) {
+      const l = [-1.1, 0.1, -0.2, -0.5, -0.1, 0.5], hist = [];
+      this.draw(s, l, 0, hist);
+      await U.wait(ctx, 1200); if (!ok()) return;
+      // 每一步：把“北京”的 logit 往上推，其余略降——概率分布被重新调整
+      for (let k = 1; k <= 11; k++) {
+        l[0] += 0.62; for (let i = 1; i < l.length; i++) l[i] -= 0.06;
+        this.draw(s, l, k, hist);
+        await U.wait(ctx, 650); if (!ok()) return;
+      }
+      await U.wait(ctx, 2600);
+    }
+  },
+  enter(s, ctx) { const tk = (this.tk = (this.tk || 0) + 1); this.run(s, ctx, tk); },
+  reset(s) { this.tk = (this.tk || 0) + 1; this.bars.forEach((b) => (b.querySelector('i').style.width = 0)); s.querySelector('.ntp-sp').setAttribute('d', ''); },
+};
+</script>
+
+<section class="slide" id="c08-mid" data-part="1" data-trans="rise" data-dur="12000" data-title="Mid-training 的本质：在目标分布上继续学习" data-notes="通用预训练不可能覆盖所有语言、领域和能力。如果模型几乎读不懂韩语文档、不了解企业内部协议，或没有形成目标任务所需的代码与长上下文表征，那么跳过这一步、直接教它“如何回答”或只按成败给奖惩，是补不上这些缺失的基础能力的。Mid-training 沿用预训练的下一个 token 目标，但<b>把数据分布收窄到目标领域，并混入一部分通用保留数据以控制遗忘</b>。它回答的是“模型是否拥有完成任务所需的知识与基本能力”，而不是“回答要长什么样”或“哪条策略奖励最高”。<br>Mid-training 与 SFT 的损失函数看起来很像，但数据组织和监督密度不同：前者通常把整段文档、代码或推导都当作学习目标，对大量 token 计算损失；后者把数据组织成输入—输出示范，并通常只在回答 token 上计算损失。因此，用少量问答 SFT 让模型背下一批事实在技术上并非不可能，但它只反复强化少数访问路径，容易记住问法而不形成广泛可调用的知识。需要吸收大规模、彼此关联的领域知识时，应优先考虑 Mid-training；需要知识可更新、可追溯时，则优先考虑 RAG。<br>左图是示意：训练数据 = 目标领域分布 + 一部分通用保留数据，滑块调节保留比例；具体配比要靠留出领域任务和通用保留集共同评估。右侧的“企业退款规定”是虚构例子：文档对每个 token 计损、点亮多条知识关联；少量问答只强化一条访问路径。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Mid-training：在<em>目标分布</em>上继续学习</h2>
+  <p class="lead fx fx-up" style="--d:2">仍是预测下一个词，但把数据收窄到目标领域、混入通用保留数据——回答“模型有没有完成任务所需的知识与基本能力”</p></header>
+  <div class="mid-body">
+    <div class="mid-l panel fx fx-left" style="--d:3">
+      <svg class="mid-svg" viewBox="0 0 700 330" width="700" height="330">
+        <path class="mid-ax" d="M30 290 H680"/>
+        <path class="mid-gen" d=""/><path class="mid-tgt" d=""/><path class="mid-mix" d=""/>
+        <text class="mid-t1" x="200" y="150">通用预训练分布</text><text class="mid-t2" x="560" y="36">目标领域</text>
+        <text class="mid-t3" x="40" y="318">数据分布（示意）</text>
+      </svg>
+      <div class="mid-ctl"><span>通用保留数据</span><input class="rng mid-rng" type="range" min="0" max="50" value="20"><b class="mid-v">20%</b></div>
+      <div class="mid-lg"><span class="g">通用预训练</span><span class="t">目标领域</span><span class="m">训练混合</span></div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="mid-r panel fx fx-right" style="--d:4">
+      <div class="mid-seg seg"><i class="knob"></i><button data-v="doc">Mid-training：整段文档</button><button data-v="qa">少量问答 SFT</button></div>
+      <div class="mid-txt"></div>
+      <svg class="mid-g" viewBox="0 0 640 230" width="640" height="230"></svg>
+      <p class="mid-cap"></p>
+      <span class="c8-sx">示意</span>
+    </div>
+  </div>
+  <div class="mid-pick fx fx-up" style="--d:6"><span><svg class="ic"><use href="#i-layers"/></svg>大规模、彼此关联的领域知识 → <b>优先 Mid-training</b></span><span><svg class="ic"><use href="#i-db"/></svg>需要可更新、可追溯 → <b>优先 RAG</b></span></div>
+  <div class="src">第八章 ·「Mid-training 的本质：在目标分布上继续学习」</div>
+</section>
+<style>
+.mid-body{display:grid;grid-template-columns:760px 1fr;gap:28px;flex:1;min-height:0}
+.mid-l,.mid-r{position:relative;padding:22px 26px;display:flex;flex-direction:column;gap:12px}
+.mid-svg{overflow:visible}
+.mid-ax{stroke:rgba(255,255,255,.2);stroke-width:2}
+.mid-gen{fill:rgba(148,163,184,.12);stroke:#94a3b8;stroke-width:2}
+.mid-tgt{fill:rgba(45,212,191,.1);stroke:#2dd4bf;stroke-width:2;stroke-dasharray:6 5}
+.mid-mix{fill:none;stroke:var(--acc);stroke-width:4;filter:drop-shadow(0 0 8px var(--acc))}
+.mid-t1{fill:#94a3b8;font-size:17px}.mid-t2{fill:#2dd4bf;font-size:17px;text-anchor:middle}.mid-t3{fill:var(--text3);font-size:15px}
+.mid-ctl{display:grid;grid-template-columns:auto 1fr 64px;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+.mid-v{font:800 24px var(--num);color:var(--acc);text-align:right}
+.mid-lg{display:flex;gap:18px;font-size:16px;color:var(--text3)}
+.mid-lg span::before{content:"";display:inline-block;width:22px;height:4px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.mid-lg .g::before{background:#94a3b8}.mid-lg .t::before{background:#2dd4bf}.mid-lg .m::before{background:var(--acc)}
+.mid-seg{align-self:flex-start}
+.mid-txt{display:flex;flex-wrap:wrap;gap:6px 4px;font-size:20px;line-height:1.5;min-height:96px}
+.mid-txt span{padding:2px 4px;border-radius:6px;border-bottom:3px solid transparent;transition:all .35s}
+.mid-txt span.q{color:var(--text3)}
+.mid-txt span.l{border-bottom-color:var(--warn);background:rgba(251,146,60,.1)}
+.mid-g{display:block;overflow:visible}
+.mid-g line{stroke:rgba(255,255,255,.12);stroke-width:2;transition:stroke .4s,stroke-width .4s}
+.mid-g line.on{stroke:var(--acc);stroke-width:4;filter:drop-shadow(0 0 6px var(--acc))}
+.mid-g circle{fill:rgba(12,18,40,.95);stroke:rgba(255,255,255,.3);stroke-width:2;transition:all .4s}
+.mid-g circle.on{stroke:var(--acc);fill:color-mix(in srgb,var(--acc) 22%,rgba(12,18,40,.95))}
+.mid-g text{fill:var(--text);font-size:16px;text-anchor:middle;dominant-baseline:central}
+.mid-cap{font-size:18px;line-height:1.6;color:var(--text2);min-height:58px}
+.mid-cap b{color:var(--acc)}
+.mid-pick{display:flex;justify-content:center;gap:24px;margin:18px 0 26px}
+.mid-pick span{display:flex;align-items:center;gap:10px;padding:12px 22px;border-radius:14px;font-size:20px;background:rgba(255,255,255,.04);border:1px solid var(--line2)}
+.mid-pick .ic{font-size:24px;color:var(--acc)}
+.mid-pick b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c08-mid'] = {
+  // 文档与问答都是虚构示例
+  DOC: ['退款', '超过', '500 元', '须经', '二级审批', '；', '财务', '在', '3 个工作日', '内', '完成', '复核', '；', '促销', '订单', '另按', '活动', '规则', '处理', '。'],
+  QA: [['问：', 'q'], ['退款', 'q'], ['超过', 'q'], ['多少', 'q'], ['需要', 'q'], ['二级审批', 'q'], ['？', 'q'], ['答：', 'q'], ['500 元', 'a']],
+  N: [['退款', 90, 60], ['500 元', 300, 30], ['二级审批', 520, 70], ['财务复核', 140, 180], ['3 个工作日', 380, 200], ['促销例外', 580, 180]],
+  E: [[0, 1], [1, 2], [0, 2], [2, 3], [3, 4], [0, 5], [5, 2], [0, 3]],
+  init(s) {
+    const g = s.querySelector('.mid-g');
+    g.innerHTML = this.E.map(([a, b]) => `<line x1="${this.N[a][1]}" y1="${this.N[a][2]}" x2="${this.N[b][1]}" y2="${this.N[b][2]}"/>`).join('') +
+      this.N.map(([t, x, y]) => `<circle cx="${x}" cy="${y}" r="${t.length > 3 ? 56 : 44}"/><text x="${x}" y="${y}">${t}</text>`).join('');
+    this.set = U.seg(s.querySelector('.mid-seg'), (v) => { this.auto = false; this.mode(s, v); });
+    const r = s.querySelector('.mid-rng');
+    r.addEventListener('input', () => this.curve(s, +r.value));
+    r.addEventListener('change', () => r.blur());
+    this.curve(s, 20);
+  },
+  curve(s, pct) {
+    const lam = pct / 100, N = 120, X = (u) => 30 + u * 650, Y = (v) => 290 - v * 235;
+    const gau = (u, m, sd) => Math.exp(-0.5 * ((u - m) / sd) ** 2);
+    const gen = [], tgt = [], mix = [];
+    for (let i = 0; i <= N; i++) {
+      const u = i / N, a = 0.42 * gau(u, 0.42, 0.2), b = gau(u, 0.8, 0.055);
+      gen.push([X(u), Y(a)]); tgt.push([X(u), Y(b)]); mix.push([X(u), Y((1 - lam) * b + lam * a * 1.6)]);
+    }
+    const close = (p) => C8.path(p) + `L${X(1)} 290L${X(0)} 290Z`;
+    s.querySelector('.mid-gen').setAttribute('d', close(gen));
+    s.querySelector('.mid-tgt').setAttribute('d', close(tgt));
+    s.querySelector('.mid-mix').setAttribute('d', C8.path(mix));
+    s.querySelector('.mid-v').textContent = pct + '%';
+    const r = s.querySelector('.mid-rng');
+    r.value = pct; r.style.setProperty('--p', pct * 2 + '%');
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(m);
+    const txt = s.querySelector('.mid-txt'), cap = s.querySelector('.mid-cap');
+    if (m === 'doc') {
+      txt.innerHTML = this.DOC.map((t) => `<span class="l">${t}</span>`).join('');
+      cap.innerHTML = '整段文档都是学习目标：<b>每个 token 都计算损失</b>，概念之间的多条关联一起被写进参数';
+    } else {
+      txt.innerHTML = this.QA.map(([t, k]) => `<span class="${k === 'a' ? 'l' : 'q'}">${t}</span>`).join('');
+      cap.innerHTML = '只在回答上计算损失：反复强化的是<b>“这一种问法 → 这个答案”</b>这一条访问路径，容易记住问法';
+    }
+    const lit = m === 'doc' ? this.E.map((_, i) => i) : [0];
+    s.querySelectorAll('.mid-g line').forEach((l, i) => l.classList.toggle('on', lit.includes(i)));
+    const nodes = new Set(lit.flatMap((i) => this.E[i]));
+    s.querySelectorAll('.mid-g circle').forEach((c, i) => c.classList.toggle('on', nodes.has(i)));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.mode(s, 'doc');
+    ctx.every(() => { if (this.auto) this.mode(s, this.m === 'doc' ? 'qa' : 'doc'); }, 4200);
+    // 保留比例自动来回扫一遍，演示“混入保留数据”
+    let t0 = 0;
+    ctx.raf((t) => { if (!this.auto) return; if (!t0) t0 = t; const u = ((t - t0) / 9000) % 1; this.curve(s, Math.round(25 - 22 * Math.cos(u * 2 * Math.PI))); });
+  },
+  reset(s) { this.curve(s, 20); s.querySelectorAll('.mid-g .on').forEach((e) => e.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c08-mask" data-part="1" data-steps="2" data-dur="12000" data-title="SFT 的本质：换了数据的预测下一个词" data-notes="这是本章第一个需要打通的关键认知：<b>SFT 在数学上和预训练是同一个任务——都是预测下一个词、最小化同一个损失函数。</b>很多初学者以为 SFT 是一种全新方法，其实不是。SFT 与预训练的差别只有两点：<br>① <b>数据不同。</b>预训练用原始互联网文本（无结构、什么都有）；SFT 用人工精心准备的“输入—输出”对，格式统一为“用户提问 → 理想回答”。模型在这些示范上继续做“预测下一个词”，于是把“被提问时该怎么组织回答”这个协议学了进去。<br>② <b>损失只算在“回答”上（loss masking，损失屏蔽）。</b>一条 SFT 样本包含问题和标注回答两部分。我们不希望模型学“怎么提问”，只希望它学“怎么回答”，所以计算损失时把问题部分的 token 屏蔽掉，只对回答部分回传梯度。这是 SFT 在工程上与预训练唯一实质性的区别。<br>理解了这一点，也就能看出 SFT 为什么会在有限示范上表现出记忆倾向：它的优化目标是<b>让标注回答里每一个 token 的概率尽可能高</b>，也就是尽量复现示范。对目标明确、格式固定的任务，这种方法极其高效（几千条样例就见效）；但当数据覆盖面和多样性不足时，模型可能对示范中的表面模式或捷径过拟合，在分布变化后性能下降。<br>一句话概括 SFT 的本质：<b>用极高的样本效率，把一套稳定的“输入→输出”映射与协议固化进参数。</b>它固化的是“格式、风格、流程”这类<b>协议性知识</b>（该怎么说、怎么做），而非大量<b>事实性知识</b>（知道什么）——后者要靠预训练或 RAG。<br>演示中的 token 切分与损失值都是示意：扫描线逐个预测下一个 token，柱高是 −log p；切到 SFT 模式后，系统提示与提问部分的 token 被屏蔽，不回传梯度。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">SFT 的本质：换了数据的<em>“预测下一个词”</em></h2></div>
+    <div class="mk-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="pre">预训练：全部计损</button><button data-v="sft">SFT：只在回答上计损</button></div></header>
+  <div class="mk-panel panel fx fx-up" style="--d:3">
+    <div class="mk-toks"></div>
+    <div class="mk-f"><span class="c8-m mk-fm"></span><span class="mk-sum">本条损失 <b>0.00</b></span><span class="mk-leg"><i class="a"></i>计入损失、回传梯度<i class="m"></i>屏蔽</span></div>
+    <span class="c8-sx">示意</span>
+  </div>
+  <div class="mk-cards">
+    <div class="mk-c fx fx-up" style="--d:5"><em>①</em><b>数据不同</b><p>原始互联网文本 → 人工准备的“用户提问 → 理想回答”，把<span>被提问时该怎么组织回答</span>这个协议学进去</p></div>
+    <div class="mk-c fx fx-up" style="--d:6"><em>②</em><b>损失只算在“回答”上</b><p>loss masking：屏蔽问题部分的 token，只对回答部分回传梯度——<span>工程上唯一实质性的区别</span></p></div>
+    <div class="mk-c mk-mem fx fx-up" data-step="1"><em>→</em><b>为什么会记忆</b><p>目标是<span>让标注回答里每一个 token 的概率尽可能高</span>：目标明确时几千条就见效；覆盖不足时会对表面模式过拟合</p></div>
+  </div>
+  <div class="mk-tag tagline fx fx-up" data-step="2"><b>用极高的样本效率，把一套稳定的“输入→输出”映射与协议固化进参数</b>：固化的是<span class="c-acc">协议性知识</span>（该怎么说、怎么做），而非大量<span class="c-warn">事实性知识</span>（知道什么，靠预训练或 RAG）</div>
+  <div class="src">第八章 ·「SFT 的本质：换了数据的“预测下一个词”」</div>
+</section>
+<style>
+#c08-mask .sh{display:flex;align-items:flex-end;justify-content:space-between}
+.mk-panel{position:relative;padding:26px 28px 18px}
+.mk-toks{display:flex;flex-wrap:wrap;gap:18px 6px;align-items:flex-end;min-height:280px}
+.mk-t{--c:var(--text3);position:relative;display:flex;flex-direction:column;align-items:center;gap:6px}
+.mk-t .bar{width:100%;min-width:30px;height:70px;display:flex;align-items:flex-end;justify-content:center}
+.mk-t .bar i{display:block;width:70%;height:0;border-radius:6px 6px 2px 2px;background:linear-gradient(0deg,var(--warn),color-mix(in srgb,var(--warn) 50%,#fff));transition:height .35s var(--ease)}
+.mk-t .bar i.on{box-shadow:0 0 12px color-mix(in srgb,var(--warn) 60%,transparent)}
+.mk-t span{padding:6px 10px;border-radius:9px;font:18px/1.2 var(--mono);white-space:pre;color:var(--text);background:color-mix(in srgb,var(--c) 14%,rgba(10,16,36,.9));border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:all .3s}
+.mk-t[data-r=s]{--c:#94a3b8}.mk-t[data-r=u]{--c:var(--tool)}.mk-t[data-r=a]{--c:var(--llm)}.mk-t[data-r=h]{--c:#64748b}
+.mk-t.cur span{outline:2px solid var(--acc);outline-offset:3px;box-shadow:0 0 18px var(--acc)}
+.mk-t.mask span{opacity:.45;background:repeating-linear-gradient(135deg,rgba(255,255,255,.06) 0 6px,transparent 6px 12px);text-decoration:line-through;text-decoration-color:rgba(251,113,133,.7)}
+.mk-t.mask .bar::after{content:"×";font:700 20px var(--num);color:var(--bad);opacity:.8}
+.mk-f{display:flex;align-items:center;gap:30px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line);font-size:22px}
+.mk-sum{font-size:19px;color:var(--text2)}
+.mk-sum b{font:800 28px var(--num);color:var(--warn)}
+.mk-leg{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text3)}
+.mk-leg i{width:16px;height:16px;border-radius:4px;margin-left:12px}
+.mk-leg i.a{background:var(--warn)}.mk-leg i.m{background:repeating-linear-gradient(135deg,rgba(255,255,255,.3) 0 3px,transparent 3px 6px);border:1px solid rgba(251,113,133,.6)}
+.mk-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:20px}
+.mk-c{padding:18px 22px;border-radius:18px;background:rgba(255,255,255,.04);border:1px solid var(--line);display:grid;grid-template-columns:36px 1fr;gap:4px 12px}
+.mk-c em{grid-row:span 2;font:800 30px var(--num);font-style:normal;color:var(--acc)}
+.mk-c b{font-size:22px}
+.mk-c p{font-size:18px;line-height:1.6;color:var(--text2)}
+.mk-c p span{color:var(--text)}
+.mk-mem{border-color:color-mix(in srgb,var(--warn) 40%,transparent);background:rgba(251,146,60,.06)}
+.mk-mem em{color:var(--warn)}
+.mk-tag{margin-top:18px;font-size:22px}
+</style>
+<script>
+HOOKS['c08-mask'] = {
+  // r：s 系统提示 / u 用户提问 / h 角色标记 / a 标注回答（只有 a 在 SFT 中计损）
+  T: [['<system>', 'h'], ['你是', 's'], ['客服', 's'], ['助手', 's'], ['，', 's'], ['用', 's'], ['JSON', 's'], ['回答', 's'], ['<user>', 'h'], ['订单', 'u'], ['1024', 'u'], ['什么', 'u'], ['时候', 'u'], ['发货', 'u'], ['？', 'u'], ['<assistant>', 'h'],
+    ['{"', 'a'], ['status', 'a'], ['": "', 'a'], ['已', 'a'], ['发货', 'a'], ['", "', 'a'], ['eta', 'a'], ['": "', 'a'], ['明天', 'a'], ['"}', 'a'], ['<end>', 'a']],
+  init(s) {
+    const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const rnd = U.rand(81);
+    this.loss = this.T.map(([, r]) => (r === 'a' ? 0.25 + rnd() * 1.6 : 0.6 + rnd() * 2.2));
+    s.querySelector('.mk-toks').innerHTML = this.T.map(([t, r]) => `<div class="mk-t" data-r="${r}"><div class="bar"><i></i></div><span>${esc(t)}</span></div>`).join('');
+    this.ts = [...s.querySelectorAll('.mk-t')];
+    this.set = U.seg(s.querySelector('.mk-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  mode(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.m = m;
+    this.set(m);
+    s.querySelector('.mk-fm').innerHTML = m === 'pre'
+      ? '<i>L</i> = −Σ<sub><i>t</i> = 1…<i>T</i></sub> log <i>p</i>(<i>x<sub>t</sub></i> | <i>x</i><sub>&lt;<i>t</i></sub>)'
+      : '<i>L</i> = −Σ<sub><i>t</i> ∈ 回答</sub> log <i>p</i>(<i>x<sub>t</sub></i> | <i>x</i><sub>&lt;<i>t</i></sub>)';
+    this.ts.forEach((t) => { t.classList.remove('cur', 'mask'); const i = t.querySelector('i'); i.style.height = 0; i.classList.remove('on'); });
+    const sum = s.querySelector('.mk-sum b');
+    sum.textContent = '0.00';
+    if (!ctx) return;
+    let acc = 0;
+    // 从第 2 个 token 开始逐个“预测下一个 token”
+    this.ts.forEach((t, j) => {
+      if (j === 0) return;
+      ctx.later(() => {
+        if (tk !== this.tk) return;
+        this.ts.forEach((x) => x.classList.toggle('cur', x === t));
+        const counted = m === 'pre' || this.T[j][1] === 'a';
+        if (counted) {
+          const i = t.querySelector('i');
+          i.style.height = Math.min(64, this.loss[j] * 26) + 'px';
+          i.classList.add('on');
+          acc += this.loss[j];
+          sum.textContent = acc.toFixed(2);
+        } else t.classList.add('mask');
+      }, 500 + j * 190);
+    });
+    ctx.later(() => { if (tk === this.tk) this.ts.forEach((x) => x.classList.remove('cur')); }, 700 + this.ts.length * 190);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'pre');
+    ctx.every(() => { if (this.auto) this.mode(s, this.m === 'pre' ? 'sft' : 'pre'); }, 7600);
+  },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.ts.forEach((t) => { t.classList.remove('cur', 'mask'); t.querySelector('i').style.height = 0; }); },
+};
+</script>
+
+<section class="slide" id="c08-lora" data-part="1" data-trans="flip" data-dur="12000" data-title="训练成本：LoRA 参数高效微调" data-notes="<b>训练成本：LoRA 参数高效微调</b>。SFT 和后面的 RL 都要更新模型参数，而全参数微调对显存的要求很高（要为数十亿参数都存梯度和优化器状态）。<b>LoRA</b>（Low-Rank Adaptation，低秩适配）是最常用的省钱办法：不动原始的大权重矩阵，只在旁边挂一个很小的“补丁”（低秩矩阵）来学习任务，参数量仅占原始的 1%–5%，却能接近全参微调的效果。因为原权重被冻结，LoRA 对基座已有能力的扰动也更小，灾难性遗忘的风险更低。<br>几条经过验证的实践经验（Thinking Machines Lab 的《LoRA Without Regret》）：<b>必须</b>把 LoRA 应用到所有主要权重矩阵（尤其参数占比最大的 MLP 层），只加在注意力层会掉点；<b>最优学习率约是全参微调的 10 倍</b>（SFT、RL 都成立，是个非常实用的迁移规则）；SFT 用中高 rank（64–256），RL 因每轮信息量很小，用小 rank（8–32）甚至 rank=1 就够。部署时一台推理服务器可同时加载多个 LoRA adapter 做多租户服务。本书把 LoRA 当作贯穿所有后训练方法的工程默认项，不再单独展开。<br>左图拖动 rank 滑块，看低秩补丁的“瓶颈”宽度变化（图形比例为示意）；右下角是多租户推理的示意：请求到达时挂上对应客户的 adapter。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">训练成本：<em>LoRA</em> 参数高效微调</h2>
+  <p class="lead fx fx-up" style="--d:2">不动原始大矩阵，只在旁边挂一个低秩“补丁”：参数量仅占原始的 1%–5%，却能接近全参微调的效果</p></header>
+  <div class="lo-body">
+    <div class="lo-l panel fx fx-left" style="--d:3">
+      <svg class="lo-svg" viewBox="0 0 860 440" width="860" height="440">
+        <defs><linearGradient id="lo8g" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#818cf8"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+        <rect class="lo-io" x="60" y="400" width="700" height="30" rx="10"/><text class="lo-iot" x="410" y="420">输入 x</text>
+        <rect class="lo-io" x="60" y="12" width="700" height="30" rx="10"/><text class="lo-iot" x="410" y="32">输出 h = W x + B A x</text>
+        <path class="lo-p" d="M210 400 V352"/><path class="lo-p" d="M210 130 V42"/>
+        <path class="lo-p t" d="M610 400 V352"/><path class="lo-p t" d="M610 130 V42"/>
+        <rect class="lo-w" x="70" y="132" width="280" height="220" rx="14"/>
+        <text class="lo-wt" x="210" y="232">原始权重 W</text><text class="lo-ws" x="210" y="262">d × d · 冻结，不训练</text>
+        <g class="lo-lock" transform="translate(320 150)"><rect x="-14" y="-4" width="28" height="22" rx="5"/><path d="M-8 -4 V-11 A8 8 0 0 1 8 -11 V-4"/></g>
+        <path class="lo-a" d=""/><path class="lo-b" d=""/>
+        <text class="lo-at" x="760" y="306">A：r × d</text><text class="lo-at" x="760" y="186">B：d × r</text>
+        <text class="lo-rt" x="610" y="246">r</text>
+        <circle class="lo-k k1" r="7"/><circle class="lo-k k2" r="7"/><circle class="lo-k k3" r="7"/><circle class="lo-k k4" r="7"/>
+      </svg>
+      <div class="lo-ctl">
+        <span>rank r</span>
+        <div class="lo-track"><i class="lo-band rl" style="left:37.5%;width:25%">RL 8–32</i><i class="lo-band sft" style="left:75%;width:25%">SFT 64–256</i><input class="rng lo-rng" type="range" min="0" max="8" step="1" value="3"></div>
+        <b class="lo-rv">8</b>
+      </div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="lo-r">
+      <ul class="lo-ul fx fx-right" style="--d:4">
+        <li><svg class="ic"><use href="#i-layers"/></svg><div><b>必须应用到所有主要权重矩阵</b><p>尤其参数占比最大的 MLP 层；只加在注意力层会掉点</p></div></li>
+        <li><svg class="ic"><use href="#i-gauge"/></svg><div><b>最优学习率约是全参微调的 10 倍</b><p>SFT、RL 都成立，是个实用的迁移规则</p></div></li>
+        <li><svg class="ic"><use href="#i-sliders"/></svg><div><b>SFT 用中高 rank，RL 用小 rank</b><p>SFT 64–256；RL 每轮信息量很小，8–32 甚至 rank = 1 就够</p></div></li>
+        <li><svg class="ic"><use href="#i-shield"/></svg><div><b>原权重冻结，遗忘风险更低</b><p>对基座已有能力的扰动更小——本书把 LoRA 当作后训练的工程默认项</p></div></li>
+      </ul>
+      <div class="lo-mt panel fx fx-right" style="--d:5">
+        <span class="lbl">多租户推理：一台服务器同时加载多个 adapter</span>
+        <div class="lo-mrow"><div class="lo-reqs"></div><div class="lo-srv"><b>基座模型</b><small>共享权重</small></div><div class="lo-ads"><span data-a="0" style="--c:#22d3ee">客户 A</span><span data-a="1" style="--c:#fbbf24">客户 B</span><span data-a="2" style="--c:#f472b6">客户 C</span></div></div>
+        <span class="c8-sx">示意</span>
+      </div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT 的本质：换了数据的“预测下一个词”」· 训练成本：LoRA 参数高效微调</div>
+</section>
+<style>
+.lo-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:22px}
+.lo-l{position:relative;width:920px;flex:none;padding:18px 24px;display:flex;flex-direction:column;gap:10px}
+.lo-svg{display:block;overflow:visible}
+.lo-io{fill:rgba(255,255,255,.05);stroke:rgba(255,255,255,.18);stroke-width:1.5}
+.lo-iot{fill:var(--text2);font-size:18px;text-anchor:middle}
+.lo-p{stroke:rgba(148,163,184,.45);stroke-width:3;stroke-dasharray:6 7;animation:flow 1s linear infinite}
+.lo-p.t{stroke:color-mix(in srgb,var(--acc) 70%,transparent)}
+.lo-w{fill:rgba(148,163,184,.12);stroke:rgba(148,163,184,.55);stroke-width:2}
+.lo-wt{fill:var(--text);font-size:24px;font-weight:700;text-anchor:middle}
+.lo-ws{fill:var(--text3);font-size:17px;text-anchor:middle}
+.lo-lock rect{fill:#94a3b8}.lo-lock path{fill:none;stroke:#94a3b8;stroke-width:3}
+.lo-a,.lo-b{fill:url(#lo8g);fill-opacity:.32;stroke:var(--acc);stroke-width:2.5;filter:drop-shadow(0 0 10px color-mix(in srgb,var(--acc) 60%,transparent));transition:d .5s var(--ease)}
+.lo-at{fill:var(--acc);font-size:17px;text-anchor:end}
+.lo-rt{fill:#fff;font:italic 700 22px "Times New Roman",serif;text-anchor:middle;dominant-baseline:central}
+.lo-k{fill:#fff;opacity:0}
+.lo-k.k1,.lo-k.k2{filter:drop-shadow(0 0 6px #94a3b8)}.lo-k.k3,.lo-k.k4{filter:drop-shadow(0 0 8px var(--acc))}
+.lo-ctl{display:grid;grid-template-columns:auto 1fr 60px;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+.lo-track{position:relative;padding-top:30px}
+.lo-band{position:absolute;top:0;height:24px;border-radius:7px;font-size:15px;font-style:normal;display:grid;place-items:center;white-space:nowrap}
+.lo-band.rl{color:var(--pink);background:rgba(244,114,182,.12);border:1px solid rgba(244,114,182,.4)}
+.lo-band.sft{color:var(--violet);background:rgba(167,139,250,.12);border:1px solid rgba(167,139,250,.4)}
+.lo-rv{font:800 28px var(--num);color:var(--acc);text-align:right}
+.lo-r{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+.lo-ul{display:flex;flex-direction:column;gap:10px}
+.lo-ul li{display:flex;gap:14px;align-items:flex-start;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.lo-ul .ic{flex:none;font-size:26px;color:var(--acc);margin-top:3px}
+.lo-ul b{font-size:20px}
+.lo-ul p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:2px}
+.lo-mt{position:relative;padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.lo-mrow{display:flex;align-items:center;gap:14px;height:96px}
+.lo-reqs{position:relative;width:120px;height:96px}
+.lo-req{position:absolute;left:0;width:16px;height:16px;border-radius:50%;background:var(--c);box-shadow:0 0 10px var(--c);transition:left .8s var(--ease),opacity .4s}
+.lo-srv{width:150px;height:84px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.4)}
+.lo-srv b{font-size:19px}.lo-srv small{font-size:15px;color:var(--text3)}
+.lo-ads{display:flex;flex-direction:column;gap:6px}
+.lo-ads span{padding:3px 12px;border-radius:8px;font-size:16px;color:var(--c);border:1px dashed color-mix(in srgb,var(--c) 50%,transparent);transition:all .35s}
+.lo-ads span.on{border-style:solid;background:color-mix(in srgb,var(--c) 20%,transparent);box-shadow:0 0 14px color-mix(in srgb,var(--c) 50%,transparent);translate:-8px 0}
+</style>
+<script>
+HOOKS['c08-lora'] = {
+  R: [1, 2, 4, 8, 16, 32, 64, 128, 256],
+  init(s) {
+    const r = s.querySelector('.lo-rng');
+    r.addEventListener('input', () => { this.auto = false; this.rank(s, +r.value); });
+    r.addEventListener('change', () => r.blur());
+    this.rank(s, 3);
+  },
+  // 瓶颈宽度按 log2(r) 线性映射（示意）
+  rank(s, i) {
+    this.ri = i;
+    const w = 8 + i * 15, cx = 610, h = 280;
+    s.querySelector('.lo-a').setAttribute('d', `M${cx - 140} 352 L${cx + 140} 352 L${cx + w / 2} 262 L${cx - w / 2} 262 Z`);
+    s.querySelector('.lo-b').setAttribute('d', `M${cx - w / 2} 230 L${cx + w / 2} 230 L${cx + 140} 132 L${cx - 140} 132 Z`);
+    s.querySelector('.lo-rv').textContent = this.R[i];
+    const rg = s.querySelector('.lo-rng');
+    rg.value = i; rg.style.setProperty('--p', (i / 8) * 100 + '%');
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    const ks = [...s.querySelectorAll('.lo-k')];
+    // 两条通路上的数据点：x 同时流经冻结的 W 与可训练的 B·A
+    const lane = (k, x, off) => ctx.raf((t) => {
+      const u = ((t / 2600) + off) % 1, y = 400 - u * 360;
+      k.setAttribute('cx', x); k.setAttribute('cy', y.toFixed(1));
+      k.style.opacity = u < 0.06 ? u / 0.06 : u > 0.94 ? (1 - u) / 0.06 : 1;
+    });
+    lane(ks[0], 210, 0); lane(ks[1], 210, 0.5); lane(ks[2], 610, 0.1); lane(ks[3], 610, 0.6);
+    const seq = [3, 4, 5, 6, 7, 8, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2];
+    let j = 0;
+    ctx.every(() => { if (this.auto) this.rank(s, seq[(j = (j + 1) % seq.length)]); }, 900);
+    // 多租户：请求依次到达，挂上对应 adapter
+    const reqs = s.querySelector('.lo-reqs'), ads = [...s.querySelectorAll('.lo-ads span')], C = ['#22d3ee', '#fbbf24', '#f472b6'];
+    let n = 0;
+    ctx.every(() => {
+      const a = n++ % 3, d = document.createElement('i');
+      d.className = 'lo-req'; d.style.setProperty('--c', C[a]); d.style.top = 40 + 'px'; d.style.left = '0px';
+      reqs.appendChild(d);
+      requestAnimationFrame(() => { d.style.left = '104px'; });
+      ctx.later(() => { ads.forEach((x, k) => x.classList.toggle('on', k === a)); d.style.opacity = 0; }, 800);
+      ctx.later(() => d.remove(), 1300);
+    }, 1500);
+  },
+  reset(s) { s.querySelector('.lo-reqs').innerHTML = ''; s.querySelectorAll('.lo-ads span').forEach((x) => x.classList.remove('on')); this.rank(s, 3); },
+};
+</script>
+
+<section class="slide" id="c08-passk" data-part="1" data-steps="2" data-dur="12000" data-title="什么时候需要先补底座，再做 SFT/RL" data-notes="RL 策略不直接模仿参考回答的 token，而是用奖励评估模型<b>自己生成</b>的回答；奖励计算仍可以使用参考答案或偏好数据。要从这种信号里学习，至少要满足两个前提：输出能被验证，并且当前策略偶尔能探索到有价值的行为。<br>第一个前提是<b>格式支持</b>：如果任务要求输出 JSON 或工具调用，而模型吐出的是无法解析的文本，奖励函数连“成功还是失败”都判断不了。此时 SFT 可以先扮演“把话说利索”的角色：用少量示范稳定格式与基本流程，使奖励可计算，再由 RL 优化策略——这就是常见的“先 SFT、后 RL”。<br>第二个前提更根本，是<b>能力支持</b>。先在留出任务上以与训练相近的温度采样，测量 pass@1 和 pass@k。若单次成功概率为 p，近似独立采样 k 次至少成功一次的概率为 pass@k = 1 − (1 − p)^k。如果 pass@1 低、但 pass@k 随 k 明显上升，说明正确策略已经处在模型分布里，只是概率质量太小；RL、拒绝采样或蒸馏都有东西可放大。反之，如果在合理的 k、采样温度和任务覆盖下，实测 pass@k 仍接近 0，那么基础模型几乎生成不出成功轨迹。只给终点 0/1 奖励时，GRPO 的一组 rollout 很可能全为 0，组内优势直接消失；PPO 也看不到“应该往哪里移动”的正向样本。把采样量继续放大只能以约 1/p 的速度等待偶然成功，效率会迅速失去实际意义。<br>这时应先问缺的是什么：缺领域语言、事实、代码模式或长上下文基础能力，优先用 Mid-training 补底座；已有能力但不会按接口表达，先用 SFT；能够局部前进但到不了终点，可以加入可验证的部分奖励或课程学习。RL 擅长把<b>已有但概率较低</b>的成功行为推高，不擅长从全零奖励中凭空创造模型从未学过的知识和能力。<br>一个重要边界：“必须先 SFT”只在输出格式或基本行为尚未建立时成立。实验 8-11 会看到，Llama-3.2-Vision-11B 在严格结构化输出设置中不经 SFT 直接 RL 会失败；但足够强、已经有非零成功率的基模可以跳过 SFT，DeepSeek-R1-Zero 就是这种情形。它后来加入冷启动 SFT，主要是改善可读性与语言一致性，而不是为 RL 注入任务知识。<br>左侧曲线按公式实时计算；下方那一组 rollout 是按当前 p 随机抽样的示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">什么时候需要<em>先补底座</em>，再做 SFT / RL</h2></header>
+  <div class="pk-body">
+    <div class="pk-l panel fx fx-left" style="--d:2">
+      <div class="pk-fm c8-m">pass@<i>k</i> = 1 − (1 − <i>p</i>)<sup><i>k</i></sup> <span class="pk-val"></span></div>
+      <svg class="pk-svg" viewBox="0 0 800 300" width="800" height="300">
+        <path class="pk-grid" d=""/><path class="pk-area" d=""/><path class="pk-cv" d=""/><circle class="pk-pt" r="9"/>
+        <g class="pk-xl"></g><text class="pk-yl" x="6" y="18">pass@k</text>
+      </svg>
+      <div class="pk-ctl"><label>单次成功率 <i>p</i></label><input class="rng pk-p" type="range" min="0" max="100" value="40"><b class="pk-pv"></b>
+        <label>采样次数 <i>k</i></label><input class="rng pk-k" type="range" min="0" max="6" step="1" value="4"><b class="pk-kv"></b></div>
+      <div class="pk-roll"><span class="lbl">一组 rollout（按 p 抽样 · 示意）</span><div class="pk-dots"></div><p class="pk-msg"></p></div>
+    </div>
+    <div class="pk-r">
+      <div class="pk-two fx fx-right" style="--d:3">
+        <div class="pk-c"><b><svg class="ic"><use href="#i-code"/></svg>格式支持</b><p>输出无法解析，奖励函数连“成功还是失败”都判断不了 → 先用少量 SFT 稳定格式，使奖励可计算</p></div>
+        <div class="pk-c"><b><svg class="ic"><use href="#i-target"/></svg>能力支持</b><p>当前策略偶尔能探索到有价值的行为：在留出任务上以相近温度采样，测 pass@1 与 pass@k</p></div>
+      </div>
+      <div class="pk-dx panel fx fx-up" data-step="1">
+        <span class="lbl">pass@k 仍接近 0 时，先问缺的是什么</span>
+        <div class="pk-br"><span>缺领域语言、事实、代码模式或长上下文基础能力</span><b style="--c:#2dd4bf">Mid-training</b></div>
+        <div class="pk-br"><span>已有能力，但不会按接口表达</span><b style="--c:#a78bfa">SFT</b></div>
+        <div class="pk-br"><span>能局部前进，但到不了终点</span><b style="--c:#fbbf24">部分奖励 / 课程</b></div>
+        <p class="pk-key">RL 擅长把<em>已有但概率较低</em>的成功行为推高，不擅长从全零奖励中凭空创造</p>
+      </div>
+      <div class="pk-bd fx fx-up" data-step="2"><svg class="ic"><use href="#i-alert"/></svg><p>“必须先 SFT”只在格式或基本行为尚未建立时成立：<b>Llama-3.2-Vision-11B</b> 不经 SFT 直接 RL 失败（实验 8-11）；<b>DeepSeek-R1-Zero</b> 已有非零成功率，可跳过 SFT，后来的冷启动 SFT 主要改善可读性与语言一致性</p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「什么时候需要先补底座，再做 SFT/RL」</div>
+</section>
+<style>
+.pk-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:22px}
+.pk-l{width:880px;flex:none;padding:20px 28px;display:flex;flex-direction:column;gap:10px}
+.pk-fm{font-size:30px;display:flex;align-items:baseline;gap:16px}
+.pk-val{font-size:22px;color:var(--acc)}
+.pk-svg{display:block;overflow:visible}
+.pk-grid{fill:none;stroke:rgba(255,255,255,.08);stroke-width:1}
+.pk-area{fill:color-mix(in srgb,var(--acc) 14%,transparent)}
+.pk-cv{fill:none;stroke:var(--acc);stroke-width:4;filter:drop-shadow(0 0 8px var(--acc))}
+.pk-pt{fill:#fff;stroke:var(--acc);stroke-width:4}
+.pk-xl text,.pk-yl{fill:var(--text3);font-size:15px}
+.pk-xl text{text-anchor:middle}
+.pk-ctl{display:grid;grid-template-columns:120px 1fr 90px;align-items:center;gap:10px 16px;font-size:18px;color:var(--text2)}
+.pk-ctl i{font-family:"Times New Roman",serif;font-size:20px}
+.pk-ctl b{font:800 22px var(--num);color:var(--acc);text-align:right}
+.pk-roll{margin-top:4px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.pk-dots{display:flex;gap:8px;flex-wrap:wrap;min-height:40px}
+.pk-dots i{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font:700 18px var(--num);font-style:normal;color:var(--text3);background:rgba(255,255,255,.05);border:1px solid var(--line2);animation:upIn .4s var(--spring) both}
+.pk-dots i.ok{color:#04121a;background:var(--ok);border-color:var(--ok);box-shadow:0 0 12px var(--ok)}
+.pk-msg{font-size:18px;line-height:1.5;min-height:28px}
+.pk-msg.bad{color:var(--bad)}.pk-msg.ok{color:var(--ok)}
+.pk-r{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
+.pk-two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pk-c{padding:16px 18px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.pk-c b{display:flex;align-items:center;gap:8px;font-size:21px;color:var(--acc)}
+.pk-c p{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+.pk-dx{padding:16px 20px;display:flex;flex-direction:column;gap:9px}
+.pk-br{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line);font-size:17px;line-height:1.45}
+.pk-br b{padding:5px 12px;border-radius:9px;font-size:17px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);white-space:nowrap}
+.pk-key{font-size:18px;line-height:1.55;color:var(--text2);margin-top:2px}
+.pk-key em{font-style:normal;color:var(--acc);font-weight:700}
+.pk-bd{display:flex;gap:12px;padding:14px 18px;border-radius:14px;background:rgba(251,146,60,.07);border:1px solid rgba(251,146,60,.3)}
+.pk-bd .ic{flex:none;font-size:22px;color:var(--warn);margin-top:2px}
+.pk-bd p{font-size:17px;line-height:1.6;color:var(--text2)}
+.pk-bd b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-passk'] = {
+  K: [1, 2, 4, 8, 16, 32, 64],
+  P: (v) => 0.001 * Math.pow(500, v / 100), // 0.1% → 50%，对数刻度
+  X: (k) => 50 + (Math.log2(k) / 6) * 730,
+  Y: (v) => 270 - v * 250,
+  init(s) {
+    s.querySelector('.pk-xl').innerHTML = this.K.map((k) => `<text x="${this.X(k)}" y="294">k=${k}</text>`).join('');
+    s.querySelector('.pk-grid').setAttribute('d', [0, 0.25, 0.5, 0.75, 1].map((v) => `M50 ${this.Y(v)}H780`).join('') + this.K.map((k) => `M${this.X(k)} 20V270`).join(''));
+    const pr = s.querySelector('.pk-p'), kr = s.querySelector('.pk-k');
+    pr.addEventListener('input', () => { this.auto = false; this.pv = +pr.value; this.draw(s, true); });
+    kr.addEventListener('input', () => { this.auto = false; this.ki = +kr.value; this.draw(s, true); });
+    [pr, kr].forEach((r) => r.addEventListener('change', () => r.blur()));
+    this.pv = 40; this.ki = 4;
+    this.draw(s, false);
+  },
+  draw(s, roll) {
+    const p = this.P(this.pv), k = this.K[this.ki], pts = [];
+    for (let i = 0; i <= 60; i++) { const kk = Math.pow(2, (i / 60) * 6); pts.push([this.X(kk), this.Y(1 - Math.pow(1 - p, kk))]); }
+    s.querySelector('.pk-cv').setAttribute('d', C8.path(pts));
+    s.querySelector('.pk-area').setAttribute('d', C8.path(pts) + `L780 270L50 270Z`);
+    const v = 1 - Math.pow(1 - p, k), pt = s.querySelector('.pk-pt');
+    pt.setAttribute('cx', this.X(k)); pt.setAttribute('cy', this.Y(v));
+    const pp = p < 0.01 ? (p * 100).toFixed(2) : (p * 100).toFixed(1);
+    s.querySelector('.pk-val').textContent = `= 1 − (1 − ${p < 0.01 ? p.toFixed(4) : p.toFixed(3)})^${k} = ${v.toFixed(3)}`;
+    s.querySelector('.pk-pv').textContent = pp + '%';
+    s.querySelector('.pk-kv').textContent = k;
+    const pr = s.querySelector('.pk-p'), kr = s.querySelector('.pk-k');
+    pr.value = this.pv; pr.style.setProperty('--p', this.pv + '%');
+    kr.value = this.ki; kr.style.setProperty('--p', (this.ki / 6) * 100 + '%');
+    if (roll) this.roll(s);
+  },
+  roll(s) {
+    const p = this.P(this.pv), k = this.K[this.ki], n = Math.min(k, 16);
+    let hit = 0;
+    const d = Array.from({ length: n }, () => { const o = Math.random() < p; hit += o; return o; });
+    s.querySelector('.pk-dots').innerHTML = d.map((o, i) => `<i class="${o ? 'ok' : ''}" style="animation-delay:${i * 40}ms">${o ? 1 : 0}</i>`).join('') + (k > 16 ? `<i>…</i>` : '');
+    const m = s.querySelector('.pk-msg');
+    if (!hit) { m.className = 'pk-msg bad'; m.textContent = `全为 0：组内优势消失，PPO 也看不到正向样本；平均约 ${Math.round(1 / p)} 次采样才等到一次成功`; }
+    else { m.className = 'pk-msg ok'; m.textContent = `${hit} 条成功：组内出现差异，有东西可放大`; }
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.roll(s);
+    const seq = [6, 26, 52, 70, 88, 70, 52, 26];
+    let j = 0;
+    ctx.every(() => { if (this.auto) { this.pv = seq[(j = (j + 1) % seq.length)]; this.draw(s, true); } else this.roll(s); }, 2400);
+  },
+  reset(s) { this.pv = 40; this.ki = 4; this.draw(s, false); s.querySelector('.pk-dots').innerHTML = ''; s.querySelector('.pk-msg').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c08-t82" data-part="1" data-dur="14000" data-title="SFT 与 RL 的本质区别：优化目标不同" data-notes="前面用“SFT 记忆、RL 泛化”概括了本章的对照实验。现在解释这种倾向为什么可能出现，关键在于两者的<b>优化目标不同</b>：<br><b>SFT 最大化标注回答的概率。</b>每个训练样本都用极大似然推动模型复现示范。多样且有代表性的示范可以教会模型可泛化的特征，但示范或 prompt 缺乏多样性时，模型也可能对表面模式或捷径过拟合。GeneralPoints 的有限示范把 J/Q/K 都当作 10，模型因此在测试值变化时性能下降。<br><b>RL 最大化期望奖励。</b>模型探索多条路径，并提高高奖励路径的概率。当奖励忠实反映目标、探索也足够时，模型可能发现示范中没有的可迁移策略。GeneralPoints 中，重新执行计算过程而不是套用固定值，在分布外测试中取得了更好表现。反过来，奖励或环境有偏时，RL 同样可能对捷径过拟合。<br>表8-2 从八个维度对比：优化目标、训练信号、数据形态、直接优化压力、分布漂移下的表现、样本效率、训练稳定性和最适合的场景。表格逐行自动高亮，也可以把鼠标移到某一行上；左侧两个小动画是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">SFT 与 RL 的本质区别：<em>优化目标不同</em></h2></header>
+  <div class="o82-body">
+    <div class="o82-l">
+      <div class="o82-c fx fx-left" style="--d:2;--c:var(--violet)">
+        <div class="o82-h"><b>SFT</b><span class="c8-m">max Σ log <i>P</i>(<i>y</i> | <i>x</i>)</span></div>
+        <p>最大化标注回答的概率：每个样本都推动模型<span>复现示范</span></p>
+        <div class="o82-demo o82-sft"><span class="o82-ex">示范：J/Q/K → 当 10 用</span><div class="o82-bar"><i></i></div></div>
+      </div>
+      <div class="o82-c fx fx-left" style="--d:3;--c:var(--pink)">
+        <div class="o82-h"><b>RL</b><span class="c8-m">max <i>E</i>[<i>R</i>(<i>τ</i>)]</span></div>
+        <p>最大化期望奖励：探索多条路径，<span>提高高奖励路径的概率</span></p>
+        <div class="o82-demo o82-rl"><div class="o82-try" data-r="0">套用固定值 → ✗</div><div class="o82-try" data-r="1">重新执行计算 → ✓</div><div class="o82-try" data-r="0">随意猜测 → ✗</div></div>
+      </div>
+      <span class="c8-sx o82-sx">示意</span>
+    </div>
+    <div class="o82-tb c8-tb fx fx-right" style="--d:3">
+      <div class="c8-tr c8-th o82-r"><span>维度</span><span>SFT（监督微调）</span><span>RL（强化学习）</span></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT 与 RL 的本质区别」· 表8-2</div>
+</section>
+<style>
+.o82-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.o82-l{position:relative;width:560px;flex:none;display:flex;flex-direction:column;gap:20px}
+.o82-c{flex:1;padding:20px 24px;border-radius:20px;display:flex;flex-direction:column;gap:12px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:linear-gradient(160deg,color-mix(in srgb,var(--c) 12%,rgba(12,18,40,.92)),rgba(12,18,40,.9) 60%)}
+.o82-h{display:flex;align-items:baseline;gap:18px}
+.o82-h b{font:800 34px var(--num);color:var(--c)}
+.o82-h .c8-m{font-size:28px}
+.o82-c>p{font-size:19px;line-height:1.6;color:var(--text2)}
+.o82-c>p span{color:var(--text)}
+.o82-demo{margin-top:auto}
+.o82-ex{font-size:17px;color:var(--text3)}
+.o82-bar{height:14px;border-radius:7px;margin-top:8px;background:rgba(255,255,255,.07);overflow:hidden}
+.o82-bar i{display:block;height:100%;width:20%;border-radius:7px;background:linear-gradient(90deg,var(--violet),#c4b5fd);transition:width 1.4s var(--ease)}
+.o82-rl{display:flex;flex-direction:column;gap:7px}
+.o82-try{padding:6px 14px;border-radius:10px;font-size:17px;color:var(--text2);border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .5s var(--ease);width:46%}
+.o82-try.hi{width:100%;color:var(--text);border-color:var(--pink);background:color-mix(in srgb,var(--pink) 16%,transparent)}
+.o82-try.lo{width:34%;opacity:.5}
+.o82-sx{top:auto!important;bottom:-4px}
+.o82-tb{flex:1;align-self:flex-start}
+.o82-r{grid-template-columns:150px 1fr 1fr;padding-top:10px;padding-bottom:10px}
+.o82-r>*{font-size:17px;line-height:1.5}
+.o82-r>b{font-size:18px;color:var(--acc)}
+.o82-r>span{color:var(--text2)}
+.o82-r.on>span{color:var(--text)}
+.o82-r:not(.c8-th)>span:nth-child(2){border-left:3px solid color-mix(in srgb,var(--violet) 50%,transparent);padding-left:12px}
+.o82-r:not(.c8-th)>span:nth-child(3){border-left:3px solid color-mix(in srgb,var(--pink) 50%,transparent);padding-left:12px}
+</style>
+<script>
+HOOKS['c08-t82'] = {
+  R: [
+    ['优化目标', '最大化标注答案的概率（极大似然）', '最大化期望奖励'],
+    ['训练信号', '标注回答的逐 token 监督', '策略生成的回答或轨迹 + 结果级或步骤级标量奖励'],
+    ['数据形态', '“输入—输出”示范对', '任务、环境 + 奖励信号（参考答案可选）'],
+    ['直接优化压力', '模仿示范中的映射与协议', '强化能够获得奖励的行为与策略'],
+    ['分布漂移下', '取决于示范覆盖和正则化；本章有限示范实验出现过拟合', '取决于奖励、环境和探索；本章实验中迁移更好'],
+    ['样本效率', '高（几千条见效）', '低（常是 SFT 的几十～上百倍）'],
+    ['训练稳定性', '高、收敛快', '低、易震荡，需要小心调'],
+    ['最适合', '固化格式 / 风格 / 流程、有高质量示范、环境稳定', '需泛化到新场景、探索最优策略、标注成本过高'],
+  ],
+  init(s) {
+    s.querySelector('.o82-tb').insertAdjacentHTML('beforeend', this.R.map(([d, a, b]) => `<div class="c8-tr o82-r"><b>${d}</b><span>${a}</span><span>${b}</span></div>`).join(''));
+    this.rows = [...s.querySelectorAll('.o82-r:not(.c8-th)')];
+    this.rows.forEach((r, i) => r.addEventListener('mouseenter', () => { this.auto = false; this.show(i); }));
+  },
+  show(i) { this.i = i; this.rows.forEach((r, j) => r.classList.toggle('on', j === i)); },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => { if (this.auto) this.show(0); }, 800);
+    ctx.every(() => { if (this.auto) this.show(((this.i ?? -1) + 1) % this.R.length); }, 1700);
+    // 左侧示意：SFT 把示范的概率一路推高；RL 逐渐偏向高奖励的那条路径
+    const bar = s.querySelector('.o82-bar i'), tries = [...s.querySelectorAll('.o82-try')];
+    let ph = 0;
+    const tick = () => {
+      ph = (ph + 1) % 2;
+      bar.style.width = ph ? '92%' : '20%';
+      tries.forEach((t) => { t.classList.toggle('hi', ph && t.dataset.r === '1'); t.classList.toggle('lo', ph && t.dataset.r === '0'); });
+    };
+    ctx.later(tick, 900);
+    ctx.every(tick, 3200);
+  },
+  reset(s) { this.i = -1; this.rows.forEach((r) => r.classList.remove('on')); s.querySelector('.o82-bar i').style.width = '20%'; s.querySelectorAll('.o82-try').forEach((t) => t.classList.remove('hi', 'lo')); },
+};
+</script>
+
+<section class="slide" id="c08-modes" data-part="1" data-trans="zoom" data-dur="13000" data-title="mass-covering 与 mode-seeking" data-notes="从概率分布看，SFT 与 RL 还有一项重要差别。一个问题往往存在多类合理回答，每一类都对应概率分布中的一个“峰”。极大似然 SFT 会逐条学习示范，因此常表现出 <b>mass-covering（覆盖式）</b>倾向：尽量覆盖训练数据中出现过的多个模式。RL 则按奖励重新分配概率，配合常见的反向 KL 约束时更容易表现出 <b>mode-seeking（寻峰）</b>倾向：把概率集中到少数高奖励峰上，而不是平均复现所有示范。<br>这一区分解释了两者的典型特点：SFT 擅长覆盖多种已知写法，RL 擅长从候选行为中寻找高奖励策略。至于最终是保持多样性还是收缩到少数模式，则取决于示范分布、奖励函数、KL 方向与系数、熵正则和采样温度。<br>画布是示意：紫色是 SFT 从示范中学到的覆盖式分布，琥珀色虚线是奖励函数，粉色是加入奖励后、在反向 KL 约束下的策略（按 π ∝ π_ref·exp(r/β) 计算，π_ref 取 SFT 分布）。拖动 β 滑块：β 越大，策略越贴近参考分布；β 越小，概率越集中到奖励最高的峰。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">覆盖式与寻峰：<em>两种分配概率的方式</em></h2>
+  <p class="lead fx fx-up" style="--d:2">一个问题往往有多类合理回答，每一类对应概率分布里的一个“峰”</p></header>
+  <div class="md-body">
+    <div class="md-l panel fx fx-left" style="--d:3">
+      <canvas class="md-cv"></canvas>
+      <div class="md-ctl"><span>KL 系数 <i>β</i></span><input class="rng md-rng" type="range" min="0" max="100" value="80"><b class="md-bv"></b><span class="md-h">分布熵 <b></b></span></div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="md-r">
+      <div class="md-c md-cov fx fx-right" style="--d:4;--c:var(--violet)"><b>mass-covering（覆盖式）</b><p>极大似然 SFT 逐条学习示范，尽量覆盖训练数据中出现过的多个模式</p><em>擅长覆盖多种已知写法</em></div>
+      <div class="md-c md-seek fx fx-right" style="--d:5;--c:var(--pink)"><b>mode-seeking（寻峰）</b><p>RL 按奖励重新分配概率，配合常见的反向 KL 约束，把概率集中到少数高奖励峰上</p><em>擅长从候选行为中寻找高奖励策略</em></div>
+      <p class="md-note fx fx-up" style="--d:6">保持多样性还是收缩到少数模式，取决于<b>示范分布、奖励函数、KL 方向与系数、熵正则和采样温度</b></p>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT 与 RL 的本质区别」</div>
+</section>
+<style>
+.md-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.md-l{position:relative;width:1040px;flex:none;padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+.md-ctl{display:grid;grid-template-columns:auto 1fr 70px 200px;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+.md-ctl i{font-family:"Times New Roman",serif;font-size:21px}
+.md-bv{font:800 24px var(--num);color:var(--pink);text-align:right}
+.md-h{text-align:right}.md-h b{font:800 22px var(--num);color:var(--text)}
+.md-r{flex:1;display:flex;flex-direction:column;gap:18px;min-width:0}
+.md-c{padding:20px 24px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.9));transition:box-shadow .5s,border-color .5s,opacity .5s}
+.md-c.on{border-color:var(--c);box-shadow:0 0 40px -10px color-mix(in srgb,var(--c) 70%,transparent)}
+.md-c.off{opacity:.55}
+.md-c b{font-size:23px;color:var(--c)}
+.md-c p{font-size:18px;line-height:1.6;color:var(--text2);margin:8px 0}
+.md-c em{font-style:normal;font-size:18px;color:var(--text)}
+.md-note{font-size:18px;line-height:1.65;color:var(--text2);padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.md-note b{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-modes'] = {
+  W: 996, H: 420, N: 300,
+  init(s) {
+    this.g = C8.cv(s.querySelector('.md-cv'), this.W, this.H);
+    const gau = (x, m, sd) => Math.exp(-0.5 * ((x - m) / sd) ** 2);
+    const xs = Array.from({ length: this.N }, (_, i) => i / (this.N - 1));
+    // 示范分布：四类合理回答（四个峰）；奖励最高的是第三个峰
+    this.ref = xs.map((x) => 0.3 * gau(x, 0.15, 0.05) + 0.24 * gau(x, 0.38, 0.06) + 0.2 * gau(x, 0.62, 0.05) + 0.26 * gau(x, 0.85, 0.055) + 0.004);
+    const z = this.ref.reduce((a, b) => a + b, 0);
+    this.ref = this.ref.map((v) => v / z);
+    this.r = xs.map((x) => 1.0 * gau(x, 0.62, 0.07) + 0.45 * gau(x, 0.15, 0.06) + 0.12 * gau(x, 0.85, 0.06));
+    const rg = s.querySelector('.md-rng');
+    rg.addEventListener('input', () => { this.auto = false; this.bv = +rg.value; this.draw(s); });
+    rg.addEventListener('change', () => rg.blur());
+    this.bv = 80;
+  },
+  beta(v) { return 0.04 * Math.pow(60, v / 100); }, // 0.04 → 2.4
+  draw(s) {
+    const g = this.g, W = this.W, H = this.H, N = this.N, b = this.beta(this.bv), base = H - 34;
+    const pol = this.ref.map((p, i) => p * Math.exp(this.r[i] / b));
+    const z = pol.reduce((a, c) => a + c, 0);
+    for (let i = 0; i < N; i++) pol[i] /= z;
+    const mx = Math.max(...pol, ...this.ref) * 1.08, X = (i) => 20 + (i / (N - 1)) * (W - 40), Y = (v) => base - (v / mx) * (H - 70);
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2; g.beginPath(); g.moveTo(20, base); g.lineTo(W - 20, base); g.stroke();
+    // 奖励函数（虚线，右侧刻度）
+    g.setLineDash([8, 7]); g.strokeStyle = 'rgba(251,191,36,.75)'; g.lineWidth = 2.5; g.beginPath();
+    this.r.forEach((v, i) => { const y = base - v * (H - 120); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); }); g.stroke(); g.setLineDash([]);
+    const fillLine = (arr, col, alpha) => {
+      g.beginPath(); arr.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
+      g.lineTo(X(N - 1), base); g.lineTo(X(0), base); g.closePath();
+      g.fillStyle = col.replace('A', alpha); g.fill();
+      g.beginPath(); arr.forEach((v, i) => (i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v))));
+      g.strokeStyle = col.replace('A', '1'); g.lineWidth = 3.5; g.shadowColor = col.replace('A', '1'); g.shadowBlur = 10; g.stroke(); g.shadowBlur = 0;
+    };
+    fillLine(this.ref, 'rgba(167,139,250,A)', '.14');
+    fillLine(pol, 'rgba(244,114,182,A)', '.2');
+    g.font = '16px "Microsoft YaHei",sans-serif'; g.textAlign = 'left';
+    [['SFT（覆盖式）', '#a78bfa'], ['RL + 反向 KL', '#f472b6'], ['奖励 r', '#fbbf24']].forEach(([t, c], i) => { g.fillStyle = c; g.fillRect(28 + i * 170, 16, 22, 5); g.fillStyle = '#cbd5e1'; g.fillText(t, 58 + i * 170, 24); });
+    ['回答类别 ①', '②', '③（奖励最高）', '④'].forEach((t, i) => { g.fillStyle = '#6c7695'; g.textAlign = 'center'; g.fillText(t, X([0.15, 0.38, 0.62, 0.85][i] * (N - 1)), base + 24); });
+    const H0 = -pol.reduce((a, p) => a + (p > 0 ? p * Math.log(p) : 0), 0);
+    s.querySelector('.md-bv').textContent = b < 0.1 ? b.toFixed(2) : b.toFixed(1);
+    s.querySelector('.md-h b').textContent = H0.toFixed(2);
+    const rg = s.querySelector('.md-rng');
+    rg.value = this.bv; rg.style.setProperty('--p', this.bv + '%');
+    s.querySelector('.md-cov').classList.toggle('on', this.bv > 55);
+    s.querySelector('.md-seek').classList.toggle('on', this.bv < 45);
+    s.querySelector('.md-cov').classList.toggle('off', this.bv < 45);
+    s.querySelector('.md-seek').classList.toggle('off', this.bv > 55);
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.draw(s);
+    let t0 = 0;
+    ctx.raf((t) => {
+      if (!this.auto) return;
+      if (!t0) t0 = t;
+      const u = ((t - t0) / 10000) % 1;
+      this.bv = Math.round(50 + 45 * Math.cos(u * 2 * Math.PI));
+      this.draw(s);
+    });
+  },
+  reset() { this.bv = 80; },
+};
+</script>
+
+<section class="slide" id="c08-threshold" data-part="1" data-dur="13000" data-title="后训练还会塑造模型何时行动" data-notes="<b>后训练还会塑造模型何时行动。</b>以 Coding 模型为例，GPT 系列与 Claude 系列经常表现出不同的默认行动阈值：前者可能先读更多仓库信息再修改，后者可能用较少文件完成定位、先实现再借测试反馈修正。这不是把模型拟人化成“谨慎”或“有直觉”，而是参数中的策略在估计：多读一个文件的预期价值，是否还高于提交当前补丁并验证的预期价值。<br>若 SFT 示范反复包含广泛调查后才编辑的轨迹，模型就会模仿较高的行动阈值；若 RL 的过程或结果奖励持续认可快速定位、尽早进入可验证循环，概率质量就会向较早行动的轨迹集中。第七章实验 7-9 在完全相同的中性 Coding Harness 中换模，确实测到这种差异随模型变化，说明 Harness 无需强制流程，模型自身也会携带稳定的工具使用策略。Harness 可以调节它，但行为的主要来源可以位于后训练后的模型参数中。由于厂商并不公开完整数据与奖励配方，这个实验能证明的是模型侧的行为差异，不能据此断言某一种具体的私有算法造成了它。<br>演示中的两种价值估计和轨迹都是示意：拖动滑块改变行动阈值，看轨迹何时从“读”转向“改”。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">后训练还会塑造模型<em>何时行动</em></h2>
+  <p class="lead fx fx-up" style="--d:2">不是“谨慎”或“直觉”，而是参数中的策略在估计：多读一个文件的预期价值，是否还高于提交补丁并验证的预期价值</p></header>
+  <div class="th8-body">
+    <div class="th8-l panel fx fx-left" style="--d:3">
+      <div class="th8-ctl"><span>行动阈值</span><span class="dim">低</span><input class="rng th8-rng" type="range" min="0" max="100" value="70"><span class="dim">高</span>
+        <div class="th8-pre"><button class="btn" data-v="70">先读更多仓库信息再修改</button><button class="btn" data-v="15">较少文件定位，先实现再借测试修正</button></div></div>
+      <div class="th8-trk"></div>
+      <div class="th8-val">
+        <div class="th8-v"><span>再读一个文件的预期价值</span><div class="meter" style="--c:var(--ctx)"><i class="th8-vr"></i></div></div>
+        <div class="th8-v"><span>提交当前补丁并验证的预期价值</span><div class="meter" style="--c:var(--tool)"><i class="th8-va"></i></div></div>
+        <p class="th8-dec"></p>
+      </div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="th8-r">
+      <div class="th8-c fx fx-right" style="--d:4;--c:var(--violet)"><b>SFT 示范</b><p>反复包含广泛调查后才编辑的轨迹 → 模型<span>模仿较高的行动阈值</span></p></div>
+      <div class="th8-c fx fx-right" style="--d:5;--c:var(--pink)"><b>RL 奖励</b><p>持续认可快速定位、尽早进入可验证循环 → 概率质量<span>向较早行动的轨迹集中</span></p></div>
+      <div class="th8-c fx fx-right" style="--d:6;--c:var(--har)"><b>实验 7-9（第七章）</b><p>同一个中性 Coding Harness 中换模，测到差异随模型变化：<span>行为的主要来源可以位于模型参数中</span>；但不能断言是哪种私有算法造成的</p></div>
+    </div>
+  </div>
+  <div class="src">第八章 ·「SFT 与 RL 的本质区别」· 实验 7-9（第七章）</div>
+</section>
+<style>
+.th8-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.th8-l{position:relative;width:1080px;flex:none;padding:22px 26px;display:flex;flex-direction:column;gap:16px}
+.th8-ctl{display:grid;grid-template-columns:auto auto 1fr auto;align-items:center;gap:12px 14px;font-size:19px;color:var(--text2)}
+.th8-pre{grid-column:1/-1;display:flex;gap:12px}
+.th8-pre .btn{font-size:16px}
+.th8-trk{display:flex;flex-wrap:wrap;gap:10px;min-height:160px;align-content:flex-start;padding:14px;border-radius:14px;background:rgba(5,9,22,.5);border:1px solid var(--line)}
+.th8-s{--c:var(--ctx);display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;font:16px var(--mono);color:var(--text);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);animation:upIn .45s var(--spring) both}
+.th8-s.e{--c:var(--tool)}.th8-s.t{--c:var(--har)}.th8-s.f{--c:var(--bad)}.th8-s.ok{--c:var(--ok)}
+.th8-val{display:flex;flex-direction:column;gap:12px}
+.th8-v{display:grid;grid-template-columns:300px 1fr;align-items:center;gap:16px;font-size:18px;color:var(--text2)}
+.th8-dec{font-size:19px;color:var(--acc);min-height:30px}
+.th8-r{flex:1;display:flex;flex-direction:column;gap:16px;min-width:0}
+.th8-c{padding:18px 22px;border-radius:18px;border:1px solid color-mix(in srgb,var(--c) 38%,transparent);background:color-mix(in srgb,var(--c) 7%,rgba(12,18,40,.9))}
+.th8-c b{font-size:22px;color:var(--c)}
+.th8-c p{font-size:18px;line-height:1.6;color:var(--text2);margin-top:6px}
+.th8-c p span{color:var(--text)}
+</style>
+<script>
+HOOKS['c08-threshold'] = {
+  F: ['src/api.py', 'src/models.py', 'src/utils.py', 'tests/test_api.py', 'src/config.py', 'docs/arch.md', 'src/cache.py'],
+  // 示意估计：多读文件的边际价值递减，提交补丁的价值随已读信息增加
+  vr: (n) => 0.88 * Math.pow(0.7, n),
+  va: (n) => Math.min(0.82, 0.22 + 0.12 * n),
+  init(s) {
+    const r = s.querySelector('.th8-rng');
+    r.addEventListener('input', () => { this.auto = false; this.th = +r.value; this.run(s); });
+    r.addEventListener('change', () => r.blur());
+    s.querySelectorAll('.th8-pre .btn').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.th = +b.dataset.v; this.run(s); }));
+    this.th = 70;
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    const r = s.querySelector('.th8-rng');
+    r.value = this.th; r.style.setProperty('--p', this.th + '%');
+    const trk = s.querySelector('.th8-trk'), dec = s.querySelector('.th8-dec'), vr = s.querySelector('.th8-vr'), va = s.querySelector('.th8-va');
+    trk.innerHTML = ''; dec.textContent = '';
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, tau = -0.2 + (this.th / 100) * 0.75;
+    const add = (t, c) => trk.insertAdjacentHTML('beforeend', `<span class="th8-s ${c || ''}">${t}</span>`);
+    let n = 0;
+    while (ok() && n < this.F.length) {
+      vr.style.width = this.vr(n) * 100 + '%'; va.style.width = this.va(n) * 100 + '%';
+      if (this.va(n) - this.vr(n) >= tau) break;
+      dec.textContent = '继续读：再读一个文件的价值仍然更高';
+      await U.wait(ctx, 650); if (!ok()) return;
+      add('读 ' + this.F[n]); n++;
+    }
+    if (!ok()) return;
+    dec.textContent = `读了 ${n} 个文件后行动：提交补丁并验证的价值已越过阈值`;
+    await U.wait(ctx, 700); if (!ok()) return;
+    add('编辑 src/api.py', 'e'); await U.wait(ctx, 550); if (!ok()) return;
+    add('运行测试', 't'); await U.wait(ctx, 600); if (!ok()) return;
+    if (n < 4) {
+      add('测试失败：漏了一个边界条件', 'f'); await U.wait(ctx, 650); if (!ok()) return;
+      add('借测试反馈修正', 'e'); await U.wait(ctx, 550); if (!ok()) return;
+      add('运行测试', 't'); await U.wait(ctx, 550); if (!ok()) return;
+    }
+    add('测试通过', 'ok');
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.th = 70;
+    this.run(s);
+    ctx.every(() => { if (this.auto) { this.th = this.th > 40 ? 15 : 70; this.run(s); } }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.th8-trk').innerHTML = ''; s.querySelector('.th8-dec').textContent = ''; },
+};
+</script>
+
+<section class="slide" id="c08-online" data-part="1" data-dur="14000" data-title="在线反馈的三个机会" data-notes="<b>在线反馈给了模型探索示范之外策略的机会。</b>固定数据集上的 SFT 使用示范提供的直接训练信号，但仍可组合预训练知识，对示范中没有的输入进行泛化。在线 RL 则让模型按当前策略生成回答、接收环境反馈，从而直接评估示范之外的候选行为。这并不自动保证更高上限：结果取决于基础模型、示范覆盖、奖励忠实度、探索和优化稳定性。在线/离线与更严格的在轨/离轨（on-policy / off-policy）将在奖励与蒸馏部分用到。这里先看在线反馈提供的三个机会：<br><b>其一，可以评估固定示范之外的候选。</b>SFT 的直接监督来自数据中记录的回答；RL 还可以强化奖励函数能够评分的新行为。实验 8-13（SimpleVLA-RL）中的“推切”动作从未出现在人类示范里，说明模型有机会发现示范之外的策略。但奖励无法识别的质量学不到，探索不到的策略也发现不了。<br><b>其二，可以利用“验证比生成容易”的任务。</b>SFT 需要先写出正确答案或高质量轨迹；RL 只需要可靠地判断答案质量。数学答案可以对照，代码可以测试，定理证明可以由验证器检查。这种不对称是 RLVR 的优势，但验证器不完整时也会导致奖励黑客。<br><b>其三，可以在当前策略实际访问的状态上训练。</b>离线模仿存在经典的<b>协变量漂移（covariate shift）</b>：策略偏离示范、进入数据中没有的状态后，可能缺少恢复信号。在特定的序列模仿学习设置中，误差最坏可随轨迹长度 T 近似按 T² 累积，而在线数据聚合可把它降到约 T。本章后面的 On-Policy Distillation 把这种在线匹配与 SFT 的稠密监督结合起来。<br>打个比方：<b>SFT 细致学习已有地图，RL 则可以拿着奖励这枚指南针探索地图外的候选路线。</b>地图或指南针不准都会迷路。因此许多系统先用 SFT 建立稳定起点，再在奖励与环境足够可信时加入 RL。<br>左侧画布是示意：青色带是示范覆盖的状态，红色是只学过示范的离线策略，偏离后找不到回来的路；绿色在自己访问的状态上补充了数据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">在线反馈：探索<em>示范之外</em>的三个机会</h2></header>
+  <div class="on8-body">
+    <div class="on8-l panel fx fx-left" style="--d:2">
+      <canvas class="on8-cv"></canvas>
+      <div class="on8-lg"><span class="d">示范覆盖的状态</span><span class="r">离线模仿：误差最坏 ≈ T²</span><span class="g">在线数据聚合：≈ T</span></div>
+      <span class="c8-sx">示意</span>
+    </div>
+    <div class="on8-r"></div>
+  </div>
+  <p class="on8-tag tagline fx fx-up" style="--d:7"><b>SFT 细致学习已有地图，RL 则可以拿着奖励这枚指南针探索地图外的候选路线</b>——地图或指南针不准都会迷路</p>
+  <div class="src">第八章 ·「SFT 与 RL 的本质区别」（在线反馈的三个机会）</div>
+</section>
+<style>
+.on8-body{display:flex;gap:26px;flex:1;min-height:0}
+.on8-l{position:relative;width:900px;flex:none;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.on8-lg{display:flex;gap:22px;font-size:16px;color:var(--text3)}
+.on8-lg span::before{content:"";display:inline-block;width:22px;height:5px;border-radius:3px;margin-right:8px;vertical-align:middle}
+.on8-lg .d::before{background:rgba(34,211,238,.45)}.on8-lg .r::before{background:var(--bad)}.on8-lg .g::before{background:var(--ok)}
+.on8-r{flex:1;display:flex;flex-direction:column;gap:12px;min-width:0}
+.on8-c{--c:var(--acc);padding:14px 18px;border-radius:16px;cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.035);transition:all .45s var(--ease)}
+.on8-c.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.9));box-shadow:0 0 34px -10px color-mix(in srgb,var(--c) 70%,transparent)}
+.on8-c b{display:flex;align-items:center;gap:10px;font-size:20px;color:var(--c)}
+.on8-c b em{font-style:normal;font:800 15px var(--num);padding:2px 8px;border-radius:7px;color:#06101f;background:var(--c)}
+.on8-c p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:6px}
+.on8-c small{display:block;font-size:15px;color:var(--warn);margin-top:6px}
+.on8-tag{margin:18px 0 26px;font-size:22px}
+</style>
+<script>
+HOOKS['c08-online'] = {
+  C: [
+    ['#fbbf24', '其一', '可以评估固定示范之外的候选', 'SFT 的监督来自记录的回答；RL 还能强化奖励函数能够评分的新行为——SimpleVLA-RL 的“推切”从未出现在人类示范里', '奖励无法识别的质量学不到，探索不到的策略也发现不了'],
+    ['#a78bfa', '其二', '可以利用“验证比生成容易”的任务', 'SFT 要先写出正确答案；RL 只需可靠地判断质量：数学答案可对照、代码可测试、定理证明可由验证器检查', '验证器不完整时也会导致奖励黑客'],
+    ['#34d399', '其三', '可以在当前策略实际访问的状态上训练', '离线模仿存在协变量漂移（covariate shift）：偏离示范后缺少恢复信号；在线数据聚合把误差从约 T² 降到约 T', 'On-Policy Distillation 把在线匹配与 SFT 的稠密监督结合起来'],
+  ],
+  W: 860, H: 470,
+  init(s) {
+    s.querySelector('.on8-r').innerHTML = this.C.map(([c, k, t, p, w], i) => `<div class="on8-c fx fx-right" data-i="${i}" style="--d:${3 + i};--c:${c}"><b><em>${k}</em>${t}</b><p>${p}</p><small>${w}</small></div>`).join('');
+    this.cs = [...s.querySelectorAll('.on8-c')];
+    this.cs.forEach((c) => c.addEventListener('click', () => { this.auto = false; this.show(+c.dataset.i); }));
+    this.g = C8.cv(s.querySelector('.on8-cv'), this.W, this.H);
+  },
+  show(i) { this.i = i; this.cs.forEach((c, j) => c.classList.toggle('on', j === i)); },
+  road(x) { return 170 + 60 * Math.sin(x / 120); },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => { if (this.auto) this.show(0); }, 700);
+    ctx.every(() => { if (this.auto) this.show(((this.i ?? -1) + 1) % 3); }, 4200);
+    const g = this.g, W = this.W, H = this.H, band = 26;
+    let ep = null;
+    const newEp = () => ({ x: 20, off: 0, on: 0, pr: [], pg: [], rnd: U.rand((Math.random() * 1e6) | 0) });
+    ep = newEp();
+    let last = 0, hold = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(40, t - last) : 16; last = t;
+      if (hold > 0) { hold -= dt; if (hold <= 0) ep = newEp(); }
+      else if (ep.x < W - 30) {
+        for (let k = 0; k < 2; k++) {
+          ep.x += 2.2;
+          const n1 = (ep.rnd() - 0.5) * 6, n2 = (ep.rnd() - 0.5) * 6;
+          // 离线策略：在示范覆盖带内会纠正，一旦出带就没有恢复信号，偏差越滚越大
+          ep.off = Math.abs(ep.off) < band ? ep.off * 0.86 + n1 : ep.off * 1.035 + Math.sign(ep.off) * 0.9 + n1 * 0.4;
+          if (Math.abs(ep.off) < 6 && ep.x > 120 && ep.rnd() < 0.02) ep.off += (ep.rnd() < 0.5 ? -1 : 1) * 24;
+          ep.on = ep.on * 0.86 + n2;
+          ep.pr.push([ep.x, this.road(ep.x) + ep.off]); ep.pg.push([ep.x, this.road(ep.x) + 140 * 0 + ep.on]);
+        }
+      } else hold = 1800;
+      g.clearRect(0, 0, W, H);
+      // 示范覆盖的状态带
+      g.beginPath();
+      for (let x = 20; x <= W - 20; x += 6) g.lineTo(x, this.road(x) - band);
+      for (let x = W - 20; x >= 20; x -= 6) g.lineTo(x, this.road(x) + band);
+      g.closePath(); g.fillStyle = 'rgba(34,211,238,.14)'; g.fill();
+      g.setLineDash([6, 8]); g.strokeStyle = 'rgba(34,211,238,.6)'; g.lineWidth = 2; g.beginPath();
+      for (let x = 20; x <= W - 20; x += 6) x === 20 ? g.moveTo(x, this.road(x)) : g.lineTo(x, this.road(x)); g.stroke(); g.setLineDash([]);
+      const line = (pts, c) => { if (pts.length < 2) return; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, C8.clamp(y, 8, 330)) : g.moveTo(x, y))); g.strokeStyle = c; g.lineWidth = 3.5; g.shadowColor = c; g.shadowBlur = 10; g.stroke(); g.shadowBlur = 0; };
+      line(ep.pr, '#fb7185'); line(ep.pg, '#34d399');
+      // 下方：累计误差的上界示意，T² 与 T
+      const by = H - 20, bh = 100, x0 = 60, x1 = W - 40;
+      g.strokeStyle = 'rgba(255,255,255,.2)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x0, by - bh); g.lineTo(x0, by); g.lineTo(x1, by); g.stroke();
+      const u = Math.min(1, (ep.x - 20) / (W - 50));
+      g.lineWidth = 3;
+      [['#fb7185', (v) => v * v], ['#34d399', (v) => v * 0.35]].forEach(([c, f]) => { g.strokeStyle = c; g.beginPath(); for (let i = 0; i <= 40; i++) { const v = (i / 40) * u; const x = x0 + v * (x1 - x0), y = by - f(v) * bh; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); });
+      g.fillStyle = '#6c7695'; g.font = '15px "Microsoft YaHei",sans-serif'; g.textAlign = 'left';
+      g.fillText('累计误差', x0 + 8, by - bh + 4); g.textAlign = 'right'; g.fillText('轨迹长度 T →', x1, by - 8);
+    });
+  },
+  reset(s) { this.i = -1; this.cs.forEach((c) => c.classList.remove('on')); this.g.clearRect(0, 0, this.W, this.H); },
+};
+</script>

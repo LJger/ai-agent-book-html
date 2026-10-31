@@ -1,0 +1,616 @@
+<!-- ================= PART 03 · Harness 工程 ================= -->
+<section class="slide chapter" id="c05-d3" data-part="3" data-title="PART 03 · Harness 工程" data-notes="第一章引入了 Harness 工程的概念和 <b>Agent = Model + Harness</b> 的公式。这里的 Harness 包含了核心公式中的上下文和工具，以及约束、验证和纠正机制——五者共同构成了第一章定义的 Harness。<br>Coding Agent 可能是最能受益于 Harness 工程的领域：代码编写是所有 Agent 任务中<b>可验证性最高</b>的一类，约束、验证和纠正都有现成的基础设施可以依托。本部分聚焦 Coding Agent 场景下的具体实践：四个工程组件、为什么 Coding 特别适合（表5-1）、三个业界案例、四条可迁移的设计原则，以及约束对“过程”的要求与故障边界控制。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:92px">Harness 工程<br>在 Coding Agent 中的实践</h1>
+  <div class="ch-s fx fx-up" style="--d:3">Agent = Model + Harness · 代码是可验证性最高的一类任务</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">能不能稳定运行，往往不取决于用了多强的模型，而取决于围绕 Agent 搭建的基础设施有多扎实。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c05-har4" data-part="3" data-dur="26000" data-title="Harness 的四个工程组件" data-notes="能不能稳定运行，往往不取决于用了多强的模型，而取决于围绕 Agent 搭建的基础设施有多扎实。第一章将 Harness 分为两个层面——<b>上下文与工具</b>（让 Agent 能做事）和<b>约束、验证与纠正</b>（让 Agent 不做错事）。在 Coding Agent 这个场景下，它们落地为具体的工程组件：<br><b>验收基线</b>：什么算做完了——测试套件、CI 管道（持续集成流水线，代码提交后自动运行的一系列检查）、代码审查标准；<br><b>执行边界</b>：Agent 能碰什么不能碰什么——模块边界、依赖规则、权限控制；<br><b>反馈信号</b>：自动化的对错判断——Linter（代码规范检查工具，能自动发现格式错误和潜在问题）输出、测试结果、类型检查错误；<br><b>回退手段</b>：出了问题怎么恢复——Git 版本控制、沙盒隔离、快照回滚。<br>左侧场地是一次示意的运行：Agent 想改 migrations/ 被执行边界挡回；改完代码 Linter 立刻报错并修复；在 Git 快照处存档；走到验收门测试失败，就回退到快照重试。重试是有界的——最多 3 轮，仍失败就停下来升级给人（每隔一轮演示一次触到上限的情形）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">四个工程组件：让 Agent <em>在安全网内大胆试错</em></h2></header>
+  <div class="p3b-body">
+    <div class="p3b-arena panel fx fx-left" style="--d:2" data-clip-ok>
+      <svg class="p3b-svg" viewBox="0 0 1000 560" width="1000" height="560">
+        <defs><linearGradient id="p3b-g" x1="0" x2="1"><stop offset="0" stop-color="#60a5fa" stop-opacity=".0"/><stop offset="1" stop-color="#60a5fa" stop-opacity=".25"/></linearGradient></defs>
+        <rect class="p3b-zone" x="330" y="44" width="250" height="104" rx="14"/>
+        <text class="p3b-zt" x="455" y="88">migrations/</text><text class="p3b-zs" x="455" y="116">执行边界：不许改动</text>
+        <rect class="p3b-gate" x="822" y="150" width="16" height="270" rx="8"/>
+        <text class="p3b-gt" x="830" y="138">验收基线</text><text class="p3b-gs" x="830" y="448">测试套件 · CI</text>
+        <path class="p3b-p" id="p3b-a" d="M90 300 C 180 300, 300 210, 420 150"/>
+        <path class="p3b-p" id="p3b-b" d="M420 150 C 380 220, 330 280, 300 300"/>
+        <path class="p3b-p" id="p3b-c" d="M300 300 C 380 310, 460 310, 540 300"/>
+        <path class="p3b-p" id="p3b-d" d="M540 300 C 650 300, 740 292, 818 288"/>
+        <path class="p3b-p rb" id="p3b-e" d="M818 288 C 740 380, 620 380, 540 300"/>
+        <path class="p3b-p" id="p3b-f" d="M818 288 L 960 288"/>
+        <circle class="p3b-dot" r="13" cx="90" cy="300"/>
+      </svg>
+      <div class="p3b-n" style="left:40px;top:330px"><b>任务</b><small>修复查询超时</small></div>
+      <div class="p3b-flag" style="left:500px;top:226px"><svg class="ic"><use href="#i-flag"/></svg><span>git 快照</span></div>
+      <div class="p3b-n" style="left:900px;top:330px"><b>交付</b></div>
+      <div class="p3b-pop"></div>
+      <div class="p3b-rd"><span>验收轮次</span><b class="p3b-r">0</b><i>/ 3</i><span class="c5-tag demo">示意</span></div>
+    </div>
+    <div class="p3b-side fx fx-right" style="--d:3">
+      <div class="p3b-lv"><span>上下文与工具</span><small>让 Agent 能做事</small></div>
+      <div class="p3b-lv k"><span>约束、验证与纠正</span><small>让 Agent 不做错事</small></div>
+      <div class="p3b-cs"></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Harness 工程在 Coding Agent 中的实践」</div>
+</section>
+<style>
+.p3b-body{display:flex;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.p3b-arena{position:relative;width:1000px;height:560px;flex:none;overflow:hidden}
+.p3b-svg{position:absolute;inset:0}
+.p3b-zone{fill:rgba(251,113,133,.06);stroke:rgba(251,113,133,.55);stroke-width:2;stroke-dasharray:7 6;transition:all .3s}
+.p3b-zone.hit{fill:rgba(251,113,133,.25);stroke:#fb7185;stroke-dasharray:none}
+.p3b-zt{font:700 20px var(--mono);fill:#fda4af;text-anchor:middle}
+.p3b-zs{font-size:16px;fill:var(--text3);text-anchor:middle}
+.p3b-gate{fill:rgba(96,165,250,.25);stroke:#60a5fa;stroke-width:2;transition:all .3s}
+.p3b-gate.bad{fill:rgba(251,113,133,.55);stroke:#fb7185}
+.p3b-gate.ok{fill:rgba(52,211,153,.6);stroke:#34d399}
+.p3b-gt{font-size:18px;font-weight:700;fill:#93c5fd;text-anchor:middle}
+.p3b-gs{font-size:15px;fill:var(--text3);text-anchor:middle}
+.p3b-p{fill:none;stroke:rgba(255,255,255,.1);stroke-width:2;stroke-dasharray:5 7}
+.p3b-p.rb{stroke:rgba(96,165,250,.25)}
+.p3b-p.on{stroke:var(--acc);animation:flow 1s linear infinite}
+.p3b-p.rb.on{stroke:#60a5fa}
+.p3b-dot{fill:#fbbf24;filter:drop-shadow(0 0 10px #fbbf24);transition:fill .3s}
+.p3b-dot.bad{fill:#fb7185}
+.p3b-n{position:absolute;display:flex;flex-direction:column;align-items:center;font-size:18px}
+.p3b-n small{font-size:15px;color:var(--text3)}
+.p3b-flag{position:absolute;display:flex;align-items:center;gap:6px;font:16px var(--mono);color:#93c5fd;padding:4px 10px;border-radius:9px;border:1px solid rgba(96,165,250,.35);background:rgba(12,18,40,.85);transition:all .3s}
+.p3b-flag.on{border-color:#60a5fa;box-shadow:0 0 16px rgba(96,165,250,.5);color:#fff}
+.p3b-pop{position:absolute;inset:0;pointer-events:none}
+.p3b-msg{position:absolute;transform:translate(-50%,0);padding:7px 14px;border-radius:10px;font:16px var(--mono);white-space:nowrap;background:rgba(5,9,22,.92);border:1px solid var(--line2);animation:upIn .4s var(--spring) both}
+.p3b-msg.bad{color:#fda4af;border-color:rgba(251,113,133,.6)}
+.p3b-msg.ok{color:#6ee7b7;border-color:rgba(52,211,153,.6)}
+.p3b-msg.info{color:#93c5fd;border-color:rgba(96,165,250,.6)}
+.p3b-rd{position:absolute;left:24px;top:20px;display:flex;align-items:baseline;gap:8px;font-size:16px;color:var(--text3)}
+.p3b-rd b{font:800 34px var(--num);color:var(--acc)}
+.p3b-rd i{font-style:normal;font-size:18px}
+.p3b-rd .c5-tag{margin-left:8px}
+.p3b-side{flex:1;display:flex;flex-direction:column;gap:10px;min-width:0}
+.p3b-lv{display:flex;align-items:baseline;gap:12px;padding:10px 16px;border-radius:12px;border:1px solid var(--line);font-size:19px;font-weight:700;color:var(--text2)}
+.p3b-lv small{font-size:16px;font-weight:400;color:var(--text3)}
+.p3b-lv.k{color:#93c5fd;border-color:rgba(96,165,250,.4);background:rgba(96,165,250,.06)}
+.p3b-cs{display:flex;flex-direction:column;gap:10px}
+.p3b-c{--c:#60a5fa;display:grid;grid-template-columns:44px 1fr;gap:4px 12px;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:all .4s}
+.p3b-c>.ic{grid-row:1/3;font-size:30px;color:var(--c);align-self:center}
+.p3b-c b{font-size:20px}
+.p3b-c b small{font-size:16px;font-weight:400;color:var(--text3);margin-left:8px}
+.p3b-c p{font-size:16px;color:var(--text2);line-height:1.5}
+.p3b-c.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 14%,rgba(12,18,40,.85));box-shadow:0 0 22px color-mix(in srgb,var(--c) 35%,transparent);translate:-6px 0}
+</style>
+<script>
+HOOKS['c05-har4'] = {
+  C: [
+    { k: 'base', n: '验收基线', q: '什么算做完了', p: '测试套件 · CI 管道 · 代码审查标准', ic: 'target', c: '#34d399' },
+    { k: 'bound', n: '执行边界', q: 'Agent 能碰什么不能碰什么', p: '模块边界 · 依赖规则 · 权限控制', ic: 'lock', c: '#fb7185' },
+    { k: 'fb', n: '反馈信号', q: '自动化的对错判断', p: 'Linter 输出 · 测试结果 · 类型检查错误', ic: 'zap', c: '#fbbf24' },
+    { k: 'rb', n: '回退手段', q: '出了问题怎么恢复', p: 'Git 版本控制 · 沙盒隔离 · 快照回滚', ic: 'undo', c: '#60a5fa' },
+  ],
+  init(s) {
+    s.querySelector('.p3b-cs').innerHTML = this.C.map((c) => `<div class="p3b-c" data-k="${c.k}" style="--c:${c.c}"><svg class="ic"><use href="#i-${c.ic}"/></svg><b>${c.n}<small>${c.q}</small></b><p>${c.p}</p></div>`).join('');
+  },
+  lit(s, k) { s.querySelectorAll('.p3b-c').forEach((c) => c.classList.toggle('on', c.dataset.k === k)); },
+  msg(s, x, y, t, cls) {
+    const pop = s.querySelector('.p3b-pop');
+    pop.innerHTML = `<div class="p3b-msg ${cls}" style="left:${x}px;top:${y}px">${C5.esc(t)}</div>`;
+  },
+  async mv(s, id, ms, rev) {
+    const p = s.querySelector('#' + id);
+    p.classList.add('on');
+    const r = await U.fly(s.querySelector('.p3b-dot'), p, ms, { ctx: this.ctx, keep: true, reverse: rev });
+    p.classList.remove('on');
+    return r;
+  },
+  // 一次运行：边界 → Linter → 快照 → 验收（失败则回退重试，最多 3 轮）
+  async once(s, failAll) {
+    const ctx = this.ctx, tk = this.tk, ok = () => ctx && ctx.alive && tk === this.tk;
+    const dot = s.querySelector('.p3b-dot'), zone = s.querySelector('.p3b-zone'), gate = s.querySelector('.p3b-gate'), flag = s.querySelector('.p3b-flag'), rd = s.querySelector('.p3b-r');
+    rd.textContent = '0'; gate.classList.remove('ok', 'bad'); flag.classList.remove('on'); s.querySelector('.p3b-pop').innerHTML = '';
+    dot.classList.remove('bad');
+    dot.setAttribute('cx', 90); dot.setAttribute('cy', 300); dot.style.opacity = 1;
+    await U.wait(ctx, 600); if (!ok()) return false;
+    await this.mv(s, 'p3b-a', 1200); if (!ok()) return false;
+    zone.classList.add('hit'); dot.classList.add('bad'); this.lit(s, 'bound');
+    this.msg(s, 455, 160, '权限控制：拒绝写入 migrations/', 'bad');
+    await U.wait(ctx, 1500); if (!ok()) return false;
+    zone.classList.remove('hit'); dot.classList.remove('bad');
+    await this.mv(s, 'p3b-b', 900); if (!ok()) return false;
+    await this.mv(s, 'p3b-c', 1000); if (!ok()) return false;
+    this.lit(s, 'fb');
+    this.msg(s, 540, 330, "edit_file → Linter：F401 'os' imported but unused", 'bad');
+    await U.wait(ctx, 1600); if (!ok()) return false;
+    this.msg(s, 540, 330, '已即时修复 · Linter 通过', 'ok');
+    await U.wait(ctx, 1000); if (!ok()) return false;
+    flag.classList.add('on'); this.lit(s, 'rb');
+    this.msg(s, 540, 330, 'git commit：存一个可回退的快照', 'info');
+    await U.wait(ctx, 1200); if (!ok()) return false;
+    for (let r = 1; r <= 3; r++) {
+      rd.textContent = r;
+      gate.classList.remove('ok', 'bad');
+      await this.mv(s, 'p3b-d', 1100); if (!ok()) return false;
+      this.lit(s, 'base');
+      const pass = !failAll && r === 2;
+      gate.classList.add(pass ? 'ok' : 'bad');
+      this.msg(s, 740, 470, pass ? 'pytest：43 passed · CI 绿灯' : 'pytest：2 failed, 41 passed', pass ? 'ok' : 'bad');
+      await U.wait(ctx, 1400); if (!ok()) return false;
+      if (pass) {
+        await this.mv(s, 'p3b-f', 800); if (!ok()) return false;
+        this.msg(s, 900, 230, '通过验收，交付', 'ok');
+        await U.wait(ctx, 2200);
+        return ok();
+      }
+      if (r === 3) {
+        dot.classList.add('bad');
+        this.msg(s, 700, 470, '达到 3 轮上限：停止重试，升级给人', 'bad');
+        this.lit(s, null);
+        await U.wait(ctx, 2600);
+        return ok();
+      }
+      this.lit(s, 'rb');
+      this.msg(s, 680, 386, 'git checkout 快照 → 改方案再试', 'info');
+      await this.mv(s, 'p3b-e', 1200); if (!ok()) return false;
+      await U.wait(ctx, 500); if (!ok()) return false;
+    }
+    return ok();
+  },
+  async loop(s) {
+    for (let n = 0; this.ctx && this.ctx.alive; n++) if (!(await this.once(s, n % 2 === 1))) return;
+  },
+  enter(s, ctx) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; ctx.later(() => this.loop(s), 700); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.lit(s, null);
+    s.querySelector('.p3b-pop').innerHTML = '';
+    s.querySelectorAll('.p3b-zone,.p3b-gate,.p3b-flag,.p3b-p').forEach((e) => e.classList.remove('hit', 'ok', 'bad', 'on'));
+  },
+};
+</script>
+
+<section class="slide" id="c05-quad" data-part="3" data-trans="zoom" data-dur="15000" data-title="表5-1 任务清晰度与验证自动化程度的四象限" data-notes="<b>Coding Agent 为什么特别适合 Harness 工程。</b>可以用任务清晰度和验证自动化程度两个维度，把任务分成四种状态（<b>表5-1</b>）：目标明确且结果可自动验证，是最适合 Agent 发挥的区域，例如修复有测试用例的 bug；目标清楚但验收还得靠人盯，吞吐量的天花板就是人的审查速度，例如代码重构需人工审查；有自动化反馈但目标模糊，系统会高效地往错误方向跑，例如用 linter 优化“代码质量”；两者都缺，Agent 基本派不上用场，例如“让 UI 更好看”。Harness 的目标就是把尽可能多的任务推向“目标明确 + 验证自动化”这个象限。<br>代码编写天然处于这个象限的核心——测试套件提供明确的验收标准，Linter 和类型检查器提供即时的自动化验证，Git 提供完美的版本控制和回退能力。这就解释了为什么 Coding Agent 是当前所有 Agent 类型中成熟度最高的：不是因为代码生成模型特别强，而是因为软件工程几十年积累的基础设施天然构成了一套强大的 Harness。<br>四格里的小点是任务，它们的运动方式只是示意各象限的特点；点击任一格查看说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表5-1：Harness 要把任务<em>推向左上角</em></h2></header>
+  <div class="p3c-body">
+    <div class="p3c-tbl fx fx-left" style="--d:2">
+      <div class="p3c-corner"><span>任务清晰度 ↓</span><span>验证自动化 →</span><span class="c5-tag demo">运动为示意</span></div>
+      <div class="p3c-ch">结果可自动验证</div><div class="p3c-ch">结果需人工验证</div>
+      <div class="p3c-rh">目标明确</div>
+      <div class="p3c-cell best" data-i="0"><canvas width="400" height="200"></canvas><b>最佳区域</b><span>修复有测试用例的 bug</span></div>
+      <div class="p3c-cell" data-i="1"><canvas width="400" height="200"></canvas><b>吞吐量受限</b><span>代码重构需人工审查</span></div>
+      <div class="p3c-rh">目标模糊</div>
+      <div class="p3c-cell" data-i="2"><canvas width="400" height="200"></canvas><b>高效地跑偏</b><span>用 linter 优化“代码质量”</span></div>
+      <div class="p3c-cell" data-i="3"><canvas width="400" height="200"></canvas><b>难以启动</b><span>“让 UI 更好看”</span></div>
+    </div>
+    <div class="p3c-side fx fx-right" style="--d:3">
+      <div class="p3c-ex panel"><b class="p3c-et"></b><p class="p3c-ep"></p></div>
+      <div class="p3c-why panel"><span class="lbl">代码编写天然处于这个象限的核心</span>
+        <div class="p3c-w"><svg class="ic"><use href="#i-check"/></svg><span>测试套件 → 明确的验收标准</span></div>
+        <div class="p3c-w"><svg class="ic"><use href="#i-zap"/></svg><span>Linter 与类型检查器 → 即时的自动化验证</span></div>
+        <div class="p3c-w"><svg class="ic"><use href="#i-branch"/></svg><span>Git → 完美的版本控制和回退能力</span></div>
+      </div>
+      <p class="p3c-tg">Coding Agent 成熟度最高，<b>不是因为代码生成模型特别强</b>，而是因为软件工程几十年积累的基础设施，天然构成了一套强大的 Harness</p>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Harness 工程在 Coding Agent 中的实践」· 表5-1</div>
+</section>
+<style>
+.p3c-body{display:grid;grid-template-columns:1000px 1fr;gap:28px;flex:1;min-height:0;margin-bottom:24px}
+.p3c-tbl{position:relative;display:grid;grid-template-columns:150px 1fr 1fr;grid-template-rows:64px 1fr 1fr;gap:12px}
+.p3c-corner{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;font-size:15px;color:var(--text3);gap:4px}
+.p3c-ch,.p3c-rh{display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:700;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.p3c-rh{writing-mode:horizontal-tb}
+.p3c-cell{--c:#94a3b8;position:relative;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid var(--line2);background:rgba(12,18,40,.8);transition:all .4s}
+.p3c-cell canvas{position:absolute;inset:0;width:100%;height:100%}
+.p3c-cell b{position:absolute;left:18px;top:14px;font-size:22px;color:var(--c)}
+.p3c-cell span{position:absolute;left:18px;bottom:14px;font-size:17px;color:var(--text2)}
+.p3c-cell[data-i="0"]{--c:#34d399}.p3c-cell[data-i="1"]{--c:#fbbf24}.p3c-cell[data-i="2"]{--c:#fb923c}.p3c-cell[data-i="3"]{--c:#fb7185}
+.p3c-cell.best{border-color:rgba(52,211,153,.55);box-shadow:0 0 30px rgba(52,211,153,.18)}
+.p3c-cell.on{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 40%,transparent)}
+.p3c-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.p3c-ex{padding:16px 20px;min-height:150px}
+.p3c-et{font-size:22px;color:var(--acc)}
+.p3c-ep{font-size:17px;line-height:1.65;color:var(--text2);margin-top:6px}
+.p3c-why{padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.p3c-w{display:flex;align-items:center;gap:12px;font-size:18px}
+.p3c-w .ic{font-size:22px;color:var(--ok);flex:none}
+.p3c-tg{font-size:19px;line-height:1.65;color:var(--text2);padding:14px 18px;border-left:4px solid var(--acc);border-radius:0 14px 14px 0;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 13%,transparent),transparent)}
+.p3c-tg b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c05-quad'] = {
+  EX: [
+    ['目标明确 × 结果可自动验证', '最佳区域：最适合 Agent 发挥。修复有测试用例的 bug——测试通过就是完成，Agent 可以自己判断何时停。'],
+    ['目标明确 × 结果需人工验证', '吞吐量受限：目标清楚，但验收还得靠人盯，吞吐量的天花板就是人的审查速度。例如代码重构需人工审查。'],
+    ['目标模糊 × 结果可自动验证', '高效地跑偏：有自动化反馈但目标模糊，系统会高效地往错误方向跑。例如用 linter 优化“代码质量”。'],
+    ['目标模糊 × 结果需人工验证', '难以启动：两者都缺，Agent 基本派不上用场。例如“让 UI 更好看”。'],
+  ],
+  init(s) {
+    this.cv = [...s.querySelectorAll('.p3c-cell canvas')].map((c) => c.getContext('2d'));
+    s.querySelector('.p3c-tbl').addEventListener('click', (e) => { const c = e.target.closest('.p3c-cell'); if (c) { this.auto = false; this.show(s, +c.dataset.i); } });
+  },
+  show(s, i) {
+    this.i = i;
+    s.querySelectorAll('.p3c-cell').forEach((c) => c.classList.toggle('on', +c.dataset.i === i));
+    s.querySelector('.p3c-et').textContent = this.EX[i][0];
+    s.querySelector('.p3c-ep').textContent = this.EX[i][1];
+  },
+  // 每格一组任务点：顺畅通过 / 在人工审查处排队 / 高速偏离目标 / 原地打转
+  spawn(k, R) {
+    return { x: 20 + R() * 30, y: 70 + R() * 90, v: 1.2 + R() * 1.6, ph: R() * 6.28, done: 0, k };
+  },
+  draw(t) {
+    const R = this.R;
+    this.cv.forEach((g, k) => {
+      const P = this.P[k];
+      if (P.length < 18 && R() < [0.09, 0.07, 0.09, 0.03][k]) P.push(this.spawn(k, R));
+      g.clearRect(0, 0, 400, 200);
+      if (k === 0) { g.fillStyle = 'rgba(52,211,153,.18)'; g.fillRect(340, 60, 50, 110); }
+      if (k === 1) { g.fillStyle = 'rgba(251,191,36,.35)'; g.fillRect(250, 60, 8, 110); }
+      if (k === 2) { g.strokeStyle = 'rgba(52,211,153,.5)'; g.setLineDash([4, 5]); g.strokeRect(345, 95, 40, 40); g.setLineDash([]); }
+      for (let i = P.length - 1; i >= 0; i--) {
+        const p = P[i];
+        if (k === 0) { p.x += p.v * 1.6; if (p.x > 345) p.done = 1; }
+        else if (k === 1) {
+          // 人工审查闸门：前面排着几个就停在第几个位置，闸门每 1.1 秒放行一个
+          if (p.x < 250) {
+            const ahead = P.filter((q) => q !== p && q.x < 250 && q.x > p.x).length, target = 240 - ahead * 12;
+            if (p.x < target) p.x = Math.min(target, p.x + p.v);
+            if (ahead === 0 && p.x >= 239 && t >= this.gateT) { p.x = 262; this.gateT = t + 1100; }
+          } else { p.x += p.v * 1.4; if (p.x > 345) p.done = 1; }
+        } else if (k === 2) { p.x += p.v * 2; p.y += p.v * 0.9; }
+        else { p.x += Math.sin(t / 300 + p.ph) * 0.6; p.y += Math.cos(t / 260 + p.ph) * 0.6; }
+        const out = p.x > 395 || p.y > 195 || (k === 3 && R() < 0.0015);
+        g.fillStyle = k === 0 && p.done ? '#34d399' : k === 2 ? '#fb923c' : k === 1 ? '#fbbf24' : '#fb7185';
+        g.beginPath(); g.arc(p.x, p.y, 5, 0, 6.283); g.fill();
+        if (out || (k <= 1 && p.x > 392)) P.splice(i, 1);
+      }
+    });
+  },
+  enter(s, ctx) {
+    this.R = U.rand(5);
+    this.P = [[], [], [], []];
+    this.gateT = 0;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.raf((t) => this.draw(t));
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 4); }, 3500);
+  },
+  reset(s) { s.querySelectorAll('.p3c-cell').forEach((c) => c.classList.remove('on')); this.cv.forEach((g) => g.clearRect(0, 0, 400, 200)); },
+};
+</script>
+
+<section class="slide" id="c05-cases" data-part="3" data-trans="flip" data-dur="18000" data-title="业界实践：三个 Harness 案例" data-notes="<b>业界实践。</b>以下三个案例的 Harness 实践印证了上述原则：<br><b>大规模代码迁移案例</b>（来自一家大型科技公司公开分享的大规模代码迁移实践）：关键不在模型强，而在 Harness 做对了三件事——知识必须存在于代码库本身（Agent 看不到的等于不存在）、约束编码进 Linter 和 CI 而非写在文档里、验证和纠正全链路自动化。<br><b>LangChain</b>：仅通过优化 Harness（系统提示词、工具中间件、自验证循环）就显著提升了基准任务表现。尤其值得一提的是“用 Agent 分析失败轨迹来改进 Harness”的方法论，使 Harness 工程从人工经验驱动转向数据驱动。<br><b>Anthropic</b>：将长任务拆分为两个角色——初始化 Agent 负责把大任务分解为任务清单，执行 Agent 负责逐步推进，并把中间成果（如已完成的代码文件、更新后的任务清单等）留给下一轮继续使用。这种分工解决了长时运行 Agent“一次想做太多”或“过早声称完成”的问题。<br>三张卡片轮流展开，也可以点击任一张（卡片里的示意图只表达机制，不对应具体数字）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">业界实践：<em>关键不在模型强，而在 Harness 做对了</em></h2></header>
+  <div class="p3d-row"></div>
+  <div class="src">第五章 ·「Harness 工程在 Coding Agent 中的实践」·「业界实践。」</div>
+</section>
+<style>
+.p3d-row{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;flex:1;min-height:0;margin-bottom:34px}
+.p3d-w{display:flex;min-height:0}
+.p3d-c{--c:var(--acc);flex:1;display:flex;flex-direction:column;gap:12px;padding:22px 24px;border-radius:22px;cursor:pointer;border:1px solid var(--line);background:linear-gradient(160deg,rgba(255,255,255,.06),rgba(255,255,255,.015) 60%);transition:all .5s var(--ease)}
+.p3d-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 26px 60px -26px color-mix(in srgb,var(--c) 60%,transparent);translate:0 -6px}
+.p3d-c.dim{opacity:.55}
+.p3d-h{display:flex;align-items:center;gap:12px}
+.p3d-h .ic{font-size:34px;color:var(--c)}
+.p3d-h b{font-size:25px}
+.p3d-c>p{font-size:17px;line-height:1.6;color:var(--text2)}
+.p3d-vis{position:relative;flex:1;min-height:260px;border-radius:16px;border:1px solid var(--line);background:rgba(5,9,22,.6);overflow:hidden}
+.p3d-pts{display:flex;flex-direction:column;gap:8px}
+.p3d-pt{display:flex;gap:10px;align-items:flex-start;font-size:16px;line-height:1.5;color:var(--text2);opacity:.45;transition:opacity .4s}
+.p3d-pt .ic{flex:none;margin-top:3px;color:var(--c)}
+.p3d-pt.on{opacity:1;color:var(--text)}
+/* 迁移：Agent 的视野 */
+.p3d-spot{position:absolute;left:50%;top:50%;width:250px;height:190px;margin:-95px 0 0 -125px;border-radius:50%;background:radial-gradient(ellipse,color-mix(in srgb,var(--c) 22%,transparent),transparent 70%);border:1px dashed color-mix(in srgb,var(--c) 60%,transparent)}
+.p3d-k{position:absolute;padding:4px 10px;border-radius:8px;font:15px var(--mono);white-space:nowrap;border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:opacity .4s}
+.p3d-k.in{color:var(--c);border-color:color-mix(in srgb,var(--c) 55%,transparent)}
+.p3d-k.out{color:var(--text3);opacity:.45;font-family:var(--font)}
+.p3d-k.out::after{content:" · 看不到";color:var(--bad)}
+/* LangChain：失败轨迹驱动的改进环 */
+.p3d-loop{position:absolute;inset:14px}
+.p3d-loop .ln{fill:none;stroke:rgba(255,255,255,.15);stroke-width:2;stroke-dasharray:5 6;animation:flow 1.2s linear infinite}
+.p3d-ln{position:absolute;transform:translate(-50%,-50%);padding:6px 10px;border-radius:10px;font-size:15px;text-align:center;white-space:nowrap;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:all .35s}
+.p3d-ln.on{border-color:var(--c);color:#fff;background:color-mix(in srgb,var(--c) 20%,rgba(12,18,40,.9))}
+/* Anthropic：两个角色交接任务清单 */
+.p3d-ag{position:absolute;top:14px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:15px;color:var(--text2)}
+.p3d-ag .ic{font-size:30px;color:var(--c)}
+.p3d-list{position:absolute;left:50%;top:86px;width:210px;margin-left:-105px;display:flex;flex-direction:column;gap:5px}
+.p3d-list div{font-size:15px;padding:3px 10px;border-radius:7px;border:1px solid var(--line2);background:rgba(12,18,40,.9);opacity:0;transition:all .4s}
+.p3d-list div.show{opacity:1}
+.p3d-list div.done{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 50%,transparent)}
+.p3d-list div.done::before{content:"✓ "}
+.p3d-art{position:absolute;right:14px;bottom:12px;display:flex;gap:6px;flex-wrap:wrap;width:120px;justify-content:flex-end}
+.p3d-art i{font-style:normal;font:15px var(--mono);padding:1px 7px;border-radius:6px;color:#06101f;background:var(--c);animation:upIn .4s var(--spring) both}
+</style>
+<script>
+HOOKS['c05-cases'] = {
+  C: [
+    { n: '大规模代码迁移案例', ic: 'stack', c: '#fbbf24', d: '一家大型科技公司公开分享的实践：Harness 做对了三件事', pts: ['知识必须存在于代码库本身——Agent 看不到的等于不存在', '约束编码进 Linter 和 CI，而不是写在文档里', '验证和纠正全链路自动化'] },
+    { n: 'LangChain', ic: 'refresh', c: '#34d399', d: '仅通过优化 Harness（系统提示词、工具中间件、自验证循环）就显著提升了基准任务表现', pts: ['用 Agent 分析失败轨迹来改进 Harness', 'Harness 工程从人工经验驱动转向数据驱动'] },
+    { n: 'Anthropic', ic: 'list', c: '#60a5fa', d: '把长任务拆成两个角色：初始化 Agent 分解任务清单，执行 Agent 逐步推进', pts: ['中间成果（已完成的代码文件、更新后的任务清单）留给下一轮继续使用', '解决长时运行 Agent“一次想做太多”或“过早声称完成”的问题'] },
+  ],
+  init(s) {
+    s.querySelector('.p3d-row').innerHTML = this.C.map((c, i) => `<div class="p3d-w fx fx-up" style="--d:${2 + i}"><div class="p3d-c" data-i="${i}" style="--c:${c.c}"><div class="p3d-h"><svg class="ic"><use href="#i-${c.ic}"/></svg><b>${c.n}</b></div><p>${c.d}</p><div class="p3d-vis" data-v="${i}"></div><div class="p3d-pts">${c.pts.map((p) => `<div class="p3d-pt"><svg class="ic"><use href="#i-check"/></svg><span>${p}</span></div>`).join('')}</div></div></div>`).join('');
+    const v = s.querySelectorAll('.p3d-vis');
+    v[0].innerHTML = '<div class="p3d-spot"></div>' + [['src/', 46, 40, 'in'], ['ARCHITECTURE.md', 30, 52, 'in'], ['.eslintrc', 58, 58, 'in'], ['CI 配置', 44, 66, 'in'], ['口头约定', 10, 12, 'out'], ['群聊里的决定', 64, 10, 'out'], ['白板照片', 12, 86, 'out']].map(([t, x, y, c]) => `<span class="p3d-k ${c}" style="left:${x}%;top:${y}%">${t}</span>`).join('');
+    v[1].innerHTML = '<svg class="p3d-loop" viewBox="0 0 100 100" preserveAspectRatio="none"><ellipse class="ln" cx="50" cy="52" rx="38" ry="34"/></svg>' + [['运行基准任务', 50, 14], ['收集失败轨迹', 88, 52], ['Agent 分析失败原因', 50, 88], ['改进 Harness<br>提示词 · 中间件 · 自验证', 13, 52]].map(([t, x, y], i) => `<span class="p3d-ln" data-n="${i}" style="left:${x}%;top:${y}%">${t}</span>`).join('');
+    v[2].innerHTML = '<div class="p3d-ag" style="left:14px"><svg class="ic"><use href="#i-robot"/></svg>初始化 Agent</div><div class="p3d-ag" style="right:14px"><svg class="ic"><use href="#i-robot"/></svg>执行 Agent</div><div class="p3d-list">' + ['拆分：数据模型', '拆分：API 层', '拆分：前端页面', '拆分：迁移脚本', '拆分：端到端测试'].map((t) => `<div>${t}</div>`).join('') + '</div><div class="p3d-art"></div>';
+    s.querySelector('.p3d-row').addEventListener('click', (e) => { const c = e.target.closest('.p3d-c'); if (c) { this.auto = false; this.show(s, +c.dataset.i); } });
+  },
+  async show(s, i) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    this.i = i;
+    s.querySelectorAll('.p3d-c').forEach((c, j) => { c.classList.toggle('on', j === i); c.classList.toggle('dim', j !== i); });
+    const card = s.querySelectorAll('.p3d-c')[i], pts = card.querySelectorAll('.p3d-pt');
+    s.querySelectorAll('.p3d-pt').forEach((p) => p.classList.remove('on'));
+    pts.forEach((p, j) => ctx.later(() => ok() && p.classList.add('on'), 500 + j * 900));
+    if (i === 1) {
+      const ns = card.querySelectorAll('.p3d-ln');
+      for (let r = 0; r < 8 && ok(); r++) { ns.forEach((n, j) => n.classList.toggle('on', j === r % 4)); await U.wait(ctx, 650); }
+    } else if (i === 2) {
+      const it = [...card.querySelectorAll('.p3d-list div')], art = card.querySelector('.p3d-art');
+      it.forEach((d) => d.classList.remove('show', 'done')); art.innerHTML = '';
+      for (const d of it) { await U.wait(ctx, 250); if (!ok()) return; d.classList.add('show'); }
+      for (const [j, d] of it.entries()) { await U.wait(ctx, 700); if (!ok()) return; d.classList.add('done'); art.insertAdjacentHTML('beforeend', `<i>第${j + 1}轮</i>`); }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    ctx.later(() => this.show(s, 0), 800);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % 3); }, 6000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.p3d-c').forEach((c) => c.classList.remove('on', 'dim'));
+    s.querySelectorAll('.p3d-pt,.p3d-ln').forEach((p) => p.classList.remove('on'));
+    s.querySelectorAll('.p3d-list div').forEach((d) => d.classList.remove('show', 'done'));
+    s.querySelectorAll('.p3d-art').forEach((a) => (a.innerHTML = ''));
+  },
+};
+</script>
+
+<section class="slide" id="c05-principles" data-part="3" data-steps="3" data-trans="rise" data-dur="9000" data-title="从 Coding Agent 到通用 Harness 设计原则" data-notes="<b>从 Coding Agent 到通用 Harness 设计原则。</b>Coding Agent 的 Harness 实践为所有 Agent 系统提供了可迁移的设计原则，按 → 逐条展开：<br>1. <b>约束优先于指导</b>：能用代码强制的规则就不要用文档建议。Linter 规则、类型约束、CI 检查的价值远超系统提示词中“请遵循...”式的指导——前者是“做不了”，后者只是“建议别做”。<br>2. <b>验证要自动化</b>：人工审查是不可扩展的瓶颈。测试套件、代码质量检查、行为监控——这些基础设施的投入回报率远高于增加人力。<br>3. <b>反馈越快越好，越结构化越好</b>：错误信息越详细、越接近错误发生的时刻，Agent 的纠正效率越高。第二章的 Agent 状态栏技术（详细错误信息、工具调用计数器）正是这一原则的体现。<br>4. <b>回退要可靠</b>：Agent 在安全网内操作才能大胆试错。Git 分支、沙盒环境、快照机制确保任何错误都可逆。<br>每格里的小动画只表达机制（示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">四条<em>可迁移</em>的通用 Harness 设计原则</h2></header>
+  <div class="p3e-grid">
+    <div class="p3e-p fx fx-up" style="--d:2" data-p="0"><div class="p3e-h"><em>1</em><b>约束优先于指导</b><span>能用代码强制的规则，就不要用文档建议</span></div><div class="p3e-v"></div></div>
+    <div class="p3e-p fx fx-up" data-step="1" data-p="1"><div class="p3e-h"><em>2</em><b>验证要自动化</b><span>人工审查是不可扩展的瓶颈</span></div><div class="p3e-v"></div></div>
+    <div class="p3e-p fx fx-up" data-step="2" data-p="2"><div class="p3e-h"><em>3</em><b>反馈越快越好，越结构化越好</b><span>越详细、越接近出错时刻，纠正效率越高</span></div><div class="p3e-v"></div></div>
+    <div class="p3e-p fx fx-up" data-step="3" data-p="3"><div class="p3e-h"><em>4</em><b>回退要可靠</b><span>在安全网内操作，才能大胆试错</span></div><div class="p3e-v"></div></div>
+  </div>
+  <div class="src">第五章 ·「Harness 工程在 Coding Agent 中的实践」·「从 Coding Agent 到通用 Harness 设计原则。」</div>
+</section>
+<style>
+.p3e-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:20px;flex:1;min-height:0;margin-bottom:34px}
+.p3e-p{display:flex;flex-direction:column;gap:10px;padding:16px 20px;border-radius:20px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+.p3e-h{display:flex;align-items:baseline;gap:12px}
+.p3e-h em{font-style:normal;font:800 22px var(--num);color:#06101f;background:var(--acc);border-radius:8px;padding:0 10px}
+.p3e-h b{font-size:23px}
+.p3e-h span{font-size:16px;color:var(--text3)}
+.p3e-v{position:relative;flex:1;min-height:0;border-radius:14px;background:rgba(5,9,22,.55);border:1px solid var(--line);overflow:hidden}
+.p3e-lab{position:absolute;font-size:16px;color:var(--text2);white-space:nowrap}
+.p3e-lab b{color:var(--text)}
+.p3e-wall{position:absolute;top:40px;bottom:16px;width:6px;border-radius:4px}
+.p3e-wall.soft{background:repeating-linear-gradient(180deg,rgba(251,191,36,.7) 0 8px,transparent 8px 16px)}
+.p3e-wall.hard{background:#60a5fa;box-shadow:0 0 14px #60a5fa}
+.p3e-ball{position:absolute;width:18px;height:18px;border-radius:50%;background:#fbbf24;box-shadow:0 0 10px #fbbf24;transition:left 1.1s var(--ease),background .3s}
+.p3e-ball.x{background:#fb7185;box-shadow:0 0 10px #fb7185}
+.p3e-q{position:absolute;display:flex;gap:6px}
+.p3e-q i{width:30px;height:22px;border-radius:6px;background:rgba(251,191,36,.25);border:1px solid rgba(251,191,36,.6)}
+.p3e-q i.ok{background:rgba(52,211,153,.3);border-color:rgba(52,211,153,.7)}
+.p3e-tl{position:absolute;left:16px;right:16px;height:30px;display:flex;align-items:center;gap:10px;font:15px var(--mono)}
+.p3e-tl .bar{position:relative;flex:1;height:8px;border-radius:8px;background:rgba(255,255,255,.08)}
+.p3e-tl .bar i{position:absolute;left:0;top:0;bottom:0;border-radius:8px;width:0;transition:width 1.4s var(--ease)}
+.p3e-git{position:absolute;inset:0}
+.p3e-git .ln{fill:none;stroke-width:4;stroke-linecap:round}
+.p3e-git .cm{stroke:#0b1020;stroke-width:3}
+.p3e-git text{font-size:15px;fill:var(--text2)}
+</style>
+<script>
+HOOKS['c05-principles'] = {
+  init(s) {
+    const V = s.querySelectorAll('.p3e-v');
+    V[0].innerHTML = `<span class="p3e-lab" style="left:16px;top:10px"><b>指导</b>：提示词里写“请遵循…” = 建议别做</span><span class="p3e-lab" style="left:52%;top:10px"><b>约束</b>：Linter / 类型 / CI = 做不了</span>
+      <i class="p3e-wall soft" style="left:30%"></i><i class="p3e-wall hard" style="left:80%"></i><span class="p3e-ball" data-b="0" style="left:5%;top:50%"></span><span class="p3e-ball" data-b="1" style="left:55%;top:50%"></span><span class="p3e-lab p3e-r0" style="left:16px;bottom:10px"></span><span class="p3e-lab p3e-r1" style="left:52%;bottom:10px"></span>`;
+    V[1].innerHTML = `<span class="p3e-lab" style="left:16px;top:10px"><b>人工审查</b>：一个一个看</span><div class="p3e-q" data-q="0" style="left:16px;top:44px"></div><span class="p3e-lab" style="left:16px;top:92px"><b>自动验证</b>：测试 · 质量检查 · 行为监控</span><div class="p3e-q" data-q="1" style="left:16px;top:126px"></div><span class="p3e-lab p3e-cnt" style="left:16px;bottom:10px"></span>`;
+    V[2].innerHTML = `<div class="p3e-tl" style="top:20px"><span style="color:#6ee7b7">即时 · 结构化</span><div class="bar"><i style="background:#34d399"></i></div></div><span class="p3e-lab" style="left:16px;top:56px">src/main.py:42 SyntaxError: '(' was never closed → 立刻改对</span>
+      <div class="p3e-tl" style="top:100px"><span style="color:#fda4af">延迟 · 笼统</span><div class="bar"><i style="background:#fb7185"></i></div></div><span class="p3e-lab" style="left:16px;top:136px">“测试没过” → 先花时间找到底哪里错了</span>`;
+    V[3].innerHTML = `<svg class="p3e-git" viewBox="0 0 760 200" preserveAspectRatio="xMidYMid meet"><path class="ln" d="M40 70 H700" stroke="#60a5fa"/><path class="ln p3e-br" d="M260 70 C 320 70, 320 150, 380 150 H560" stroke="#fbbf24"/><circle class="cm" cx="120" cy="70" r="11" fill="#60a5fa"/><circle class="cm" cx="260" cy="70" r="11" fill="#60a5fa"/><circle class="cm" cx="440" cy="150" r="11" fill="#fbbf24"/><circle class="cm p3e-bad" cx="560" cy="150" r="11" fill="#fbbf24"/><text x="96" y="44">main</text><text x="400" y="186">实验分支：大胆试</text><text class="p3e-gt" x="580" y="155"></text></svg>`;
+  },
+  run(s, k) {
+    const ctx = this.ctx, tk = this.tk;
+    const alive = () => ctx && ctx.alive && tk === this.tk;
+    if (k >= 0 && !this.r0) {
+      this.r0 = 1;
+      const b = s.querySelectorAll('.p3e-ball');
+      const cyc = (n) => {
+        if (!alive()) return;
+        b.forEach((x) => { x.style.transition = 'none'; x.classList.remove('x'); });
+        b[0].style.left = '5%'; b[1].style.left = '55%';
+        void b[0].offsetWidth;
+        b.forEach((x) => (x.style.transition = ''));
+        s.querySelector('.p3e-r0').textContent = ''; s.querySelector('.p3e-r1').textContent = '';
+        ctx.later(() => { if (!alive()) return; const through = n % 2 === 0; b[0].style.left = through ? '40%' : '26%'; if (through) b[0].classList.add('x'); s.querySelector('.p3e-r0').textContent = through ? '偶尔越线：违反了规则' : '这次遵守了'; b[1].style.left = '77%'; b[1].classList.add('x'); s.querySelector('.p3e-r1').textContent = '撞墙：提交被拒绝，无法违反'; }, 500);
+        ctx.later(() => cyc(n + 1), 3200);
+      };
+      cyc(0);
+    }
+    if (k >= 1 && !this.r1) {
+      this.r1 = 1;
+      const q0 = s.querySelector('.p3e-q[data-q="0"]'), q1 = s.querySelector('.p3e-q[data-q="1"]'), cnt = s.querySelector('.p3e-cnt');
+      q0.innerHTML = q1.innerHTML = '<i></i>'.repeat(12);
+      let a = 0, c = 0;
+      ctx.every(() => { if (!alive()) return; if (a < 12) q0.children[a++].classList.add('ok'); }, 1600);
+      ctx.every(() => { if (!alive()) return; if (c < 12) q1.children[c++].classList.add('ok'); else { c = 0; a = 0; [...q0.children, ...q1.children].forEach((i) => i.classList.remove('ok')); } cnt.textContent = '同样的时间里，自动验证处理的数量远多于人工'; }, 260);
+    }
+    if (k >= 2 && !this.r2) {
+      this.r2 = 1;
+      const bars = s.querySelectorAll('.p3e-v')[2].querySelectorAll('.bar i');
+      const cyc = () => { if (!alive()) return; bars.forEach((x) => (x.style.width = '0')); ctx.later(() => { if (!alive()) return; bars[0].style.width = '12%'; bars[1].style.width = '78%'; }, 300); ctx.later(cyc, 3600); };
+      cyc();
+    }
+    if (k >= 3 && !this.r3) {
+      this.r3 = 1;
+      const br = s.querySelector('.p3e-br'), bad = s.querySelector('.p3e-bad'), gt = s.querySelector('.p3e-gt');
+      const cyc = (n) => { if (!alive()) return; br.style.opacity = 1; bad.setAttribute('fill', '#fbbf24'); gt.textContent = ''; ctx.later(() => { if (!alive()) return; bad.setAttribute('fill', '#fb7185'); gt.textContent = '失败 → 丢弃分支，main 毫发无损'; }, 1200); ctx.later(() => { if (alive()) br.style.opacity = 0.2; }, 2400); ctx.later(() => cyc(n + 1), 3800); };
+      cyc(0);
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.tk = (this.tk || 0) + 1; this.r0 = this.r1 = this.r2 = this.r3 = 0; ctx.later(() => this.run(s, k), 600); },
+  step(s, ctx, k) { this.run(s, k); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.r0 = this.r1 = this.r2 = this.r3 = 0; },
+};
+</script>
+
+<section class="slide" id="c05-process" data-part="3" data-dur="18000" data-title="过程性错误与故障边界控制" data-notes="<b>约束的另一层目的：防止过程性错误。</b>验收基线管的是结果对不对，执行边界管的是<b>过程</b>——即使结果正确，用错误的方法达成也不行。修复数据库故障时直接把库删了重建，“修复”确实生效，但数据没了；修复编译错误时把代码全删重写，编译确实通过，但实现没了。这类破坏性捷径总是存在：即使把限制写进最终评估指标，Agent 也常能找到绕过去的办法——这正是第八章讨论的 reward hacking 在 Agent 任务中的日常形态。因此生产级 Harness 要对 rm -rf、删除生产数据、覆盖未读文件这类危险动作设置专门的检查与审批（本章安全一节的语义解析、第四章的 Sidecar 复核），约束的是<b>动作</b>而非仅仅是结果。第八章的 RLVP（验证路径惩罚，“奖励结果、惩罚路径”）从训练侧回答同一个问题：在最终结果奖励之外，对过程中可验证的违规动作施加惩罚，把“不用破坏性手段”内化为模型的工程常识。对已有模型，Harness 护栏是外部约束；对可训练模型，过程惩罚是内部内化——两者目标一致。<br><b>工具编排：故障边界控制</b>。成熟的 Coding Agent 支持并行工具调用，Harness 视角下的独特问题是<b>故障如何传播</b>：一个工具失败时，哪些调用应当中止、哪些应当继续？原则是故障只在同一批并行调用内传播，不上升到父级操作——比如同时读取三个文件，其中一个找不到，应该只报告这一个失败，而不是把另外两个也取消掉，更不是让整个任务中止。这种精细的故障边界控制避免了“一个命令失败导致整个任务中止”的脆弱模式。并行调用、流式解析与级联中止的具体机制见“实现技巧”一节。<br>两个演示都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">约束管<em>动作</em>，不只管结果；故障只在<em>本批</em>内传播</h2></header>
+  <div class="p3f-body">
+    <div class="p3f-l panel fx fx-left" style="--d:2">
+      <div class="p3f-hd"><b>结果对 ≠ 过程对</b><div class="p3f-seg seg"><i class="knob"></i><button data-v="db">修复数据库故障</button><button data-v="cc">修复编译错误</button></div></div>
+      <div class="p3f-lanes">
+        <div class="p3f-lane" data-l="a"><span class="p3f-path"></span><div class="p3f-ck"><span class="p3f-r">结果检查</span><span class="p3f-p">过程检查</span></div></div>
+        <div class="p3f-lane" data-l="b"><span class="p3f-path"></span><div class="p3f-ck"><span class="p3f-r">结果检查</span><span class="p3f-p">过程检查</span></div></div>
+      </div>
+      <div class="p3f-rl"><div><b>Harness 护栏</b><span>对已有模型：外部约束 · 危险动作检查与审批</span></div><i>⇄</i><div><b>RLVP 过程惩罚</b><span>对可训练模型：奖励结果、惩罚路径 · 内部内化</span></div></div>
+      <span class="c5-tag demo p3f-dm">示意</span>
+    </div>
+    <div class="p3f-rp panel fx fx-right" style="--d:3">
+      <div class="p3f-hd"><b>工具编排：故障边界控制</b><button class="tgl p3f-tg"><i></i>脆弱模式</button></div>
+      <svg class="p3f-svg" viewBox="0 0 640 380" width="640" height="380">
+        <path class="p3f-e" d="M320 70 C 320 120, 120 120, 120 180"/><path class="p3f-e" d="M320 70 V180"/><path class="p3f-e" d="M320 70 C 320 120, 520 120, 520 180"/>
+      </svg>
+      <div class="p3f-parent">父级操作：<b>同时读取 3 个文件</b></div>
+      <div class="p3f-calls"><div class="p3f-call" data-c="0">Read(a.py)</div><div class="p3f-call" data-c="1">Read(b.py)</div><div class="p3f-call" data-c="2">Read(c.py)</div></div>
+      <div class="p3f-out"></div>
+    </div>
+  </div>
+  <div class="src">第五章 ·「Harness 工程在 Coding Agent 中的实践」·「约束的另一层目的：防止过程性错误。」「工具编排：故障边界控制」</div>
+</section>
+<style>
+.p3f-body{display:grid;grid-template-columns:960px 1fr;gap:26px;flex:1;min-height:0;margin-bottom:24px}
+.p3f-l,.p3f-rp{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+.p3f-hd{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.p3f-hd b{font-size:22px}
+.p3f-hd .seg button{font-size:17px;padding:8px 18px}
+.p3f-lanes{display:flex;flex-direction:column;gap:14px}
+.p3f-lane{padding:14px 16px;border-radius:16px;border:1px solid var(--line);background:rgba(5,9,22,.55);display:flex;flex-direction:column;gap:12px}
+.p3f-path{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px}
+.p3f-path i{font-style:normal;padding:6px 12px;border-radius:10px;font-size:17px;border:1px solid var(--line2);background:rgba(12,18,40,.9);animation:upIn .4s var(--spring) both}
+.p3f-path i.cmd{font-family:var(--mono);font-size:16px;color:#fda4af;border-color:rgba(251,113,133,.55)}
+.p3f-path i.ok{color:#6ee7b7;border-color:rgba(52,211,153,.55)}
+.p3f-path i.bad{color:#fda4af;border-color:rgba(251,113,133,.55)}
+.p3f-path em{font-style:normal;color:var(--text3)}
+.p3f-ck{display:flex;gap:12px}
+.p3f-ck span{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:999px;font-size:16px;color:var(--text3);border:1px solid var(--line2);transition:all .4s}
+.p3f-ck span.ok{color:#6ee7b7;border-color:rgba(52,211,153,.6);background:rgba(52,211,153,.1)}
+.p3f-ck span.ok::before{content:"✓"}
+.p3f-ck span.bad{color:#fda4af;border-color:rgba(251,113,133,.6);background:rgba(251,113,133,.1)}
+.p3f-ck span.bad::before{content:"✗"}
+.p3f-rl{margin-top:auto;display:flex;align-items:center;gap:14px}
+.p3f-rl div{flex:1;padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.p3f-rl b{display:block;font-size:18px;color:var(--acc)}
+.p3f-rl span{font-size:15px;color:var(--text2)}
+.p3f-rl i{font-style:normal;font-size:22px;color:var(--text3)}
+.p3f-dm{position:absolute;right:22px;top:66px}
+.p3f-rp{gap:0}
+.p3f-rp .p3f-hd{margin-bottom:6px}
+.p3f-svg{position:absolute;left:22px;top:70px;overflow:visible}
+.p3f-e{fill:none;stroke:rgba(255,255,255,.2);stroke-width:2.5;stroke-dasharray:6 7;transition:stroke .3s}
+.p3f-e.on{stroke:var(--acc);animation:flow 1s linear infinite}
+.p3f-parent{position:relative;align-self:center;margin-top:16px;padding:10px 20px;border-radius:14px;font-size:18px;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:all .4s}
+.p3f-parent.bad{border-color:var(--bad);color:#fda4af;box-shadow:0 0 22px rgba(251,113,133,.35)}
+.p3f-calls{position:relative;display:flex;justify-content:space-between;margin-top:80px;padding:0 8px}
+.p3f-call{width:180px;text-align:center;padding:12px 10px;border-radius:14px;font:17px var(--mono);border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:all .4s}
+.p3f-call.run{border-color:var(--acc);box-shadow:0 0 16px color-mix(in srgb,var(--acc) 40%,transparent)}
+.p3f-call.ok{border-color:var(--ok);color:#6ee7b7}
+.p3f-call.bad{border-color:var(--bad);color:#fda4af}
+.p3f-call.cx{opacity:.4;text-decoration:line-through}
+.p3f-out{position:relative;margin-top:26px;display:flex;flex-direction:column;gap:8px;font-size:17px;line-height:1.5}
+.p3f-out div{padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(5,9,22,.6);animation:upIn .4s var(--spring) both}
+.p3f-out .ok{color:#6ee7b7}.p3f-out .bad{color:#fda4af}
+</style>
+<script>
+HOOKS['c05-process'] = {
+  SC: {
+    db: { a: [['定位：连接池耗尽'], ['重启连接池', ''], ['故障修复', 'ok'], ['数据完整', 'ok']], b: [['DROP DATABASE orders;', 'cmd'], ['重建空库', ''], ['“修复”生效', 'ok'], ['数据没了', 'bad']], cmd: '删除生产数据' },
+    cc: { a: [['读报错：类型不匹配'], ['改两行类型标注', ''], ['编译通过', 'ok'], ['实现完好', 'ok']], b: [['rm -rf src/', 'cmd'], ['从头重写一个空壳', ''], ['编译通过', 'ok'], ['实现没了', 'bad']], cmd: 'rm -rf' },
+  },
+  init(s) {
+    this.set = U.seg(s.querySelector('.p3f-seg'), (v) => { this.auto = false; this.lanes(s, v); });
+    s.querySelector('.p3f-tg').addEventListener('click', (e) => { this.fragile = !this.fragile; e.currentTarget.classList.toggle('on', this.fragile); this.batch(s); });
+  },
+  async lanes(s, v) {
+    const ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tk;
+    if (!ctx) return;
+    this.v = v; this.set(v);
+    const sc = this.SC[v];
+    for (const k of ['a', 'b']) {
+      const lane = s.querySelector(`.p3f-lane[data-l="${k}"]`);
+      lane.querySelector('.p3f-path').innerHTML = `<em>${k === 'a' ? '路径 A' : '路径 B · 破坏性捷径'}</em>`;
+      lane.querySelectorAll('.p3f-ck span').forEach((x) => x.classList.remove('ok', 'bad'));
+    }
+    for (let i = 0; i < 4; i++) {
+      for (const k of ['a', 'b']) {
+        const [t, c] = sc[k][i];
+        s.querySelector(`.p3f-lane[data-l="${k}"] .p3f-path`).insertAdjacentHTML('beforeend', `${i ? '<em>→</em>' : ''}<i class="${c || ''}">${t}</i>`);
+      }
+      await U.wait(ctx, 700); if (!ok()) return;
+    }
+    s.querySelectorAll('.p3f-ck .p3f-r').forEach((x) => x.classList.add('ok'));
+    await U.wait(ctx, 900); if (!ok()) return;
+    s.querySelector('.p3f-lane[data-l="a"] .p3f-p').classList.add('ok');
+    const pb = s.querySelector('.p3f-lane[data-l="b"] .p3f-p');
+    pb.classList.add('bad');
+    pb.textContent = `过程检查：拦下“${sc.cmd}”，需要审批`;
+  },
+  // 一批并行调用：b.py 找不到；正常模式只报告它，脆弱模式把整批和父级都中止
+  async batch(s) {
+    const ctx = this.ctx, tk = (this.tb = (this.tb || 0) + 1), ok = () => ctx && ctx.alive && tk === this.tb;
+    if (!ctx) return;
+    const calls = s.querySelectorAll('.p3f-call'), out = s.querySelector('.p3f-out'), par = s.querySelector('.p3f-parent');
+    calls.forEach((c) => c.classList.remove('run', 'ok', 'bad', 'cx'));
+    par.classList.remove('bad'); out.innerHTML = '';
+    s.querySelectorAll('.p3f-e').forEach((e) => e.classList.add('on'));
+    calls.forEach((c) => c.classList.add('run'));
+    await U.wait(ctx, 1000); if (!ok()) return;
+    calls[1].classList.remove('run'); calls[1].classList.add('bad');
+    out.insertAdjacentHTML('beforeend', '<div class="bad">Read(b.py)：文件不存在</div>');
+    await U.wait(ctx, 700); if (!ok()) return;
+    if (this.fragile) {
+      calls[0].classList.add('cx'); calls[2].classList.add('cx');
+      par.classList.add('bad');
+      out.insertAdjacentHTML('beforeend', '<div class="bad">一个命令失败 → 取消整批 → 整个任务中止（脆弱模式）</div>');
+    } else {
+      calls[0].classList.remove('run'); calls[0].classList.add('ok');
+      calls[2].classList.remove('run'); calls[2].classList.add('ok');
+      out.insertAdjacentHTML('beforeend', '<div class="ok">a.py、c.py 照常返回；父级操作继续，只报告这一个失败</div>');
+    }
+    s.querySelectorAll('.p3f-e').forEach((e) => e.classList.remove('on'));
+    await U.wait(ctx, 3400);
+    if (ok() && this.auto) { this.fragile = !this.fragile; s.querySelector('.p3f-tg').classList.toggle('on', this.fragile); this.batch(s); }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.fragile = false;
+    s.querySelector('.p3f-tg').classList.remove('on');
+    ctx.later(() => { this.lanes(s, 'db'); this.batch(s); }, 700);
+    ctx.every(() => { if (this.auto) this.lanes(s, this.v === 'db' ? 'cc' : 'db'); }, 8000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1; this.tb = (this.tb || 0) + 1;
+    s.querySelectorAll('.p3f-path').forEach((p) => (p.innerHTML = ''));
+    s.querySelectorAll('.p3f-ck span').forEach((x) => x.classList.remove('ok', 'bad'));
+    s.querySelectorAll('.p3f-p').forEach((x) => (x.textContent = '过程检查'));
+    s.querySelector('.p3f-out').innerHTML = '';
+    s.querySelectorAll('.p3f-call').forEach((c) => c.classList.remove('run', 'ok', 'bad', 'cx'));
+  },
+};
+</script>

@@ -1,0 +1,1617 @@
+<!-- ================= PART 03 语音：级联与流式 ================= -->
+<section class="slide chapter" id="c06-d3" data-part="3" data-title="PART 03 · 语音：级联与流式" data-notes="异步与事件驱动让世界能够在任务进行中唤醒 Agent，原生引导又让用户不必等完整回答结束才能提交更新。接下来三节进一步压缩时间尺度：当环境变化的速度达到甚至超过模型的生成速度时，能接收更新还不够，系统还必须及时作出反应。<br>语音是第一站，它把时机轴推到毫秒级：按本章开篇的尺度表，语音落在 10 毫秒到 1 秒——观察侧要<b>边说边听，不等一句说完</b>，动作侧要<b>边想边说，可被打断</b>。<br>这一部分先说明语音为什么是最自然的人机接口，再用“级联、轮次式、全双工”三分法建立坐标；然后拆开最常见的级联流水线：四个模块的分工与瓶颈、串行累积的延迟瀑布、排队对空载延迟的放大，以及实验 6-4 的真实测量；最后讲怎样在保留模块化分工的前提下走向流式感知与声学事件（实验 6-5）。端到端 Omni、全双工与快慢思考留给下一部分。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">语音：最自然的<br>人机接口</h1>
+  <div class="ch-s fx fx-up" style="--d:3">级联流水线、延迟瀑布与流式感知：先把“听、想、说”的时序算清楚</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">贯穿三种范式的主线是：如何摆脱“轮流说话”和 VAD 对发言权的猜测。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c06-voice" data-part="3" data-trans="rise" data-title="语音的价值不只是把文字换成声音" data-dur="13000" data-notes="语音的价值不只是把文字换成声音。正常说话的速度约为打字的四倍，而且不占用双手与视线，因此它天然适合把 Agent 放进<b>持续工作、随时可能被打断的输入输出回路</b>。语音输入法把口述转成文字，语音 Agent 则让用户直接与 Agent 协作；两者都可以支持引言中提到的 whisper coding。<br>本节同时讨论两个方向：<b>用户对 Agent 说话</b>，以及 <b>Agent 代替用户对外部世界说话</b>（例如本章第一节中 Pine 代表用户拨打客服电话）。语音模型决定“能回答什么”，交互架构决定“能否听清、及时回应、自然换手，并在通话中完成确认和工具调用”。后文先讨论交互时序，再讨论深度思考和表达质量。<br>左侧的赛跑按原书给出的约四倍速度比演示（进度与句子为示意）：说话那条完成时，打字大约只完成四分之一，可点击“再比一次”。右侧两个方向自动交替（对话内容为示意），也可以点击开关切换。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">语音的价值，不只是<em>把文字换成声音</em></h2>
+  <p class="lead fx fx-up" style="--d:2">说话约为打字的四倍速，又不占用双手与视线——天然适合持续工作、随时可能被打断的输入输出回路</p></header>
+  <div class="c06vo-body">
+    <div class="c06vo-l panel fx fx-left" style="--d:3">
+      <div class="c06vo-h"><b>同一句话，两种输入</b><span class="chip warn c06vo-sim">示意</span><button class="btn c06vo-again"><svg class="ic"><use href="#i-refresh"/></svg>再比一次</button></div>
+      <div class="c06vo-lane" data-k="type"><span class="c06vo-lb"><svg class="ic"><use href="#i-keyboard"/></svg>打字</span><div class="c06vo-tr" data-clip-ok><i class="c06vo-fill"></i><span class="c06vo-tx"></span></div><em>×1</em></div>
+      <div class="c06vo-lane" data-k="talk"><span class="c06vo-lb"><svg class="ic"><use href="#i-mic"/></svg>说话</span><div class="c06vo-tr" data-clip-ok><i class="c06vo-fill"></i><span class="c06vo-tx"></span></div><em>≈ ×4</em></div>
+      <p class="c06vo-note">说话那条完成时，打字大约才完成 <b class="c06vo-pct">—</b></p>
+      <div class="c06vo-free"><span class="chip ok"><svg class="ic"><use href="#i-hand"/></svg>不占用双手</span><span class="chip ok"><svg class="ic"><use href="#i-eye"/></svg>不占用视线</span><span class="chip acc"><svg class="ic"><use href="#i-repeat"/></svg>适合持续工作、随时可能被打断的回路</span></div>
+      <div class="c06vo-vs">
+        <div class="c06vo-c"><svg class="ic"><use href="#i-keyboard"/></svg><div><b>语音输入法</b><p>把口述转成文字</p></div></div>
+        <div class="c06vo-c on"><svg class="ic"><use href="#i-robot"/></svg><div><b>语音 Agent</b><p>用户直接与 Agent 协作</p></div></div>
+      </div>
+      <p class="c06vo-wc">两者都可以支持引言中提到的 <b>whisper coding</b></p>
+    </div>
+    <div class="c06vo-r panel fx fx-right" style="--d:4">
+      <div class="c06vo-h"><b>本节同时讨论两个方向</b><div class="c06vo-seg seg"><i class="knob"></i><button data-v="in">用户 → Agent</button><button data-v="out">Agent → 外部世界</button></div></div>
+      <p class="c06vo-cap"><span class="c06vo-ct"></span><span class="chip warn c06vo-sim">对话示意</span></p>
+      <div class="c06vo-stage">
+        <div class="c06vo-n" style="left:6px"><i class="c06vo-rp"></i><svg class="ic"><use href="#i-user"/></svg><b>用户</b></div>
+        <div class="c06vo-n" style="left:300px"><i class="c06vo-rp"></i><svg class="ic"><use href="#i-robot"/></svg><b>语音 Agent</b></div>
+        <div class="c06vo-n" style="left:594px"><i class="c06vo-rp"></i><svg class="ic"><use href="#i-phone"/></svg><b>外部世界</b><small>客服 · 商家 · 机构</small></div>
+        <svg class="c06vo-svg" viewBox="0 0 790 190" width="790" height="190">
+          <path class="c06vo-p" d="M192 72 C 232 24, 260 24, 300 72"/>
+          <path class="c06vo-p" d="M300 122 C 260 170, 232 170, 192 122"/>
+          <path class="c06vo-p" d="M486 72 C 526 24, 554 24, 594 72"/>
+          <path class="c06vo-p" d="M594 122 C 554 170, 526 170, 486 122"/>
+          <circle class="pk c06vo-dot" r="9" style="fill:#e879f9"/>
+        </svg>
+      </div>
+      <div class="c06vo-log"></div>
+    </div>
+  </div>
+  <div class="c06vo-bot fx fx-up" style="--d:6">
+    <div class="c06vo-k"><span class="lbl">语音模型决定</span><b>“能回答什么”</b></div>
+    <div class="c06vo-k"><span class="lbl">交互架构决定</span><div class="c06vo-q"><span>能否听清</span><span>及时回应</span><span>自然换手</span><span>在通话中完成确认和工具调用</span></div></div>
+    <p class="c06vo-nx">后文先讨论<b>交互时序</b>，再讨论深度思考和表达质量</p>
+  </div>
+  <div class="src">第六章 ·「语音：最自然的人机接口」</div>
+</section>
+<style>
+#c06-voice .c06vo-body{display:grid;grid-template-columns:780px 1fr;gap:26px;height:476px}
+#c06-voice .c06vo-l,#c06-voice .c06vo-r{padding:20px 26px;display:flex;flex-direction:column;gap:13px}
+#c06-voice .c06vo-h{display:flex;align-items:center;gap:12px;min-height:42px}
+#c06-voice .c06vo-h>b{font-size:23px}
+#c06-voice .c06vo-sim{font-size:15px;padding:3px 10px}
+#c06-voice .c06vo-again{margin-left:auto;font-size:16px;padding:7px 14px}
+#c06-voice .c06vo-lane{display:grid;grid-template-columns:96px 1fr 64px;align-items:center;gap:12px}
+#c06-voice .c06vo-lane[data-k=type]{--c:#94a3b8}
+#c06-voice .c06vo-lane[data-k=talk]{--c:var(--acc)}
+#c06-voice .c06vo-lb{display:flex;align-items:center;gap:8px;font-size:19px;color:var(--text2)}
+#c06-voice .c06vo-lb .ic{font-size:22px;color:var(--c)}
+#c06-voice .c06vo-tr{position:relative;height:52px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);overflow:hidden}
+#c06-voice .c06vo-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,color-mix(in srgb,var(--c) 34%,transparent),color-mix(in srgb,var(--c) 12%,transparent));border-right:2px solid var(--c)}
+#c06-voice .c06vo-tx{position:absolute;left:14px;top:0;line-height:52px;font-size:19px;white-space:nowrap;color:var(--text)}
+#c06-voice .c06vo-lane em{font:800 22px var(--num);font-style:normal;color:var(--c);text-align:right}
+#c06-voice .c06vo-note{font-size:18px;color:var(--text2)}
+#c06-voice .c06vo-note b{font:800 24px var(--num);color:var(--acc);margin-left:4px}
+#c06-voice .c06vo-free{display:flex;flex-wrap:wrap;gap:8px}
+#c06-voice .c06vo-free .chip{font-size:16px}
+#c06-voice .c06vo-vs{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:auto}
+#c06-voice .c06vo-c{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+#c06-voice .c06vo-c .ic{font-size:28px;color:var(--text3)}
+#c06-voice .c06vo-c b{font-size:19px}
+#c06-voice .c06vo-c p{font-size:16px;color:var(--text2);margin-top:2px}
+#c06-voice .c06vo-c.on{border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-voice .c06vo-c.on .ic{color:var(--acc)}
+#c06-voice .c06vo-wc{font-size:17px;color:var(--text2)}
+#c06-voice .c06vo-wc b{color:var(--acc2)}
+#c06-voice .c06vo-seg{margin-left:auto}
+#c06-voice .c06vo-seg button{font-size:17px;padding:8px 16px}
+#c06-voice .c06vo-cap{display:flex;align-items:center;gap:10px;font-size:17px;color:var(--acc);min-height:28px}
+#c06-voice .c06vo-cap .chip{margin-left:auto}
+#c06-voice .c06vo-stage{position:relative;height:190px;flex:none}
+#c06-voice .c06vo-svg{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:3}
+#c06-voice .c06vo-p{fill:none;stroke:rgba(255,255,255,.14);stroke-width:2.5;stroke-dasharray:6 8;transition:stroke .4s}
+#c06-voice .c06vo-p.on{stroke:var(--acc);animation:flow 1s linear infinite}
+#c06-voice .c06vo-n{position:absolute;top:32px;width:190px;height:126px;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:rgba(12,18,40,.92);border:1px solid var(--line2);transition:border-color .4s,box-shadow .4s}
+#c06-voice .c06vo-n .ic{font-size:36px;color:var(--acc)}
+#c06-voice .c06vo-n b{font-size:20px}
+#c06-voice .c06vo-n small{font-size:15px;color:var(--text3)}
+#c06-voice .c06vo-n.spk{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 40%,transparent)}
+#c06-voice .c06vo-rp{position:absolute;inset:-2px;border-radius:20px;border:2px solid var(--acc);opacity:0;pointer-events:none}
+#c06-voice .c06vo-n.spk .c06vo-rp{animation:c06vo-ring 1.2s ease-out infinite}
+@keyframes c06vo-ring{0%{opacity:.85;transform:scale(1)}100%{opacity:0;transform:scale(1.22)}}
+#c06-voice .c06vo-log{display:flex;flex-direction:column;gap:8px}
+#c06-voice .c06vo-li{--c:var(--acc);display:flex;gap:12px;align-items:baseline;padding:7px 14px;border-radius:10px;font-size:17px;line-height:1.45;background:rgba(255,255,255,.03);border-left:3px solid var(--c);animation:upIn .5s var(--spring) both}
+#c06-voice .c06vo-li[data-r=u]{--c:var(--tool)}
+#c06-voice .c06vo-li[data-r=w]{--c:var(--env)}
+#c06-voice .c06vo-li em{flex:none;font-style:normal;font-size:15px;font-weight:700;color:var(--c)}
+#c06-voice .c06vo-bot{display:grid;grid-template-columns:300px 1fr 290px;gap:18px;margin-top:16px}
+#c06-voice .c06vo-k{padding:12px 20px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);display:flex;flex-direction:column;gap:6px}
+#c06-voice .c06vo-k b{font-size:24px;color:var(--llm)}
+#c06-voice .c06vo-q{display:flex;flex-wrap:wrap;gap:8px}
+#c06-voice .c06vo-q span{padding:5px 14px;border-radius:999px;font-size:17px;border:1px solid color-mix(in srgb,var(--har) 45%,transparent);color:var(--har);background:color-mix(in srgb,var(--har) 9%,transparent);transition:all .4s}
+#c06-voice .c06vo-q span.on{color:#06101f;background:var(--har)}
+#c06-voice .c06vo-nx{align-self:center;font-size:18px;line-height:1.6;color:var(--text2)}
+#c06-voice .c06vo-nx b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c06-voice'] = {
+  TXT: '帮我把下午三点的会挪到四点，并通知所有参会人',
+  LOG: {
+    in: [['u', '用户', '把下午三点的会挪到四点'], ['a', 'Agent', '好，已改到四点。要通知参会人吗？'], ['u', '用户（插话）', '要，顺便订一间会议室']],
+    out: [['a', 'Agent → 客服', '您好，我代表张女士来电，想协商一下账单'], ['w', '客服 → Agent', '请先提供账户持有人的验证码'], ['a', 'Agent → 用户', '客服在等验证码，请尽快告诉我']],
+  },
+  SEQ: { in: [[0, 0], [1, 1], [0, 0]], out: [[1, 2], [2, 3], [1, 1]] },
+  CAP: { in: '方向一：用户对 Agent 说话——要听清、及时回应、自然换手', out: '方向二：Agent 代替用户对外部世界说话——在通话中完成确认，再向用户汇报' },
+  init(s) {
+    this.set = U.seg(s.querySelector('.c06vo-seg'), (v) => { this.auto = false; this.dir(s, v); });
+    s.querySelector('.c06vo-again').addEventListener('click', () => this.race(s));
+  },
+  // 赛跑：说话按打字的约 4 倍速度推进（原书比例），说话完成时记录打字进度
+  race(s) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const tk = (this.rk = (this.rk || 0) + 1), T = 2400, N = this.TXT.length;
+    const L = ['talk', 'type'].map((k) => s.querySelector(`.c06vo-lane[data-k=${k}]`));
+    const pct = s.querySelector('.c06vo-pct');
+    let t0 = performance.now(), got = false;
+    pct.textContent = '—';
+    ctx.raf((now) => {
+      if (tk !== this.rk) return false;
+      let e = now - t0;
+      if (e > 4 * T + 2400) { t0 = now; e = 0; got = false; pct.textContent = '—'; }
+      const p = [Math.min(1, e / T), Math.min(1, e / (4 * T))];
+      L.forEach((l, i) => {
+        l.querySelector('.c06vo-fill').style.width = (p[i] * 100).toFixed(1) + '%';
+        l.querySelector('.c06vo-tx').textContent = this.TXT.slice(0, Math.round(N * p[i]));
+      });
+      if (p[0] >= 1 && !got) { got = true; pct.textContent = Math.round(p[1] * 100) + '%'; }
+    });
+  },
+  // 两个方向的对话：数据包沿连线流动，说话的一方发出声波
+  dir(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    this.set(m);
+    s.querySelector('.c06vo-ct').textContent = this.CAP[m];
+    const log = s.querySelector('.c06vo-log'), nodes = [...s.querySelectorAll('.c06vo-n')], P = [...s.querySelectorAll('.c06vo-p')];
+    log.innerHTML = '';
+    nodes.forEach((n) => n.classList.remove('spk'));
+    P.forEach((p) => p.classList.remove('on'));
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, dot = s.querySelector('.c06vo-dot');
+    const run = async () => {
+      await U.wait(ctx, 500);
+      if (!ok()) return;
+      for (let i = 0; i < this.SEQ[m].length; i++) {
+        const [sp, p] = this.SEQ[m][i];
+        nodes.forEach((n, j) => n.classList.toggle('spk', j === sp));
+        P.forEach((x, j) => x.classList.toggle('on', j === p));
+        await U.fly(dot, P[p], 1100, { ctx });
+        if (!ok()) return;
+        const [r, who, t] = this.LOG[m][i];
+        log.insertAdjacentHTML('beforeend', `<div class="c06vo-li" data-r="${r}"><em>${who}</em><span>${t}</span></div>`);
+        await U.wait(ctx, 850);
+        if (!ok()) return;
+      }
+      nodes.forEach((n) => n.classList.remove('spk'));
+      P.forEach((x) => x.classList.remove('on'));
+      await U.wait(ctx, 1900);
+      if (!ok()) return;
+      this.dir(s, this.auto ? (m === 'in' ? 'out' : 'in') : m);
+    };
+    run();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.race(s);
+    this.dir(s, 'in');
+    const q = [...s.querySelectorAll('.c06vo-q span')];
+    let i = 0;
+    ctx.every(() => { q.forEach((x, j) => x.classList.toggle('on', j === i % q.length)); i++; }, 1300);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    this.rk = (this.rk || 0) + 1;
+    s.querySelector('.c06vo-log').innerHTML = '';
+    s.querySelectorAll('.c06vo-n.spk').forEach((x) => x.classList.remove('spk'));
+    s.querySelectorAll('.c06vo-p.on,.c06vo-q span.on').forEach((x) => x.classList.remove('on'));
+    s.querySelectorAll('.c06vo-fill').forEach((f) => (f.style.width = '0'));
+    s.querySelectorAll('.c06vo-tx').forEach((t) => (t.textContent = ''));
+    s.querySelector('.c06vo-pct').textContent = '—';
+  },
+};
+</script>
+
+<section class="slide" id="c06-paradigms" data-part="3" data-trans="zoom" data-title="交互时序：三种范式" data-dur="15000" data-notes="OpenAI 在 GPT-Live 的介绍（2026-07-08）中用“级联、轮次式、全双工”概括了语音系统的三种交互范式；本书的“端到端全模态（Omni）”对应其中的 turn-based voice models 一类。它们<b>不是简单的新旧替代，而是不同延迟、成本和可观测性约束下的取舍</b>：<br>· <b>级联</b>：VAD → ASR → LLM → TTS。模块清晰、易替换、易调试；代价是延迟累积，副语言信息在接口处丢失。<br>· <b>端到端 Omni</b>：原生音频输入输出，按轮次交互。延迟较低，能保留语气、情绪和环境声；但仍依赖轮次，训练和调试成本较高。<br>· <b>全双工</b>：原生音频输入输出，持续听、说和决策。支持重叠说话、自然打断和连续流；模型训练、控制和评估都更复杂。<br>贯穿三种范式的主线是：如何摆脱“轮流说话”和 VAD 对发言权的猜测。<b>级联和 Omni 仍要划分轮次，只有全双工把“该谁说话”变成模型的持续决策。</b><br>表格三行自动轮换，下方时间线同步演示这种范式下一来一回的节奏（时间为示意）；点击任一行可固定查看。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">交互时序：<em>级联、轮次式、全双工</em></h2>
+  <p class="lead fx fx-up" style="--d:2">三种范式不是简单的新旧替代，而是不同延迟、成本和可观测性约束下的取舍</p></header>
+  <div class="c06pd-tb panel fx fx-up" style="--d:3">
+    <div class="c06pd-r c06pd-h"><span>范式</span><span>核心结构</span><span>主要优势</span><span>主要限制</span></div>
+    <div class="c06pd-rows"></div>
+  </div>
+  <div class="c06pd-tl panel fx fx-up" style="--d:4">
+    <div class="c06pd-th"><b class="c06pd-nm"></b><span class="c06pd-fl"></span><span class="chip warn c06pd-sim">时间线为示意</span></div>
+    <div class="c06pd-st">
+      <div class="c06pd-ln" style="top:34px"><span><svg class="ic"><use href="#i-user"/></svg>用户</span></div>
+      <div class="c06pd-ln" style="top:110px"><span><svg class="ic"><use href="#i-robot"/></svg>Agent</span></div>
+      <div class="c06pd-bk"></div>
+      <div class="c06pd-ax"></div>
+      <div class="c06pd-hd"></div>
+    </div>
+  </div>
+  <p class="tagline c06pd-tag fx fx-up" style="--d:6">主线：如何摆脱<b>“轮流说话”和 VAD 对发言权的猜测</b>——级联和 Omni 仍要划分轮次，只有全双工把“该谁说话”变成模型的持续决策</p>
+  <div class="src">第六章 ·「交互时序：从级联到全双工」· 范式 / 核心结构 / 主要优势 / 主要限制 对照表 · 三分法出自 OpenAI《Introducing GPT-Live》（2026-07-08）</div>
+</section>
+<style>
+#c06-paradigms .c06pd-tb{padding:4px 0}
+#c06-paradigms .c06pd-r{--c:var(--line2);display:grid;grid-template-columns:190px 400px 1fr 1fr;gap:18px;align-items:center;padding:12px 26px;border-left:4px solid transparent;transition:background .4s,border-color .4s;cursor:pointer}
+#c06-paradigms .c06pd-rows .c06pd-r{border-top:1px solid var(--line)}
+#c06-paradigms .c06pd-h{cursor:default;padding-top:9px;padding-bottom:9px}
+#c06-paradigms .c06pd-h span{font-size:16px;color:var(--text3);letter-spacing:.12em}
+#c06-paradigms .c06pd-r b{font-size:24px;color:var(--c)}
+#c06-paradigms .c06pd-rows span{font-size:19px;line-height:1.5;color:var(--text2)}
+#c06-paradigms .c06pd-rows .c06pd-s{font-family:var(--mono);font-size:18px;color:var(--text)}
+#c06-paradigms .c06pd-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+#c06-paradigms .c06pd-r.on span{color:var(--text)}
+#c06-paradigms .c06pd-tl{margin-top:16px;padding:12px 24px 6px}
+#c06-paradigms .c06pd-th{display:flex;align-items:center;gap:18px;min-height:34px}
+#c06-paradigms .c06pd-nm{font-size:22px;color:var(--acc)}
+#c06-paradigms .c06pd-fl{font-size:18px;color:var(--text2)}
+#c06-paradigms .c06pd-sim{margin-left:auto;font-size:15px;padding:3px 10px}
+#c06-paradigms .c06pd-st{position:relative;height:216px}
+#c06-paradigms .c06pd-ln{position:absolute;left:0;right:0;height:66px;border-radius:12px;background:rgba(255,255,255,.025)}
+#c06-paradigms .c06pd-ln>span{position:absolute;left:12px;top:20px;display:flex;align-items:center;gap:8px;font-size:18px;font-weight:700;color:var(--text2)}
+#c06-paradigms .c06pd-ln .ic{font-size:22px;color:var(--acc)}
+#c06-paradigms .c06pd-b{--c:var(--acc);position:absolute;z-index:2;height:50px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 14%,rgba(10,16,36,.94));opacity:.16;transition:opacity .35s,box-shadow .35s,background .35s}
+#c06-paradigms .c06pd-b.vis{opacity:1}
+#c06-paradigms .c06pd-b.on{background:color-mix(in srgb,var(--c) 30%,rgba(10,16,36,.94));box-shadow:0 0 22px color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-paradigms .c06pd-b.u{--c:#fbbf24}
+#c06-paradigms .c06pd-b.int{--c:#fbbf24;border:2px solid var(--bad)}
+#c06-paradigms .c06pd-b.wait{--c:#f472b6;background:repeating-linear-gradient(135deg,color-mix(in srgb,#f472b6 22%,transparent) 0 8px,rgba(10,16,36,.94) 8px 16px)}
+#c06-paradigms .c06pd-b.proc{--c:#a78bfa}
+#c06-paradigms .c06pd-b.say,#c06-paradigms .c06pd-b.bc{--c:#2dd4bf}
+#c06-paradigms .c06pd-mk{--c:var(--acc);position:absolute;z-index:1;top:0;height:180px;border-left:2px dashed var(--c);opacity:0;transition:opacity .4s}
+#c06-paradigms .c06pd-mk span{position:absolute;left:6px;top:2px;font-size:15px;color:var(--c);white-space:nowrap}
+#c06-paradigms .c06pd-mk.vis{opacity:1}
+#c06-paradigms .c06pd-ax span{position:absolute;top:186px;font:15px var(--num);color:var(--text3);translate:-50% 0}
+#c06-paradigms .c06pd-hd{position:absolute;z-index:3;top:28px;height:154px;width:2px;left:110px;background:linear-gradient(var(--acc),var(--acc2));box-shadow:0 0 12px var(--acc)}
+#c06-paradigms .c06pd-tag{margin-top:16px;font-size:22px;padding:14px 24px}
+</style>
+<script>
+HOOKS['c06-paradigms'] = {
+  X0: 110, K: 184,
+  P: [
+    { n: '级联', s: 'VAD → ASR → LLM → TTS', a: '模块清晰、易替换、易调试', l: '延迟累积，副语言信息在接口处丢失', c: '#f472b6' },
+    { n: '端到端 Omni', s: '原生音频输入输出，按轮次交互', a: '延迟较低，能保留语气、情绪和环境声', l: '仍依赖轮次，训练和调试成本较高', c: '#c084fc' },
+    { n: '全双工', s: '原生音频输入输出，持续听、说和决策', a: '支持重叠说话、自然打断和连续流', l: '模型训练、控制和评估都更复杂', c: '#22d3ee' },
+  ],
+  TL: [
+    { nm: '级联：严格轮流', fl: '发言权：静音就算“说完”，由 VAD 猜测', B: [[0, 0.2, 2.6, '用户说话', 'u'], [1, 2.6, 3.3, 'VAD 等静音', 'wait'], [1, 3.3, 4.4, 'ASR → LLM → TTS', 'proc'], [1, 4.4, 6.9, '播放回复', 'say']], M: [[3.3, 'VAD 判定“说完了”'], [4.4, '语气、情绪已在接口处丢失']] },
+    { nm: '端到端 Omni：仍按轮次', fl: '发言权：仍按轮次，静音就算“说完”', B: [[0, 0.2, 2.6, '用户说话', 'u'], [1, 2.6, 3.3, 'VAD 等静音', 'wait'], [1, 3.3, 3.75, '端到端', 'proc'], [1, 3.75, 6.3, '播放回复 · 保留语气与情绪', 'say']], M: [[3.3, '仍靠 VAD 划分轮次'], [3.75, '延迟较低']] },
+    { nm: '全双工：持续听、说和决策', fl: '发言权：该谁说话，由模型持续决策', B: [[0, 0.2, 2.6, '用户说话', 'u'], [1, 1.25, 1.6, '嗯', 'bc'], [1, 2.75, 4.85, '回应：何时开口由模型决定', 'say'], [0, 4.5, 5.7, '插话', 'int'], [1, 5.95, 7.6, '接着回应', 'say']], M: [[1.25, '附和，不抢话'], [4.5, '被打断 → 让出话头']] },
+  ],
+  init(s) {
+    const rows = s.querySelector('.c06pd-rows');
+    rows.innerHTML = this.P.map((p, i) => `<div class="c06pd-r" data-i="${i}" style="--c:${p.c}"><b>${p.n}</b><span class="c06pd-s">${p.s}</span><span>${p.a}</span><span>${p.l}</span></div>`).join('');
+    rows.addEventListener('click', (e) => { const r = e.target.closest('[data-i]'); if (r) { this.auto = false; this.show(s, +r.dataset.i); } });
+    s.querySelector('.c06pd-ax').innerHTML = [0, 2, 4, 6, 8].map((t) => `<span style="left:${this.X0 + t * this.K}px">${t} s</span>`).join('');
+  },
+  // 选中一种范式：表格行高亮，时间线随播放头逐块出现
+  show(s, i) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, d = this.TL[i];
+    this.i = i;
+    s.querySelectorAll('.c06pd-rows .c06pd-r').forEach((r) => r.classList.toggle('on', +r.dataset.i === i));
+    s.querySelector('.c06pd-nm').textContent = d.nm;
+    s.querySelector('.c06pd-fl').textContent = d.fl;
+    const bk = s.querySelector('.c06pd-bk'), top = [42, 118];
+    bk.innerHTML = d.B.map(([l, a, b, t, c]) => `<div class="c06pd-b ${c}" data-a="${a}" data-b="${b}" style="left:${this.X0 + a * this.K}px;width:${(b - a) * this.K}px;top:${top[l]}px">${t}</div>`).join('')
+      + d.M.map(([t, x]) => `<div class="c06pd-mk" data-a="${t}" style="left:${this.X0 + t * this.K}px"><span>${x}</span></div>`).join('');
+    const els = [...bk.children].map((el) => ({ el, a: +el.dataset.a, b: el.dataset.b === undefined ? 99 : +el.dataset.b, mk: el.classList.contains('c06pd-mk') }));
+    const hd = s.querySelector('.c06pd-hd');
+    hd.style.left = this.X0 + 'px';
+    if (!ctx) return;
+    const D = 8000, HOLD = 1500;
+    let t0 = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const e = now - t0;
+      if (e > D + HOLD) {
+        if (this.auto) { this.show(s, (i + 1) % this.P.length); return false; }
+        t0 = now;
+      }
+      const t = Math.min(D, e) / 1000;
+      hd.style.left = this.X0 + t * this.K + 'px';
+      els.forEach((x) => { x.el.classList.toggle('vis', t >= x.a); if (!x.mk) x.el.classList.toggle('on', t >= x.a && t < x.b); });
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.show(s, 0); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.c06pd-rows .c06pd-r').forEach((r) => r.classList.remove('on'));
+    s.querySelector('.c06pd-bk').innerHTML = '';
+  },
+};
+</script>
+
+<section class="slide" id="c06-cascade" data-part="3" data-trans="flip" data-title="范式一 · 级联流水线" data-dur="14000" data-notes="绝大多数商业语音助手都基于串行流水线（图6-6）：<b>VAD</b> 判断用户何时说完，<b>ASR</b> 把音频转成文字，<b>LLM</b> 理解并生成回复，<b>TTS</b> 再把文字念出来。模块化让每个组件可以独立优化，<b>但每一级都可能增加等待时间</b>。<br>四个模块的典型瓶颈（原书表格）：VAD 判断是否说完——静音阈值带来等待和误切分；ASR 音频转文字——识别延迟与上下文丢失；LLM 理解、思考、生成——首 token 延迟，开启 reasoning 后等待更长；TTS 文字转语音——首包合成和播放缓冲。<br>图6-6 还标出了各级的典型区间与实现：VAD 500–800ms（Silero VAD、ONNX Runtime）、ASR 50–200ms（Whisper、SenseVoice）、LLM 100–500ms（GPT-4o、Doubao Flash）、TTS 200–500ms（Fish Audio S1）。底部那句是关键：<b>串行阻塞，每阶段等待前一阶段完成</b>——用户说话 2–3 秒，VAD 等待，ASR 等待，LLM 空闲，浪费了所有时间间隙。<br>动画中的“数据包”标出每一级交出的东西：音频 → 一段话的音频 → 文字 → 回复文字 → 合成音频；点击任一模块卡片或表格行可以固定查看它的瓶颈。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">范式一 · 级联流水线：<em>每一级都可能增加等待</em></h2>
+  <p class="lead fx fx-up" style="--d:2">VAD 判断用户何时说完，ASR 转成文字，LLM 理解并生成，TTS 再念出来——绝大多数商业语音助手都基于它</p></header>
+  <div class="c06cs-pipe panel fx fx-up" style="--d:3">
+    <i class="c06cs-ln"></i>
+    <div class="c06cs-io c06cs-mic"><i class="c06cs-rp"></i><svg class="ic"><use href="#i-mic"/></svg><small>用户说话</small></div>
+    <div class="c06cs-io c06cs-spk"><i class="c06cs-rp"></i><svg class="ic"><use href="#i-speaker"/></svg><small>播放</small></div>
+    <i class="c06cs-belt"></i>
+    <div class="c06cs-pkt"><svg class="ic"><use href="#i-wave"/></svg><span>音频流</span></div>
+  </div>
+  <div class="c06cs-low">
+    <div class="c06cs-tb panel fx fx-left" style="--d:4">
+      <div class="c06cs-r c06cs-h"><span>模块</span><span>作用</span><span>典型瓶颈</span></div>
+      <div class="c06cs-rows"></div>
+    </div>
+    <div class="c06cs-side fx fx-right" style="--d:5">
+      <div class="c06cs-note"><b>串行阻塞：每阶段等待前一阶段完成</b><p>用户说话 2–3 秒 → VAD 等待 → ASR 等待 → LLM 空闲 → 浪费所有时间间隙</p></div>
+      <div class="c06cs-det"><div class="c06cs-dh"><span class="lbl">此刻</span><button class="btn c06cs-auto"><svg class="ic"><use href="#i-play"/></svg>恢复自动</button></div><p class="c06cs-dt"></p></div>
+      <p class="c06cs-stack">图6-6 标注的技术栈：Node.js WebSocket + AudioWorklet（128 样本 ≈ 2.7ms）+ FFmpeg</p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式一 · 级联流水线（Cascading）」· 图6-6 · 模块 / 作用 / 典型瓶颈 表</div>
+</section>
+<style>
+#c06-cascade .c06cs-pipe{position:relative;height:250px}
+#c06-cascade .c06cs-ln{position:absolute;left:136px;right:136px;top:108px;height:2px;background:repeating-linear-gradient(90deg,rgba(255,255,255,.2) 0 8px,transparent 8px 16px)}
+#c06-cascade .c06cs-io{position:absolute;top:52px;width:110px;height:110px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;border:1px solid var(--line2);background:rgba(12,18,40,.92);transition:border-color .4s,box-shadow .4s}
+#c06-cascade .c06cs-io .ic{font-size:36px;color:var(--text2)}
+#c06-cascade .c06cs-io small{font-size:15px;color:var(--text3)}
+#c06-cascade .c06cs-mic{left:26px;--c:#fbbf24}
+#c06-cascade .c06cs-spk{left:1526px;--c:#2dd4bf}
+#c06-cascade .c06cs-io.on{border-color:var(--c);box-shadow:0 0 30px color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-cascade .c06cs-io.on .ic{color:var(--c)}
+#c06-cascade .c06cs-rp{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--c);opacity:0}
+#c06-cascade .c06cs-io.on .c06cs-rp{animation:c06cs-ring 1.1s ease-out infinite}
+@keyframes c06cs-ring{0%{opacity:.85;transform:scale(1)}100%{opacity:0;transform:scale(1.35)}}
+#c06-cascade .c06cs-m{position:absolute;top:14px;width:300px;height:184px;padding:14px 18px;border-radius:18px;display:flex;flex-direction:column;gap:8px;background:rgba(12,18,40,.94);border:1px solid var(--line2);transition:border-color .4s,box-shadow .4s,opacity .4s,background .4s;cursor:pointer;z-index:1}
+#c06-cascade .c06cs-mt{display:flex;align-items:baseline;gap:12px}
+#c06-cascade .c06cs-mt b{font:800 32px var(--num);color:var(--c)}
+#c06-cascade .c06cs-mt span{font-size:18px;color:var(--text2)}
+#c06-cascade .c06cs-ms{align-self:flex-start;padding:3px 12px;border-radius:8px;font:700 18px var(--num);color:var(--text);border:1px solid color-mix(in srgb,var(--c) 45%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent)}
+#c06-cascade .c06cs-im{display:flex;gap:8px;flex-wrap:wrap}
+#c06-cascade .c06cs-im i{font-style:normal;font-size:15px;color:var(--text3);padding:2px 8px;border-radius:6px;border:1px solid var(--line)}
+#c06-cascade .c06cs-stt{margin-top:auto;font-size:16px;color:var(--text3)}
+#c06-cascade .c06cs-m[data-st=work]{border-color:var(--c);background:color-mix(in srgb,var(--c) 13%,rgba(12,18,40,.94));box-shadow:0 0 34px color-mix(in srgb,var(--c) 40%,transparent)}
+#c06-cascade .c06cs-m[data-st=work] .c06cs-stt,#c06-cascade .c06cs-m[data-st=listen] .c06cs-stt{color:var(--c);font-weight:700}
+#c06-cascade .c06cs-m[data-st=pre]{opacity:.5}
+#c06-cascade .c06cs-belt{position:absolute;left:26px;right:24px;top:212px;height:20px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-cascade .c06cs-pkt{--c:#fbbf24;position:absolute;z-index:2;top:205px;left:81px;height:34px;padding:0 14px;border-radius:999px;display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700;color:#06101f;background:var(--c);box-shadow:0 0 18px var(--c);translate:-50% 0;white-space:nowrap;transition:background .3s}
+#c06-cascade .c06cs-pkt .ic{font-size:18px}
+#c06-cascade .c06cs-low{display:grid;grid-template-columns:1020px 1fr;gap:22px;margin-top:18px}
+#c06-cascade .c06cs-tb{padding:4px 0}
+#c06-cascade .c06cs-r{--c:var(--line2);display:grid;grid-template-columns:120px 260px 1fr;gap:16px;align-items:center;padding:13px 24px;border-left:4px solid transparent;transition:background .4s,border-color .4s;cursor:pointer}
+#c06-cascade .c06cs-rows .c06cs-r{border-top:1px solid var(--line)}
+#c06-cascade .c06cs-h{cursor:default;padding-top:9px;padding-bottom:9px}
+#c06-cascade .c06cs-h span{font-size:16px;color:var(--text3);letter-spacing:.12em}
+#c06-cascade .c06cs-r b{font:800 24px var(--num);color:var(--c)}
+#c06-cascade .c06cs-rows span{font-size:19px;color:var(--text2)}
+#c06-cascade .c06cs-r.on{border-left-color:var(--c);background:color-mix(in srgb,var(--c) 11%,transparent)}
+#c06-cascade .c06cs-r.on span{color:var(--text)}
+#c06-cascade .c06cs-side{display:flex;flex-direction:column;gap:12px}
+#c06-cascade .c06cs-note{padding:14px 18px;border-radius:16px;background:color-mix(in srgb,var(--bad) 8%,transparent);border:1px solid color-mix(in srgb,var(--bad) 35%,transparent)}
+#c06-cascade .c06cs-note b{font-size:19px;color:#fda4af}
+#c06-cascade .c06cs-note p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:6px}
+#c06-cascade .c06cs-det{flex:1;padding:12px 18px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+#c06-cascade .c06cs-dh{display:flex;align-items:center;justify-content:space-between}
+#c06-cascade .c06cs-auto{font-size:15px;padding:5px 12px}
+#c06-cascade .c06cs-dt{font-size:17px;line-height:1.6;color:var(--text2);margin-top:6px}
+#c06-cascade .c06cs-dt b{color:var(--text)}
+#c06-cascade .c06cs-stack{font-size:15px;line-height:1.5;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-cascade'] = {
+  M: [
+    { k: 'VAD', zh: '语音活动检测', ms: '500–800ms', impl: ['Silero VAD', 'ONNX Runtime'], c: '#f472b6', role: '判断是否说完', neck: '静音阈值带来等待和误切分' },
+    { k: 'ASR', zh: '语音识别', ms: '50–200ms', impl: ['Whisper', 'SenseVoice'], c: '#22d3ee', role: '音频转文字', neck: '识别延迟与上下文丢失' },
+    { k: 'LLM', zh: '语言模型推理', ms: '100–500ms', impl: ['GPT-4o', 'Doubao Flash'], c: '#a78bfa', role: '理解、思考、生成', neck: '首 token 延迟，开启 reasoning 后等待更长' },
+    { k: 'TTS', zh: '语音合成', ms: '200–500ms', impl: ['Fish Audio S1', '神经网络合成'], c: '#34d399', role: '文字转语音', neck: '首包合成和播放缓冲' },
+  ],
+  X: [81, 320, 670, 1020, 1370, 1581],
+  FORM: ['音频流', '一段话的音频', '文字', '回复文字', '合成音频'],
+  WORK: ['等静音确认说完', '转写中', '推理中', '合成中'],
+  DUR: [1000, 650, 850, 750],
+  DET: [
+    '<b>用户说话 2–3 秒</b>：VAD 在监听；ASR、LLM、TTS 都只能空等（图6-6）',
+    '<b>VAD · 判断是否说完</b>：必须等到一段静音才能确认说完。阈值带来等待，也会误切分——实验 6-5 里 900 ms 的句中停顿就被 600 ms 阈值的 VAD 切成了两段',
+    '<b>ASR · 音频转文字</b>：识别延迟与上下文丢失——按片段识别时，邮箱、人名和专有名词容易出错',
+    '<b>LLM · 理解、思考、生成</b>：首 token 延迟；开启 reasoning 后等待更长',
+    '<b>TTS · 文字转语音</b>：首包合成和播放缓冲',
+    '<b>开始播放</b>：用户直到这时才听到第一个字——之前每一级都在等前一级做完',
+  ],
+  init(s) {
+    s.querySelector('.c06cs-pipe').insertAdjacentHTML('beforeend', this.M.map((m, i) => `<div class="c06cs-m" data-i="${i}" style="left:${170 + i * 350}px;--c:${m.c}"><div class="c06cs-mt"><b>${m.k}</b><span>${m.zh}</span></div><span class="c06cs-ms">${m.ms}</span><div class="c06cs-im">${m.impl.map((x) => `<i>${x}</i>`).join('')}</div><span class="c06cs-stt">空闲</span></div>`).join(''));
+    s.querySelector('.c06cs-rows').innerHTML = this.M.map((m, i) => `<div class="c06cs-r" data-i="${i}" style="--c:${m.c}"><b>${m.k}</b><span>${m.role}</span><span>${m.neck}</span></div>`).join('');
+    s.querySelectorAll('.c06cs-m,.c06cs-rows .c06cs-r').forEach((el) => el.addEventListener('click', () => this.pin(s, +el.dataset.i)));
+    s.querySelector('.c06cs-auto').addEventListener('click', () => this.run(s));
+  },
+  // cur：-1 用户说话，0–3 各模块处理中，4 开始播放
+  state(s, cur) {
+    s.querySelectorAll('.c06cs-m').forEach((c, i) => {
+      const st = cur === -1 ? (i === 0 ? 'listen' : 'pre') : i < cur ? 'done' : i === cur ? 'work' : 'pre';
+      c.dataset.st = st;
+      c.querySelector('.c06cs-stt').textContent = st === 'work' ? this.WORK[i] : st === 'listen' ? '监听中' : st === 'done' ? '已交出 · 空闲' : '空闲 · 等上游';
+    });
+    s.querySelectorAll('.c06cs-rows .c06cs-r').forEach((r, i) => r.classList.toggle('on', i === cur));
+    s.querySelector('.c06cs-mic').classList.toggle('on', cur === -1);
+    s.querySelector('.c06cs-spk').classList.toggle('on', cur === 4);
+    s.querySelector('.c06cs-dt').innerHTML = this.DET[cur + 1];
+  },
+  move(pkt, x1, ms, tk) {
+    const ctx = this.ctx, x0 = parseFloat(pkt.style.left) || this.X[0], t0 = performance.now();
+    return new Promise((res) => {
+      ctx.raf((now) => {
+        if (tk !== this.tk) { res(false); return false; }
+        const t = Math.min(1, (now - t0) / ms), e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+        pkt.style.left = x0 + (x1 - x0) * e + 'px';
+        if (t >= 1) { res(true); return false; }
+      });
+    });
+  },
+  // 自动演示：数据包从麦克风出发，逐级停留，每一级交出新的表示
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk;
+    const pkt = s.querySelector('.c06cs-pkt'), lab = pkt.querySelector('span');
+    const go = async () => {
+      while (ok()) {
+        pkt.style.left = this.X[0] + 'px';
+        pkt.style.setProperty('--c', '#fbbf24');
+        lab.textContent = this.FORM[0];
+        this.state(s, -1);
+        await U.wait(ctx, 2300);
+        if (!ok()) return;
+        for (let i = 0; i < 4; i++) {
+          await this.move(pkt, this.X[i + 1], 520, tk);
+          if (!ok()) return;
+          this.state(s, i);
+          await U.wait(ctx, this.DUR[i]);
+          if (!ok()) return;
+          lab.textContent = this.FORM[i + 1];
+          pkt.style.setProperty('--c', this.M[i].c);
+        }
+        await this.move(pkt, this.X[5], 520, tk);
+        if (!ok()) return;
+        this.state(s, 4);
+        await U.wait(ctx, 2000);
+      }
+    };
+    go();
+  },
+  pin(s, i) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.c06cs-m').forEach((c, j) => { c.dataset.st = j === i ? 'work' : 'pre'; c.querySelector('.c06cs-stt').textContent = j === i ? '查看中' : '—'; });
+    s.querySelectorAll('.c06cs-rows .c06cs-r').forEach((r, j) => r.classList.toggle('on', j === i));
+    s.querySelectorAll('.c06cs-io').forEach((x) => x.classList.remove('on'));
+    s.querySelector('.c06cs-dt').innerHTML = this.DET[i + 1];
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    const pkt = s.querySelector('.c06cs-pkt');
+    pkt.style.left = this.X[0] + 'px';
+    pkt.querySelector('span').textContent = this.FORM[0];
+    s.querySelectorAll('.c06cs-m').forEach((c) => { delete c.dataset.st; c.querySelector('.c06cs-stt').textContent = '空闲'; });
+    s.querySelectorAll('.c06cs-rows .c06cs-r,.c06cs-io').forEach((x) => x.classList.remove('on'));
+    s.querySelector('.c06cs-dt').innerHTML = '';
+  },
+};
+</script>
+
+<section class="slide" id="c06-waterfall" data-part="3" data-title="延迟瀑布：串行累积" data-dur="14000" data-notes="图6-7 描述的是一个简短、<b>不开启 reasoning</b> 的回复：VAD、ASR、LLM 和 TTS 的等待会<b>串行累积</b>。五段依次是：VAD 等待静音确认说完（500–800ms）、ASR 转录（50–200ms）、LLM 首 token（TTFT，100–500ms）、LLM 生成（100–300ms）、TTS 合成（200–500ms）。全部取下限时，总响应时间约 950ms ≈ 0.9s；全部取上限时约 2300ms ≈ 2.3s——而这还只是<b>空载理想情况</b>。<br>真实数值取决于输入长度、模型、硬件、网络和负载：生产环境的排队还会进一步放大空载延迟（下一页）；实验 6-4 的真实单轮测量会给出一个具体的例子。<br>注意 VAD 等待排在最前面，而且在两个极端下都是单项最长的一段：它是“必须等一段静音才能确认说完”的代价，这正是后文流式感知与语义端点判断要解决的问题。<br>默认在最优与最差之间自动扫动；拖动任一行右侧的滑块可以手动设定该阶段耗时，上方开关可以直接跳到最优或最差。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">延迟瀑布：<em>串行累积</em>总响应时间</h2>
+    <p class="lead fx fx-up" style="--d:2">一个简短、不开启 reasoning 的回复：五段等待依次相加</p></div>
+    <div class="c06wf-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="auto">自动扫动</button><button data-v="best">最优</button><button data-v="worst">最差</button></div></header>
+  <div class="c06wf-body">
+    <div class="c06wf-ch panel fx fx-left" style="--d:3">
+      <div class="c06wf-rows"><i class="c06wf-tl"><span>总计</span></i></div>
+      <div class="c06wf-ax"><span></span><div class="c06wf-axt"></div></div>
+      <p class="c06wf-hint"><svg class="ic"><use href="#i-sliders"/></svg>拖动每行右侧的滑块改变该阶段耗时；斜线浅色带是图6-7 给出的区间</p>
+    </div>
+    <div class="c06wf-tot panel fx fx-right" style="--d:4">
+      <span class="lbl">总响应时间</span>
+      <div class="c06wf-big"><b class="c06wf-ms">950</b><small>ms</small></div>
+      <div class="c06wf-sec">≈ <b>0.95</b> s</div>
+      <div class="c06wf-gauge"><i></i></div>
+      <div class="c06wf-gl"><span>950</span><span>2300</span></div>
+      <div class="c06wf-bd"><span data-b="best">最优：950ms ≈ 0.9s</span><span data-b="worst">最差：2300ms ≈ 2.3s</span></div>
+      <span class="lbl">各段占比</span>
+      <div class="c06wf-comp" data-clip-ok></div>
+      <div class="c06wf-lg"></div>
+      <p class="c06wf-idle"><svg class="ic"><use href="#i-alert"/></svg><span>空载理想情况：真实数值取决于输入长度、模型、硬件、网络和负载</span></p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式一 · 级联流水线（Cascading）」· 图6-7</div>
+</section>
+<style>
+#c06-waterfall .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-waterfall .c06wf-seg.man .knob{opacity:0}
+#c06-waterfall .c06wf-body{display:grid;grid-template-columns:1110px 1fr;gap:26px}
+#c06-waterfall .c06wf-ch{padding:26px 24px 18px}
+#c06-waterfall .c06wf-rows{position:relative;display:flex;flex-direction:column;gap:12px}
+#c06-waterfall .c06wf-row{--c:var(--acc);display:grid;grid-template-columns:150px 600px 92px 1fr;gap:14px;align-items:center;height:80px}
+#c06-waterfall .c06wf-lb{display:flex;flex-direction:column;gap:2px;font-size:20px;font-weight:700;color:var(--text)}
+#c06-waterfall .c06wf-lb small{font:15px var(--num);font-weight:400;color:var(--text3)}
+#c06-waterfall .c06wf-lb i{display:inline-block;width:12px;height:12px;border-radius:4px;background:var(--c);box-shadow:0 0 10px var(--c);margin-bottom:4px}
+#c06-waterfall .c06wf-trk{position:relative;height:44px;border-radius:8px;background:rgba(255,255,255,.03)}
+#c06-waterfall .c06wf-gh{position:absolute;top:5px;bottom:5px;border-radius:6px;background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--c) 24%,transparent) 0 6px,transparent 6px 12px);border:1px dashed color-mix(in srgb,var(--c) 55%,transparent)}
+#c06-waterfall .c06wf-bar{position:absolute;top:0;bottom:0;border-radius:8px;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 62%,#fff));box-shadow:0 0 16px color-mix(in srgb,var(--c) 45%,transparent)}
+#c06-waterfall .c06wf-v{font:800 21px var(--num);color:var(--c);text-align:right}
+#c06-waterfall .c06wf-row .rng{--acc:var(--c)}
+#c06-waterfall .c06wf-tl{position:absolute;z-index:2;top:-8px;bottom:-8px;left:164px;width:2px;background:#fff;box-shadow:0 0 12px var(--acc)}
+#c06-waterfall .c06wf-tl span{position:absolute;top:-24px;left:-14px;font-size:15px;color:var(--text);white-space:nowrap}
+#c06-waterfall .c06wf-ax{display:grid;grid-template-columns:150px 600px;gap:14px;margin-top:14px}
+#c06-waterfall .c06wf-axt{position:relative;height:30px;border-top:1px solid var(--line2)}
+#c06-waterfall .c06wf-axt span{position:absolute;top:6px;font:15px var(--num);color:var(--text3);translate:-50% 0}
+#c06-waterfall .c06wf-hint{display:flex;align-items:center;gap:10px;margin-top:10px;font-size:16px;color:var(--text3)}
+#c06-waterfall .c06wf-hint .ic{font-size:20px;color:var(--acc)}
+#c06-waterfall .c06wf-tot{padding:24px 28px;display:flex;flex-direction:column;gap:10px}
+#c06-waterfall .c06wf-big{display:flex;align-items:baseline;gap:8px}
+#c06-waterfall .c06wf-big b{font:800 88px/1 var(--num);background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+#c06-waterfall .c06wf-big small{font:700 26px var(--num);color:var(--text2)}
+#c06-waterfall .c06wf-sec{font-size:22px;color:var(--text2)}
+#c06-waterfall .c06wf-sec b{font:800 26px var(--num);color:var(--text)}
+#c06-waterfall .c06wf-gauge{position:relative;height:12px;border-radius:999px;background:linear-gradient(90deg,var(--ok),var(--warn),var(--bad));opacity:.8;margin-top:6px}
+#c06-waterfall .c06wf-gauge i{position:absolute;top:-7px;width:6px;height:26px;margin-left:-3px;border-radius:4px;background:#fff;box-shadow:0 0 12px #fff}
+#c06-waterfall .c06wf-gl{display:flex;justify-content:space-between;font:15px var(--num);color:var(--text3)}
+#c06-waterfall .c06wf-bd{display:flex;flex-direction:column;gap:8px}
+#c06-waterfall .c06wf-bd span{padding:8px 14px;border-radius:12px;font:700 18px var(--num);color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .35s}
+#c06-waterfall .c06wf-bd span.on{color:#06101f;background:linear-gradient(90deg,var(--acc),var(--acc2));border-color:transparent;box-shadow:0 0 18px color-mix(in srgb,var(--acc) 45%,transparent)}
+#c06-waterfall .c06wf-comp{display:flex;height:28px;border-radius:8px;overflow:hidden}
+#c06-waterfall .c06wf-comp i{flex:0 0 20%;height:100%}
+#c06-waterfall .c06wf-lg{display:flex;flex-wrap:wrap;gap:6px 14px}
+#c06-waterfall .c06wf-lg span{display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text2)}
+#c06-waterfall .c06wf-lg span i{width:10px;height:10px;border-radius:3px}
+#c06-waterfall .c06wf-idle{display:flex;gap:10px;align-items:flex-start;margin-top:auto;font-size:16px;line-height:1.55;color:var(--warn)}
+#c06-waterfall .c06wf-idle .ic{flex:none;font-size:20px;margin-top:2px}
+</style>
+<script>
+HOOKS['c06-waterfall'] = {
+  S: [
+    { n: 'VAD 等待', min: 500, max: 800, c: '#f472b6' },
+    { n: 'ASR 转录', min: 50, max: 200, c: '#22d3ee' },
+    { n: 'LLM TTFT', min: 100, max: 500, c: '#a78bfa' },
+    { n: 'LLM 生成', min: 100, max: 300, c: '#c4b5fd' },
+    { n: 'TTS 合成', min: 200, max: 500, c: '#34d399' },
+  ],
+  K: 0.25,
+  init(s) {
+    s.querySelector('.c06wf-rows').insertAdjacentHTML('beforeend', this.S.map((x, i) => `<div class="c06wf-row" data-k="${i}" style="--c:${x.c}"><span class="c06wf-lb"><i></i>${x.n}<small>${x.min}–${x.max}ms</small></span><div class="c06wf-trk"><i class="c06wf-gh"></i><i class="c06wf-bar"></i></div><b class="c06wf-v"></b><input type="range" class="rng c06wf-in" min="${x.min}" max="${x.max}" step="10" value="${x.min}" aria-label="${x.n}"></div>`).join(''));
+    s.querySelector('.c06wf-axt').innerHTML = [0, 500, 1000, 1500, 2000].map((m) => `<span style="left:${m * this.K}px">${m}ms</span>`).join('');
+    s.querySelector('.c06wf-comp').innerHTML = this.S.map((x) => `<i style="background:${x.c}"></i>`).join('');
+    s.querySelector('.c06wf-lg').innerHTML = this.S.map((x) => `<span><i style="background:${x.c}"></i>${x.n}</span>`).join('');
+    this.v = this.S.map((x) => x.min);
+    s.querySelectorAll('.c06wf-in').forEach((inp, i) => {
+      inp.addEventListener('input', () => { this.manual(s); this.v[i] = +inp.value; this.draw(s); });
+      inp.addEventListener('change', () => inp.blur());
+      inp.addEventListener('pointerup', () => inp.blur());
+    });
+    this.set = U.seg(s.querySelector('.c06wf-seg'), (v) => this.mode(s, v));
+    this.draw(s);
+  },
+  // 瀑布：每段从前面各段之和的位置开始；浅色带是该段的区间
+  draw(s) {
+    const K = this.K, rows = [...s.querySelectorAll('.c06wf-row')];
+    let acc = 0;
+    this.S.forEach((x, i) => {
+      const r = rows[i], v = this.v[i], inp = r.querySelector('.c06wf-in');
+      const gh = r.querySelector('.c06wf-gh'), bar = r.querySelector('.c06wf-bar');
+      gh.style.left = (acc + x.min) * K + 'px';
+      gh.style.width = (x.max - x.min) * K + 'px';
+      bar.style.left = acc * K + 'px';
+      bar.style.width = v * K + 'px';
+      r.querySelector('.c06wf-v').textContent = v + ' ms';
+      if (+inp.value !== v) inp.value = v;
+      inp.style.setProperty('--p', ((v - x.min) / (x.max - x.min)) * 100 + '%');
+      acc += v;
+    });
+    s.querySelector('.c06wf-ms').textContent = acc;
+    s.querySelector('.c06wf-sec b').textContent = (acc / 1000).toFixed(2);
+    s.querySelector('.c06wf-tl').style.left = 164 + acc * K + 'px';
+    s.querySelector('.c06wf-gauge i').style.left = ((acc - 950) / 1350) * 100 + '%';
+    s.querySelectorAll('.c06wf-bd span').forEach((b) => b.classList.toggle('on', b.dataset.b === 'best' ? acc <= 960 : acc >= 2290));
+    s.querySelectorAll('.c06wf-comp i').forEach((seg, i) => (seg.style.flexBasis = (this.v[i] / acc) * 100 + '%'));
+  },
+  manual(s) {
+    this.tk = (this.tk || 0) + 1;
+    const seg = s.querySelector('.c06wf-seg');
+    seg.classList.add('man');
+    seg.querySelectorAll('button').forEach((b) => b.classList.remove('on'));
+  },
+  mode(s, v) {
+    s.querySelector('.c06wf-seg').classList.remove('man');
+    this.set(v);
+    const tk = (this.tk = (this.tk || 0) + 1);
+    if (v !== 'auto') { this.v = this.S.map((x) => (v === 'best' ? x.min : x.max)); this.draw(s); return; }
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const P = 8000, t0 = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      const ph = (1 - Math.cos((2 * Math.PI * ((now - t0) % P)) / P)) / 2;
+      this.v = this.S.map((x) => Math.round((x.min + ph * (x.max - x.min)) / 10) * 10);
+      this.draw(s);
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.mode(s, 'auto'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.c06wf-seg').classList.remove('man');
+    this.v = this.S.map((x) => x.min);
+    this.draw(s);
+  },
+};
+</script>
+
+<section class="slide" id="c06-queue" data-part="3" data-trans="zoom" data-title="排队把空载延迟放大" data-dur="15000" data-notes="上一页的瀑布是<b>空载</b>下的延迟。生产环境的排队还会进一步放大空载延迟（图6-8）。图中用的是最简单的排队关系：总延迟 = S /（1 − ρ），其中 S 是空载延迟（取 1 s），ρ 是服务的利用率。ρ = 0.5 时总延迟翻倍到 2 s，图中标为“用户忍受上限”；ρ = 0.8 时达到 5 s，“不可接受”；ρ 趋近 1 时，延迟趋于无穷。生产环境的 ρ 通常在 0.5–0.8，因此实际延迟往往是空载延迟的 2–5 倍。<br>原书特别说明：这属于<b>服务容量规划</b>，本章不展开排队模型。放在这里，是为了提醒读者：只优化单次请求的空载延迟还不够，负载同样决定用户实际等多久。<br>左侧曲线可以直接拖动（或用下方滑块）改变 ρ；默认自动在低负载和高负载之间来回扫动。右侧是一个随机到达的请求队列（示意）：ρ 越高，排队越长，模拟测得的平均总延迟会逐渐接近曲线给出的理论值。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">排队把<em>空载延迟</em>放大</h2>
+    <p class="lead fx fx-up" style="--d:2">总延迟 = S /（1 − ρ）：利用率 ρ 越接近 1，等待越是急剧上升</p></div>
+    <div class="c06qu-ctl fx fx-up" style="--d:2"><button class="btn c06qu-auto"><svg class="ic"><use href="#i-play"/></svg><span>自动扫动</span></button></div></header>
+  <div class="c06qu-body">
+    <div class="c06qu-ch panel fx fx-left" style="--d:3">
+      <svg class="c06qu-svg" viewBox="0 0 980 540" width="980" height="540"></svg>
+      <div class="c06qu-sl"><span>利用率 ρ</span><input type="range" class="rng c06qu-in" min="0" max="0.97" step="0.01" value="0.3" aria-label="利用率"><b class="c06qu-rv">0.30</b></div>
+    </div>
+    <div class="c06qu-side">
+      <div class="c06qu-sim panel fx fx-right" style="--d:4">
+        <div class="c06qu-sh"><b>服务端的请求队列</b><span class="chip warn c06qu-sm">示意 · 随机到达</span></div>
+        <canvas class="c06qu-cv" width="1112" height="400"></canvas>
+        <div class="c06qu-ms"><span>队列中 <b class="c06qu-qn">0</b> 个请求</span><span>模拟测得平均总延迟 <b class="c06qu-mv">—</b></span></div>
+      </div>
+      <div class="c06qu-rd panel fx fx-right" style="--d:5">
+        <div class="c06qu-f">总延迟 = <i>S</i> /（1 − <i>ρ</i>）<small>空载延迟 S = 1 s</small></div>
+        <div class="c06qu-n"><b class="c06qu-tv">1.4</b><span>s</span><em class="c06qu-xv">空载的 1.4 倍</em></div>
+        <span class="chip ok c06qu-st">≤ 2 s：在用户忍受上限内</span>
+        <p class="c06qu-p">生产环境 ρ 通常 0.5–0.8 → 实际延迟是空载延迟的 2–5 倍。这属于服务容量规划，本章不展开排队模型。</p>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式一 · 级联流水线（Cascading）」· 图6-8</div>
+</section>
+<style>
+#c06-queue .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-queue .c06qu-auto.on{color:#06101f;font-weight:600;border-color:transparent;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+#c06-queue .c06qu-body{display:grid;grid-template-columns:1030px 1fr;gap:24px}
+#c06-queue .c06qu-ch{padding:16px 24px 18px}
+#c06-queue .c06qu-svg{display:block;overflow:visible;touch-action:none;cursor:ew-resize}
+#c06-queue .c06qu-band{fill:color-mix(in srgb,var(--acc) 9%,transparent)}
+#c06-queue .c06qu-bt{fill:var(--acc);font-size:16px;text-anchor:middle}
+#c06-queue .c06qu-gl{stroke:rgba(255,255,255,.07);stroke-width:1.5;stroke-dasharray:6 6}
+#c06-queue .c06qu-axl{stroke:rgba(255,255,255,.35);stroke-width:2}
+#c06-queue .c06qu-yl{fill:var(--text3);font:16px var(--num);text-anchor:end}
+#c06-queue .c06qu-xl{fill:var(--text3);font:16px var(--num);text-anchor:middle}
+#c06-queue .c06qu-at{fill:var(--text2);font-size:18px;font-weight:700;text-anchor:middle}
+#c06-queue .c06qu-cv0{fill:none;stroke:var(--acc);stroke-width:4;stroke-linecap:round;filter:drop-shadow(0 0 8px var(--acc))}
+#c06-queue .c06qu-pt{fill:#0a1024;stroke:#fff;stroke-width:3}
+#c06-queue .c06qu-pl{fill:var(--text);font-size:18px;font-weight:700}
+#c06-queue .c06qu-pl2{fill:var(--text2);font-size:16px}
+#c06-queue .c06qu-gx,#c06-queue .c06qu-gy{stroke:var(--acc2);stroke-width:2;stroke-dasharray:5 6}
+#c06-queue .c06qu-hc{fill:var(--acc2);stroke:#fff;stroke-width:3;filter:drop-shadow(0 0 10px var(--acc2))}
+#c06-queue .c06qu-tag rect{fill:rgba(8,12,30,.92);stroke:var(--acc2);stroke-width:1.5}
+#c06-queue .c06qu-tag text{fill:var(--text);font:700 18px var(--num);text-anchor:middle}
+#c06-queue .c06qu-sl{display:grid;grid-template-columns:90px 1fr 70px;gap:16px;align-items:center;margin-top:8px;padding-left:56px;font-size:17px;color:var(--text2)}
+#c06-queue .c06qu-sl b{font:800 22px var(--num);color:var(--acc2)}
+#c06-queue .c06qu-sl .rng{--acc:var(--acc2)}
+#c06-queue .c06qu-side{display:flex;flex-direction:column;gap:16px}
+#c06-queue .c06qu-sim{padding:16px 20px}
+#c06-queue .c06qu-sh{display:flex;align-items:center;justify-content:space-between}
+#c06-queue .c06qu-sh b{font-size:20px}
+#c06-queue .c06qu-sm{font-size:15px;padding:3px 10px}
+#c06-queue .c06qu-cv{display:block;width:556px;height:200px;margin-top:8px}
+#c06-queue .c06qu-ms{display:flex;justify-content:space-between;font-size:16px;color:var(--text2);margin-top:6px}
+#c06-queue .c06qu-ms b{font:800 19px var(--num);color:var(--text)}
+#c06-queue .c06qu-rd{flex:1;padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-queue .c06qu-f{font-size:22px;font-weight:700}
+#c06-queue .c06qu-f i{font-family:Georgia,'Times New Roman',serif}
+#c06-queue .c06qu-f small{display:block;font-size:16px;font-weight:400;color:var(--text3);margin-top:2px}
+#c06-queue .c06qu-n{display:flex;align-items:baseline;gap:8px}
+#c06-queue .c06qu-n b{font:800 60px/1 var(--num);background:linear-gradient(92deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+#c06-queue .c06qu-n span{font:700 24px var(--num);color:var(--text2)}
+#c06-queue .c06qu-n em{font-style:normal;font-size:18px;color:var(--text2);margin-left:10px}
+#c06-queue .c06qu-st{align-self:flex-start;font-size:17px}
+#c06-queue .c06qu-p{font-size:16px;line-height:1.6;color:var(--text2);margin-top:auto}
+</style>
+<script>
+HOOKS['c06-queue'] = {
+  x(r) { return 80 + r * 860; },
+  y(t) { return 470 - t * (440 / 12); },
+  init(s) {
+    const svg = s.querySelector('.c06qu-svg');
+    let h = `<rect class="c06qu-band" x="${this.x(0.5)}" y="30" width="${this.x(0.8) - this.x(0.5)}" height="440"/><text class="c06qu-bt" x="${(this.x(0.5) + this.x(0.8)) / 2}" y="54">生产环境 ρ 通常 0.5–0.8</text>`;
+    for (let t = 0; t <= 12; t += 2) h += `<line class="c06qu-gl" x1="80" x2="940" y1="${this.y(t)}" y2="${this.y(t)}"/><text class="c06qu-yl" x="68" y="${this.y(t) + 6}">${t}</text>`;
+    for (let i = 0; i <= 5; i++) h += `<text class="c06qu-xl" x="${this.x(i / 5)}" y="498">${(i / 5).toFixed(1)}</text>`;
+    h += '<line class="c06qu-axl" x1="80" y1="470" x2="940" y2="470"/><line class="c06qu-axl" x1="80" y1="30" x2="80" y2="470"/>';
+    h += '<text class="c06qu-at" x="510" y="532">利用率 ρ</text><text class="c06qu-at" transform="translate(24 250) rotate(-90)">总延迟（s）</text>';
+    let d = '';
+    for (let r = 0; r <= 0.9166; r += 0.004) d += (d ? 'L' : 'M') + this.x(r).toFixed(1) + ' ' + this.y(1 / (1 - r)).toFixed(1);
+    d += 'L' + this.x(0.9167).toFixed(1) + ' 30';
+    h += `<path class="c06qu-cv0" d="${d}"/>`;
+    h += `<circle class="c06qu-pt" cx="${this.x(0.5)}" cy="${this.y(2)}" r="7"/><text class="c06qu-pl" x="${this.x(0.5) + 14}" y="${this.y(2) + 32}">ρ=0.5 → 2s</text><text class="c06qu-pl2" x="${this.x(0.5) + 14}" y="${this.y(2) + 56}">用户忍受上限</text>`;
+    h += `<circle class="c06qu-pt" cx="${this.x(0.8)}" cy="${this.y(5)}" r="7"/><text class="c06qu-pl" x="${this.x(0.8) + 16}" y="${this.y(5) + 30}">ρ=0.8 → 5s</text><text class="c06qu-pl2" x="${this.x(0.8) + 16}" y="${this.y(5) + 54}">不可接受</text>`;
+    h += `<text class="c06qu-pl" x="${this.x(0.9167) - 16}" y="62" text-anchor="end">ρ→1 → ∞</text>`;
+    h += '<line class="c06qu-gx"/><line class="c06qu-gy"/><circle class="c06qu-hc" r="12"/><g class="c06qu-tag"><rect rx="10" width="200" height="44"/><text x="100" y="29"></text></g>';
+    svg.innerHTML = h;
+    const pick = (e) => { const p = U.local(svg, e); this.auto = false; this.btn(s); this.setR(s, Math.max(0, Math.min(0.97, (p.x - 80) / 860))); };
+    svg.addEventListener('pointerdown', (e) => { this.drag = true; svg.setPointerCapture(e.pointerId); pick(e); });
+    svg.addEventListener('pointermove', (e) => { if (this.drag) pick(e); });
+    svg.addEventListener('pointerup', () => { this.drag = false; });
+    const inp = s.querySelector('.c06qu-in');
+    inp.addEventListener('input', () => { this.auto = false; this.btn(s); this.setR(s, +inp.value); });
+    inp.addEventListener('change', () => inp.blur());
+    inp.addEventListener('pointerup', () => inp.blur());
+    s.querySelector('.c06qu-auto').addEventListener('click', () => { this.auto = !this.auto; this.t0 = performance.now(); this.btn(s); });
+    this.cv = s.querySelector('.c06qu-cv');
+    this.g = this.cv.getContext('2d');
+    this.setR(s, 0.3);
+  },
+  btn(s) {
+    const b = s.querySelector('.c06qu-auto');
+    b.classList.toggle('on', !!this.auto);
+    b.querySelector('span').textContent = this.auto ? '自动扫动中' : '自动扫动';
+    b.querySelector('use').setAttribute('href', this.auto ? '#i-pause' : '#i-play');
+  },
+  setR(s, r) {
+    this.r = r;
+    const T = 1 / (1 - r), xr = this.x(r), yT = this.y(Math.min(12, T));
+    const q = (c) => s.querySelector(c);
+    const gx = q('.c06qu-gx'), gy = q('.c06qu-gy'), hc = q('.c06qu-hc'), tag = q('.c06qu-tag');
+    gx.setAttribute('x1', xr); gx.setAttribute('x2', xr); gx.setAttribute('y1', 470); gx.setAttribute('y2', yT);
+    gy.setAttribute('x1', 80); gy.setAttribute('x2', xr); gy.setAttribute('y1', yT); gy.setAttribute('y2', yT);
+    hc.setAttribute('cx', xr); hc.setAttribute('cy', yT);
+    const tx = xr > 700 ? xr - 222 : xr + 22, ty = Math.max(34, Math.min(410, yT - 60));
+    tag.setAttribute('transform', `translate(${tx} ${ty})`);
+    tag.querySelector('text').textContent = `ρ = ${r.toFixed(2)} · ${T > 12 ? '> 12' : T.toFixed(1)} s`;
+    const inp = q('.c06qu-in');
+    if (Math.abs(+inp.value - r) > 0.004) inp.value = r.toFixed(2);
+    inp.style.setProperty('--p', (r / 0.97) * 100 + '%');
+    q('.c06qu-rv').textContent = r.toFixed(2);
+    q('.c06qu-tv').textContent = T >= 100 ? '≫ 99' : T.toFixed(1);
+    q('.c06qu-xv').textContent = `空载的 ${T >= 100 ? '近百' : T.toFixed(1)} 倍`;
+    const st = q('.c06qu-st'), lv = T <= 2.0001 ? 0 : T < 5 ? 1 : 2;
+    st.className = 'chip c06qu-st ' + ['ok', 'warn', 'bad'][lv];
+    st.textContent = ['≤ 2 s：在用户忍受上限内', '2–5 s：已超过用户忍受上限', '≥ 5 s：不可接受'][lv];
+  },
+  // 随机到达的单服务台队列（示意）：到达率 ∝ ρ，平均服务时间 S = 1 s
+  simReset() { this.sim = { t: 0, next: 0, q: [], cur: null, free: 0, out: [], resp: [], rnd: U.rand(20261029) }; },
+  ex(m) { return -Math.log(1 - this.sim.rnd()) * m; },
+  simStep(dt) {
+    const S = this.sim, lam = Math.max(0.02, this.r);
+    S.t += dt * 1.6;
+    if (!S.next) S.next = S.t + this.ex(1 / lam);
+    while (S.next <= S.t) { if (S.q.length < 200) S.q.push({ a: S.next }); S.next += this.ex(1 / lam); }
+    for (let g = 0; g < 50; g++) {
+      if (!S.cur) {
+        if (!S.q.length) break;
+        const j = S.q.shift();
+        j.s = Math.max(j.a, S.free);
+        j.d = j.s + this.ex(1);
+        S.cur = j;
+      }
+      if (S.cur.d > S.t) break;
+      S.resp.push(S.cur.d - S.cur.a);
+      if (S.resp.length > 40) S.resp.shift();
+      S.free = S.cur.d;
+      S.out.push({ x: 410, life: 1 });
+      S.cur = null;
+    }
+    S.out.forEach((o) => { o.x += dt * 90; o.life -= dt * 1.6; });
+    S.out = S.out.filter((o) => o.life > 0);
+  },
+  simDraw(s) {
+    const g = this.g, S = this.sim, A = '#e879f9', B = '#22d3ee';
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, 556, 200);
+    g.strokeStyle = 'rgba(255,255,255,.08)';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(10, 100); g.lineTo(330, 100); g.stroke();
+    // 服务台
+    g.fillStyle = 'rgba(34,211,238,.10)';
+    g.strokeStyle = B;
+    g.lineWidth = 2;
+    g.beginPath(); g.roundRect(340, 50, 70, 100, 14); g.fill(); g.stroke();
+    g.fillStyle = '#e9edf8';
+    g.font = '600 15px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.textAlign = 'center';
+    g.fillText('服务端', 375, 72);
+    if (S.cur) {
+      const p = Math.max(0, Math.min(1, (S.t - S.cur.s) / Math.max(0.05, S.cur.d - S.cur.s)));
+      g.fillStyle = A; g.beginPath(); g.arc(375, 108, 9, 0, 6.283); g.fill();
+      g.strokeStyle = '#fff'; g.lineWidth = 3; g.beginPath(); g.arc(375, 108, 17, -1.571, -1.571 + p * 6.283); g.stroke();
+    }
+    // 排队的请求
+    const n = S.q.length, vis = Math.min(n, 17);
+    for (let i = 0; i < vis; i++) {
+      const x = 318 - i * 18;
+      g.fillStyle = i < 3 ? A : 'rgba(232,121,249,.7)';
+      g.beginPath(); g.arc(x, 100, 7, 0, 6.283); g.fill();
+    }
+    if (n > vis) { g.fillStyle = A; g.font = '700 15px "Segoe UI",Arial,sans-serif'; g.textAlign = 'left'; g.fillText('+' + (n - vis), 8, 85); }
+    // 完成离开的请求
+    S.out.forEach((o) => { g.globalAlpha = Math.max(0, o.life); g.fillStyle = '#34d399'; g.beginPath(); g.arc(Math.min(540, o.x + 10), 100, 6, 0, 6.283); g.fill(); });
+    g.globalAlpha = 1;
+    g.fillStyle = 'rgba(165,175,201,.9)';
+    g.font = '15px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.textAlign = 'left';
+    g.fillText('← 新请求按 ρ 随机到达', 12, 170);
+    g.textAlign = 'right';
+    g.fillText('处理完离开 →', 548, 170);
+    s.querySelector('.c06qu-qn').textContent = n + (S.cur ? 1 : 0);
+    const mv = S.resp.length >= 6 ? S.resp.reduce((a, b) => a + b, 0) / S.resp.length : 0;
+    s.querySelector('.c06qu-mv').textContent = mv ? mv.toFixed(1) + ' s' : '—';
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.simReset();
+    this.auto = true;
+    this.btn(s);
+    let last = performance.now();
+    this.t0 = last;
+    ctx.raf((now) => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (this.auto) {
+        const ph = ((now - this.t0) / 22000) % 1, tri = ph < 0.5 ? ph * 2 : 2 - ph * 2;
+        this.setR(s, 0.15 + 0.77 * tri);
+      }
+      this.simStep(dt);
+      this.simDraw(s);
+    });
+  },
+  leave() { this.ctx = null; this.drag = false; },
+  reset(s) { this.auto = false; this.btn(s); this.setR(s, 0.3); this.simReset(); this.g.setTransform(1, 0, 0, 1, 0, 0); this.g.clearRect(0, 0, 1112, 400); },
+};
+</script>
+
+<section class="slide" id="c06-exp4" data-part="3" data-trans="rise" data-title="实验 6-4 ★：构建传统语音 Agent" data-dur="15000" data-notes="<b>实验 6-4 ★</b>用 WebSocket 串起麦克风、Silero VAD、本地 Whisper、流式 LLM 和 Fish S1 TTS，建立后续方案的<b>级联基线（baseline）</b>。配套代码（chapter6/live-audio）的前端用 Web Audio 采集麦克风、经 WebSocket 流式上传；后端运行 Silero VAD，用约 500 ms 的静音判断说完，再把这段话依次交给可插拔的 ASR、LLM 和 TTS 提供商，合成音频流式返回播放。<br>右侧回放的是配套仓库 2026-07-29 的一次真实单轮记录（9/9 严格门禁通过）：一段 5.056 s 的真实麦克风录音，Silero VAD 以 500 ms 静音判定端点；本地 whisper-tiny 用时 2.710 s（其中模型加载 0.34 s、推理 1.30 s），转写为“是男朋友叫这样的”；ARK 的 doubao-seed-1-6-flash-250615 首 token 0.749 s、总 0.792 s（30 个输出 token 里有 23 个 reasoning token）；Fish S1 首字节 2.819 s、总 3.279 s。<b>端点后到首个音频字节 6.279 s</b>。<br>和图6-7 的空载理想区间（0.95–2.3 s）相比，这次实测慢得多：主要耗在本机的本地 Whisper 和 TTS 首包上——正如原书所说，真实数值取决于输入长度、模型、硬件、网络和负载。记录本身也写明：它只证明一次保存的真实麦克风单轮跑通了 VAD → ASR → LLM → TTS，不代表并发或生产负载基准；同日另三次尝试没有通过全部门禁，不计入结果。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-4 ★：构建<em>传统语音 Agent</em></h2>
+  <p class="lead fx fx-up" style="--d:2">用 WebSocket 串起麦克风、Silero VAD、本地 Whisper、流式 LLM 和 Fish S1 TTS，建立后续方案的级联基线</p></header>
+  <div class="c06e4-body">
+    <div class="c06e4-l panel fx fx-left" style="--d:3">
+      <div class="c06e4-h"><span class="badge">实验设计</span><b>级联基线（baseline）</b></div>
+      <ol class="c06e4-ch">
+        <li><span><svg class="ic"><use href="#i-mic"/></svg></span><div><b>浏览器麦克风</b><p>Web Audio 采集，经 WebSocket 流式上传</p></div></li>
+        <li><span><svg class="ic"><use href="#i-ear"/></svg></span><div><b>Silero VAD（服务端）</b><p>约 500 ms 静音判定说完</p></div></li>
+        <li><span><svg class="ic"><use href="#i-docs"/></svg></span><div><b>本地 Whisper</b><p>音频转文字（本次：whisper-tiny）</p></div></li>
+        <li><span><svg class="ic"><use href="#i-brain"/></svg></span><div><b>流式 LLM</b><p>理解并生成（本次：ARK doubao-seed-1-6-flash）</p></div></li>
+        <li><span><svg class="ic"><use href="#i-speaker"/></svg></span><div><b>Fish S1 TTS</b><p>合成音频，流式返回播放</p></div></li>
+      </ol>
+      <p class="c06e4-pl"><svg class="ic"><use href="#i-plug"/></svg>可插拔的提供商：ASR、LLM、TTS 都可以替换</p>
+      <div class="c06e4-q"><span class="lbl">检查自己的解释 · 配套 README</span><p>用户在播放期间开始说话时，哪些模块应停止，哪些状态应该保留？</p></div>
+    </div>
+    <div class="c06e4-r panel fx fx-right" style="--d:4">
+      <div class="c06e4-h"><b>一次真实单轮的回放</b><span class="chip env">2026-07-29 · 9/9 严格门禁通过</span><button class="btn c06e4-rp"><svg class="ic"><use href="#i-refresh"/></svg>重放</button></div>
+      <div class="c06e4-chat">
+        <div class="c06e4-u"><span class="lbl">用户 · 麦克风录音 5.056 s → ASR 转写</span><p class="c06e4-ut">……</p></div>
+        <div class="c06e4-a"><span class="lbl">Agent · 回复文本 → 合成音频 1.933 s</span><p class="c06e4-at">……</p><i class="c06e4-sp"><svg class="ic"><use href="#i-speaker"/></svg></i></div>
+      </div>
+      <div class="c06e4-tl">
+        <div class="c06e4-clk"><span class="c06e4-ph">等待端点</span>端点后 <b class="c06e4-t">0.00</b> s</div>
+        <div class="c06e4-rows"></div>
+        <div class="c06e4-ax"><span></span><div class="c06e4-axt"></div></div>
+      </div>
+      <div class="c06e4-cmp">
+        <div class="c06e4-cr"><span>图6-7 空载理想（含 VAD 等待）</span><div class="c06e4-ct"><i class="c06e4-ideal"></i></div><b>0.95–2.3 s</b></div>
+        <div class="c06e4-cr"><span>本次实测：端点后到首个音频字节</span><div class="c06e4-ct"><i class="c06e4-real"></i></div><b class="c06e4-rv">6.279 s</b></div>
+      </div>
+      <p class="c06e4-cv">只证明一次保存的真实麦克风单轮跑通了 Silero VAD → 真实 ASR → 真实 LLM → 真实 TTS，不代表并发或生产负载基准</p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「范式一 · 级联流水线（Cascading）」· 实验 6-4 · 数据：配套仓库 chapter6/live-audio 验收记录（2026-07-29，本地 whisper-tiny + doubao-seed-1-6-flash-250615 + Fish S1）</div>
+</section>
+<style>
+#c06-exp4 .c06e4-body{display:grid;grid-template-columns:520px 1fr;gap:24px;height:670px}
+#c06-exp4 .c06e4-l,#c06-exp4 .c06e4-r{padding:20px 24px;display:flex;flex-direction:column;gap:12px}
+#c06-exp4 .c06e4-h{display:flex;align-items:center;gap:12px}
+#c06-exp4 .c06e4-h>b{font-size:21px}
+#c06-exp4 .c06e4-h .chip{font-size:15px}
+#c06-exp4 .c06e4-rp{margin-left:auto;font-size:15px;padding:6px 14px}
+#c06-exp4 .c06e4-ch{display:flex;flex-direction:column;gap:8px}
+#c06-exp4 .c06e4-ch li{display:flex;gap:14px;align-items:center;padding:9px 12px;border-radius:14px;border:1px solid transparent;opacity:.55;transition:all .4s var(--ease)}
+#c06-exp4 .c06e4-ch li>span{flex:none;width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 40%,transparent);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c06-exp4 .c06e4-ch b{font-size:18px}
+#c06-exp4 .c06e4-ch p{font-size:15px;color:var(--text2);margin-top:2px}
+#c06-exp4 .c06e4-ch li.done{opacity:.85}
+#c06-exp4 .c06e4-ch li.cur{opacity:1;border-color:color-mix(in srgb,var(--acc) 50%,transparent);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c06-exp4 .c06e4-ch li.cur>span{color:#06101f;background:var(--acc);box-shadow:0 0 16px var(--acc)}
+#c06-exp4 .c06e4-pl{display:flex;align-items:center;gap:10px;font-size:16px;color:var(--text2)}
+#c06-exp4 .c06e4-pl .ic{color:var(--acc2);font-size:20px}
+#c06-exp4 .c06e4-q{margin-top:auto;padding:12px 16px;border-radius:14px;border:1px dashed var(--line2)}
+#c06-exp4 .c06e4-q p{font-size:16px;line-height:1.6;margin-top:4px}
+#c06-exp4 .c06e4-chat{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c06-exp4 .c06e4-u,#c06-exp4 .c06e4-a{position:relative;padding:10px 16px;border-radius:14px;min-height:76px}
+#c06-exp4 .c06e4-u{background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.3)}
+#c06-exp4 .c06e4-a{background:rgba(45,212,191,.07);border:1px solid rgba(45,212,191,.3)}
+#c06-exp4 .c06e4-ut,#c06-exp4 .c06e4-at{font-size:21px;margin-top:4px}
+#c06-exp4 .c06e4-sp{position:absolute;right:14px;bottom:12px;font-size:24px;color:var(--text3)}
+#c06-exp4 .c06e4-a.play .c06e4-sp{color:#2dd4bf;animation:blink .8s steps(1) infinite}
+#c06-exp4 .c06e4-tl{padding:10px 14px;border-radius:14px;background:rgba(5,9,22,.55);border:1px solid var(--line)}
+#c06-exp4 .c06e4-clk{display:flex;align-items:baseline;gap:8px;font-size:17px;color:var(--text2)}
+#c06-exp4 .c06e4-clk b{font:800 26px var(--num);color:var(--acc);min-width:70px}
+#c06-exp4 .c06e4-ph{margin-right:auto;font-size:16px;color:var(--acc2)}
+#c06-exp4 .c06e4-rows{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+#c06-exp4 .c06e4-row{--c:var(--acc);display:grid;grid-template-columns:200px 672px 1fr;gap:12px;align-items:center}
+#c06-exp4 .c06e4-lb{font-size:16px;color:var(--text2)}
+#c06-exp4 .c06e4-lb b{color:var(--c);font:800 17px var(--num);margin-right:6px}
+#c06-exp4 .c06e4-trk{position:relative;height:30px;border-radius:7px;background:rgba(255,255,255,.03)}
+#c06-exp4 .c06e4-bar{position:absolute;top:0;bottom:0;width:0;border-radius:7px;background:linear-gradient(90deg,var(--c),color-mix(in srgb,var(--c) 60%,#fff));box-shadow:0 0 14px color-mix(in srgb,var(--c) 40%,transparent)}
+#c06-exp4 .c06e4-v{font:800 18px var(--num);color:var(--c)}
+#c06-exp4 .c06e4-sub{grid-column:2/4;margin-top:-4px;font-size:15px;color:var(--text3)}
+#c06-exp4 .c06e4-ax{display:grid;grid-template-columns:200px 672px;gap:12px;margin-top:4px}
+#c06-exp4 .c06e4-axt{position:relative;height:24px;border-top:1px solid var(--line2)}
+#c06-exp4 .c06e4-axt span{position:absolute;top:3px;font:15px var(--num);color:var(--text3);translate:-50% 0}
+#c06-exp4 .c06e4-cmp{display:flex;flex-direction:column;gap:6px}
+#c06-exp4 .c06e4-cr{display:grid;grid-template-columns:200px 672px 1fr;gap:12px;align-items:center;padding:0 14px}
+#c06-exp4 .c06e4-cr span{font-size:15px;color:var(--text2)}
+#c06-exp4 .c06e4-cr b{font:800 18px var(--num);color:var(--text)}
+#c06-exp4 .c06e4-ct{position:relative;height:22px}
+#c06-exp4 .c06e4-ideal{position:absolute;top:0;bottom:0;border-radius:6px;background:repeating-linear-gradient(135deg,rgba(52,211,153,.4) 0 6px,rgba(52,211,153,.12) 6px 12px);border:1px solid rgba(52,211,153,.6)}
+#c06-exp4 .c06e4-real{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:6px;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+#c06-exp4 .c06e4-cv{font-size:15px;line-height:1.55;color:var(--text3);margin-top:auto}
+</style>
+<script>
+HOOKS['c06-exp4'] = {
+  K: 96,
+  R: [
+    { k: 'ASR', n: '本地 whisper-tiny', a: 0, b: 2.71, v: '2.710 s', sub: '其中模型加载 0.34 s、推理 1.30 s', c: '#22d3ee' },
+    { k: 'LLM', n: '首 token（TTFT）', a: 2.71, b: 3.459, v: '0.749 s', sub: 'doubao-seed-1-6-flash-250615 · 生成总耗时 0.792 s', c: '#a78bfa' },
+    { k: 'TTS', n: 'Fish S1 首字节', a: 3.459, b: 6.279, v: '2.819 s', sub: '合成总耗时 3.279 s · 输出 1.933 s 音频', c: '#34d399' },
+  ],
+  init(s) {
+    s.querySelector('.c06e4-rows').innerHTML = this.R.map((r) => `<div class="c06e4-row" style="--c:${r.c}"><span class="c06e4-lb"><b>${r.k}</b>${r.n}</span><div class="c06e4-trk"><i class="c06e4-bar" style="left:${r.a * this.K}px"></i></div><span class="c06e4-v">${r.v}</span><small class="c06e4-sub">${r.sub}</small></div>`).join('');
+    s.querySelector('.c06e4-axt').innerHTML = [0, 1, 2, 3, 4, 5, 6, 7].map((t) => `<span style="left:${t * this.K}px">${t} s</span>`).join('');
+    const id = s.querySelector('.c06e4-ideal');
+    id.style.left = 0.95 * this.K + 'px';
+    id.style.width = 1.35 * this.K + 'px';
+    s.querySelector('.c06e4-rp').addEventListener('click', () => this.play(s));
+  },
+  // 按真实记录的时间（端点后，单位秒）实时回放一次单轮
+  play(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const lis = [...s.querySelectorAll('.c06e4-ch li')], bars = [...s.querySelectorAll('.c06e4-bar')];
+    const clk = s.querySelector('.c06e4-t'), ph = s.querySelector('.c06e4-ph'), real = s.querySelector('.c06e4-real');
+    const ut = s.querySelector('.c06e4-ut'), at = s.querySelector('.c06e4-at'), ab = s.querySelector('.c06e4-a');
+    const lit = (i) => lis.forEach((l, j) => { l.classList.toggle('cur', j === i); l.classList.toggle('done', j < i); });
+    const PRE = 1800, D = 6279, HOLD = 3400;
+    let t0 = performance.now();
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      let e = now - t0;
+      if (e > PRE + D + HOLD) { t0 = now; e = 0; }
+      if (e < PRE) {
+        lit(e < 800 ? 0 : 1);
+        ph.textContent = e < 800 ? '录音经 WebSocket 送达' : 'VAD：500 ms 静音 → 端点';
+        clk.textContent = '0.00';
+        bars.forEach((b) => (b.style.width = '0'));
+        real.style.width = '0';
+        ut.textContent = '……';
+        at.textContent = '……';
+        ab.classList.remove('play');
+        return;
+      }
+      const t = Math.min(D, e - PRE) / 1000;
+      clk.textContent = t.toFixed(2);
+      this.R.forEach((r, i) => (bars[i].style.width = Math.max(0, Math.min(t, r.b) - r.a) * this.K + 'px'));
+      real.style.width = t * this.K + 'px';
+      const cur = t < 2.71 ? 2 : t < 3.459 ? 3 : t < 6.279 ? 4 : 5;
+      lit(cur);
+      ph.textContent = ['', '', 'ASR 转写中', 'LLM 生成首 token', 'TTS 合成首包', '首个音频字节到达'][cur];
+      if (t >= 2.71) ut.textContent = '是男朋友叫这样的';
+      if (t >= 3.459) at.textContent = '那是男朋友叫这样的呀';
+      ab.classList.toggle('play', t >= 6.279);
+    });
+  },
+  enter(s, ctx) { this.ctx = ctx; this.play(s); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelectorAll('.c06e4-ch li').forEach((l) => l.classList.remove('cur', 'done'));
+    s.querySelectorAll('.c06e4-bar').forEach((b) => (b.style.width = '0'));
+    s.querySelector('.c06e4-real').style.width = '0';
+    s.querySelector('.c06e4-t').textContent = '0.00';
+    s.querySelector('.c06e4-ut').textContent = '……';
+    s.querySelector('.c06e4-at').textContent = '……';
+    s.querySelector('.c06e4-a').classList.remove('play');
+  },
+};
+</script>
+
+<section class="slide" id="c06-stream" data-part="3" data-steps="2" data-trans="flip" data-title="从串行到流式感知" data-dur="12000" data-notes="图6-7 描述的是 VAD + ASR + LLM + TTS 的完全串行情形，这种串行感知方案有三个问题：<b>延迟累积</b>——必须等待一段静音才能确认说完；<b>信息丢失</b>——有声 / 无声二值信号无法表达犹豫、情绪、附和和环境声；<b>上下文被切断</b>——邮箱、人名和专有名词可能被分片识别而出错。<br>为了解决这个问题，在保留模块化分工的前提下，一种优化方案是<b>流式感知</b>，让各阶段尽早产出增量结果：<br>· <b>ASR 边听边转</b>：VAD 检测到用户开始说话时，就按照一定的时间间隔调用 ASR 模型，流式生成临时转录内容；VAD 检测到用户说话结束后，再确认最终文本。<br>· <b>LLM 推测执行</b>：临时转录内容生成后，就送给 LLM；如果最终文本与临时转录内容相同就不再调用 LLM，否则取消前序推测执行的思考，重新调用 LLM。<br>· <b>LLM 分段输出</b>：第一段适合播报的文本生成后立即交给 TTS，不等完整回复。<br>· <b>TTS 增量合成</b>：持续返回音频块，让后续生成、合成和播放重叠进行。<br>按 → 依次切换三种情形：完全串行 → 流式（临时转录正确）→ 流式（最终文本不同，需要取消重来）；也可以点击右上角开关。甘特图里的时间都是示意，用来看清哪些等待被重叠掉了。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从串行到<em>流式感知</em></h2></div>
+    <div class="c06st-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="serial">完全串行</button><button data-v="same">流式 · 临时转录正确</button><button data-v="diff">流式 · 最终文本不同</button></div></header>
+  <div class="c06st-body">
+    <div class="c06st-pr fx fx-left" style="--d:3">
+      <span class="lbl">完全串行的三个问题</span>
+      <div class="c06st-pc" data-p="0"><div class="c06st-ph"><em>1</em><b>延迟累积</b></div><p>必须等待一段静音才能确认说完</p><div class="c06st-sil"><i></i><span>静音计时 → 阈值</span></div></div>
+      <div class="c06st-pc" data-p="1"><div class="c06st-ph"><em>2</em><b>信息丢失</b></div><p>有声 / 无声二值信号无法表达犹豫、情绪、附和和环境声</p>
+        <svg class="c06st-wv" viewBox="0 0 380 66" width="380" height="66"><path class="c06st-w1" d="M0 22 Q10 6 20 22 T40 22 T60 22 T80 22 Q90 16 100 22 T120 22 Q130 18 140 22 T160 22 Q175 8 190 22 T220 22 Q232 12 244 22 T268 22 L290 22 Q300 4 310 22 T330 22 Q340 10 350 22 T380 22"/><path class="c06st-w2" d="M0 60 V44 H90 V60 H96 V44 H170 V60 H184 V44 H270 V60 H286 V44 H380"/><text x="96" y="12">嗯…</text><text x="178" y="12">笑</text><text x="292" y="12">附和</text></svg>
+        <small>犹豫、笑声、附和……在二值信号里都只是“有声”</small></div>
+      <div class="c06st-pc" data-p="2"><div class="c06st-ph"><em>3</em><b>上下文被切断</b></div><p>邮箱、人名和专有名词可能被分片识别而出错</p>
+        <div class="c06st-fr"><span>zhang wei</span><span>艾特 example</span><span>点 com</span></div><small>分片识别：张伟 艾特 example 点 com ✗ · 整段上下文：zhangwei@example.com ✓（示意）</small></div>
+    </div>
+    <div class="c06st-main">
+      <div class="c06st-g panel fx fx-up" style="--d:4">
+        <div class="c06st-gh"><b class="c06st-gn"></b><span class="c06st-ev"></span><span class="chip warn c06st-sm">时间为示意</span></div>
+        <div class="c06st-gs">
+          <div class="c06st-lanes"></div>
+          <div class="c06st-bk"></div>
+          <div class="c06st-ax"></div>
+          <i class="c06st-fa"><span></span></i>
+          <i class="c06st-fs"><span>串行 4.1 s</span></i>
+          <i class="c06st-hd"></i>
+        </div>
+      </div>
+      <div class="c06st-op fx fx-up" style="--d:5">
+        <div class="c06st-o" data-o="0"><b>ASR 边听边转</b><p>开始说话就按间隔调用 ASR，流式生成临时转录；说完后再确认最终文本</p></div>
+        <div class="c06st-o" data-o="1"><b>LLM 推测执行</b><p>临时转录先送给 LLM；最终文本相同就不再调用，不同则取消重来</p></div>
+        <div class="c06st-o" data-o="2"><b>LLM 分段输出</b><p>第一段适合播报的文本生成后立即交给 TTS，不等完整回复</p></div>
+        <div class="c06st-o" data-o="3"><b>TTS 增量合成</b><p>持续返回音频块，让后续生成、合成和播放重叠进行</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「从串行到流式感知」· 图6-7 的完全串行情形 vs 流式感知</div>
+</section>
+<style>
+#c06-stream .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-stream .c06st-seg button{font-size:18px;padding:10px 20px}
+#c06-stream .c06st-body{display:grid;grid-template-columns:440px 1fr;gap:24px}
+#c06-stream .c06st-pr{display:flex;flex-direction:column;gap:12px}
+#c06-stream .c06st-pc{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.75);transition:border-color .4s,background .4s,box-shadow .4s}
+#c06-stream .c06st-pc.on{border-color:color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 8%,rgba(12,18,40,.85));box-shadow:0 0 26px color-mix(in srgb,var(--bad) 22%,transparent)}
+#c06-stream .c06st-ph{display:flex;align-items:center;gap:10px}
+#c06-stream .c06st-ph em{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;font:700 15px var(--num);font-style:normal;color:var(--bad);border:1px solid color-mix(in srgb,var(--bad) 50%,transparent)}
+#c06-stream .c06st-ph b{font-size:21px}
+#c06-stream .c06st-pc p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:6px}
+#c06-stream .c06st-pc small{display:block;font-size:15px;line-height:1.5;color:var(--text3);margin-top:6px}
+#c06-stream .c06st-sil{position:relative;height:26px;margin-top:8px;border-radius:7px;background:rgba(255,255,255,.05);overflow:hidden}
+#c06-stream .c06st-sil i{position:absolute;left:0;top:0;bottom:0;width:0;background:linear-gradient(90deg,color-mix(in srgb,#f472b6 30%,transparent),#f472b6)}
+#c06-stream .c06st-pc.on .c06st-sil i{animation:c06st-fill 2.2s linear infinite}
+@keyframes c06st-fill{0%{width:0}80%,100%{width:100%}}
+#c06-stream .c06st-sil span{position:absolute;left:10px;top:0;line-height:26px;font-size:15px;color:var(--text)}
+#c06-stream .c06st-wv{display:block;margin-top:6px}
+#c06-stream .c06st-w1{fill:none;stroke:#c084fc;stroke-width:2.5}
+#c06-stream .c06st-w2{fill:none;stroke:#94a3b8;stroke-width:2.5}
+#c06-stream .c06st-wv text{fill:#c084fc;font-size:15px}
+#c06-stream .c06st-fr{display:flex;gap:6px;margin-top:8px}
+#c06-stream .c06st-fr span{padding:3px 10px;border-radius:8px;font:15px var(--mono);color:var(--text);border:1px dashed var(--line2);background:rgba(255,255,255,.04)}
+#c06-stream .c06st-pc.on .c06st-fr span{animation:c06st-split 1.6s var(--ease) infinite alternate}
+#c06-stream .c06st-pc.on .c06st-fr span:nth-child(2){animation-delay:.15s}
+#c06-stream .c06st-pc.on .c06st-fr span:nth-child(3){animation-delay:.3s}
+@keyframes c06st-split{to{translate:0 -4px;border-color:var(--bad)}}
+#c06-stream .c06st-main{display:flex;flex-direction:column;gap:14px;min-width:0}
+#c06-stream .c06st-g{padding:12px 20px 8px}
+#c06-stream .c06st-gh{display:flex;align-items:center;gap:16px;min-height:36px}
+#c06-stream .c06st-gn{font-size:20px;color:var(--acc);white-space:nowrap}
+#c06-stream .c06st-ev{flex:1;font-size:16px;color:var(--text);min-width:0}
+#c06-stream .c06st-sm{font-size:15px;padding:3px 10px}
+#c06-stream .c06st-gs{position:relative;height:316px;margin-top:4px}
+#c06-stream .c06st-ln{position:absolute;left:0;right:0;height:44px;border-radius:9px;background:rgba(255,255,255,.025)}
+#c06-stream .c06st-ln span{position:absolute;left:10px;top:0;line-height:44px;font-size:16px;font-weight:700;color:var(--text2)}
+#c06-stream .c06st-b{--c:var(--acc);position:absolute;z-index:2;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 55%,transparent);background:color-mix(in srgb,var(--c) 18%,rgba(10,16,36,.94));opacity:0;transform-origin:left center;scale:0 1;transition:opacity .3s,scale .45s var(--ease),box-shadow .3s}
+#c06-stream .c06st-b.vis{opacity:1;scale:1 1}
+#c06-stream .c06st-b.on{box-shadow:0 0 18px color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 32%,rgba(10,16,36,.94))}
+#c06-stream .c06st-b.u{--c:#fbbf24}
+#c06-stream .c06st-b.vad{--c:#f472b6;background:repeating-linear-gradient(135deg,color-mix(in srgb,#f472b6 26%,transparent) 0 7px,rgba(10,16,36,.94) 7px 14px)}
+#c06-stream .c06st-b.asr,#c06-stream .c06st-b.asrp{--c:#22d3ee}
+#c06-stream .c06st-b.asrp{border-style:dashed}
+#c06-stream .c06st-b.llm{--c:#a78bfa}
+#c06-stream .c06st-b.spec{--c:#a78bfa;border-style:dashed}
+#c06-stream .c06st-b.x.cut{text-decoration:line-through;color:#fecdd3;border-color:var(--bad);background:repeating-linear-gradient(135deg,rgba(251,113,133,.22) 0 7px,rgba(10,16,36,.94) 7px 14px)}
+#c06-stream .c06st-b.tts{--c:#34d399}
+#c06-stream .c06st-b.play{--c:#2dd4bf}
+#c06-stream .c06st-mk{position:absolute;z-index:3;width:12px;height:12px;margin:-6px 0 0 -6px;rotate:45deg;background:#fff;border-radius:2px;opacity:0;transition:opacity .3s}
+#c06-stream .c06st-mk.vis{opacity:1;box-shadow:0 0 12px #fff}
+#c06-stream .c06st-ax span{position:absolute;top:290px;font:15px var(--num);color:var(--text3);translate:-50% 0}
+#c06-stream .c06st-fa,#c06-stream .c06st-fs{position:absolute;z-index:4;top:0;height:284px;width:0;border-left:2px solid #2dd4bf;opacity:0;transition:opacity .4s}
+#c06-stream .c06st-fa span,#c06-stream .c06st-fs span{position:absolute;left:6px;top:-2px;font:700 15px var(--num);color:#2dd4bf;white-space:nowrap;padding:1px 6px;border-radius:6px;background:rgba(5,8,22,.85)}
+#c06-stream .c06st-fs{border-left:2px dashed rgba(255,255,255,.4)}
+#c06-stream .c06st-fs span{color:var(--text3);top:20px}
+#c06-stream .c06st-fa.vis,#c06-stream .c06st-fs.vis{opacity:1}
+#c06-stream .c06st-hd{position:absolute;z-index:5;top:0;height:284px;width:2px;left:118px;background:linear-gradient(var(--acc),var(--acc2));box-shadow:0 0 12px var(--acc)}
+#c06-stream .c06st-op{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+#c06-stream .c06st-o{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.45;transition:all .4s var(--ease)}
+#c06-stream .c06st-o b{font-size:19px;color:var(--acc)}
+#c06-stream .c06st-o p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}
+#c06-stream .c06st-o.rdy{opacity:.8}
+#c06-stream .c06st-o.on{opacity:1;border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 11%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 25%,transparent)}
+</style>
+<script>
+HOOKS['c06-stream'] = {
+  X0: 118, K: 178, D: 5.8,
+  LN: ['用户说话', 'VAD', 'ASR', 'LLM', 'TTS', '播放'],
+  MODES: ['serial', 'same', 'diff'],
+  G: {
+    serial: {
+      nm: '完全串行：每一级等前一级做完', first: 4.1,
+      B: [[0, 0.2, 2.2, '用户说话', 'u'], [1, 2.2, 2.8, '等静音确认说完', 'vad'], [2, 2.8, 3.0, '整段', 'asr'], [3, 3.0, 3.7, '首 token + 完整回复', 'llm'], [4, 3.7, 4.1, '整段合成', 'tts'], [5, 4.1, 5.6, '播放', 'play']],
+      E: [[2.2, 1, '用户说完了，但 VAD 还要等一段静音才能确认'], [2.8, 2, '确认说完，ASR 这才开始识别整段音频'], [3.0, 3, 'LLM 等到完整文本才开始'], [3.7, 4, 'TTS 等到完整回复才开始合成'], [4.1, 5, '首个音频 4.1 s：此前每一级都在等前一级']],
+    },
+    same: {
+      nm: '流式感知：各阶段尽早产出增量结果', first: 2.95,
+      B: [[0, 0.2, 2.2, '用户说话', 'u'], [2, 0.8, 0.95, '', 'asrp', 0], [2, 1.4, 1.55, '', 'asrp', 0], [2, 2.0, 2.15, '', 'asrp', 0], [1, 2.2, 2.8, '等静音确认', 'vad'], [2, 2.8, 2.9, '', 'asr', 0], [3, 2.15, 3.2, '推测执行：基于临时转录', 'spec', 1], [4, 2.55, 2.75, '', 'tts', 3], [4, 2.95, 3.15, '', 'tts', 3], [4, 3.35, 3.55, '', 'tts', 3], [5, 2.95, 4.5, '边合成边播放', 'play']],
+      K: [[2, 0.8], [3, 2.15], [3, 2.55], [2, 2.85]],
+      E: [[0.8, 2, 'ASR 边听边转：用户还在说，临时转录已经出来', 0], [2.15, 3, 'LLM 推测执行：拿临时转录先开始生成', 1], [2.55, 3, 'LLM 分段输出：第一段可播报文本立即交给 TTS', 2], [2.6, 4, 'TTS 增量合成：开始逐块返回音频', 3], [2.85, 2, '确认说完：最终文本与临时转录相同 → 不再调用 LLM', 0], [2.95, 5, '开始播放：比完全串行早约 1.15 s（示意）']],
+    },
+    diff: {
+      nm: '最终文本不同：取消推测，重新调用', first: 3.45,
+      B: [[0, 0.2, 2.2, '用户说话', 'u'], [2, 0.8, 0.95, '', 'asrp', 0], [2, 1.4, 1.55, '', 'asrp', 0], [2, 2.0, 2.15, '', 'asrp', 0], [1, 2.2, 2.8, '等静音确认', 'vad'], [2, 2.8, 2.9, '', 'asr', 0], [3, 2.15, 2.9, '推测执行', 'spec x', 1], [3, 2.9, 3.6, '重新调用 LLM', 'llm', 1], [4, 3.25, 3.4, '', 'tts', 3], [4, 3.6, 3.75, '', 'tts', 3], [4, 3.95, 4.1, '', 'tts', 3], [5, 3.45, 4.9, '播放', 'play']],
+      K: [[2, 0.8], [3, 2.15], [3, 2.9], [3, 3.25]],
+      E: [[0.8, 2, 'ASR 边听边转：临时转录先出来', 0], [2.15, 3, 'LLM 推测执行：基于临时转录先开始', 1], [2.9, 3, '最终文本与临时转录不同 → 取消前序推测执行，重新调用 LLM', 1], [3.25, 4, 'LLM 分段输出 + TTS 增量合成照常进行', 2], [3.45, 5, '开始播放：仍比完全串行早约 0.65 s（示意）']],
+    },
+  },
+  init(s) {
+    s.querySelector('.c06st-lanes').innerHTML = this.LN.map((n, i) => `<div class="c06st-ln" style="top:${i * 48}px"><span>${n}</span></div>`).join('');
+    s.querySelector('.c06st-ax').innerHTML = [0, 1, 2, 3, 4, 5].map((t) => `<span style="left:${this.X0 + t * this.K}px">${t} s</span>`).join('');
+    s.querySelector('.c06st-fs').style.left = this.X0 + 4.1 * this.K + 'px';
+    this.set = U.seg(s.querySelector('.c06st-seg'), (v) => this.show(s, v));
+  },
+  // 甘特图：播放头扫过时块依次出现；流式模式下对应的优化卡片点亮
+  show(s, m) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, g = this.G[m], X = (t) => this.X0 + t * this.K;
+    this.set(m);
+    s.querySelector('.c06st-gn').textContent = g.nm;
+    s.querySelector('.c06st-ev').textContent = '';
+    const bk = s.querySelector('.c06st-bk');
+    bk.innerHTML = g.B.map(([l, a, b, t, c, o]) => `<div class="c06st-b ${c}" data-a="${a}" data-b="${b}"${o !== undefined ? ` data-o="${o}"` : ''} style="left:${X(a)}px;width:${(b - a) * this.K}px;top:${l * 48 + 6}px">${t}</div>`).join('')
+      + (g.K || []).map(([l, t]) => `<i class="c06st-mk" data-a="${t}" style="left:${X(t)}px;top:${l * 48 + 22}px"></i>`).join('');
+    const els = [...bk.children].map((el) => ({ el, a: +el.dataset.a, b: el.dataset.b ? +el.dataset.b : 99, o: el.dataset.o }));
+    const fa = s.querySelector('.c06st-fa'), fs = s.querySelector('.c06st-fs'), hd = s.querySelector('.c06st-hd');
+    fa.style.left = X(g.first) + 'px';
+    fa.querySelector('span').textContent = `首个音频 ${g.first} s`;
+    fa.classList.remove('vis');
+    fs.classList.toggle('vis', m !== 'serial');
+    const ops = [...s.querySelectorAll('.c06st-o')], prs = [...s.querySelectorAll('.c06st-pc')];
+    ops.forEach((o) => o.classList.remove('on', 'rdy'));
+    prs.forEach((p) => p.classList.remove('on'));
+    hd.style.left = this.X0 + 'px';
+    if (!ctx) return;
+    const DUR = this.D * 1000, HOLD = 2200, ev = s.querySelector('.c06st-ev');
+    let t0 = performance.now(), last = -1;
+    ctx.raf((now) => {
+      if (tk !== this.tk) return false;
+      let e = now - t0;
+      if (e > DUR + HOLD) { t0 = now; e = 0; last = -1; ops.forEach((o) => o.classList.remove('on', 'rdy')); fa.classList.remove('vis'); ev.textContent = ''; }
+      const t = Math.min(DUR, e) / 1000;
+      hd.style.left = X(t) + 'px';
+      els.forEach((x) => {
+        x.el.classList.toggle('vis', t >= x.a);
+        x.el.classList.toggle('on', t >= x.a && t < x.b);
+        if (x.el.classList.contains('x')) x.el.classList.toggle('cut', t >= x.b);
+      });
+      fa.classList.toggle('vis', t >= g.first);
+      // 事件说明：取最近一条已发生的事件
+      let k = -1;
+      g.E.forEach((x, i) => { if (t >= x[0]) k = i; });
+      if (k !== last) {
+        last = k;
+        ev.textContent = k >= 0 ? g.E[k][2] : '';
+        if (m === 'serial') prs.forEach((p, i) => p.classList.toggle('on', k >= 0 && i === (k <= 1 ? 0 : k === 2 ? 2 : 1)));
+        else {
+          ops.forEach((o) => o.classList.remove('on'));
+          if (k >= 0 && g.E[k][3] !== undefined) { const o = ops[g.E[k][3]]; o.classList.add('on', 'rdy'); }
+        }
+      }
+    });
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.show(s, this.MODES[k] || 'serial'); },
+  step(s, ctx, k) { this.show(s, this.MODES[k] || 'serial'); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.c06st-bk').innerHTML = '';
+    s.querySelectorAll('.c06st-o,.c06st-pc').forEach((o) => o.classList.remove('on', 'rdy'));
+    s.querySelectorAll('.c06st-fa,.c06st-fs').forEach((x) => x.classList.remove('vis'));
+  },
+};
+</script>
+
+<section class="slide" id="c06-acoustic" data-part="3" data-trans="slide" data-title="流式听觉模型与声学事件" data-dur="16000" data-notes="真正的流式 ASR 需要模型支持。Whisper 的解码虽然是自回归的，但<b>编码器需要完整音频段</b>，因此不能直接等同于流式模型。基于 LLM 的流式听觉模型可以从连续音频中输出文本和语义事件，把“识别”和部分“理解”放进同一个模型；它保留从对话开始到当前时刻的上下文，也可以利用世界知识处理品牌、人名和专有名词。<br>如果只想解决“用户是否说完”，也可以把轮次判断直接做进流式识别器：模型综合语义和静音判断一句话是否表达完整。<b>端点判断的训练标签必须只使用决策时刻可见的信息</b>，否则会因“上帝视角”产生线上无法复现的判断（左下例 2：标注时看到了停顿之后的话，模型在线上却看不到）。<br>模型输出的不仅是文字，还可以包含声学事件标记：<b>speak_start/end、interrupt</b>——说话起止与打断意图；<b>emotion</b>——情感、犹豫等状态；<b>laugh、sigh、noise</b>——副语言和环境声。这些标记和文字 token 形成统一事件流，Agent 可以据此识别犹豫、打断和环境变化，而不必把所有声音压成纯文本。<br>右侧可切换“统一事件流 / 压成纯文本”，点击图例可高亮某一类标记；左侧两个例子会自动交替。波形、话语与 Agent 的反应均为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">流式听觉模型与<em>声学事件</em></h2></header>
+  <div class="c06ac-body">
+    <div class="c06ac-l">
+      <div class="c06ac-a panel fx fx-left" style="--d:2">
+        <div class="c06ac-h"><b>真正的流式 ASR 需要模型支持</b><span class="chip warn c06ac-sm">示意</span></div>
+        <div class="c06ac-ln" data-l="w">
+          <div class="c06ac-ll"><b>Whisper</b><small>解码是自回归的，但编码器需要完整音频段</small></div>
+          <div class="c06ac-tk"><div class="c06ac-ck"></div><div class="c06ac-br"><span>完整音频段</span></div><div class="c06ac-md"><span>编码</span></div><div class="c06ac-out"></div></div>
+        </div>
+        <div class="c06ac-ln" data-l="s">
+          <div class="c06ac-ll"><b>基于 LLM 的流式听觉模型</b><small>连续音频 → 文本 + 语义事件</small></div>
+          <div class="c06ac-tk"><div class="c06ac-ck"></div><div class="c06ac-md"><span>流式</span></div><div class="c06ac-out"></div></div>
+        </div>
+        <div class="c06ac-cx"><span class="c06ac-cl">上下文：从对话开始到当前时刻</span><i><b></b></i><span class="c06ac-kn"><svg class="ic"><use href="#i-book"/></svg>世界知识：品牌、人名、专有名词</span></div>
+      </div>
+      <div class="c06ac-b panel fx fx-left" style="--d:3">
+        <div class="c06ac-h"><b>把轮次判断做进流式识别器</b><div class="c06ac-sg2 seg"><i class="knob"></i><button data-v="sem">例 1 · 语义补足静音</button><button data-v="god">例 2 · 上帝视角的标签</button></div></div>
+        <div class="c06ac-ut"></div>
+        <div class="c06ac-vd"></div>
+      </div>
+    </div>
+    <div class="c06ac-c panel fx fx-right" style="--d:4">
+      <div class="c06ac-h"><b>声学事件标记 + 文字 token = 统一事件流</b><div class="c06ac-sg seg"><i class="knob"></i><button data-v="ev">统一事件流</button><button data-v="tx">压成纯文本</button></div></div>
+      <canvas class="c06ac-cv" width="1560" height="300"></canvas>
+      <div class="c06ac-st" data-clip-ok></div>
+      <div class="c06ac-lg">
+        <button data-g="0" style="--c:#f472b6"><b>speak_start/end、interrupt</b><span>说话起止与打断意图</span></button>
+        <button data-g="1" style="--c:#c084fc"><b>emotion</b><span>情感、犹豫等状态</span></button>
+        <button data-g="2" style="--c:#22d3ee"><b>laugh、sigh、noise</b><span>副语言和环境声</span></button>
+      </div>
+      <div class="c06ac-re"><span class="lbl">Agent 据此</span><p class="c06ac-rt">……</p></div>
+    </div>
+  </div>
+  <div class="src">第六章 ·「从串行到流式感知」· 流式听觉模型 · 端点判断 · 声学事件标记</div>
+</section>
+<style>
+#c06-acoustic .c06ac-body{display:grid;grid-template-columns:800px 1fr;gap:24px}
+#c06-acoustic .c06ac-l{display:flex;flex-direction:column;gap:16px}
+#c06-acoustic .c06ac-h{display:flex;align-items:center;gap:12px;min-height:40px}
+#c06-acoustic .c06ac-h>b{font-size:21px}
+#c06-acoustic .c06ac-sm{margin-left:auto;font-size:15px;padding:3px 10px}
+#c06-acoustic .c06ac-a{padding:14px 22px 14px}
+#c06-acoustic .c06ac-ln{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center;margin-top:10px}
+#c06-acoustic .c06ac-ll b{display:block;font-size:18px}
+#c06-acoustic .c06ac-ll small{display:block;font-size:15px;line-height:1.45;color:var(--text3);margin-top:2px}
+#c06-acoustic .c06ac-tk{position:relative;height:74px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#c06-acoustic .c06ac-ck{position:absolute;left:10px;top:20px;display:flex;gap:4px}
+#c06-acoustic .c06ac-ck i{width:30px;height:34px;border-radius:6px;background:color-mix(in srgb,#fbbf24 30%,transparent);border:1px solid color-mix(in srgb,#fbbf24 60%,transparent);animation:upIn .35s var(--spring) both}
+#c06-acoustic .c06ac-br{position:absolute;left:4px;top:4px;width:212px;height:64px;border:2px dashed rgba(255,255,255,.18);border-radius:10px;transition:border-color .3s}
+#c06-acoustic .c06ac-br span{position:absolute;left:8px;bottom:-1px;font-size:15px;color:var(--text3);background:var(--bg);padding:0 4px;translate:0 50%}
+#c06-acoustic .c06ac-br.full{border-color:#fbbf24}
+#c06-acoustic .c06ac-md{position:absolute;left:230px;top:13px;width:70px;height:46px;border-radius:10px;display:grid;place-items:center;font-size:15px;color:var(--text2);border:1px solid var(--line2);background:rgba(12,18,40,.9);transition:all .3s}
+#c06-acoustic .c06ac-md.on{color:#06101f;background:#22d3ee;border-color:#22d3ee;box-shadow:0 0 18px #22d3ee}
+#c06-acoustic .c06ac-out{position:absolute;left:314px;right:8px;top:18px;display:flex;flex-wrap:wrap;gap:5px}
+#c06-acoustic .c06ac-out span{padding:3px 9px;border-radius:7px;font-size:16px;color:var(--text);background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.4);animation:upIn .35s var(--spring) both}
+#c06-acoustic .c06ac-cx{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;align-items:center;margin-top:12px}
+#c06-acoustic .c06ac-cl{font-size:15px;color:var(--text2)}
+#c06-acoustic .c06ac-cx>i{height:10px;border-radius:999px;background:rgba(255,255,255,.06);overflow:hidden}
+#c06-acoustic .c06ac-cx>i b{display:block;height:100%;width:0;background:linear-gradient(90deg,#22d3ee,var(--acc))}
+#c06-acoustic .c06ac-kn{grid-column:1/-1;display:flex;align-items:center;gap:8px;font-size:15px;color:var(--acc2)}
+#c06-acoustic .c06ac-b{padding:12px 22px 14px}
+#c06-acoustic .c06ac-sg2{margin-left:auto}
+#c06-acoustic .c06ac-sg2 button{font-size:16px;padding:7px 14px}
+#c06-acoustic .c06ac-ut{position:relative;height:96px;margin-top:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+#c06-acoustic .c06ac-w{position:absolute;top:16px;height:40px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;white-space:nowrap;color:var(--text);border:1px solid color-mix(in srgb,#fbbf24 55%,transparent);background:color-mix(in srgb,#fbbf24 14%,rgba(10,16,36,.92));transition:opacity .4s,filter .4s}
+#c06-acoustic .c06ac-w.gap{color:var(--text3);font-size:15px;border:1px dashed var(--line2);background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 6px,transparent 6px 12px)}
+#c06-acoustic .c06ac-w.fut{opacity:.18;filter:blur(3px)}
+#c06-acoustic .c06ac-ut.god .c06ac-w.fut{opacity:.9;filter:none;border-color:var(--bad)}
+#c06-acoustic .c06ac-dl{position:absolute;top:6px;bottom:6px;width:0;border-left:2px solid var(--acc);opacity:0;transition:opacity .3s}
+#c06-acoustic .c06ac-dl span{position:absolute;left:6px;bottom:-2px;font-size:15px;color:var(--acc);white-space:nowrap}
+#c06-acoustic .c06ac-dl.on{opacity:1}
+#c06-acoustic .c06ac-uh{position:absolute;top:8px;bottom:8px;width:2px;background:#fff;opacity:.6}
+#c06-acoustic .c06ac-vd{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+#c06-acoustic .c06ac-v{display:grid;grid-template-columns:210px 1fr auto;gap:12px;align-items:center;padding:8px 14px;border-radius:12px;font-size:16px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:.35;transition:all .4s}
+#c06-acoustic .c06ac-v b{font-size:16px;color:var(--text2)}
+#c06-acoustic .c06ac-v em{font-style:normal;font-weight:700;font-size:16px}
+#c06-acoustic .c06ac-v.on{opacity:1}
+#c06-acoustic .c06ac-v.ok em{color:var(--ok)}
+#c06-acoustic .c06ac-v.bad em{color:var(--bad)}
+#c06-acoustic .c06ac-v.on.ok{border-color:color-mix(in srgb,var(--ok) 45%,transparent)}
+#c06-acoustic .c06ac-v.on.bad{border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+#c06-acoustic .c06ac-c{padding:14px 22px 16px;display:flex;flex-direction:column;gap:12px}
+#c06-acoustic .c06ac-sg{margin-left:auto}
+#c06-acoustic .c06ac-sg button{font-size:16px;padding:7px 14px}
+#c06-acoustic .c06ac-cv{display:block;width:780px;height:150px;border-radius:12px;background:rgba(5,9,22,.6);border:1px solid var(--line)}
+#c06-acoustic .c06ac-st{display:flex;flex-wrap:wrap;align-content:flex-start;gap:7px;height:142px;overflow:hidden}
+#c06-acoustic .c06ac-k{--c:#94a3b8;padding:5px 11px;border-radius:9px;font-size:16px;color:var(--text);border:1px solid color-mix(in srgb,var(--c) 50%,transparent);background:color-mix(in srgb,var(--c) 12%,transparent);animation:upIn .35s var(--spring) both;transition:opacity .3s}
+#c06-acoustic .c06ac-k.e{font-family:var(--mono);font-size:15px;color:var(--c);font-weight:700}
+#c06-acoustic .c06ac-k.lost{color:var(--text3);border-style:dashed;background:none;font-family:var(--font);font-weight:400}
+#c06-acoustic .c06ac-st.fg .c06ac-k:not(.hit){opacity:.22}
+#c06-acoustic .c06ac-lg{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:10px}
+#c06-acoustic .c06ac-lg button{text-align:left;padding:10px 14px;border-radius:12px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 8%,transparent);transition:all .3s}
+#c06-acoustic .c06ac-lg b{display:block;font:700 16px var(--mono);color:var(--c)}
+#c06-acoustic .c06ac-lg span{display:block;font-size:15px;color:var(--text2);margin-top:3px}
+#c06-acoustic .c06ac-lg button.on{background:color-mix(in srgb,var(--c) 20%,transparent);box-shadow:0 0 18px color-mix(in srgb,var(--c) 30%,transparent)}
+#c06-acoustic .c06ac-re{padding:10px 16px;border-radius:12px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),transparent)}
+#c06-acoustic .c06ac-rt{font-size:18px;line-height:1.55;margin-top:2px;min-height:28px}
+#c06-acoustic .c06ac-c.tx .c06ac-re{border-left-color:var(--text3);background:rgba(255,255,255,.03)}
+#c06-acoustic .c06ac-c.tx .c06ac-rt{color:var(--text2)}
+</style>
+<script>
+HOOKS['c06-acoustic'] = {
+  // 统一事件流脚本（示意）：时间（秒）、类型、分组、文字、Agent 的反应、只有文字时的情况
+  E: [
+    [0.12, 'e', 0, 'speak_start', '开始收听', '只能靠音量猜：用户好像开始说话了'],
+    [0.5, 't', -1, '我'], [0.75, 't', -1, '想'], [1.0, 't', -1, '改'], [1.25, 't', -1, '一下'], [1.6, 't', -1, '明天'], [1.9, 't', -1, '的安排'],
+    [2.5, 'e', 1, 'emotion: 犹豫', '用户在犹豫：放慢节奏，给出选项', '只看到“嗯……”两个字：不知道用户在犹豫'],
+    [2.8, 't', -1, '嗯……'],
+    [3.3, 't', -1, '改到'], [3.7, 't', -1, '下午'], [4.1, 't', -1, '吧'],
+    [4.85, 'e', 2, 'laugh', '语气轻松：保持随意的口吻', '笑声没有对应的文字：语气信息丢失'],
+    [5.4, 'e', 0, 'speak_end', '用户说完：开始回应', '只能靠静音阈值猜测是否说完'],
+    [6.05, 'e', 2, 'noise', '环境突然变吵：必要时确认是否听清', '噪声被丢弃：不知道环境变了'],
+    [6.9, 'e', 2, 'sigh', '用户叹气：可能不满意，先确认', '叹气没有文字：错过了不满的信号'],
+    [8.05, 'e', 0, 'interrupt', '用户插话：停止播报，让出话头', '分不清是插话还是背景人声：继续播报'],
+    [8.4, 't', -1, '等等'], [8.75, 't', -1, '还是'], [9.1, 't', -1, '上午吧'],
+  ],
+  W: [[0.1, 2.2, 'sp'], [2.4, 3.0, 'hes'], [3.1, 4.5, 'sp'], [4.6, 5.3, 'laugh'], [6.0, 6.35, 'noise'], [6.8, 7.4, 'sigh'], [8.0, 9.3, 'sp']],
+  AG: [5.7, 8.3],
+  CK: [0.3, 0.8, 1.3, 1.8, 2.3, 2.8],
+  TOK: [['请'], ['帮我'], ['订', '两张'], ['去'], ['上海', '的'], ['票']],
+  EX: {
+    sem: { P: [['把会议改到', 0, 1.25], ['停顿', 1.25, 2.05, 'gap'], ['下午两点半', 2.05, 3.2]], dec: 1.75, V: [['只看静音（VAD）', '静音超过阈值 → 判定“说完了”', 'bad', '误切分'], ['语义 + 静音', '“改到……”还没表达完整 → 继续听', 'ok', '正确']] },
+    god: { P: [['我想订一张票。', 0, 1.45], ['停顿', 1.45, 2.25, 'gap'], ['去上海的。', 2.25, 3.2, 'fut']], dec: 1.95, V: [['只用决策时刻可见的信息', '一句完整的话 + 静音 → 标签“说完了”，线上同样能做出', 'ok', '可复现'], ['上帝视角', '标注时看到了后面的“去上海的。” → 标签“没说完”', 'bad', '线上无法复现']] },
+  },
+  init(s) {
+    this.cv = s.querySelector('.c06ac-cv');
+    this.g = this.cv.getContext('2d');
+    this.setM = U.seg(s.querySelector('.c06ac-sg'), (v) => this.mode(s, v));
+    this.setX = U.seg(s.querySelector('.c06ac-sg2'), (v) => { this.exAuto = false; this.ex(s, v); });
+    s.querySelectorAll('.c06ac-lg button').forEach((b) => b.addEventListener('click', () => {
+      const g = +b.dataset.g;
+      this.focus = this.focus === g ? -1 : g;
+      this.paintFocus(s);
+    }));
+    this.focus = -1;
+    this.m = 'ev';
+  },
+  paintFocus(s) {
+    const st = s.querySelector('.c06ac-st');
+    st.classList.toggle('fg', this.focus >= 0);
+    st.querySelectorAll('.c06ac-k').forEach((k) => k.classList.toggle('hit', +k.dataset.g === this.focus));
+    s.querySelectorAll('.c06ac-lg button').forEach((b) => b.classList.toggle('on', +b.dataset.g === this.focus));
+  },
+  mode(s, v) {
+    this.m = v;
+    this.setM(v);
+    s.querySelector('.c06ac-c').classList.toggle('tx', v === 'tx');
+    s.querySelector('.c06ac-st').innerHTML = '';
+    s.querySelector('.c06ac-rt').textContent = '……';
+    this.last = -1;
+  },
+  // 波形振幅（示意）：说话、犹豫、笑声、噪声、叹气各有不同的包络
+  amp(t) {
+    const seg = this.W.find((w) => t >= w[0] && t < w[1]);
+    const h = Math.abs(Math.sin(t * 91.7) * 4375.5) % 1;
+    if (!seg) return [0.03 + h * 0.03, 'sil'];
+    const [a, b, k] = seg, u = (t - a) / (b - a);
+    if (k === 'sp') return [(0.35 + 0.55 * Math.abs(Math.sin(t * 9.1) * Math.sin(t * 3.3))) * (0.75 + 0.35 * h), k];
+    if (k === 'hes') return [0.16 + 0.06 * Math.sin(t * 40) + 0.04 * h, k];
+    if (k === 'laugh') return [(0.15 + 0.6 * Math.max(0, Math.sin(t * 34))) * (0.8 + 0.3 * h), k];
+    if (k === 'noise') return [(0.95 - 0.6 * u) * (0.6 + 0.5 * h), k];
+    return [0.32 * Math.sin(Math.PI * u) * (0.85 + 0.25 * h), k];
+  },
+  draw(t) {
+    const g = this.g, W = 780, H = 150, win = 6, mid = 58;
+    const col = { sp: '#cbd5e1', hes: '#c084fc', laugh: '#22d3ee', noise: '#22d3ee', sigh: '#22d3ee', sil: '#475569' };
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(255,255,255,.08)';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(0, mid); g.lineTo(W, mid); g.stroke();
+    for (let x = 0; x < W - 6; x += 4) {
+      const tt = t - ((W - 6 - x) / (W - 6)) * win;
+      if (tt < 0) continue;
+      const [a, k] = this.amp(tt);
+      g.fillStyle = col[k];
+      g.fillRect(x, mid - a * 48, 2.4, a * 96);
+    }
+    // Agent 播放道
+    g.fillStyle = 'rgba(255,255,255,.05)';
+    g.fillRect(0, 122, W, 18);
+    const x0 = W - 6 - ((t - this.AG[0]) / win) * (W - 6), x1 = W - 6 - ((t - Math.min(t, this.AG[1])) / win) * (W - 6);
+    if (t > this.AG[0] && x1 > 0) { g.fillStyle = 'rgba(45,212,191,.55)'; g.fillRect(Math.max(0, x0), 122, x1 - Math.max(0, x0), 18); }
+    g.fillStyle = 'rgba(233,237,248,.75)';
+    g.font = '15px "PingFang SC","Microsoft YaHei",sans-serif';
+    g.textAlign = 'left';
+    g.fillText('用户麦克风', 8, 18);
+    g.fillText('Agent 播放', 8, 136);
+    g.fillStyle = '#e879f9';
+    g.fillRect(W - 6, 4, 2, 116);
+  },
+  addChip(s, e, i) {
+    const st = s.querySelector('.c06ac-st');
+    const [, k, gr, x] = e, ev = k === 'e', lost = ev && this.m === 'tx';
+    const c = ['#f472b6', '#c084fc', '#22d3ee'][gr] || '#94a3b8';
+    st.insertAdjacentHTML('beforeend', `<span class="c06ac-k${ev ? ' e' : ''}${lost ? ' lost' : ''}" data-g="${lost ? -1 : gr}" style="--c:${lost ? '#64748b' : c}">${lost ? '（声音信息丢失）' : ev ? '[' + x + ']' : x}</span>`);
+    while (st.children.length > 22) st.firstElementChild.remove();
+    if (ev) s.querySelector('.c06ac-rt').textContent = this.m === 'tx' ? e[5] : e[4];
+    this.paintFocus(s);
+  },
+  // 左上：Whisper 等整段 vs 流式模型逐块输出；左下：两个端点判断的例子
+  left(s, t) {
+    const lw = s.querySelector('[data-l=w]'), ls = s.querySelector('[data-l=s]');
+    const n = this.CK.filter((x) => t >= x).length;
+    [lw, ls].forEach((l) => { const ck = l.querySelector('.c06ac-ck'); while (ck.children.length < n) ck.insertAdjacentHTML('beforeend', '<i></i>'); if (n === 0) ck.innerHTML = ''; });
+    lw.querySelector('.c06ac-br').classList.toggle('full', t >= 3.3);
+    lw.querySelector('.c06ac-md').classList.toggle('on', t >= 3.3 && t < 4.0);
+    const wo = lw.querySelector('.c06ac-out'), all = this.TOK.flat(), nw = t < 4.0 ? 0 : Math.min(all.length, Math.floor((t - 4.0) / 0.13) + 1);
+    if (wo.children.length !== nw) wo.innerHTML = all.slice(0, nw).map((x) => `<span>${x}</span>`).join('');
+    const so = ls.querySelector('.c06ac-out'), ns = this.CK.filter((x) => t >= x + 0.25).length;
+    const toks = this.TOK.slice(0, ns).flat();
+    if (so.children.length !== toks.length) so.innerHTML = toks.map((x) => `<span>${x}</span>`).join('');
+    ls.querySelector('.c06ac-md').classList.toggle('on', this.CK.some((x) => t >= x && t < x + 0.3));
+    s.querySelector('.c06ac-cx>i b').style.width = Math.min(100, (t / 3.2) * 100) + '%';
+  },
+  ex(s, k) {
+    this.exK = k;
+    this.setX(k);
+    const d = this.EX[k], ut = s.querySelector('.c06ac-ut'), KX = 200, X0 = 14;
+    ut.classList.remove('god');
+    ut.innerHTML = d.P.map(([t, a, b, c]) => `<div class="c06ac-w${c ? ' ' + c : ''}" style="left:${X0 + a * KX}px;width:${(b - a) * KX - 6}px">${t}</div>`).join('')
+      + `<i class="c06ac-dl" style="left:${X0 + d.dec * KX}px"><span>决策时刻</span></i><i class="c06ac-uh" style="left:${X0}px"></i>`;
+    s.querySelector('.c06ac-vd').innerHTML = d.V.map(([a, b, c, e]) => `<div class="c06ac-v ${c}"><b>${a}</b><span>${b}</span><em>${e}</em></div>`).join('');
+    this.exT0 = performance.now();
+  },
+  exTick(s, now) {
+    const d = this.EX[this.exK], e = (now - this.exT0) / 1000, KX = 200, X0 = 14;
+    if (e > 7.5) {
+      if (this.exAuto) { this.ex(s, this.exK === 'sem' ? 'god' : 'sem'); return; }
+      this.exT0 = now;
+    }
+    const t = Math.min(3.2, e * 0.9);
+    s.querySelector('.c06ac-uh').style.left = X0 + t * KX + 'px';
+    s.querySelector('.c06ac-dl').classList.toggle('on', t >= d.dec);
+    const v = [...s.querySelectorAll('.c06ac-v')];
+    v.forEach((x, i) => x.classList.toggle('on', t >= d.dec + 0.15 + i * 0.35));
+    if (this.exK === 'god') s.querySelector('.c06ac-ut').classList.toggle('god', t >= d.dec + 0.5);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.mode(s, this.m || 'ev');
+    this.exAuto = true;
+    this.ex(s, 'sem');
+    const D = 10.5;
+    let t0 = performance.now();
+    this.last = -1;
+    ctx.raf((now) => {
+      let t = (now - t0) / 1000;
+      if (t > D) { t0 = now; t = 0; this.last = -1; s.querySelector('.c06ac-st').innerHTML = ''; }
+      this.draw(t);
+      this.left(s, (t * 1.0) % 7.5);
+      for (let i = this.last + 1; i < this.E.length && this.E[i][0] <= t; i++) { this.addChip(s, this.E[i], i); this.last = i; }
+      this.exTick(s, now);
+    });
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    s.querySelector('.c06ac-st').innerHTML = '';
+    s.querySelector('.c06ac-rt').textContent = '……';
+    s.querySelectorAll('.c06ac-ck,.c06ac-out').forEach((x) => (x.innerHTML = ''));
+    s.querySelectorAll('.c06ac-md').forEach((x) => x.classList.remove('on'));
+    s.querySelector('.c06ac-br').classList.remove('full');
+    this.focus = -1;
+    this.paintFocus(s);
+    this.g.setTransform(1, 0, 0, 1, 0, 0);
+    this.g.clearRect(0, 0, 1560, 300);
+  },
+};
+</script>
+
+<section class="slide" id="c06-exp5" data-part="3" data-trans="iris" data-title="实验 6-5 ★：使用 Qwen2-Audio 模拟流式语音感知" data-dur="16000" data-notes="<b>实验 6-5 ★</b>：Qwen2-Audio 本身不是流式模型。本实验用<b>递增音频前缀</b>模拟连续感知——每收到一个新块（2 秒），就把从开头到当前时刻 [0 : t] 的完整累积音频再次送入 Qwen2-Audio，输出当前转写和声学事件；对照组是传统的 600ms VAD 端点 + 开源 Whisper（tiny）。三类场景：正常对话、含 900ms 中途停顿的长句、混入粉红背景噪声的对话。这种方式能研究“何时得到有用信息”，但会重复编码，<b>不能当作具有持续内部状态的原生流式实现</b>。<br>配套仓库 2026-07-30 的 canonical 运行（Apple M2 Max，Qwen2-Audio-7B-Instruct 的 4-bit MLX 量化权重）：8/8 执行与溯源门禁通过，但验收记录里的 6 项预期结果只复现 2 项。13 次前缀推理实测 8.4–11.3 s——每 2 秒来一个新块，单次推理却要 8 秒以上，远跟不上实时；传统路径端点后的回复也没有在三类输入上全部落入 800–1100 ms（正常 1.25 s、停顿 0.99 s、噪声 1.16 s）。900 ms 停顿被 VAD 切成两段——Whisper 路径在 4.64 s 就判定说完，5.03 s 就会回复，而用户其实还没说完；Qwen 则漏报了 silence 标记。强噪声样本检出 noise，同时误报 cough 与 laughter，停顿场景的 6 秒前缀也冒出过同样的误报。最终转写方面，Qwen 最后一个前缀的字错率为 0，Whisper tiny 为 2.9%（把“会议室”识别成“会议时”）。<b>这些负结果与全部原始响应都保留在验收记录中</b>——路径真实跑通，不等于预期结论成立。<br>配套 README 留了一个问题：如果前缀越长处理越慢，怎样区分模型本身的实时能力与反复重编码带来的开销？">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 6-5 ★：用 Qwen2-Audio <em>模拟流式语音感知</em></h2>
+  <p class="lead fx fx-up" style="--d:2">Qwen2-Audio 本身不是流式模型：每来一个新块，就把 [0 : t] 的完整音频重新送入；对照 600 ms VAD + Whisper</p></header>
+  <div class="c06e5-body">
+    <div class="c06e5-l panel fx fx-left" style="--d:3">
+      <div class="c06e5-top"><div class="c06e5-seg seg"><i class="knob"></i><button data-v="normal">正常对话</button><button data-v="pause">含 900 ms 停顿</button><button data-v="noise">粉红背景噪声</button></div><span class="c06e5-sum">累计送入模型 <b class="c06e5-fed">0</b> s 音频 · 原音频 <b class="c06e5-dur">7.49</b> s</span></div>
+      <div class="c06e5-hd"><span class="c06e5-lb">音频</span><div class="c06e5-au"></div><span></span><span class="c06e5-ref">参考：麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室，别忘了通知大家。</span></div>
+      <div class="c06e5-pre"></div>
+      <div class="c06e5-wh"></div>
+    </div>
+    <div class="c06e5-r panel fx fx-right" style="--d:4">
+      <div class="c06e5-g"><b>8/8</b><div><span>执行与溯源门禁通过</span><small>真实运行 Qwen2-Audio 与 600 ms VAD + Whisper；13 个前缀的原始输出全部保留</small></div></div>
+      <span class="lbl c06e5-ct">验收记录中的 6 项预期结果 · 只复现 2 项</span>
+      <ul class="c06e5-cl"></ul>
+      <p class="c06e5-tk"><b>启示</b>递增前缀能研究“何时得到有用信息”，但每次都从头重复编码，不能当作具有持续内部状态的原生流式实现；路径跑通 ≠ 预期结论成立，负结果同样保留</p>
+    </div>
+  </div>
+  <div class="src">第六章 ·「从串行到流式感知」· 实验 6-5 · 数据：配套仓库 chapter6/streaming-speech 验收记录（2026-07-30，Qwen2-Audio-7B-Instruct 4-bit MLX，Apple M2 Max；对照 600 ms VAD + Whisper tiny）</div>
+</section>
+<style>
+#c06-exp5 .c06e5-body{display:grid;grid-template-columns:1080px 1fr;gap:24px;height:676px}
+#c06-exp5 .c06e5-l{padding:16px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-exp5 .c06e5-top{display:flex;align-items:center;gap:16px}
+#c06-exp5 .c06e5-seg button{font-size:17px;padding:8px 16px}
+#c06-exp5 .c06e5-sum{margin-left:auto;font-size:16px;color:var(--text2)}
+#c06-exp5 .c06e5-sum b{font:800 21px var(--num);color:var(--acc)}
+#c06-exp5 .c06e5-hd,#c06-exp5 .c06e5-row{display:grid;grid-template-columns:96px 340px 84px 1fr;gap:12px;align-items:center}
+#c06-exp5 .c06e5-lb{font-size:16px;font-weight:700;color:var(--text2)}
+#c06-exp5 .c06e5-au,#c06-exp5 .c06e5-tr{position:relative;height:30px;border-radius:7px;background:rgba(255,255,255,.04)}
+#c06-exp5 .c06e5-au i{position:absolute;top:4px;bottom:4px;border-radius:5px}
+#c06-exp5 .c06e5-au .sp{background:linear-gradient(90deg,rgba(251,191,36,.55),rgba(251,191,36,.3))}
+#c06-exp5 .c06e5-au .gap{background:repeating-linear-gradient(135deg,rgba(255,255,255,.18) 0 5px,transparent 5px 10px);border:1px dashed var(--line2)}
+#c06-exp5 .c06e5-au .nz{top:0;bottom:0;background:repeating-linear-gradient(90deg,rgba(34,211,238,.25) 0 2px,transparent 2px 5px)}
+#c06-exp5 .c06e5-au b,#c06-exp5 .c06e5-tr b{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.3)}
+#c06-exp5 .c06e5-au em{position:absolute;top:5px;font-style:normal;font-size:15px;color:var(--text);white-space:nowrap}
+#c06-exp5 .c06e5-ref{font-size:15px;line-height:1.45;color:var(--text3)}
+#c06-exp5 .c06e5-pre{display:flex;flex-direction:column;gap:8px}
+#c06-exp5 .c06e5-row{min-height:50px;opacity:0;translate:0 10px;transition:opacity .5s,translate .5s var(--ease)}
+#c06-exp5 .c06e5-row.on{opacity:1;translate:0 0}
+#c06-exp5 .c06e5-row .c06e5-lb{font-size:15px;font-weight:400;color:var(--text3)}
+#c06-exp5 .c06e5-row .c06e5-lb b{display:block;font:700 16px var(--mono);color:var(--text)}
+#c06-exp5 .c06e5-bar{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:7px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 70%,transparent),var(--acc));box-shadow:0 0 12px color-mix(in srgb,var(--acc) 40%,transparent);transition:width .8s var(--ease)}
+#c06-exp5 .c06e5-it{font:800 18px var(--num);color:var(--warn);text-align:right}
+#c06-exp5 .c06e5-it small{display:block;font:400 15px var(--font);color:var(--text3)}
+#c06-exp5 .c06e5-tx{font-size:16px;line-height:1.45;color:var(--text)}
+#c06-exp5 .c06e5-tx i{font-style:normal;margin-left:6px;padding:1px 7px;border-radius:6px;font:700 15px var(--mono);color:#fecdd3;border:1px solid color-mix(in srgb,var(--bad) 55%,transparent);background:color-mix(in srgb,var(--bad) 12%,transparent)}
+#c06-exp5 .c06e5-wh{margin-top:auto;padding:10px 0 0;border-top:1px solid var(--line);opacity:0;transition:opacity .5s}
+#c06-exp5 .c06e5-wh.on{opacity:1}
+#c06-exp5 .c06e5-wh .c06e5-tr i{position:absolute;top:4px;bottom:4px;border-radius:5px;background:rgba(52,211,153,.45);border:1px solid rgba(52,211,153,.7)}
+#c06-exp5 .c06e5-wh .c06e5-tr u{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1px;background:var(--bad);box-shadow:0 0 8px var(--bad)}
+#c06-exp5 .c06e5-wn{font-size:15px;line-height:1.45;color:var(--text2)}
+#c06-exp5 .c06e5-wn b{color:var(--text)}
+#c06-exp5 .c06e5-r{padding:18px 22px;display:flex;flex-direction:column;gap:10px}
+#c06-exp5 .c06e5-g{display:flex;gap:16px;align-items:center;padding:12px 16px;border-radius:14px;background:color-mix(in srgb,var(--ok) 9%,transparent);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+#c06-exp5 .c06e5-g>b{font:800 40px var(--num);color:var(--ok)}
+#c06-exp5 .c06e5-g span{font-size:18px;font-weight:700}
+#c06-exp5 .c06e5-g small{display:block;font-size:15px;line-height:1.45;color:var(--text2);margin-top:2px}
+#c06-exp5 .c06e5-ct{margin-top:4px}
+#c06-exp5 .c06e5-cl{display:flex;flex-direction:column;gap:6px}
+#c06-exp5 .c06e5-cl li{display:grid;grid-template-columns:30px 1fr;gap:4px 10px;padding:7px 12px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03);opacity:0;translate:16px 0;transition:opacity .45s,translate .45s var(--ease)}
+#c06-exp5 .c06e5-cl li.on{opacity:1;translate:0 0}
+#c06-exp5 .c06e5-cl li>em{grid-row:1/3;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-weight:800;font-size:16px}
+#c06-exp5 .c06e5-cl li.y>em{color:#06101f;background:var(--ok)}
+#c06-exp5 .c06e5-cl li.n>em{color:#fff;background:var(--bad)}
+#c06-exp5 .c06e5-cl b{font-size:16px}
+#c06-exp5 .c06e5-cl span{font-size:15px;color:var(--text2)}
+#c06-exp5 .c06e5-tk{margin-top:auto;font-size:16px;line-height:1.6;color:var(--text2);padding:10px 14px;border-radius:12px;border-left:4px solid var(--acc);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),transparent)}
+#c06-exp5 .c06e5-tk b{color:var(--acc);margin-right:8px}
+</style>
+<script>
+HOOKS['c06-exp5'] = {
+  K: 40,
+  ORDER: ['normal', 'pause', 'noise'],
+  SC: {
+    normal: {
+      dur: 7.4875, sp: [[0.02, 7.16]],
+      P: [[2, 9.97, '麻烦你帮我把明天下午的会议', []], [4, 9.88, '麻烦你帮我把明天下午的会议改到两点半地点', []], [6, 10.45, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室。', []], [7.4875, 10.79, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室，别忘了通知大家。', []]],
+      W: { seg: [[0.02, 7.16]], dec: [7.76], note: '<b>端点后 1.25 s 回复</b>（距开始 8.41 s）· 1 段 · 字错率 2.9%（“会议室”→“会议时”）' },
+    },
+    pause: {
+      dur: 8.3875, sp: [[0.02, 4.04], [4.94, 8.06]], gap: [4.04, 4.94],
+      P: [[2, 8.41, '麻烦你帮我把明天下午的会议', []], [4, 8.74, '麻烦你帮我把明天下午的会议改到两点半地点', []], [6, 10.99, '麻烦你帮我把明天下午的会议改到两点半地点还还是在三号会议室', ['noise', 'laughter', 'cough']], [8, 10.7, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室，别忘了通知大家。', []], [8.3875, 10.82, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室，别忘了通知大家。', []]],
+      W: { seg: [[0.02, 4.04], [4.94, 8.06]], dec: [4.64, 8.66], note: '<b>被切成 2 段</b>：4.64 s 就判定说完、5.03 s 回复，用户其实还没说完 · Qwen 漏报 silence' },
+    },
+    noise: {
+      dur: 7.4875, sp: [[0.02, 7.16]], nz: true,
+      P: [[2, 8.96, '麻烦你帮我把明天下午的会议', []], [4, 10.23, '麻烦你帮我把明天下午的会议改到两点半地点', ['noise', 'laughter', 'cough']], [6, 10.29, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室。', []], [7.4875, 11.27, '麻烦你帮我把明天下午的会议改到两点半，地点还是在三号会议室，别忘了通知大家。', ['noise', 'laughter', 'cough']]],
+      W: { seg: [[0.02, 7.4875]], dec: [8.0875], note: '<b>端点后 1.16 s 回复</b>（距开始 8.64 s）· Qwen 检出 noise，同时误报 cough、laughter' },
+    },
+  },
+  C: [
+    [0, 'Qwen 每次增量推理 100–200 ms', '实测 13 次前缀推理 8.4–11.3 s'],
+    [0, '传统路径端点后 800–1100 ms 回复', '实测：正常 1.25 s · 停顿 0.99 s · 噪声 1.16 s'],
+    [1, '900 ms 停顿被 VAD 切成两段', '600 ms VAD 在 4.04 s 处切出第一段'],
+    [0, '停顿让 Whisper 把“两点”误识别成“零点”', '转写中没有出现“零点”'],
+    [1, '噪声样本检出 &lt;|noise|&gt;', '同时误报 &lt;|cough|&gt; 与 &lt;|laughter|&gt;'],
+    [0, '噪声让 VAD 更早判定开始说话', '三类输入的语音起点都在 0.02 s'],
+  ],
+  init(s) {
+    this.set = U.seg(s.querySelector('.c06e5-seg'), (v) => { this.auto = false; this.show(s, v); });
+    s.querySelector('.c06e5-cl').innerHTML = this.C.map(([y, a, b]) => `<li class="${y ? 'y' : 'n'}"><em>${y ? '✓' : '✗'}</em><b>${a}</b><span>${b}</span></li>`).join('');
+  },
+  ticks() { return [2, 4, 6, 8].map((t) => `<b style="left:${t * this.K}px"></b>`).join(''); },
+  // 选一个场景：前缀逐行出现，每一行都从 0 秒重新编码到 t
+  show(s, k) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, d = this.SC[k], K = this.K;
+    this.k = k;
+    this.set(k);
+    let au = d.sp.map(([a, b]) => `<i class="sp" style="left:${a * K}px;width:${(b - a) * K}px"></i>`).join('');
+    if (d.gap) au += `<i class="gap" style="left:${d.gap[0] * K}px;width:${(d.gap[1] - d.gap[0]) * K}px"></i><em style="left:${d.gap[0] * K + 2}px">900 ms 停顿</em>`;
+    if (d.nz) au += `<i class="nz" style="left:0;width:${d.dur * K}px"></i>`;
+    s.querySelector('.c06e5-au').innerHTML = au + this.ticks();
+    s.querySelector('.c06e5-dur').textContent = d.dur.toFixed(2);
+    s.querySelector('.c06e5-fed').textContent = '0';
+    const pre = s.querySelector('.c06e5-pre');
+    pre.innerHTML = d.P.map(([t, inf, tx, ev], i) => `<div class="c06e5-row"><span class="c06e5-lb">前缀 ${i + 1}<b>[0 : ${+t.toFixed(2)} s]</b></span><div class="c06e5-tr">${this.ticks()}<i class="c06e5-bar"></i></div><span class="c06e5-it">${inf.toFixed(2)} s<small>推理</small></span><span class="c06e5-tx">${tx}${ev.map((e) => `<i>&lt;|${e}|&gt;</i>`).join('')}</span></div>`).join('');
+    const wh = s.querySelector('.c06e5-wh');
+    wh.classList.remove('on');
+    wh.innerHTML = `<div class="c06e5-row on"><span class="c06e5-lb">对照组<b>VAD + Whisper</b></span><div class="c06e5-tr">${this.ticks()}${d.W.seg.map(([a, b]) => `<i style="left:${a * K}px;width:${(b - a) * K}px"></i>`).join('')}${d.W.dec.map((x) => `<u style="left:${x * K}px"></u>`).join('')}</div><span class="c06e5-it" style="color:#34d399">600 ms<small>静音阈值</small></span><span class="c06e5-wn">${d.W.note}</span></div>`;
+    if (!ctx) return;
+    const rows = [...pre.children], ok = () => ctx.alive && tk === this.tk;
+    const run = async () => {
+      let fed = 0;
+      for (let i = 0; i < rows.length; i++) {
+        await U.wait(ctx, i ? 1150 : 500);
+        if (!ok()) return;
+        rows[i].classList.add('on');
+        rows[i].querySelector('.c06e5-bar').style.width = d.P[i][0] * K + 'px';
+        fed += d.P[i][0];
+        s.querySelector('.c06e5-fed').textContent = fed.toFixed(1);
+      }
+      await U.wait(ctx, 1000);
+      if (!ok()) return;
+      wh.classList.add('on');
+      await U.wait(ctx, 4200);
+      if (!ok()) return;
+      if (this.auto) this.show(s, this.ORDER[(this.ORDER.indexOf(k) + 1) % 3]);
+    };
+    run();
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 'normal');
+    s.querySelectorAll('.c06e5-cl li').forEach((li, i) => ctx.later(() => li.classList.add('on'), 700 + i * 260));
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.tk = (this.tk || 0) + 1;
+    s.querySelector('.c06e5-pre').innerHTML = '';
+    s.querySelector('.c06e5-wh').classList.remove('on');
+    s.querySelectorAll('.c06e5-cl li').forEach((li) => li.classList.remove('on'));
+  },
+};
+</script>

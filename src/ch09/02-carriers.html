@@ -1,0 +1,211 @@
+<!-- ================= PART 02 四种更新载体 ================= -->
+<section class="slide chapter" id="c09-d2" data-part="2" data-title="PART 02 · Agent 持续进化的四种方法" data-notes="<b>学习信号说明 Agent 应当改变，但没有说明改变应发生在哪里。</b>事实和经验适合写成知识文档；可以用语言清楚表达的策略适合写入提示词或 Skill；可以精确执行的流程与约束适合写成程序；感知、语言风格和隐式策略等高维能力则必须进入模型参数。图9-3展示了这四种方式及其关系，表9-2给出紧凑的比较。PART 03–06 再分别展开每一种。">
+  <div class="ch-k fx fx-up">PART 02</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">四种更新载体</h1>
+  <div class="ch-s fx fx-up" style="--d:3">知识 · 指令 · 程序 · 参数：经验最终写到哪里</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">学习信号说明 Agent 应当改变，但没有说明改变应发生在哪里。</blockquote>
+  <div class="ch-loop" data-node="1" data-num="02"></div>
+</section>
+
+<section class="slide" id="c09-four" data-part="2" data-trans="zoom" data-dur="16000" data-title="能力的表示性质决定主要更新位置（图9-3）" data-notes="学习信号说明 Agent 应当改变，但没有说明改变应发生在哪里。<b>事实和经验适合写成知识文档；可以用语言清楚表达的策略适合写入提示词或 Skill；可以精确执行的流程与约束适合写成程序；感知、语言风格和隐式策略等高维能力则必须进入模型参数。</b>图9-3 展示了这四种方式及其关系：从左到右，一端易更新、可追溯，另一端内化、推理开销低——但这<b>不是单向阶梯，而是四种互补载体</b>。<br>首要判断是：<b>能力能否被事实、语言规则或程序完整表达？</b>稳定性、成本与更新频率决定的是具体部署方式，而不是能力能否参数化。<br>下方的“分拣机”把本章出现过的一些经验依次分到四种载体（条目取自正文各节的例子，分拣演示为示意）；可以点击“下一条”手动分拣，或点击上方任一载体卡片查看它收到的条目。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">能力的<em>表示性质</em>决定主要更新位置</h2></header>
+  <div class="fr9-stage fx fx-scale" style="--d:2">
+    <div class="fr9-cards"></div>
+    <div class="fr9-axis"><span>易更新、可追溯</span><i></i><b>不是单向阶梯，而是四种互补载体</b><i></i><span>内化、低推理开销</span></div>
+    <div class="fr9-low">
+      <div class="fr9-judge"><span class="lbl">首要判断</span><b>能力能否被事实、语言规则或程序完整表达？</b><p>稳定性、成本与更新频率决定具体部署方式，<br>而非能力能否参数化</p></div>
+      <div class="fr9-hop"><span class="lbl">待分拣的经验 <span class="c9-sy">示意</span></span><div class="fr9-cur"><b class="fr9-ct">—</b><span class="fr9-cp">—</span></div><button class="btn fr9-next"><svg class="ic"><use href="#i-right"/></svg>下一条</button></div>
+    </div>
+    <div class="fr9-tok"></div>
+  </div>
+  <div class="src">第九章 ·「Agent 持续进化的四种方法」· 图9-3</div>
+</section>
+<style>
+.fr9-stage{position:relative;width:1660px;height:700px}
+.fr9-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;height:300px}
+.fr9-c{--c:var(--acc);position:relative;display:flex;flex-direction:column;gap:6px;padding:18px 20px;border-radius:20px;text-align:left;cursor:pointer;background:linear-gradient(165deg,color-mix(in srgb,var(--c) 14%,rgba(12,18,40,.92)),rgba(12,18,40,.92) 65%);border:1px solid color-mix(in srgb,var(--c) 40%,transparent);transition:box-shadow .45s,border-color .45s,translate .45s var(--ease)}
+.fr9-c .ic{font-size:34px;color:var(--c)}
+.fr9-c b{font-size:30px;color:var(--c)}
+.fr9-c .fr9-d{font-size:19px;color:var(--text)}
+.fr9-c .fr9-w{font:16px var(--mono);color:var(--text3)}
+.fr9-c ul{margin-top:auto;display:flex;flex-direction:column;gap:5px}
+.fr9-c li{font-size:15px;line-height:1.45;padding:4px 9px;border-radius:8px;color:var(--text2);background:color-mix(in srgb,var(--c) 9%,transparent);border:1px solid color-mix(in srgb,var(--c) 25%,transparent);animation:upIn .45s var(--spring) both}
+.fr9-n{position:absolute;right:16px;top:14px;min-width:34px;height:34px;padding:0 8px;border-radius:999px;display:grid;place-items:center;font:800 18px var(--num);color:#06101f;background:var(--c)}
+.fr9-c.on{border-color:var(--c);box-shadow:0 0 40px color-mix(in srgb,var(--c) 45%,transparent);translate:0 -5px}
+.fr9-axis{display:flex;align-items:center;gap:16px;margin:22px 30px 0}
+.fr9-axis span{font-size:18px;color:var(--text2);white-space:nowrap}
+.fr9-axis i{flex:1;height:3px;border-radius:3px;background:linear-gradient(90deg,var(--c9-know),var(--c9-inst),var(--c9-prog),var(--c9-param))}
+.fr9-axis b{font-size:21px;color:var(--text);white-space:nowrap}
+.fr9-low{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:26px;height:290px}
+.fr9-judge{display:flex;flex-direction:column;justify-content:center;gap:12px;padding:22px 28px;border-radius:20px;background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.88));border:1px solid color-mix(in srgb,var(--acc) 40%,transparent)}
+.fr9-judge b{font-size:28px;line-height:1.4}
+.fr9-judge p{font-size:19px;line-height:1.6;color:var(--text2)}
+.fr9-hop{display:flex;flex-direction:column;gap:12px;padding:20px 24px;border-radius:20px;background:rgba(12,18,40,.88);border:1px dashed var(--line2)}
+.fr9-cur{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:14px 18px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.fr9-ct{font-size:24px;line-height:1.45}
+.fr9-cp{align-self:flex-start;font-size:17px;padding:3px 12px;border-radius:999px;color:var(--c,var(--text3));border:1px solid color-mix(in srgb,var(--c,#94a3b8) 50%,transparent);transition:color .3s,border-color .3s}
+.fr9-next{align-self:flex-end}
+.fr9-tok{position:absolute;left:0;top:0;width:220px;padding:10px 14px;border-radius:12px;font-size:16px;line-height:1.4;color:#06101f;background:var(--c,#fff);box-shadow:0 0 26px var(--c,#fff);opacity:0;pointer-events:none;transition:translate .9s var(--eio),opacity .3s;z-index:5}
+</style>
+<script>
+HOOKS['c09-four'] = {
+  K: [
+    { k: '知识', ic: 'book', c: 'var(--c9-know)', d: '事实、经验与例外', w: 'Markdown / 知识库' },
+    { k: '指令', ic: 'note', c: 'var(--c9-inst)', d: '可语言化的判断原则', w: 'Prompt / Skill' },
+    { k: '程序', ic: 'code', c: 'var(--c9-prog)', d: '确定性流程与强约束', w: '工具 / 工作流 / Harness' },
+    { k: '参数', ic: 'brain', c: 'var(--c9-param)', d: '高维感知与隐式策略', w: 'SFT / 蒸馏 / RL' },
+  ],
+  // 条目取自正文各节的例子：[文字, 去向, 表示性质]
+  IT: [
+    ['订票前先检查特殊餐食截止时间', 0, '行动经验：在什么条件下怎样做'],
+    ['只有用户明确要求人工或出现安全情形才转接', 1, '需要理解语境的判断原则'],
+    ['不可重试的错误首次出现即熔断', 2, '可确定执行的控制逻辑'],
+    ['消除文本里模板化的“AI 味”', 3, '生成风格，难以压缩成规则'],
+    ['某种策略只在哪些环境版本中有效', 0, '经验的适用条件与例外'],
+    ['什么时候先问、问什么、何时直接开工', 1, '带作用域的流程性判断'],
+    ['高风险写入在确认前一律否决', 2, '高风险硬约束'],
+    ['从医疗影像中识别病灶', 3, '高维感知'],
+    ['把一次发邮件的网页探索变成可回放工作流', 2, '稳定、重复、可验证的操作'],
+    ['自然的语音韵律', 3, '高维生成能力'],
+  ],
+  init(s) {
+    s.querySelector('.fr9-cards').innerHTML = this.K.map((k, i) => `<button class="fr9-c" data-i="${i}" style="--c:${k.c}"><svg class="ic"><use href="#i-${k.ic}"/></svg><b>${k.k}</b><span class="fr9-d">${k.d}</span><span class="fr9-w">${k.w}</span><ul></ul><span class="fr9-n">0</span></button>`).join('');
+    s.querySelector('.fr9-cards').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.peek(s, +b.dataset.i); } });
+    s.querySelector('.fr9-next').addEventListener('click', () => { this.auto = false; this.sort(s); });
+  },
+  peek(s, i) { s.querySelectorAll('.fr9-c').forEach((c) => c.classList.toggle('on', +c.dataset.i === i)); },
+  // 分拣一条：先在待分拣区显示表示性质，再飞向对应载体
+  sort(s) {
+    const ctx = this.ctx;
+    if (!ctx || this.busy) return;
+    this.busy = true;
+    const tk = this.tk, [t, to, prop] = this.IT[this.n % this.IT.length], K = this.K[to];
+    this.n++;
+    const ct = s.querySelector('.fr9-ct'), cp = s.querySelector('.fr9-cp'), tok = s.querySelector('.fr9-tok'), card = s.querySelectorAll('.fr9-c')[to];
+    ct.textContent = t;
+    cp.textContent = '表示性质：' + prop;
+    cp.style.setProperty('--c', K.c);
+    this.peek(s, -1);
+    ctx.later(() => {
+      if (tk !== this.tk) return;
+      const hop = s.querySelector('.fr9-cur');
+      tok.textContent = t;
+      tok.style.setProperty('--c', K.c);
+      tok.style.transition = 'none';
+      tok.style.translate = `${hop.offsetLeft + 30}px ${hop.offsetTop + 20}px`;
+      tok.style.opacity = 1;
+      void tok.offsetWidth;
+      tok.style.transition = '';
+      tok.style.translate = `${card.offsetLeft + 30}px ${card.offsetTop + 150}px`;
+    }, 900);
+    ctx.later(() => {
+      if (tk !== this.tk) return;
+      tok.style.opacity = 0;
+      const ul = card.querySelector('ul'), n = card.querySelector('.fr9-n');
+      ul.insertAdjacentHTML('beforeend', `<li>${t}</li>`);
+      while (ul.children.length > 2) ul.firstElementChild.remove();
+      n.textContent = +n.textContent + 1;
+      this.peek(s, to);
+      this.busy = false;
+    }, 1900);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    C9.tk(this);
+    this.auto = true;
+    this.n = 0;
+    this.busy = false;
+    ctx.later(() => this.sort(s), 1000);
+    ctx.every(() => { if (this.auto) this.sort(s); }, 2900);
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    C9.tk(this);
+    this.busy = false;
+    s.querySelectorAll('.fr9-c').forEach((c) => { c.classList.remove('on'); c.querySelector('ul').innerHTML = ''; c.querySelector('.fr9-n').textContent = '0'; });
+    s.querySelector('.fr9-tok').style.opacity = 0;
+    s.querySelector('.fr9-ct').textContent = '—';
+    s.querySelector('.fr9-cp').textContent = '—';
+  },
+};
+</script>
+
+<section class="slide" id="c09-tbl2" data-part="2" data-trans="flip" data-dur="15000" data-title="表9-2 四种持续进化方式的适用边界" data-notes="<b>表9-2</b> 给出了一个紧凑的比较：<b>经验知识库</b>适合承载事实、经验规律、例外与来源，优势是更新快、可追溯、可按需检索，局限是依赖检索和模型正确应用；<b>Prompt 与 Skill</b> 适合承载需要理解语境、例外和优先级，但仍能用自然语言说明的判断原则，可解释、作用范围可控，但容易膨胀、冲突或被忽略；<b>程序与 Harness</b> 适合承载可确定解析、可执行验证和高风险硬约束，可测试、执行稳定、成本低，但开发与维护成本较高；<b>模型参数</b>适合承载高维感知、生成风格和隐式策略，泛化能力强、推理开销低，但更新与回归成本高。<br>四种方式并不互斥：医疗影像 Agent 依靠参数识别病灶，用知识库提供最新指南，再用代码计算风险指标；客服模型的自然语气来自后训练，具体企业政策由知识和 Skill 提供，关键合规则由服务端代码兜底。同一能力可以拆到多个载体：事实进入知识库，解释例外的原则进入 Skill，不可绕过的权限仍由程序门控，高维识别能力再进入参数。<b>路由结果只是更新提案，尚未获得发布资格。</b><br>下方三个案例自动轮播，也可以点击；最右列显示该案例拆到每种载体的部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">表9-2：四种方式的<em>适用边界</em></h2></header>
+  <div class="t2-tb panel fx fx-up" style="--d:2">
+    <div class="t2-r t2-h"><span>更新方式</span><span>适合承载</span><span>主要优势</span><span>主要局限</span><span class="t2-hc">本案例拆到这里的部分</span></div>
+  </div>
+  <div class="t2-low">
+    <div class="t2-cases fx fx-left" style="--d:4"><span class="lbl">四种方式并不互斥</span></div>
+    <div class="t2-stamp fx fx-right" style="--d:5"><div class="t2-st stamp">更新提案 · 待验证</div><p>路由结果只是<b>更新提案</b>，尚未获得发布资格</p></div>
+  </div>
+  <div class="src">第九章 ·「Agent 持续进化的四种方法」· 表9-2 四种持续进化方式的适用边界</div>
+</section>
+<style>
+.t2-tb{padding:4px 0;overflow:hidden}
+.t2-r{--c:var(--text3);display:grid;grid-template-columns:210px 1fr 250px 250px 330px;gap:20px;align-items:center;padding:13px 24px;border-left:4px solid transparent;transition:background .4s,border-color .4s}
+.t2-r+.t2-r{border-top:1px solid var(--line)}
+.t2-h{font-size:15px;letter-spacing:.12em;color:var(--text3);padding-top:10px;padding-bottom:10px}
+.t2-hc{color:var(--acc)}
+.t2-r>b{font-size:23px;color:var(--c)}
+.t2-r>span{font-size:18px;line-height:1.55;color:var(--text2)}
+.t2-r>.t2-a{color:var(--text)}
+.t2-r>.t2-p{font-size:17px}
+.t2-r>.t2-m{font-size:17px;color:#fecdd3}
+.t2-x{min-height:44px;display:flex;align-items:center}
+.t2-x span{padding:7px 12px;border-radius:12px;font-size:17px;line-height:1.45;color:#06101f;background:var(--c);box-shadow:0 0 18px color-mix(in srgb,var(--c) 45%,transparent);animation:upIn .5s var(--spring) both}
+.t2-r.on{background:color-mix(in srgb,var(--c) 9%,transparent);border-left-color:var(--c)}
+.t2-low{display:grid;grid-template-columns:1fr 420px;gap:24px;margin-top:20px}
+.t2-cases{display:flex;flex-direction:column;gap:10px}
+.t2-cb{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:14px;text-align:left;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s}
+.t2-cb .ic{font-size:26px;color:var(--acc);flex:none}
+.t2-cb b{font-size:20px;white-space:nowrap}
+.t2-cb span{font-size:16px;color:var(--text3)}
+.t2-cb.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+.t2-stamp{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:18px;border-radius:18px;border:1px dashed var(--line2)}
+.t2-st{padding:12px 26px;border-radius:12px;font-size:26px;font-weight:800;letter-spacing:.08em;color:var(--warn);border:3px solid var(--warn)}
+.t2-stamp p{font-size:18px;color:var(--text2);text-align:center}
+.t2-stamp p b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c09-tbl2'] = {
+  R: [
+    ['经验知识库', 'var(--c9-know)', '事实、经验规律、例外与来源', '更新快、可追溯、可按需检索', '依赖检索和模型正确应用'],
+    ['Prompt 与 Skill', 'var(--c9-inst)', '需要理解语境、例外和优先级，但仍能用自然语言说明的判断原则', '可解释、作用范围可控', '容易膨胀、冲突或被忽略'],
+    ['程序与 Harness', 'var(--c9-prog)', '可确定解析、可执行验证和高风险硬约束', '可测试、执行稳定、成本低', '开发与维护成本较高'],
+    ['模型参数', 'var(--c9-param)', '高维感知、生成风格和隐式策略', '泛化能力强、推理开销低', '更新与回归成本高'],
+  ],
+  C: [
+    { n: '医疗影像 Agent', ic: 'eye', d: '参数识别病灶，知识库提供指南，代码计算风险', x: ['最新诊疗指南', null, '计算风险指标', '识别病灶'] },
+    { n: '客服 Agent', ic: 'headphones', d: '语气来自后训练，政策来自知识与 Skill，合规由代码兜底', x: ['具体企业政策', '政策的适用与例外', '关键合规则兜底', '自然的语气'] },
+    { n: '同一能力拆到多个载体', ic: 'layers', d: '事实、例外原则、权限、识别能力各归其位', x: ['事实', '解释例外的原则', '不可绕过的权限门控', '高维识别能力'] },
+  ],
+  init(s) {
+    s.querySelector('.t2-tb').insertAdjacentHTML('beforeend', this.R.map(([n, c, a, p, m], i) => `<div class="t2-r" data-r="${i}" style="--c:${c}"><b>${n}</b><span class="t2-a">${a}</span><span class="t2-p">${p}</span><span class="t2-m">${m}</span><div class="t2-x"></div></div>`).join(''));
+    s.querySelector('.t2-cases').insertAdjacentHTML('beforeend', this.C.map((c, i) => `<button class="t2-cb" data-i="${i}"><svg class="ic"><use href="#i-${c.ic}"/></svg><b>${c.n}</b><span>${c.d}</span></button>`).join(''));
+    s.querySelector('.t2-cases').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.show(s, +b.dataset.i); } });
+  },
+  show(s, i) {
+    const tk = C9.tk(this), ctx = this.ctx, c = this.C[i];
+    if (!ctx) return;
+    this.i = i;
+    s.querySelectorAll('.t2-cb').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    const rows = [...s.querySelectorAll('.t2-r[data-r]')], st = s.querySelector('.t2-st');
+    rows.forEach((r) => { r.classList.remove('on'); r.querySelector('.t2-x').innerHTML = ''; });
+    st.classList.remove('on');
+    c.x.forEach((x, j) => ctx.later(() => {
+      if (tk !== this.tk) return;
+      rows[j].classList.add('on');
+      if (x) rows[j].querySelector('.t2-x').innerHTML = `<span>${x}</span>`;
+    }, 400 + j * 650));
+    ctx.later(() => { if (tk === this.tk) U.restart(st, 'on'); }, 400 + 4 * 650 + 200);
+  },
+  enter(s, ctx) { this.ctx = ctx; C9.auto(this, ctx, this.C.length, 5600, (i) => this.show(s, i), 700); },
+  leave() { this.ctx = null; },
+  reset(s) {
+    C9.tk(this);
+    s.querySelectorAll('.t2-r,.t2-cb,.t2-st').forEach((x) => x.classList.remove('on'));
+    s.querySelectorAll('.t2-x').forEach((x) => (x.innerHTML = ''));
+  },
+};
+</script>

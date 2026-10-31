@@ -1,0 +1,116 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c00-sum" data-part="6" data-dur="12000" data-title="引言小结" data-notes="引言回答了五个问题。<br>① 这本书从哪里来：以图灵《AI Agent 实战营》的课程讲义和配套实验为基础，经过系统整理、补充与重构而成；成书过程本身采用 whisper coding，记录了一种由 Agent 深度参与的知识生产方式。<br>② 原则从哪里来：来自 Pine 这类长流程、高风险的真实业务——实践在前，命名在后；要更早识别并解决问题，需要两个关键条件：选择对 Agent 能力上限提出足够高要求的真实业务并持续获取真实反馈，以及建立系统的评估机制。<br>③ 原则是什么：Agent = LLM + 上下文 + 工具，也就是大脑 + 眼睛 + 手脚，或者策略 + 观察空间 + 动作空间——三种说法对应同一个对象。<br>④ 十章怎样组织：第一至六章“如何构建 Agent”，第七至十章“如何提升 Agent 能力”，从模型参数、单体系统和群体系统三个层面扩展能力。<br>⑤ 怎样读：按身份选择阅读路径，动手跑实验，前置知识有所欠缺也不必却步。<br>Agent 技术仍在快速演进，但<b>好的架构设计原则具有穿越时间的力量</b>。掌握了“为什么要这样设计”，你就能在技术浪潮的变化中保持清醒的判断力。希望这本书能成为你构建 AI Agent 的可靠指南。<br>背景里流动的是时间，卡片保持不动；点击任一卡片回到对应部分。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">引言<em>小结</em></h2></header>
+  <div class="sm-stage">
+    <canvas class="sm-cv" width="3320" height="1040"></canvas>
+    <div class="sm-cards"></div>
+  </div>
+  <blockquote class="quote sm-q fx fx-blur" style="--d:9">Agent 技术仍在快速演进，但<b>好的架构设计原则具有穿越时间的力量</b>。掌握了“为什么要这样设计”，你就能在技术浪潮的变化中保持清醒的判断力。</blockquote>
+  <div class="src">引言 · 全篇 ·「前置知识」结语段</div>
+</section>
+<style>
+.sm-stage{position:relative;height:520px}
+.sm-cv{position:absolute;left:0;top:0;width:1660px;height:520px;opacity:.9}
+.sm-cards{position:absolute;inset:0;display:grid;grid-template-columns:repeat(5,1fr);gap:30px;padding:30px 0}
+.sm-w{height:100%}
+.sm-c{--c:var(--acc);position:relative;height:100%;padding:26px 24px;border-radius:22px;cursor:pointer;display:flex;flex-direction:column;gap:14px;border:1px solid var(--line);background:rgba(10,16,36,.86);backdrop-filter:blur(6px);transition:border-color .5s,box-shadow .5s,background .5s}
+.sm-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);box-shadow:0 0 50px -10px color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 9%,rgba(10,16,36,.9))}
+.sm-n{font:800 46px var(--num);color:var(--c);opacity:.85}
+.sm-c b{font-size:26px;line-height:1.3}
+.sm-c ul{display:flex;flex-direction:column;gap:10px}
+.sm-c li{font-size:18px;line-height:1.55;color:var(--text2);padding-left:14px;border-left:2px solid color-mix(in srgb,var(--c) 50%,transparent)}
+.sm-c.on li{color:var(--text)}
+.sm-go{margin-top:auto;font-size:16px;color:var(--c);display:flex;align-items:center;gap:6px;opacity:.8}
+.sm-q{margin-top:26px;font-size:27px}
+.sm-q b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c00-sum'] = {
+  K: [
+    { p: 1, c: '#67e8f9', t: '成书缘起', li: ['课程讲义与配套实验，经系统整理、补充与重构而成', 'whisper coding：一种由 Agent 深度参与的知识生产方式'] },
+    { p: 2, c: '#5eead4', t: '实践在前，命名在后', li: ['原则来自长流程、高风险的真实业务', '两个关键条件：高要求的真实业务与真实反馈；系统的评估'] },
+    { p: 3, c: '#c4b5fd', t: '核心公式', li: ['Agent = LLM + 上下文 + 工具', '= 大脑 + 眼睛 + 手脚', '= 策略 + 观察空间 + 动作空间'] },
+    { p: 4, c: '#93c5fd', t: '全书结构', li: ['第一至六章：如何构建 Agent', '第七至十章：如何提升 Agent 能力——模型参数 · 单体系统 · 群体系统'] },
+    { p: 5, c: '#a5f3fc', t: '如何阅读本书', li: ['按身份选择阅读路径', '动手跑实验；前置知识有所欠缺也不必却步'] },
+  ],
+  init(s) {
+    s.querySelector('.sm-cards').innerHTML = this.K.map((k, i) => `<div class="sm-w fx fx-up" style="--d:${2 + i}"><div class="sm-c" data-i="${i}" style="--c:${k.c}"><span class="sm-n">0${i + 1}</span><b>${k.t}</b><ul>${k.li.map((x) => `<li>${x}</li>`).join('')}</ul><span class="sm-go">回到这一部分<svg class="ic"><use href="#i-arrow"/></svg></span></div></div>`).join('');
+    s.querySelectorAll('.sm-c').forEach((c) => c.addEventListener('click', () => C00.jump(this.K[+c.dataset.i].p)));
+    this.g = s.querySelector('.sm-cv').getContext('2d');
+    const rnd = U.rand(9);
+    this.P = Array.from({ length: 150 }, () => ({ x: rnd() * 1660, y: rnd() * 520, v: 0.8 + rnd() * 2.6, r: 0.6 + rnd() * 1.6, h: rnd() }));
+  },
+  enter(s, ctx) {
+    const cards = [...s.querySelectorAll('.sm-c')];
+    let j = 0;
+    ctx.later(() => cards[0].classList.add('on'), 1200);
+    ctx.every(() => { j = (j + 1) % cards.length; cards.forEach((c, i) => c.classList.toggle('on', i === j)); }, 2400);
+    // 背景：一条从左向右流动的“时间之河”
+    const g = this.g;
+    ctx.raf(() => {
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 1660, 520);
+      for (const p of this.P) {
+        p.x += p.v;
+        if (p.x > 1680) { p.x = -20; p.y = Math.random() * 520; }
+        const col = p.h < 0.5 ? '125,211,252' : '165,180,252', a = 0.25 + p.v / 6;
+        const gr = g.createLinearGradient(p.x - p.v * 14, p.y, p.x, p.y);
+        gr.addColorStop(0, `rgba(${col},0)`); gr.addColorStop(1, `rgba(${col},${a.toFixed(2)})`);
+        g.strokeStyle = gr; g.lineWidth = p.r * 1.4;
+        g.beginPath(); g.moveTo(p.x - p.v * 14, p.y); g.lineTo(p.x, p.y); g.stroke();
+      }
+    });
+  },
+  reset(s) { s.querySelectorAll('.sm-c').forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c00-end" data-part="6" data-trans="iris" data-title="致谢 · 下一章" data-notes="<b>致谢</b>：感谢图灵的梦鸽老师和刘美英老师的辛勤编辑，以及为组织图灵《AI Agent 实战营》课程付出的努力；感谢刘俊明老师在国科大开设 AI Agent 实战课程。也要特别感谢图灵《AI Agent 实战营》的所有学员，以及国科大 AI Agent 实战课程的所有同学——在讲授这些课程的过程中，大家给了作者许多有价值的反馈与建议，也让作者对这些概念本身有了更清晰的理解。<br>感谢 Pine AI 的所有同事。如果没有 Pine AI 这样优秀的产品，以及它所带来的种种挑战，作者不可能在 Agent 领域获得如此深入的理解与实践；在一次次思想碰撞中，同事们也提出了许多宝贵的见解。<br>也要感谢 AI 业界的许多朋友（在此不一一具名）。在各种行业讨论中，大家对作者的观点给予了坦诚的反馈，纠正了不少错误的判断，提升了对模型与 Agent 的认知。<br>最要感谢的，是作者的家人，特别是他的太太孟佳颖：她始终支持本书的写作，还为本书提出了许多宝贵的意见。<br>引言到此结束，下一章是第一章「AI Agent 入门」。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><em>致谢</em></h2></header>
+  <div class="ty-body">
+    <ul class="ty-list"></ul>
+    <div class="ty-next fx fx-right" style="--d:8">
+      <span class="lbl">引言到此结束 · 接下来</span>
+      <div class="ty-orb"><svg class="ic"><use href="#i-robot"/></svg></div>
+      <b>第一章 · AI Agent 入门</b>
+      <p>核心公式 · 观察与动作空间 · ReAct 循环 · Harness 工程 · 编排模式 · 护栏 · 设计模式</p>
+      <div class="end-nav">
+        <a class="btn pri" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+        <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+        <a class="btn" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+      </div>
+    </div>
+  </div>
+  <div class="src">引言 ·「致谢」</div>
+</section>
+<style>
+.ty-body{display:flex;gap:40px;height:700px}
+.ty-list{flex:1;display:flex;flex-direction:column;gap:12px}
+.ty-li{display:grid;grid-template-columns:64px 1fr;gap:18px;align-items:center;padding:14px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.6);opacity:0;translate:-30px 0}
+.active .ty-li{animation:c00tyIn .8s var(--ease) forwards;animation-delay:calc(var(--i)*260ms + 500ms)}
+@keyframes c00tyIn{to{opacity:1;translate:0 0}}
+.ty-li .ic{font-size:34px;color:var(--acc);justify-self:center}
+.ty-li b{display:block;font-size:22px}
+.ty-li p{font-size:18px;line-height:1.5;color:var(--text2);margin-top:3px}
+.ty-li.fam{border-color:color-mix(in srgb,var(--acc) 45%,transparent);background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 12%,transparent),rgba(12,18,40,.6))}
+.ty-next{width:560px;flex:none;align-self:center;padding:34px 34px;border-radius:26px;display:flex;flex-direction:column;align-items:flex-start;gap:16px;border:1px solid color-mix(in srgb,#22d3ee 45%,transparent);background:linear-gradient(160deg,rgba(34,211,238,.12),rgba(12,18,40,.88) 60%)}
+.ty-orb{width:110px;height:110px;border-radius:32px;display:grid;place-items:center;font-size:58px;color:#22d3ee;background:rgba(34,211,238,.12);border:1px solid rgba(34,211,238,.45);box-shadow:0 0 50px rgba(34,211,238,.35);animation:floaty 4s ease-in-out infinite}
+.ty-next b{font-size:32px}
+.ty-next p{font-size:18px;line-height:1.6;color:var(--text2)}
+.ty-next .end-nav{margin-top:10px}
+</style>
+<script>
+HOOKS['c00-end'] = {
+  T: [
+    ['book', '图灵 · 梦鸽老师、刘美英老师', '辛勤的编辑，以及为组织图灵《AI Agent 实战营》课程付出的努力'],
+    ['grad', '刘俊明老师', '在国科大开设 AI Agent 实战课程'],
+    ['users', '实战营的全体学员 · 国科大课程的全体同学', '许多有价值的反馈与建议，让作者对这些概念本身有了更清晰的理解'],
+    ['robot', 'Pine AI 的所有同事', '优秀的产品与它带来的种种挑战；一次次思想碰撞中的宝贵见解'],
+    ['globe', 'AI 业界的许多朋友（不一一具名）', '坦诚的反馈，纠正了不少错误的判断，提升了对模型与 Agent 的认知'],
+    ['home', '家人，特别是太太孟佳颖', '始终支持本书的写作，还为本书提出了许多宝贵的意见'],
+  ],
+  init(s) {
+    s.querySelector('.ty-list').innerHTML = this.T.map(([ic, b, p], i) => `<li class="ty-li${i === 5 ? ' fam' : ''}" style="--i:${i}"><svg class="ic"><use href="#i-${ic}"/></svg><div><b>${b}</b><p>${p}</p></div></li>`).join('');
+  },
+};
+</script>

@@ -1,0 +1,13 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#7dd3fc", "acc2": "#a5b4fc" },
+    { "n": "成书缘起", "k": "PART 01", "short": "缘起", "acc": "#67e8f9", "acc2": "#93c5fd" },
+    { "n": "实践在前，命名在后", "k": "PART 02", "short": "实践", "acc": "#5eead4", "acc2": "#7dd3fc" },
+    { "n": "核心公式", "k": "PART 03", "short": "公式", "acc": "#c4b5fd", "acc2": "#67e8f9" },
+    { "n": "全书结构", "k": "PART 04", "short": "结构", "acc": "#93c5fd", "acc2": "#c4b5fd" },
+    { "n": "如何阅读本书", "k": "PART 05", "short": "阅读", "acc": "#a5f3fc", "acc2": "#a5b4fc" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#7dd3fc", "acc2": "#a5b4fc" }
+  ]
+}

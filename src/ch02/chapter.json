@@ -1,0 +1,17 @@
+{
+  "ready": true,
+  "autoMs": 10000,
+  "parts": [
+    { "n": "开篇", "k": "OPENING", "short": "开篇", "acc": "#38bdf8", "acc2": "#a78bfa" },
+    { "n": "上下文：能力上限的关键", "k": "PART 01", "short": "能力上限", "acc": "#22d3ee", "acc2": "#818cf8" },
+    { "n": "API 的上下文结构", "k": "PART 02", "short": "API", "acc": "#60a5fa", "acc2": "#22d3ee" },
+    { "n": "KV Cache 的直觉与注意力", "k": "PART 03", "short": "KV直觉", "acc": "#a78bfa", "acc2": "#38bdf8" },
+    { "n": "Chat Template 与 KV Cache 原理", "k": "PART 04", "short": "KV原理", "acc": "#818cf8", "acc2": "#f0abfc" },
+    { "n": "缓存层级与架构约束", "k": "PART 05", "short": "缓存约束", "acc": "#2dd4bf", "acc2": "#60a5fa" },
+    { "n": "提示工程与提示注入", "k": "PART 06", "short": "提示工程", "acc": "#fbbf24", "acc2": "#fb7185" },
+    { "n": "动态提示词与 Agent Skills", "k": "PART 07", "short": "Skills", "acc": "#34d399", "acc2": "#22d3ee" },
+    { "n": "Agent 状态栏", "k": "PART 08", "short": "状态栏", "acc": "#f472b6", "acc2": "#a78bfa" },
+    { "n": "上下文压缩策略", "k": "PART 09", "short": "压缩", "acc": "#38bdf8", "acc2": "#34d399" },
+    { "n": "收束", "k": "CLOSING", "short": "收束", "acc": "#38bdf8", "acc2": "#a78bfa" }
+  ]
+}

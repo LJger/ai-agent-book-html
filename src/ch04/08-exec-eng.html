@@ -1,0 +1,382 @@
+<!-- ================= PART 08 执行工具 · 工程保障 ================= -->
+<section class="slide chapter" id="c04-d8" data-part="8" data-title="PART 08 · 执行工具 · 工程保障" data-notes="安全审查之外，执行工具还需要一组工程保障：自动验证与反馈闭环、长输出的截断与持久化、执行环境的隔离与沙盒、工具执行的可观测性、幂等性与取消语义，以及不能幂等的操作该怎么办——“预检-确认”两段式。最后是实验 4-4：执行工具 MCP 服务器。">
+  <div class="ch-k fx fx-up">PART 08</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:96px">执行工具<br>· 工程保障</h1>
+  <div class="ch-s fx fx-up" style="--d:3">验证 · 截断 · 沙盒 · 可观测 · 幂等</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">如果操作结果可以被验证，就应该自动验证。</blockquote>
+  <div class="ch-loop" data-node="7" data-num="08"></div>
+</section>
+
+<section class="slide" id="c04-verify" data-part="8" data-trans="zoom" data-dur="15000" data-title="自动验证与反馈闭环" data-notes="<b>自动验证与反馈闭环。</b>执行工具的另一个重要设计原则是：<b>如果操作结果可以被验证，就应该自动验证</b>。以代码编写为例，当 Agent 调用 write_file 创建或修改代码文件时，工具不应只写入内容然后返回“成功”，而应在写入后立即执行语法检查：根据文件类型调用相应的 linter（代码静态检查工具），将输出解析为结构化的错误列表，作为工具返回值的一部分返回给 Agent。<br>这就创建了一个“执行-验证-反馈”的闭环。如果代码有语法错误，Agent 在下一轮思考中就会看到具体的错误信息（如“第 10 行：未定义的变量 result”），从而可以立即修正。<br>演示代码为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">自动验证与反馈闭环：<em>执行 → 验证 → 反馈</em></h2></header>
+  <div class="vf8-body">
+    <div class="vf8-ring fx fx-left" style="--d:2"></div>
+    <div class="vf8-r fx fx-right" style="--d:3">
+      <div class="win"><div class="win-bar"><i></i><i></i><i></i><span>stats.py</span><span class="c4x-sx">示意</span></div><div class="code vf8-cd"></div></div>
+      <div class="vf8-ret"><span class="lbl">write_file 的返回值</span><code class="vf8-rv">—</code></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「执行工具」· 自动验证与反馈闭环</div>
+</section>
+<style>
+#c04-verify .vf8-body{display:grid;grid-template-columns:520px 1fr;gap:30px;height:680px}
+#c04-verify .vf8-ring{display:grid;place-items:center}
+#c04-verify .vf8-r{display:flex;flex-direction:column;gap:16px}
+#c04-verify .vf8-cd{font-size:18px;line-height:1.7;padding:14px 20px}
+#c04-verify .vf8-cd .ln.bad{background:rgba(251,113,133,.18)}
+#c04-verify .vf8-cd .ln.fix{background:rgba(52,211,153,.18)}
+#c04-verify .vf8-ret{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-verify .vf8-ret code{display:block;margin-top:8px;font:17px/1.6 var(--mono);white-space:pre-wrap;min-height:110px}
+</style>
+<script>
+HOOKS['c04-verify'] = {
+  init(s) {
+    this.ring = U.ring(s.querySelector('.vf8-ring'), { size: 460, labelSize: 18, cometDur: 6, nodes: [{ label: '执行 write_file', color: '#fbbf24' }, { label: 'linter 验证', color: '#22d3ee' }, { label: '结构化错误反馈', color: '#fb7185' }, { label: 'Agent 修正', color: '#a78bfa' }], center: (c) => `<text x="${c}" y="${c + 8}" text-anchor="middle" style="fill:var(--text);font-size:26px;font-weight:800">闭环</text>` });
+    this.nodes = [...this.ring.querySelectorAll('.node,.lab')];
+  },
+  hl(i) { this.nodes.forEach((x) => { const o = +x.dataset.i === i; x.classList.toggle('on', o); x.classList.toggle('dim', !o); }); },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const cd = s.querySelector('.vf8-cd'), rv = s.querySelector('.vf8-rv');
+    const v1 = ['<span class="t-k">def</span> mean(xs):', '    total = <span class="t-n">0</span>', '    <span class="t-k">for</span> x <span class="t-k">in</span> xs:', '        total += x', '    <span class="t-k">return</span> result / len(xs)'];
+    while (ok()) {
+      cd.innerHTML = v1.map((l) => `<span class="ln">${l}</span>`).join(''); rv.textContent = '';
+      this.hl(0); await U.wait(ctx, 1400); if (!ok()) return;
+      this.hl(1); rv.textContent = '运行 linter……'; await U.wait(ctx, 1200); if (!ok()) return;
+      this.hl(2); cd.children[4].classList.add('bad');
+      rv.textContent = '{"written": true,\n "lint_errors": [{"line": 5, "message": "未定义的变量 result"}]}';
+      await U.wait(ctx, 1800); if (!ok()) return;
+      this.hl(3); cd.children[4].classList.remove('bad'); cd.children[4].classList.add('fix'); cd.children[4].innerHTML = '    <span class="t-k">return</span> total / len(xs)';
+      await U.wait(ctx, 1400); if (!ok()) return;
+      this.hl(1); rv.textContent = '{"written": true, "lint_errors": []}  ✓'; await U.wait(ctx, 2400); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.nodes.forEach((x) => x.classList.remove('on', 'dim')); },
+};
+</script>
+
+<section class="slide" id="c04-long" data-part="8" data-trans="rise" data-dur="15000" data-title="长输出的截断与持久化" data-notes="<b>长输出的截断与持久化。</b>执行工具常常会产生复杂冗长的输出。当检测到输出超过阈值（如 200 行或 10000 个字符）时，工具只将头尾各若干行写入上下文，完整结果则保存到临时文件：<b>头部保留</b>——前 50 行，通常包含初始输出或错误上下文；<b>尾部保留</b>——后 50 行，通常包含最终错误信息或成功标志；<b>中间提示</b>——如“... [省略 8523 行，完整输出已保存至 /tmp/execution_output.txt] ...”；<b>文件引导</b>——“如需完整输出，请使用 read_file 工具读取该文件”。<br>左侧是一段滚动的冗长输出（示意），右侧是折叠后写入上下文的样子。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">长输出：<em>头尾进上下文，完整结果落盘</em></h2></header>
+  <div class="lo8-body">
+    <div class="lo8-raw win fx fx-left" style="--d:2"><div class="win-bar"><i></i><i></i><i></i><span>pytest -v · 8,623 行输出</span><span class="c4x-sx">示意</span></div><div class="lo8-scroll c4x-term" data-clip-ok></div></div>
+    <div class="lo8-ctx fx fx-right" style="--d:3">
+      <div class="lo8-th">超过阈值（如 <b>200 行</b>或 <b>10000 个字符</b>）→ 折叠</div>
+      <div class="lo8-p h"><b>头部保留 · 前 50 行</b><span>初始输出或错误上下文</span></div>
+      <div class="lo8-p m"><code>... [省略 8523 行，完整输出已保存至 /tmp/execution_output.txt] ...</code></div>
+      <div class="lo8-p t"><b>尾部保留 · 后 50 行</b><span>最终错误信息或成功标志</span></div>
+      <div class="lo8-p g"><b>文件引导</b><span>如需完整输出，请使用 read_file 工具读取该文件</span></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「执行工具」· 长输出的截断与持久化</div>
+</section>
+<style>
+#c04-long .lo8-body{display:grid;grid-template-columns:860px 1fr;gap:26px;height:680px}
+#c04-long .lo8-raw{display:flex;flex-direction:column}
+#c04-long .lo8-scroll{flex:1;overflow:hidden;font-size:15px;color:#94a3b8}
+#c04-long .lo8-ctx{display:flex;flex-direction:column;gap:12px}
+#c04-long .lo8-th{padding:12px 16px;border-radius:12px;font-size:18px;border:1px dashed var(--warn)}
+#c04-long .lo8-th b{color:var(--warn)}
+#c04-long .lo8-p{padding:14px 18px;border-radius:14px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 7%,transparent);animation:upIn .4s both}
+#c04-long .lo8-p.h,#c04-long .lo8-p.t{--c:#22d3ee;flex:1}
+#c04-long .lo8-p.m{--c:var(--warn)}
+#c04-long .lo8-p.g{--c:var(--ok)}
+#c04-long .lo8-p b{display:block;font-size:19px;color:var(--c)}
+#c04-long .lo8-p span{font-size:16px;color:var(--text2)}
+#c04-long .lo8-p code{font:16px var(--mono);color:#fde68a}
+</style>
+<script>
+HOOKS['c04-long'] = {
+  enter(s, ctx) {
+    const sc = s.querySelector('.lo8-scroll');
+    let n = 0;
+    sc.innerHTML = '';
+    ctx.every(() => {
+      for (let i = 0; i < 3; i++) { n++; const fail = n % 97 === 0; sc.insertAdjacentHTML('beforeend', `<span class="c4x-ln" style="${fail ? 'color:#fb7185' : ''}">tests/test_${(n % 41) + 1}.py::case_${n} ${fail ? 'FAILED' : 'PASSED'}</span>`); }
+      while (sc.children.length > 26) sc.firstElementChild.remove();
+      if (n > 8600) n = 0;
+    }, 90);
+  },
+  reset(s) { s.querySelector('.lo8-scroll').innerHTML = ''; },
+};
+</script>
+
+<section class="slide" id="c04-sandbox" data-part="8" data-trans="flip" data-dur="17000" data-title="执行环境的隔离与沙盒" data-notes="<b>执行环境的隔离与沙盒。</b>通用执行工具（如 Python 解释器、Shell 终端）本质上允许 Agent 执行任意代码，需要特别的安全考虑。理想的实现方式是在沙盒环境中运行，与宿主机隔离。这里需要澄清一个常见误区：Python 虚拟环境（venv）不是沙盒。它只隔离包依赖，对文件系统、网络和进程没有任何安全约束，在 venv 中运行的代码照样可以删除任意文件、访问任意网络。<br>真正的隔离依靠操作系统及更底层的机制，按隔离强度递增：<b>进程级隔离</b>——对低风险的 Agent，可以直接在本地环境中执行代码，Claude Code、Codex、OpenClaw 等 Coding Agent 默认都是在本地调用命令的。在没有沙盒的模式下，Agent 生成的代码和命令与本地用户拥有相同的权限；而 Codex 的 workspace-write 模式、Claude Code 的只读起始权限与文件系统/网络沙盒等，会把默认可写范围限制在工作区内，越界访问或高风险操作需要额外审批。实际权限取决于宿主的沙盒与审批策略，而非“本地执行”这一事实本身。<b>容器隔离</b>——Docker 等容器提供独立的文件系统和网络栈，隔离更完整，但与宿主机共享内核，内核漏洞仍可能被利用来逃逸。<b>microVM/虚拟机</b>——Firecracker 等 microVM 提供带独立内核的硬件级隔离，是运行完全不可信代码的最强层级。容器和 microVM/虚拟机隔离环境还应设置 CPU、内存、磁盘、网络的使用上限。<br>应根据部署环境和安全需求选择隔离层级——本地开发且输入可信时，进程级机制加上宿主的工作区沙盒与审批通常够用；输入不可信、凭证敏感或操作不可逆的场景，即使是本地开发也应升级到容器乃至 microVM 级别的隔离，生产环境更是如此。<br>右侧场景选择器给出建议的隔离层级。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">执行环境的<em>隔离与沙盒</em></h2></header>
+  <div class="sb8-body">
+    <div class="sb8-l fx fx-left" style="--d:2">
+      <div class="sb8-venv"><svg class="ic"><use href="#i-ban"/></svg><div><b>venv 不是沙盒</b><p>只隔离包依赖：照样能删除任意文件、访问任意网络</p></div></div>
+      <div class="sb8-steps"></div>
+      <p class="sb8-lim">容器与 microVM 还应设置 <b>CPU、内存、磁盘、网络</b>的使用上限</p>
+    </div>
+    <div class="sb8-r panel fx fx-right" style="--d:3">
+      <b class="sb8-h">选择隔离层级</b>
+      <div class="sb8-sc"><button class="btn" data-i="0">本地开发 · 输入可信</button><button class="btn" data-i="1">读取不可信网页 / 附件</button><button class="btn" data-i="2">凭证敏感 · 操作不可逆</button><button class="btn" data-i="3">生产环境运行用户代码</button></div>
+      <div class="sb8-rec">—</div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「执行工具」· 执行环境的隔离与沙盒</div>
+</section>
+<style>
+#c04-sandbox .sb8-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:690px}
+#c04-sandbox .sb8-l{display:flex;flex-direction:column;gap:12px}
+#c04-sandbox .sb8-venv{display:flex;gap:14px;align-items:center;padding:12px 18px;border-radius:14px;border:1.5px dashed var(--bad)}
+#c04-sandbox .sb8-venv .ic{font-size:32px;color:var(--bad)}
+#c04-sandbox .sb8-venv b{font-size:19px;color:var(--bad)}
+#c04-sandbox .sb8-venv p{font-size:16px;color:var(--text2)}
+#c04-sandbox .sb8-steps{display:flex;flex-direction:column;gap:10px}
+#c04-sandbox .sb8-s{display:grid;grid-template-columns:200px 1fr;gap:16px;align-items:center;padding:14px 18px;border-radius:14px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.72);transition:all .4s}
+#c04-sandbox .sb8-s b{font-size:20px;color:var(--c)}
+#c04-sandbox .sb8-s b small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+#c04-sandbox .sb8-s p{font-size:16px;line-height:1.5;color:var(--text2)}
+#c04-sandbox .sb8-s .meter{grid-column:1/-1}
+#c04-sandbox .sb8-s.on{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent)}
+#c04-sandbox .sb8-lim{margin-top:auto;font-size:17px;color:var(--text2)}
+#c04-sandbox .sb8-lim b{color:var(--text)}
+#c04-sandbox .sb8-r{padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c04-sandbox .sb8-h{font-size:21px;color:var(--acc)}
+#c04-sandbox .sb8-sc{display:flex;flex-direction:column;gap:8px}
+#c04-sandbox .sb8-sc .btn{justify-content:flex-start;font-size:17px}
+#c04-sandbox .sb8-sc .btn.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+#c04-sandbox .sb8-rec{flex:1;padding:16px 18px;border-radius:14px;font-size:18px;line-height:1.6;border:1.5px solid var(--acc);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+</style>
+<script>
+HOOKS['c04-sandbox'] = {
+  S: [['进程级隔离', '本地执行', '#34d399', 'Claude Code、Codex、OpenClaw 默认本地调用命令；没有沙盒时与本地用户同权限。Codex workspace-write、Claude Code 只读起始权限与文件系统 / 网络沙盒把可写范围限制在工作区', 33], ['容器隔离', 'Docker 等', '#fbbf24', '独立的文件系统和网络栈；但<b>与宿主机共享内核</b>，内核漏洞仍可能被利用来逃逸', 66], ['microVM / 虚拟机', 'Firecracker 等', '#fb7185', '带<b>独立内核</b>的硬件级隔离：运行完全不可信代码的最强层级', 100]],
+  R: [[0, '进程级机制 + 宿主的工作区沙盒与审批，<b>通常够用</b>'], [1, '输入不可信：即使是本地开发，也应<b>升级到容器</b>'], [2, '凭证敏感或操作不可逆：<b>容器乃至 microVM</b>'], [2, '生产环境：<b>容器乃至 microVM</b>，并设置资源上限']],
+  init(s) {
+    s.querySelector('.sb8-steps').innerHTML = this.S.map(([n, sm, c, d, v]) => `<div class="sb8-s" style="--c:${c}"><b>${n}<small>${sm}</small></b><p>${d}</p><div class="meter" style="--c:${c}"><i style="--v:${v}%"></i></div></div>`).join('');
+    this.ss = [...s.querySelectorAll('.sb8-s')]; this.bs = [...s.querySelectorAll('.sb8-sc .btn')];
+    this.bs.forEach((b) => b.addEventListener('click', () => { this.auto = false; this.pick(s, +b.dataset.i); }));
+  },
+  pick(s, i) { this.i = i; const [l, t] = this.R[i]; this.bs.forEach((b, j) => b.classList.toggle('on', j === i)); this.ss.forEach((x, j) => x.classList.toggle('on', j === l)); s.querySelector('.sb8-rec').innerHTML = `建议：<b style="color:${this.S[l][2]}">${this.S[l][0]}</b><br>${t}`; },
+  enter(s, ctx) { this.auto = true; this.pick(s, 0); ctx.every(() => { if (this.auto) this.pick(s, (this.i + 1) % 4); }, 2800); },
+  reset() { this.ss.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c04-obs" data-part="8" data-trans="zoom" data-dur="15000" data-title="工具执行的可观测性" data-notes="<b>工具执行的可观测性。</b>执行工具还需要<b>可观测性</b>（Observability），用于监控、审计和调试 Agent 的执行行为。优秀的 Agent 框架应该对执行工具提供：详细的<b>日志</b>（每次调用的时间、参数、结果、耗时）、<b>审计追踪</b>（谁在什么上下文下为什么执行了操作）、<b>性能指标</b>（调用频率、成功率、平均耗时）以及<b>告警机制</b>（频繁失败、超时、资源超限时通知管理员）。<br>仪表盘中的数据为示意；点击“注入故障”触发告警。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">工具执行的<em>可观测性</em>：监控、审计、调试</h2></div>
+    <button class="btn ob8-f fx fx-up" style="--d:2"><svg class="ic"><use href="#i-bug"/></svg>注入故障</button></header>
+  <div class="ob8-g fx fx-up" style="--d:2">
+    <div class="ob8-c log"><b>日志</b><small>时间 · 参数 · 结果 · 耗时</small><div class="ob8-lg c4x-term"></div></div>
+    <div class="ob8-c"><b>审计追踪</b><small>谁 · 在什么上下文 · 为什么</small><div class="ob8-au"></div></div>
+    <div class="ob8-c"><b>性能指标</b><small>调用频率 · 成功率 · 平均耗时</small><div class="ob8-kp"><div><span>调用/分钟</span><b class="ob8-r">0</b></div><div><span>成功率</span><b class="ob8-s">100%</b></div><div><span>平均耗时</span><b class="ob8-t">0 ms</b></div></div></div>
+    <div class="ob8-c al"><b>告警</b><small>频繁失败 · 超时 · 资源超限 → 通知管理员</small><div class="ob8-al">一切正常</div></div>
+  </div>
+  <span class="c4x-sx ob8-sx">示意</span>
+  <div class="src">第四章 ·「执行工具」· 工具执行的可观测性</div>
+</section>
+<style>
+#c04-obs .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-obs .ob8-g{display:grid;grid-template-columns:1.4fr 1fr;grid-template-rows:1fr 1fr;gap:18px;height:680px}
+#c04-obs .ob8-sx{position:absolute;right:130px;top:196px}
+#c04-obs .ob8-c{padding:16px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#c04-obs .ob8-c>b{font-size:21px;color:var(--acc)}
+#c04-obs .ob8-c>small{font-size:15px;color:var(--text3)}
+#c04-obs .ob8-c.log{grid-row:1/3}
+#c04-obs .ob8-lg{flex:1;overflow:hidden;padding:8px 0;font-size:15px}
+#c04-obs .ob8-lg .e{color:#fb7185}
+#c04-obs .ob8-au{display:flex;flex-direction:column;gap:6px;font-size:15px;line-height:1.5;color:var(--text2)}
+#c04-obs .ob8-au b{color:var(--text)}
+#c04-obs .ob8-kp{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-items:center}
+#c04-obs .ob8-kp span{display:block;font-size:15px;color:var(--text3)}
+#c04-obs .ob8-kp b{font:800 30px var(--num)}
+#c04-obs .ob8-al{flex:1;display:grid;place-items:center;border-radius:12px;font-size:20px;font-weight:700;color:var(--ok);border:1px dashed var(--ok)}
+#c04-obs .ob8-c.al.on{border-color:var(--bad);box-shadow:0 0 30px rgba(251,113,133,.4)}
+#c04-obs .ob8-c.al.on .ob8-al{color:#fecdd3;border-color:var(--bad);background:rgba(251,113,133,.12);animation:shake .5s}
+</style>
+<script>
+HOOKS['c04-obs'] = {
+  T: ['bash("pytest -q")', 'write_file("src/app.py")', 'http_post("/api/orders")', 'bash("npm run build")', 'read_file("README.md")'],
+  init(s) { s.querySelector('.ob8-f').addEventListener('click', () => { this.fault = 8; }); },
+  enter(s, ctx) {
+    this.fault = 0;
+    const lg = s.querySelector('.ob8-lg'), au = s.querySelector('.ob8-au'), al = s.querySelector('.ob8-al'), alc = s.querySelector('.ob8-c.al');
+    lg.innerHTML = ''; let n = 0, okc = 0, tsum = 0, auto = 0;
+    au.innerHTML = '<span><b>Agent #7</b> · 任务“修复构建失败” · 因 lint 报错修改 src/app.py</span><span><b>Agent #7</b> · 同一任务 · 验证修复后运行测试</span><span><b>Agent #3</b> · 任务“创建订单” · 用户确认后调用订单 API</span>';
+    ctx.every(() => {
+      auto++; if (auto % 40 === 25 && !this.fault) this.fault = 8;
+      const t = this.T[n % 5], fail = this.fault > 0 && n % 2 === 0, ms = fail ? 30000 : 40 + ((n * 137) % 900);
+      const d = new Date(Date.UTC(2026, 9, 30, 10, 0, n));
+      lg.insertAdjacentHTML('beforeend', `<span class="c4x-ln${fail ? ' e' : ''}">${d.toISOString().slice(11, 19)}  ${C4.esc(t)}  ${fail ? 'TIMEOUT' : 'ok'}  ${ms}ms</span>`);
+      while (lg.children.length > 22) lg.firstElementChild.remove();
+      n++; if (!fail) okc++; tsum += ms; if (this.fault) this.fault--;
+      s.querySelector('.ob8-r').textContent = Math.min(120, n * 2);
+      s.querySelector('.ob8-s').textContent = Math.round((okc / n) * 100) + '%';
+      s.querySelector('.ob8-t').textContent = Math.round(tsum / n) + ' ms';
+      const bad = this.fault > 0;
+      alc.classList.toggle('on', bad); al.textContent = bad ? '告警：http_post 频繁超时 → 已通知管理员' : '一切正常';
+      if (n > 200) { n = 0; okc = 0; tsum = 0; }
+    }, 450);
+  },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c04-idem" data-part="8" data-trans="rise" data-dur="16000" data-title="幂等性与取消语义" data-notes="<b>幂等性与取消语义。</b>执行工具改变外部世界，因此必须回答一个感知工具无需考虑的问题：<b>当一次调用被取消或超时时，它的副作用到底发生了没有？</b>一个转账调用在网络超时后返回失败，钱可能已经转出，也可能还没——Agent 若不加判断地重试，就可能重复转账。<br>解决这一问题的核心是<b>幂等性</b>：同一个操作执行一次和执行多次，对外部世界的影响完全相同，因而可以安全重试。设计上有两条常用手段：其一是让操作携带<b>唯一标识</b>，服务端凭此去重，重复请求直接返回首次结果而非再次执行；其二是<b>先查询后变更</b>——重试前先查询目标资源的当前状态（订单是否已创建、文件是否已写入），确认未完成再执行。具备幂等性的操作让超时与打断的处理简单得多。<br>转账模拟为示意；右上角切换三种做法。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">超时之后，<em>副作用到底发生了没有？</em></h2></div>
+    <div class="seg id8-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">盲目重试</button><button data-v="1">唯一标识</button><button data-v="2">先查询后变更</button></div></header>
+  <div class="id8-body">
+    <div class="id8-st panel fx fx-left" style="--d:2"><div class="id8-lane"><span>Agent</span><div class="id8-a"></div></div><div class="id8-lane"><span>银行服务端</span><div class="id8-b"></div></div><div class="id8-bal"><span>收款方到账</span><b class="id8-n">¥0</b></div><span class="c4x-sx">示意</span></div>
+    <div class="id8-r fx fx-right" style="--d:3"><div class="id8-def"><b>幂等性</b><p>同一个操作执行一次和执行多次，对外部世界的影响<b>完全相同</b>，因而可以安全重试</p></div><div class="id8-k">—</div></div>
+  </div>
+  <div class="src">第四章 ·「执行工具」· 幂等性与取消语义</div>
+</section>
+<style>
+#c04-idem .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-idem .id8-seg button{font-size:17px;padding:8px 16px}
+#c04-idem .id8-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:670px}
+#c04-idem .id8-st{position:relative;padding:18px 22px;display:flex;flex-direction:column;gap:14px}
+#c04-idem .id8-st>.c4x-sx{position:absolute;right:16px;top:14px}
+#c04-idem .id8-lane{display:grid;grid-template-columns:120px 1fr;gap:14px;align-items:start}
+#c04-idem .id8-lane>span{font-size:18px;font-weight:700;padding-top:8px}
+#c04-idem .id8-a,#c04-idem .id8-b{display:flex;flex-direction:column;gap:6px;min-height:200px}
+#c04-idem .id8-e{padding:8px 12px;border-radius:10px;font:15px var(--mono);border-left:4px solid var(--c);background:rgba(255,255,255,.04);animation:upIn .35s both}
+#c04-idem .id8-bal{display:flex;align-items:baseline;gap:16px;margin-top:auto;padding:14px 18px;border-radius:14px;border:1px solid var(--line)}
+#c04-idem .id8-bal span{font-size:18px}
+#c04-idem .id8-n{font:800 44px var(--num)}
+#c04-idem .id8-r{display:flex;flex-direction:column;gap:14px}
+#c04-idem .id8-def{padding:16px 20px;border-radius:16px;border:1.5px solid var(--acc);background:color-mix(in srgb,var(--acc) 7%,transparent)}
+#c04-idem .id8-def b{font-size:21px;color:var(--acc)}
+#c04-idem .id8-def p{margin-top:6px;font-size:17px;line-height:1.55}
+#c04-idem .id8-def p b{font-size:inherit;color:var(--text)}
+#c04-idem .id8-k{flex:1;padding:16px 20px;border-radius:16px;font-size:19px;line-height:1.6;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+</style>
+<script>
+HOOKS['c04-idem'] = {
+  init(s) { this.set = U.seg(s.querySelector('.id8-seg'), (v) => { this.auto = false; this.v = +v; this.run(s); }); },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    this.set(String(this.v));
+    const A = s.querySelector('.id8-a'), B = s.querySelector('.id8-b'), N = s.querySelector('.id8-n'), K = s.querySelector('.id8-k');
+    const a = (t, c) => A.insertAdjacentHTML('beforeend', `<div class="id8-e" style="--c:${c}">${t}</div>`), b = (t, c) => B.insertAdjacentHTML('beforeend', `<div class="id8-e" style="--c:${c}">${t}</div>`);
+    A.innerHTML = ''; B.innerHTML = ''; N.textContent = '¥0'; N.style.color = ''; K.textContent = '';
+    const w = (ms) => U.wait(ctx, ms);
+    const key = this.v === 1 ? ', key="tx-8f3a"' : '';
+    a(`transfer(to="张三", amount=1000${key})`, '#a78bfa'); await w(800); if (!ok()) return;
+    b('收到请求，执行转账 ✓', '#34d399'); N.textContent = '¥1,000'; await w(600); if (!ok()) return;
+    a('网络超时：没收到响应 ✗', '#fb7185'); await w(1000); if (!ok()) return;
+    if (this.v === 0) { a('重试 transfer(to="张三", amount=1000)', '#a78bfa'); await w(700); if (!ok()) return; b('收到请求，再次执行转账', '#fb7185'); N.textContent = '¥2,000'; N.style.color = 'var(--bad)'; K.innerHTML = '<span style="color:var(--bad)">重复转账</span>：钱其实已经转出，Agent 不加判断地重试——副作用发生了两次'; }
+    else if (this.v === 1) { a(`重试 transfer(…${key})`, '#a78bfa'); await w(700); if (!ok()) return; b('key 已处理过 → 直接返回首次结果，不再执行', '#34d399'); N.style.color = 'var(--ok)'; K.innerHTML = '<span style="color:var(--ok)">唯一标识</span>：服务端凭此去重，重复请求直接返回首次结果而非再次执行'; }
+    else { a('query_transfer(to="张三", since=10:30)', '#22d3ee'); await w(700); if (!ok()) return; b('已有一笔 ¥1,000 转账，状态：成功', '#22d3ee'); await w(700); if (!ok()) return; a('已完成，不再执行', '#34d399'); N.style.color = 'var(--ok)'; K.innerHTML = '<span style="color:var(--ok)">先查询后变更</span>：重试前先查目标资源的当前状态，确认未完成再执行'; }
+    await w(3000); if (!ok()) return;
+    if (this.auto) this.v = (this.v + 1) % 3;
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.v = 0; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-2phase" data-part="8" data-trans="flip" data-dur="15000" data-title="不能幂等的操作：预检-确认两段式" data-notes="但并非所有操作都能做成幂等的。<b>发送邮件、拨打电话、对外转账</b>这类操作，每执行一次就产生一个不可撤销的真实世界事件。对这类操作，应采用<b>“预检-确认”两段式</b>：第一段使用一个来自不同模型家族的模型和专用安全检查提示词做校验，例如检查余额、确认收款方、生成待发送内容；第二段才真正执行。执行阶段如果失败不能盲目重试，而要把详细的错误信息返回给 Agent 主模型重新规划。<br>演示一笔转账的两段流程（内容为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不能幂等的操作：<em>“预检-确认”两段式</em></h2></header>
+  <div class="tp8-ops fx fx-up" style="--d:2"><span><svg class="ic"><use href="#i-mail"/></svg>发送邮件</span><span><svg class="ic"><use href="#i-phone"/></svg>拨打电话</span><span><svg class="ic"><use href="#i-coin"/></svg>对外转账</span><p>每执行一次就产生一个<b>不可撤销</b>的真实世界事件</p></div>
+  <div class="tp8-flow fx fx-up" style="--d:3">
+    <div class="tp8-st a"><em>第一段</em><b>预检</b><small>不同模型家族的模型 + 专用安全检查提示词</small><div class="tp8-chk"></div></div>
+    <i class="tp8-ar">→</i>
+    <div class="tp8-st b"><em>第二段</em><b>确认后执行</b><small>真正产生副作用</small><div class="tp8-ex">—</div></div>
+    <i class="tp8-ar">→</i>
+    <div class="tp8-st c"><em>失败时</em><b>不盲目重试</b><small>详细错误返回主模型重新规划</small><div class="tp8-fail">—</div></div>
+  </div>
+  <span class="c4x-sx tp8-sx">示意</span>
+  <div class="src">第四章 ·「执行工具」· 幂等性与取消语义 · “预检-确认”两段式</div>
+</section>
+<style>
+#c04-2phase .tp8-ops{display:flex;align-items:center;gap:14px}
+#c04-2phase .tp8-ops span{display:flex;align-items:center;gap:8px;padding:10px 18px;border-radius:999px;font-size:19px;border:1.5px solid var(--bad)}
+#c04-2phase .tp8-ops .ic{color:var(--bad)}
+#c04-2phase .tp8-ops p{font-size:19px;color:var(--text2)}
+#c04-2phase .tp8-ops b{color:var(--bad)}
+#c04-2phase .tp8-flow{display:grid;grid-template-columns:1fr 40px 1fr 40px 1fr;gap:10px;align-items:stretch;margin-top:22px;height:520px}
+#c04-2phase .tp8-sx{position:absolute;right:130px;top:200px}
+#c04-2phase .tp8-ar{display:grid;place-items:center;font-style:normal;font-size:30px;color:var(--text3)}
+#c04-2phase .tp8-st{padding:18px 20px;border-radius:18px;border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 6%,rgba(12,18,40,.7));display:flex;flex-direction:column;gap:6px}
+#c04-2phase .tp8-st.a{--c:#22d3ee}#c04-2phase .tp8-st.b{--c:#34d399}#c04-2phase .tp8-st.c{--c:#fbbf24}
+#c04-2phase .tp8-st em{font-style:normal;font-size:16px;color:var(--text3)}
+#c04-2phase .tp8-st b{font-size:24px;color:var(--c)}
+#c04-2phase .tp8-st small{font-size:15px;color:var(--text2)}
+#c04-2phase .tp8-chk{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+#c04-2phase .tp8-chk span{padding:9px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);opacity:.3;transition:all .35s}
+#c04-2phase .tp8-chk span.on{opacity:1;border-color:var(--ok)}
+#c04-2phase .tp8-ex,#c04-2phase .tp8-fail{margin-top:10px;flex:1;padding:12px 14px;border-radius:12px;font-size:16px;line-height:1.55;background:rgba(255,255,255,.04)}
+</style>
+<script>
+HOOKS['c04-2phase'] = {
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const ch = s.querySelector('.tp8-chk'), ex = s.querySelector('.tp8-ex'), fl = s.querySelector('.tp8-fail');
+    for (let r = 0; ok(); r++) {
+      ch.innerHTML = ['检查余额：¥12,400 ≥ ¥3,000 ✓', '确认收款方：李四 · 尾号 8821 · 与历史一致 ✓', '生成待执行内容：转账 ¥3,000，备注“3 月房租” ✓'].map((t) => `<span>${t}</span>`).join('');
+      ex.textContent = '—'; fl.textContent = '—';
+      for (const sp of ch.children) { await U.wait(ctx, 800); if (!ok()) return; sp.classList.add('on'); }
+      await U.wait(ctx, 700); if (!ok()) return;
+      if (r % 2 === 0) { ex.innerHTML = '<span style="color:var(--ok)">transfer(…) 执行成功</span>'; fl.textContent = '（本次无失败）'; }
+      else { ex.innerHTML = '<span style="color:var(--bad)">transfer(…) 失败：收款行维护中（错误码 B503）</span>'; await U.wait(ctx, 700); if (!ok()) return; fl.innerHTML = '不重试；把错误码、时间、已完成的预检结果返回主模型 → 主模型改为“明早 9 点后再转，并先告知用户”'; }
+      await U.wait(ctx, 2800);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-x44" data-part="8" data-trans="zoom" data-dur="18000" data-title="实验 4-4 ★★：执行工具 MCP 服务器" data-notes="<b>实验 4-4 ★★：执行工具 MCP 服务器。</b>本实验构建一套执行工具系统，重点展示安全机制的实践应用。工具覆盖：<b>文件写入与编辑</b>（写入后自动调用 linter 验证语法，返回结构化错误信息）；<b>终端命令执行</b>（超时控制、危险命令检测如 rm、dd、curl | sh、命令历史追踪）；<b>代码解释器</b>（沙盒 Python 执行，危险操作审批和长输出总结）；<b>数据操作</b>（Excel 读写、公式应用、截图生成）；<b>外部系统对接</b>（日历事件创建、GitHub PR、邮件发送、Webhook 调用）；<b>图形界面操作</b>（基于 browser-use 的虚拟浏览器、Anthropic Computer Use 虚拟桌面、Android World 虚拟手机）。<b>实验要求</b>：为这些执行工具添加完整的安全和验证体系——文件操作的自动 linter 检查（Python、JavaScript 等），为危险命令添加 LLM 驱动的审查机制，为长输出实现截断和持久化。<br>配套仓库的验收（chapter4/execution-tools，real_mcp_gui_20260802T093657Z，2026-08-02）：20 次正式调用，15 项门禁通过 13 项。坏 Python 被拒（Syntax error at line 1）；../../escape.py 越界被拒；sleep 2 在 1 秒超时；rm -rf 被 LLM 审查拒绝（OpenRouter GPT-4.1-mini）；Docker 沙盒 network none、只读根、256m 内存、1 CPU、64 个进程上限；260 行输出头尾各留 50 行并落盘；GitHub PR #605 用先查询后变更的方式复用；Xvfb 桌面与 AndroidWorld API-33 实机操作；Google Calendar 与真实邮箱缺凭据，状态为 blocked。右侧点选可以查看每条收据。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 4-4 ★★：<em>执行工具 MCP 服务器</em></h2></header>
+  <div class="x44-body">
+    <div class="x44-l fx fx-left" style="--d:2">
+      <div class="x44-cats"></div>
+      <div class="x44-req"><b>实验要求</b><p>文件操作自动 linter 检查（Python、JavaScript 等）· 危险命令的 LLM 审查 · 长输出截断与持久化</p></div>
+    </div>
+    <div class="x44-r fx fx-right" style="--d:3">
+      <div class="x44-k"><div><b>20</b><span>次正式调用</span></div><div><b>13/15</b><span>项门禁通过</span></div></div>
+      <div class="x44-list"></div>
+      <div class="x44-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter4/execution-tools（real_mcp_gui_20260802T093657Z，2026-08-02）</div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「执行工具」· 实验 4-4</div>
+</section>
+<style>
+#c04-x44 .x44-body{display:grid;grid-template-columns:720px 1fr;gap:26px;height:690px}
+#c04-x44 .x44-l,#c04-x44 .x44-r{display:flex;flex-direction:column;gap:10px}
+#c04-x44 .x44-cats{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+#c04-x44 .x44-c{padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x44 .x44-c b{font-size:18px;color:var(--tp-exe)}
+#c04-x44 .x44-c p{font-size:15px;line-height:1.45;color:var(--text2);margin-top:2px}
+#c04-x44 .x44-req{margin-top:auto;padding:14px 18px;border-radius:14px;border:1.5px dashed var(--acc)}
+#c04-x44 .x44-req b{font-size:18px;color:var(--acc)}
+#c04-x44 .x44-req p{font-size:16px;line-height:1.55;color:var(--text2);margin-top:4px}
+#c04-x44 .x44-k{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#c04-x44 .x44-k>div{padding:10px 16px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x44 .x44-k b{font:800 32px var(--num);color:var(--acc)}
+#c04-x44 .x44-k span{margin-left:8px;font-size:16px;color:var(--text2)}
+#c04-x44 .x44-list{display:flex;flex-direction:column;gap:6px}
+#c04-x44 .x44-i{display:grid;grid-template-columns:28px 1fr;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line);cursor:pointer;transition:all .3s}
+#c04-x44 .x44-i em{font-style:normal;font-weight:800;text-align:center}
+#c04-x44 .x44-i.ok em{color:var(--ok)}#c04-x44 .x44-i.no em{color:var(--bad)}#c04-x44 .x44-i.bl em{color:var(--warn)}
+#c04-x44 .x44-i code{font:15px var(--mono);color:var(--ctx)}
+#c04-x44 .x44-i.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c04-x44 .x44-src{margin-top:auto;display:flex;gap:8px;font-size:15px;line-height:1.5;color:var(--text3)}
+#c04-x44 .x44-src .ic{flex:none;color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-x44'] = {
+  C: [['文件写入与编辑', '写入后自动 linter，返回结构化错误'], ['终端命令执行', '超时控制、危险命令检测（rm、dd、curl | sh）、命令历史'], ['代码解释器', '沙盒 Python、危险操作审批、长输出总结'], ['数据操作', 'Excel 读写、公式应用、截图生成'], ['外部系统对接', '日历事件、GitHub PR、邮件、Webhook'], ['图形界面操作', 'browser-use 虚拟浏览器 · Computer Use 虚拟桌面 · Android World 虚拟手机']],
+  L: [['no', '坏 Python 被拒：<code>Syntax error at line 1</code>'], ['no', '<code>../../escape.py</code> 越界被拒'], ['no', '<code>sleep 2</code> 在 1 秒超时'], ['no', '<code>rm -rf</code> 被 LLM 审查拒绝（OpenRouter GPT-4.1-mini）'], ['ok', 'Docker 沙盒：network none · 只读根 · 256m · 1 CPU · 64 pids'], ['ok', '260 行输出：头尾各留 50 行并落盘'], ['ok', 'GitHub PR #605：先查询后变更，复用已有 PR'], ['ok', 'Xvfb 桌面与 AndroidWorld API-33 实机操作'], ['bl', 'Google Calendar、真实邮箱：缺凭据 → blocked']],
+  init(s) {
+    s.querySelector('.x44-cats').innerHTML = this.C.map(([n, d]) => `<div class="x44-c"><b>${n}</b><p>${d}</p></div>`).join('');
+    s.querySelector('.x44-list').innerHTML = this.L.map(([c, t]) => `<div class="x44-i ${c}"><em>${c === 'ok' ? '✓' : c === 'no' ? '⛔' : '…'}</em><span>${t}</span></div>`).join('');
+    this.is = [...s.querySelectorAll('.x44-i')];
+    this.is.forEach((x, i) => x.addEventListener('click', () => { this.auto = false; this.hl(i); }));
+  },
+  hl(i) { this.i = i; this.is.forEach((x, j) => x.classList.toggle('on', j === i)); },
+  enter(s, ctx) { this.auto = true; this.hl(0); ctx.every(() => { if (this.auto) this.hl((this.i + 1) % this.L.length); }, 1500); },
+  reset() { this.is.forEach((x) => x.classList.remove('on')); },
+};
+</script>

@@ -1,0 +1,308 @@
+<!-- ================= PART 05 上下文：Agent 的眼睛 ================= -->
+<section class="slide chapter" id="c1-d5" data-part="5" data-title="PART 05 · 上下文：Agent 的眼睛" data-notes="上下文是 Agent 在每个决策点能看到的全部信息。就像一个人在做决策时需要看到桌上摊开的所有资料——任务说明、参考手册、之前的沟通记录、最新的数据——Agent 的上下文窗口就是它的“视野”。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">上下文：<br>Agent 的眼睛</h1>
+  <div class="ch-s fx fx-up" style="--d:3">每个决策点能看到的全部信息</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">上下文决定了 Agent 能看到什么，而 Agent 只能基于它看到的信息做决策。</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c1-ctx5" data-part="5" data-title="上下文的五个组成部分" data-dur="12000" data-notes="从 API 的视角看（详见第二章），每次调用 LLM 时的上下文由五个部分构成：<br><b>系统提示词</b>（System Prompt）：由开发者编写，在整个对话过程中保持不变，相当于 Agent 的“岗位说明书”——定义它的身份、权限和行为准则；通过提示工程精心设计系统提示词，可以塑造 Agent 的工作方式。系统提示词中还会包含跨会话保存的<b>用户记忆</b>（第三章）和动态注入的环境状态。<br><b>工具定义</b>（Tool Definitions）：声明可用工具的名称、功能描述和参数格式。没有工具定义，Agent 就无法识别和调用任何工具，但它并不会因此停下来（实验 1-1）。工具定义与系统提示词一起构成对话中保持不变的<b>静态前缀</b>（这是基础模式；2026 年以来，生产框架中工具的完整 schema 也可以按需动态加载到上下文末尾而不破坏前缀）。<br><b>用户消息</b>：来自用户的输入，还可能包含通过 RAG（检索增强生成）动态检索引入的<b>外部知识</b>。<br><b>模型回复</b>：最多包含三个部分——思考过程（reasoning）、文本内容（content）和工具调用请求（tool_calls）。三者不一定同时出现：决定调用工具时通常只有 reasoning + tool_calls，给出最终回答时通常只有 reasoning + content。<br><b>工具执行结果</b>：Agent 框架执行工具后返回的结果，是下一步思考的直接依据，也让它能从执行结果中学习、避免重复犯错。<br><b>前两项是静态前缀，后三项是随交互不断增长的动态消息历史</b>。五个部分共同构成了 LLM 每次推理时的上下文。点击左侧任一部分查看说明。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">每次调用 LLM，上下文由<em>五个部分</em>构成</h2></header>
+  <div class="cx-body">
+    <div class="cx-win panel fx fx-left" style="--d:2">
+      <div class="cx-grp st"><span class="cx-gl">静态前缀 · 保持不变</span></div>
+      <div class="cx-grp dy"><span class="cx-gl">动态消息历史 · 随交互增长</span></div>
+      <div class="cx-list"></div>
+      <div class="cx-grow"></div>
+    </div>
+    <div class="cx-card panel fx fx-right" style="--d:3">
+      <div class="cx-h"><span class="cx-role mono"></span><b class="cx-n"></b></div>
+      <p class="cx-d"></p>
+      <div class="cx-ex"></div>
+      <div class="cx-slots">
+        <div class="cx-sl" data-s="r"><b>reasoning</b><span>思考过程：保持思维连贯，让决策可解释</span></div>
+        <div class="cx-sl" data-s="c"><b>content</b><span>文本内容：对用户的回复</span></div>
+        <div class="cx-sl" data-s="t"><b>tool_calls</b><span>工具调用请求：Agent 采取行动的方式</span></div>
+        <p class="cx-sm"></p>
+      </div>
+      <div class="runbar cx-bar"><i></i></div>
+    </div>
+  </div>
+  <p class="tagline fx fx-up" style="--d:6">前两项是<b>静态前缀</b>，后三项是随交互不断增长的<b>动态消息历史</b></p>
+  <div class="src">第一章 ·「上下文：Agent 的眼睛」</div>
+</section>
+<style>
+.cx-body{display:flex;gap:34px;flex:1;min-height:0;margin-bottom:22px}
+.cx-win{position:relative;width:640px;flex:none;padding:24px 26px 24px 70px}
+.cx-grp{position:absolute;left:18px;width:30px;border:2px solid;border-right:0;border-radius:14px 0 0 14px}
+.cx-grp.st{top:26px;height:150px;border-color:color-mix(in srgb,var(--har) 70%,transparent)}
+.cx-grp.dy{top:190px;bottom:24px;border-color:color-mix(in srgb,var(--acc) 70%,transparent)}
+.cx-gl{position:absolute;left:-14px;top:50%;transform:translate(-50%,-50%) rotate(-90deg);white-space:nowrap;font-size:15px;letter-spacing:.1em;background:var(--bg);padding:0 8px}
+.cx-grp.st .cx-gl{color:var(--har)}.cx-grp.dy .cx-gl{color:var(--acc)}
+.cx-list{display:flex;flex-direction:column;gap:10px}
+.cx-it{--c:var(--text3);display:flex;align-items:center;gap:14px;height:66px;padding:0 18px;border-radius:14px;cursor:pointer;border:1px solid color-mix(in srgb,var(--c) 35%,transparent);background:color-mix(in srgb,var(--c) 8%,rgba(10,16,36,.9));transition:all .4s var(--ease)}
+.cx-it:nth-child(2){margin-bottom:14px}
+.cx-it .ic{font-size:26px;color:var(--c)}
+.cx-it b{font-size:21px}
+.cx-it small{margin-left:auto;font:14px var(--mono);color:var(--c)}
+.cx-it.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 18%,rgba(10,16,36,.9));box-shadow:0 0 26px color-mix(in srgb,var(--c) 35%,transparent);translate:6px 0}
+.cx-grow{margin-top:10px;display:flex;flex-direction:column;gap:6px}
+.cx-gr{height:26px;border-radius:8px;display:flex;align-items:center;padding:0 12px;font:14px var(--mono);color:var(--c);border:1px dashed color-mix(in srgb,var(--c) 45%,transparent);animation:upIn .5s var(--spring) both}
+.cx-card{flex:1;padding:28px 32px 20px;display:flex;flex-direction:column;gap:16px;--c:var(--acc);border-color:color-mix(in srgb,var(--c) 40%,transparent)}
+.cx-card::before{content:"";position:absolute;left:0;top:28px;bottom:28px;width:4px;border-radius:4px;background:var(--c);box-shadow:0 0 16px var(--c)}
+.cx-h{display:flex;align-items:baseline;gap:16px}
+.cx-role{font-size:18px;color:var(--c);padding:4px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--c) 45%,transparent)}
+.cx-n{font-size:34px}
+.cx-d{font-size:21px;line-height:1.7}
+.cx-ex{display:flex;flex-wrap:wrap;gap:10px}
+.cx-ex span{padding:8px 16px;border-radius:12px;font-size:18px;background:color-mix(in srgb,var(--c) 10%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.cx-slots{display:none;flex-direction:column;gap:10px}
+.cx-card[data-r=assistant] .cx-slots{display:flex}
+.cx-sl{display:flex;gap:16px;align-items:center;padding:12px 16px;border-radius:12px;border:1px solid var(--line);opacity:.35;transition:all .4s}
+.cx-sl b{min-width:110px;font:700 17px var(--mono);color:var(--llm)}
+.cx-sl span{font-size:18px}
+.cx-sl.on{opacity:1;border-color:color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 12%,transparent)}
+.cx-sm{font-size:17px;color:var(--text2)}
+.cx-bar{margin-top:auto}
+.cx-card.sw .cx-h,.cx-card.sw .cx-d,.cx-card.sw .cx-ex{animation:swIn .5s var(--ease) both}
+</style>
+<script>
+HOOKS['c1-ctx5'] = {
+  P: [
+    { r: 'system', n: '系统提示词', ic: 'clipboard', c: '#94a3b8', d: '由开发者编写，在整个对话过程中保持不变，相当于 Agent 的“岗位说明书”——定义它的身份、权限和行为准则；通过提示工程可以塑造 Agent 的工作方式。', ex: ['身份', '权限', '行为准则', '跨会话的用户记忆（第三章）', '动态注入的环境状态'] },
+    { r: 'tools', n: '工具定义', ic: 'wrench', c: '#60a5fa', d: '声明可用工具的名称、功能描述和参数格式。没有它，Agent 就无法识别和调用任何工具——但它并不会因此停下来（实验 1-1）。与系统提示词一起构成静态前缀。', ex: ['名称', '功能描述', '参数格式', '2026 年起：完整 schema 可按需加载到上下文末尾而不破坏前缀'] },
+    { r: 'user', n: '用户消息', ic: 'user', c: '#fbbf24', d: '来自用户的输入。还可能包含通过 RAG（检索增强生成）动态检索引入的外部知识——覆盖训练数据截止后的信息或私有领域知识（第三章）。', ex: ['用户输入', 'RAG 引入的外部知识'] },
+    { r: 'assistant', n: '模型回复', ic: 'brain', c: '#a78bfa', d: '模型之前生成的回复，最多包含三个部分。在一次具体的回复中，三者不一定同时出现。', ex: [] },
+    { r: 'tool', n: '工具执行结果', ic: 'server', c: '#34d399', d: 'Agent 框架执行工具后返回的结果。它是 Agent 下一步思考的直接依据，也让它能够从执行结果中学习、避免重复犯错。', ex: ['下一步思考的直接依据', '从结果中学习、避免重复犯错'] },
+  ],
+  init(s) {
+    s.querySelector('.cx-list').innerHTML = this.P.map((p, i) => `<div class="cx-it" data-i="${i}" style="--c:${p.c}"><svg class="ic"><use href="#i-${p.ic}"/></svg><b>${p.n}</b><small>${p.r}</small></div>`).join('');
+    s.querySelector('.cx-list').addEventListener('click', (e) => { const it = e.target.closest('[data-i]'); if (it) { this.auto = false; this.show(s, +it.dataset.i); } });
+  },
+  show(s, i) {
+    const p = this.P[i], ctx = this.ctx, tk = (this.tk = (this.tk || 0) + 1);
+    this.i = i;
+    s.querySelectorAll('.cx-it').forEach((it) => it.classList.toggle('on', +it.dataset.i === i));
+    const c = s.querySelector('.cx-card');
+    c.style.setProperty('--c', p.c);
+    c.dataset.r = p.r;
+    c.querySelector('.cx-role').textContent = p.r;
+    c.querySelector('.cx-n').textContent = p.n;
+    c.querySelector('.cx-d').textContent = p.d;
+    c.querySelector('.cx-ex').innerHTML = p.ex.map((x) => `<span>${x}</span>`).join('');
+    U.restart(c, 'sw');
+    const bar = c.querySelector('.cx-bar');
+    bar.classList.remove('run'); void bar.offsetWidth;
+    if (this.auto) bar.classList.add('run');
+    if (p.r === 'assistant') {
+      // 两种典型回复交替演示：调用工具时 vs 给出最终回答时
+      const sl = (k) => c.querySelector(`.cx-sl[data-s=${k}]`), sm = c.querySelector('.cx-sm');
+      const show = (a, b, txt) => { c.querySelectorAll('.cx-sl').forEach((x) => x.classList.remove('on')); sl(a).classList.add('on'); sl(b).classList.add('on'); sm.textContent = txt; };
+      show('r', 't', '决定调用工具时：通常只有 reasoning + tool_calls');
+      ctx.later(() => tk === this.tk && show('r', 'c', '给出最终回答时：通常只有 reasoning + content'), 2600);
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    ctx.every(() => { if (this.auto) this.show(s, (this.i + 1) % this.P.length); }, 5200);
+    // 动态历史不断增长：一轮轮追加模型回复与工具结果
+    const grow = s.querySelector('.cx-grow');
+    let n = 0;
+    ctx.every(() => {
+      if (n >= 6) { grow.innerHTML = ''; n = 0; return; }
+      const a = n % 2 === 0;
+      grow.insertAdjacentHTML('beforeend', `<div class="cx-gr" style="--c:${a ? '#a78bfa' : '#34d399'}">${a ? '+ assistant' : '+ tool'}  第 ${Math.floor(n / 2) + 2} 轮</div>`);
+      n++;
+    }, 1100);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.cx-grow').innerHTML = ''; s.querySelectorAll('.cx-it').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c1-ablation" data-part="5" data-trans="zoom" data-title="实验 1-1：上下文消融" data-dur="16000" data-notes="要验证每个组件是否都不可或缺，最直接的方法是<b>消融实验</b>（Ablation Study）：就像医生诊断时逐一排除病因——先去掉 A 组件看系统是否还正常，再去掉 B 组件，以此类推。<b>实验 1-1 ★★</b>从五个部分中选取了四个组件进行测试——系统提示词作为 Agent 的基本身份定义不参与消融。五组对照包括一组保留全部组件的完整基线，再加上四组各缺失一个组件的对照（图1-3）。<br>结果揭示了每个组件的作用，也揭示了它们<b>并不同等重要</b>。<b>工具定义</b>是 Agent 行动能力的基础；但失去行动能力不等于沉默——模型照样会给出一份格式工整、语气笃定的答案，数据却来自参数记忆。它是坦白拒绝还是就地编造，主要取决于模型自身的幻觉率与诚实度；提示词里“不得自行估计”这类约束只能降低编造的概率，并不能消除。<b>工具执行结果</b>是闭环控制的关键，缺失它会让 Agent“盲目”执行，反复重试直到耗尽迭代预算。<b>思考过程</b>记录的是“为什么这么做”，工具执行结果记录的是“发生了什么”；当前者可以从后者重建时，把它从历史中丢掉几乎没有代价。<b>历史消息</b>则防止了冗余操作，避免重复犯同样的错误。<br>核心洞察：<b>上下文决定了 Agent 能看到什么，而 Agent 只能基于它看到的信息做决策</b>。组件并不等价，衡量的标准是它承载的信息能否从别处重建——“每个组件都不可或缺”这类论断要靠实测，而且模型迭代很快，同一个消融换到新模型上完全可能得出不同的结论。还有一点对工程实践更重要：<b>“给出了回答”不等于“完成了任务”</b>，上下文残缺时典型的失败不是报错退出，而是一个看上去毫无破绽的答案。<br>本页数据来自配套仓库 chapter1/context 的两次验收记录（同一任务、迭代上限 5 轮）：Kimi K3（2026-08-25）与 DeepSeek V4 Flash（2026-09-01）。点击右上角切换模型，左侧切换实验组——同一组在两个模型上的结论并不相同。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 1-1 ★★：<em>上下文消融</em></h2></div>
+    <div class="ab-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="kimi">Kimi K3 · 08-25</button><button data-v="ds">DeepSeek V4 Flash · 09-01</button></div></header>
+  <div class="ab-task fx fx-up" style="--d:2"><svg class="ic"><use href="#i-clipboard"/></svg><span>任务：Q1 2.5M USD、Q2 2.1M EUR、Q3 1.8M GBP、Q4 380M JPY → 换算成美元，计算年度总收入和季度平均收入，保留两位小数；<b>不要自行估计汇率，请使用工具观测</b></span></div>
+  <div class="ab-body">
+    <div class="ab-arms fx fx-left" style="--d:3"></div>
+    <div class="ab-run win fx fx-up" style="--d:4">
+      <div class="win-bar"><i></i><i></i><i></i><span class="ab-wt">回放</span></div>
+      <div class="ab-seq"></div>
+      <div class="ab-ans"><span class="lbl">最终回答</span><p></p></div>
+    </div>
+    <div class="ab-res panel fx fx-right" style="--d:5">
+      <div class="ab-v"><span class="badge ab-oc"></span></div>
+      <div class="ab-ms"><div><b class="ab-it">0</b><span>迭代</span></div><div><b class="ab-tc">0</b><span>工具行动</span></div><div><b class="ab-rp">—</b><span>重复行动</span></div></div>
+      <p class="ab-bk"></p>
+      <p class="ab-xt"></p>
+    </div>
+  </div>
+  <div class="ab-ins fx fx-up" style="--d:7"><b>给出了回答 ≠ 完成了任务</b><span>组件并不等价：标准是它承载的信息能否从别处重建</span><span>模型迭代很快：同一个消融换到新模型上，结论可能不同</span></div>
+  <div class="src">第一章 ·「上下文：Agent 的眼睛」· 实验 1-1 · 图1-3 · 数据：配套仓库 chapter1/context 验收记录</div>
+</section>
+<style>
+#c1-ablation .sh{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:16px}
+.ab-task{display:flex;gap:12px;align-items:flex-start;padding:12px 18px;border-radius:12px;font-size:18px;line-height:1.55;color:var(--text2);background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ab-task .ic{flex:none;font-size:22px;color:var(--acc);margin-top:2px}
+.ab-task b{color:var(--warn);font-weight:600}
+.ab-body{display:grid;grid-template-columns:380px 1fr 440px;gap:22px;margin-top:16px;height:520px}
+.ab-arms{display:flex;flex-direction:column;gap:10px}
+.ab-arm{--c:var(--acc);text-align:left;padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(255,255,255,.03);transition:all .35s var(--ease)}
+.ab-arm b{display:block;font-size:20px;color:var(--text)}
+.ab-pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.ab-pills i{font-style:normal;font-size:14px;padding:2px 8px;border-radius:7px;color:var(--text2);border:1px solid var(--line2)}
+.ab-pills i.x{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 55%,transparent);text-decoration:line-through}
+.ab-arm.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 12%,transparent);box-shadow:0 0 24px color-mix(in srgb,var(--acc) 25%,transparent)}
+.ab-note{font-size:15px;color:var(--text3);padding:0 4px}
+.ab-run{display:flex;flex-direction:column;min-width:0}
+.ab-seq{flex:1;padding:16px 18px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px;overflow:hidden}
+.ab-c{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;font:15px var(--mono);color:#cbd5f5;background:rgba(255,255,255,.05);border:1px solid var(--line2);animation:upIn .4s var(--spring) both}
+.ab-c.cv{border-color:color-mix(in srgb,var(--tool) 45%,transparent)}
+.ab-c.ci{border-color:color-mix(in srgb,var(--har) 55%,transparent);color:var(--har)}
+.ab-c.rep{border-color:var(--bad);color:#fecdd3;background:color-mix(in srgb,var(--bad) 12%,transparent)}
+.ab-c.probe{border-color:var(--warn);color:#fed7aa;background:color-mix(in srgb,var(--warn) 12%,transparent)}
+.ab-c em{font-style:normal;font-size:12px;padding:0 5px;border-radius:5px;background:rgba(0,0,0,.35)}
+.ab-sep{width:100%;font-size:14px;color:var(--text3);margin-top:4px}
+.ab-cap{width:100%;margin-top:6px;padding:8px 12px;border-radius:10px;font-size:16px;color:var(--bad);border:1px dashed color-mix(in srgb,var(--bad) 55%,transparent);animation:upIn .4s var(--spring) both}
+.ab-ans{padding:12px 18px 16px;border-top:1px solid var(--line);min-height:96px}
+.ab-ans p{font-size:16px;line-height:1.6;margin-top:6px;color:var(--text);font-family:var(--mono)}
+.ab-res{padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.ab-ms{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ab-ms div{padding:12px;border-radius:12px;text-align:center;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ab-ms b{display:block;font:800 30px var(--num);color:var(--acc)}
+.ab-ms span{font-size:15px;color:var(--text3)}
+.ab-bk{font-size:18px;line-height:1.65}
+.ab-xt{font-size:16px;line-height:1.6;color:var(--text2);padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.ab-xt:empty{display:none}
+.ab-ins{display:flex;align-items:center;gap:20px;margin-top:18px;padding:14px 22px;border-radius:14px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 14%,transparent),transparent);border-left:4px solid var(--acc)}
+.ab-ins b{font-size:22px;color:var(--acc);white-space:nowrap}
+.ab-ins span{font-size:17px;color:var(--text2)}
+.ab-ins span::before{content:"·";margin-right:12px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c1-ablation'] = {
+  ARMS: [
+    { k: 'full', n: '完整基线', x: -1 },
+    { k: 'no_history', n: '去掉历史消息', x: 3 },
+    { k: 'no_reasoning', n: '去掉思考过程', x: 2 },
+    { k: 'no_tool_calls', n: '去掉工具定义', x: 0 },
+    { k: 'no_tool_results', n: '去掉工具执行结果', x: 1 },
+  ],
+  COMP: ['工具定义', '工具执行结果', '思考过程', '历史消息'],
+  OUT: {
+    correct: ['正确', 'var(--ok)'],
+    incorrect: ['有观测，但答错', 'var(--warn)'],
+    unsupported_numbers: ['报出了无依据的数字', 'var(--bad)'],
+    no_unsupported_numbers: ['未声称任何未被给予的数字', 'var(--har)'],
+    no_terminal_response: ['触到迭代上限，没有回答', 'var(--bad)'],
+  },
+  // 工具调用序列：c 换汇（币种 金额），i 代码解释器，k 计算器
+  CONV: ['c EUR 2100000', 'c GBP 1800000', 'c JPY 380000000'],
+  BOOK: {
+    full: '保留全部组件：3 次迭代、4 次工具行动，得到正确的年度总收入与季度均值。',
+    no_history: '历史消息防止冗余操作：每一轮都“忘记”之前做过的换汇，于是一遍遍重做，直到迭代上限。',
+    no_reasoning: '思考过程记录“为什么这么做”，工具结果记录“发生了什么”；当前者可以从后者重建时，丢掉它几乎没有代价。',
+    no_tool_calls: '失去行动能力不等于沉默：坦白拒绝还是就地编造，主要取决于模型自身的幻觉率与诚实度。',
+    no_tool_results: '工具执行结果是闭环控制的关键：缺失它，Agent “盲目”执行，反复重试直到耗尽迭代预算。',
+  },
+  init(s) {
+    const D = (it, seq, oc, ans, extra) => ({ it, seq, oc, ans, extra });
+    const rep5 = [].concat(...Array.from({ length: 5 }, () => this.CONV));
+    this.DATA = {
+      kimi: {
+        full: D(3, [...this.CONV, 'i'], 'correct', '年度总收入 $9,602,895.73 USD；季度均值 $2,400,723.93 USD'),
+        no_history: D(5, rep5, 'no_terminal_response', ''),
+        no_reasoning: D(3, [...this.CONV, 'i'], 'correct', '年度总收入 $9,602,895.73 USD；季度均值 $2,400,723.93 USD', '这一组在 Kimi K3 上测不出退化。'),
+        no_tool_calls: D(1, [], 'no_unsupported_numbers', 'I attempted to proceed with this task, but … no currency-conversion or calculation tools are actually available in my current environment.',
+          '对照：去掉提示词里那句“不要自行估计汇率”，同一模型、同一组给出了 $9,587,333.33——与工具汇率表相差 0.16%，汇率是它自己补上的。即使保留这句约束，同一模型仍有 2/13 组报出了无依据的数字。'),
+        no_tool_results: D(5, [...this.CONV, 'c EUR 2100000', 'c EUR 1', 'c GBP 1', 'c JPY 1', 'c EUR 2.1', 'i'], 'no_terminal_response', '',
+          '重复运行（Kimi K3，上限 5 轮）：静默隐藏结果时 7 次里有 6 次跑到上限；换成可见的“结果已隐藏”占位符，4 次里只有 1 次——占位符本身就是一个信号。'),
+      },
+      ds: {
+        full: D(3, [...this.CONV, 'i'], 'correct', 'Annual total: $9,602,895.73 USD；Quarterly average: $2,400,723.93 USD'),
+        no_history: D(5, rep5, 'no_terminal_response', ''),
+        no_reasoning: D(3, ['c EUR 2.1', 'c GBP 1.8', 'c JPY 380', 'i'], 'incorrect', 'Annual total: 9,600,000.00 USD；Quarterly average: 2,400,000.00 USD',
+          '这一组按“百万”为单位换算、再用四舍五入后的中间值汇总，结果偏离精确答案。验收记录特别说明：该组剥离的是历史中保留的思考，模型每轮仍会重新思考，因此只是“结论随模型而变”的又一个例子。'),
+        no_tool_calls: D(1, [], 'unsupported_numbers', 'Annual total = 9.60 million USD; quarterly average = 2.40 million USD.',
+          '没有任何工具观测，却报出了营收量级的数字——排版与基于观测的答案一样笃定，数字来自模型的参数记忆。'),
+        no_tool_results: D(5, [...this.CONV, 'c EUR 2100000', 'c EUR 1', 'k', 'i'], 'no_terminal_response', ''),
+      },
+    };
+    s.querySelector('.ab-arms').innerHTML = this.ARMS.map((a, i) => `
+      <button class="ab-arm" data-i="${i}"><b>${a.n}</b><div class="ab-pills">${this.COMP.map((c, j) => `<i class="${j === a.x ? 'x' : ''}">${c}</i>`).join('')}</div></button>`).join('')
+      + '<p class="ab-note">系统提示词不参与消融：没有它，Agent 连基本的角色认知都没有</p>';
+    s.querySelector('.ab-arms').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.arm = +b.dataset.i; this.run(s); } });
+    this.set = U.seg(s.querySelector('.ab-seg'), (v) => { this.auto = false; this.m = v; this.run(s); });
+  },
+  chip(code, seen) {
+    if (code === 'i') return '<span class="ab-c ci">code_interpreter</span>';
+    if (code === 'k') return '<span class="ab-c ci">calculate</span>';
+    const [, cur, amt] = code.split(' ');
+    const probe = +amt === 1, rep = seen.has(code);
+    seen.add(code);
+    return `<span class="ab-c cv${rep ? ' rep' : ''}${probe ? ' probe' : ''}">convert_currency(${amt} ${cur}→USD)${rep ? '<em>重复</em>' : ''}${probe ? '<em>试探</em>' : ''}</span>`;
+  },
+  run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx, a = this.ARMS[this.arm], d = this.DATA[this.m][a.k];
+    if (!ctx) return;
+    this.set(this.m);
+    s.querySelectorAll('.ab-arm').forEach((b) => b.classList.toggle('on', +b.dataset.i === this.arm));
+    s.querySelector('.ab-wt').textContent = `回放 · ${a.n} · ${this.m === 'kimi' ? 'Kimi K3' : 'DeepSeek V4 Flash'}`;
+    const seq = s.querySelector('.ab-seq'), ans = s.querySelector('.ab-ans p');
+    seq.innerHTML = '';
+    ans.textContent = '';
+    const oc = s.querySelector('.ab-oc');
+    oc.textContent = '运行中…';
+    oc.style.setProperty('--c', 'var(--text3)');
+    ['.ab-it', '.ab-tc'].forEach((q) => (s.querySelector(q).textContent = 0));
+    s.querySelector('.ab-rp').textContent = '—';
+    s.querySelector('.ab-bk').textContent = this.BOOK[a.k];
+    s.querySelector('.ab-xt').textContent = '';
+    const seen = new Set();
+    let t = 300;
+    if (!d.seq.length) {
+      ctx.later(() => tk === this.tk && seq.insertAdjacentHTML('beforeend', '<span class="ab-sep">请求里没有工具定义：模型发不出任何工具调用</span>'), t);
+      t += 700;
+    }
+    d.seq.forEach((code, i) => {
+      ctx.later(() => {
+        if (tk !== this.tk) return;
+        seq.insertAdjacentHTML('beforeend', this.chip(code, seen));
+        s.querySelector('.ab-tc').textContent = i + 1;
+      }, t);
+      t += d.seq.length > 9 ? 230 : 420;
+    });
+    ctx.later(() => {
+      if (tk !== this.tk) return;
+      if (d.oc === 'no_terminal_response') seq.insertAdjacentHTML('beforeend', `<div class="ab-cap">已到迭代上限（${d.it} 轮），没有给出终止回答</div>`);
+      U.count(s.querySelector('.ab-it'), d.it, { dur: 500, ctx });
+      s.querySelector('.ab-rp').textContent = new Set(d.seq).size < d.seq.length ? '是' : '否';
+      ans.textContent = d.ans || '（无）';
+      const [lab, col] = this.OUT[d.oc];
+      oc.textContent = lab;
+      oc.style.setProperty('--c', col);
+      s.querySelector('.ab-xt').textContent = d.extra || '';
+    }, t + 300);
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.m = 'kimi';
+    this.arm = 0;
+    this.run(s);
+    // 自动演示：依次播放五组，两个模型轮流
+    ctx.every(() => {
+      if (!this.auto) return;
+      this.arm++;
+      if (this.arm >= this.ARMS.length) { this.arm = 0; this.m = this.m === 'kimi' ? 'ds' : 'kimi'; }
+      this.run(s);
+    }, 7000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { this.tk = (this.tk || 0) + 1; s.querySelector('.ab-seq').innerHTML = ''; },
+};
+</script>

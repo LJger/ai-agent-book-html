@@ -1,0 +1,275 @@
+<!-- ================= PART 07 VLA、世界模型与 Sim2Real ================= -->
+<section class="slide chapter" id="c06-d7" data-part="7" data-title="PART 07 · VLA、世界模型与 Sim2Real" data-notes="上一部分把“整理桌面”拆成了有边界的技能：长程规划决定先处理杯子还是废纸，pick、place、verify_state 这样的工具调用定义每一步要达到的状态。这一部分回答剩下的三个问题：<b>VLA</b> 如何把一条技能指令变成连续动作，以及动作分块为什么是在平滑性和反应速度之间做取舍；VLA 的局限为什么需要<b>世界模型</b>来补上“做了之后可能发生什么”；以及模拟器里得到的结论为什么不能直接搬到真机上（<b>从仿真环境到真实机器人</b>）。实验 6-13 在模拟器中比较开环、逐步检查和预测式三种闭环，实验 6-14 检查视觉策略能否适应新的摄像头画面。">
+  <div class="ch-k fx fx-up">PART 07</div>
+  <h1 class="ch-t fx fx-up" style="--d:2;font-size:86px">VLA、世界模型<br>与 Sim2Real</h1>
+  <div class="ch-s fx fx-up" style="--d:3">现在该做什么 · 做了之后会怎样 · 换个环境还行不行</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">VLA 主要回答“现在应该做什么”，还需要另一类模型帮助判断“做了之后可能发生什么”。</blockquote>
+  <div class="ch-loop" data-node="6" data-num="07"></div>
+</section>
+
+<section class="slide" id="c06-vla" data-part="7" data-trans="slide" data-title="VLA：从技能指令到连续动作" data-dur="14000" data-notes="<b>VLA</b> 是 Vision-Language-Action 的缩写，中文可以理解为“视觉—语言—动作模型”。它接收当前画面和一条技能指令，然后输出机器人接下来要执行的动作：<b>当前观察 + 技能指令 → 动作</b>。<br>在 XLeRobot 的例子里，高层规划器只提交 pick(red_cup)，VLA 或技能策略还要根据当前画面决定从哪个方向接近杯子、夹爪何时闭合、手臂以什么轨迹抬起。执行层完成这一小段运动后，系统会重新拍摄桌面；只有确认杯子确实被夹住，规划器才允许提交 place(red_cup, tray)。因此，<b>工具调用定义的是期望的状态变化，VLA 定义的是如何通过连续动作实现这个状态变化</b>。<br>动作有两种表示路线：<b>RT-2 和 OpenVLA</b> 把连续动作切成离散的 token，再像生成文字一样逐个输出；<b>π₀</b> 则代表另一条路线，直接生成连续、平滑的动作轨迹。两种方法没有简单的高下之分：离散 token 更容易和语言模型结合，连续轨迹通常更适合表达平滑运动。<br>右上角可以切换两种表示（不点时每轮自动交替）：离散模式下末端随一个个 token 跳步前进，连续模式下整段轨迹平滑生成。动作 token 的取值、曲线和机械臂尺寸都是示意。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">VLA：把技能指令变成<em>连续动作</em></h2></div>
+    <div class="vl-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="tok">离散 token · RT-2 / OpenVLA</button><button data-v="traj">连续轨迹 · π₀</button></div></header>
+  <div class="vl-pipe fx fx-up" style="--d:2">
+    <div class="vl-box vl-obs"><span class="lbl">当前观察</span>
+      <svg class="vl-cam" viewBox="0 0 176 84" width="176" height="84"><rect class="vl-mt" x="4" y="58" width="168" height="22" rx="4"/><rect class="vl-mtr" x="126" y="60" width="38" height="8" rx="2"/><path class="vl-marm" d="M30 58 L48 30 L84 30"/><g class="vl-mcup"><path d="M90 40h16l-2 18h-12z"/></g><circle class="vl-rec" cx="164" cy="12" r="4"/></svg></div>
+    <i class="vl-op">+</i>
+    <div class="vl-box vl-skill"><span class="lbl">技能指令</span><code>pick(red_cup)</code><small>来自高层规划器</small></div>
+    <i class="vl-ar"></i>
+    <div class="vl-box vl-model"><svg class="ic"><use href="#i-brain"/></svg><b>VLA</b><small>视觉—语言—动作模型</small></div>
+    <i class="vl-ar"></i>
+    <div class="vl-box vl-out">
+      <div class="vl-oh"><span class="lbl">动作</span><span class="vl-ot"></span><span class="chip warn vl-sim">示意</span>
+        <span class="vl-leg"><i style="--c:var(--acc)"></i>水平位置<i style="--c:#a78bfa"></i>高度<i style="--c:#fbbf24"></i>夹爪</span></div>
+      <div class="vl-oc">
+        <svg class="vl-plot" viewBox="0 0 470 82" width="470" height="82"><line class="vl-ax" x1="0" y1="80" x2="470" y2="80"/><polyline class="vl-pl vl-px" points=""/><polyline class="vl-pl vl-py" points=""/><polyline class="vl-pl vl-pg" points=""/></svg>
+        <div class="vl-toks"></div>
+      </div>
+    </div>
+  </div>
+  <div class="vl-body">
+    <div class="vl-stage panel fx fx-left" style="--d:3">
+      <svg class="vl-svg" viewBox="0 0 960 400" width="960" height="400">
+        <defs><linearGradient id="c06vl-tbl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e293b"/><stop offset="1" stop-color="#0b1222"/></linearGradient></defs>
+        <rect x="20" y="330" width="920" height="56" rx="10" fill="url(#c06vl-tbl)" stroke="rgba(255,255,255,.12)"/>
+        <polygon class="vl-cone" points="880,62 470,330 940,330"/>
+        <g class="vl-camg" transform="translate(856 30)"><rect width="48" height="30" rx="6"/><circle cx="24" cy="15" r="9"/></g>
+        <text class="vl-lb" x="760" y="44">摄像头</text>
+        <rect class="vl-tray" x="760" y="314" width="140" height="16" rx="4"/>
+        <text class="vl-lb" x="830" y="362">tray</text>
+        <path class="vl-paper" d="M432 330 l8 -14 l14 4 l10 -8 l8 18 z"/>
+        <text class="vl-lb" x="452" y="362">yellow_paper</text>
+        <text class="vl-lb" x="600" y="362">red_cup</text>
+        <polyline class="vl-trace" points=""/>
+        <g class="vl-dots"></g>
+        <path class="vl-cup" d="M572 266H628L622 330H578Z"/>
+        <rect class="vl-base" x="250" y="290" width="80" height="40" rx="8"/>
+        <line class="vl-l1" x1="290" y1="290" x2="290" y2="290"/><line class="vl-l2" x1="290" y1="290" x2="290" y2="290"/>
+        <circle class="vl-jB" cx="290" cy="290" r="11"/><circle class="vl-jE" cx="290" cy="290" r="9"/><circle class="vl-jW" cx="290" cy="290" r="8"/>
+        <line class="vl-palm" x1="290" y1="290" x2="290" y2="290"/><line class="vl-f1" x1="290" y1="290" x2="290" y2="290"/><line class="vl-f2" x1="290" y1="290" x2="290" y2="290"/>
+        <text class="vl-held" x="690" y="160">red_cup = held ✓</text>
+        <text class="vl-sk" x="30" y="44">侧视：执行 pick(red_cup)</text>
+      </svg>
+    </div>
+    <ol class="sl vl-sl fx fx-right" style="--d:4">
+      <li><span>1</span><div><b>规划器只提交 pick(red_cup)</b><p>说明要达到的状态：杯子被夹住</p></div></li>
+      <li><span>2</span><div><b>VLA 根据当前画面输出动作</b><p>从哪个方向接近 · 夹爪何时闭合 · 以什么轨迹抬起</p></div></li>
+      <li><span>3</span><div><b>执行完这一小段，重新拍摄桌面</b><p>执行层完成运动后，系统再看一眼现实</p></div></li>
+      <li><span>4</span><div><b>确认夹住，才放行<code class="vl-next"><svg class="ic vl-lk"><use href="#i-lock"/></svg>place(red_cup, tray)</code></b><p>后置条件不满足，就不进入下一步</p></div></li>
+    </ol>
+  </div>
+  <div class="vl-foot fx fx-up" style="--d:5">
+    <p class="vl-tag"><b>工具调用</b>定义期望的状态变化，<b>VLA</b> 定义如何通过连续动作实现这个状态变化</p>
+    <div class="vl-two"><span><em>离散 token</em>更容易和语言模型结合</span><span><em>连续轨迹</em>通常更适合表达平滑运动</span><small>两种方法没有简单的高下之分</small></div>
+  </div>
+  <div class="src">第六章 ·「VLA 控制」· RT-2 / OpenVLA / π₀</div>
+</section>
+<style>
+#c06-vla .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c06-vla .vl-seg button{font-size:18px;padding:10px 20px}
+#c06-vla .vl-pipe{display:flex;align-items:stretch;gap:14px;height:132px}
+#c06-vla .vl-box{border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.86);padding:10px 16px;display:flex;flex-direction:column;gap:6px}
+#c06-vla .vl-obs{width:210px;flex:none}
+#c06-vla .vl-cam{display:block;border-radius:10px;background:rgba(5,9,22,.85);border:1px solid var(--line);transition:box-shadow .3s,border-color .3s}
+#c06-vla .vl-obs.flash .vl-cam{border-color:#fff;box-shadow:0 0 26px rgba(255,255,255,.55)}
+#c06-vla .vl-mt{fill:rgba(255,255,255,.07)}
+#c06-vla .vl-mtr{fill:none;stroke:#94a3b8;stroke-width:1.5}
+#c06-vla .vl-marm{fill:none;stroke:#cbd5e1;stroke-width:4;stroke-linecap:round;stroke-linejoin:round}
+#c06-vla .vl-mcup path{fill:#ef4444}
+#c06-vla .vl-mcup{transition:transform .5s var(--ease)}
+#c06-vla .vl-obs.held .vl-mcup{transform:translateY(-14px)}
+#c06-vla .vl-rec{fill:#fb7185;animation:blink 1.2s steps(1) infinite}
+#c06-vla .vl-skill{width:230px;flex:none;justify-content:center}
+#c06-vla .vl-skill code{font:700 24px var(--mono);color:var(--tool)}
+#c06-vla .vl-skill small{font-size:15px;color:var(--text3)}
+#c06-vla .vl-op{flex:none;align-self:center;font-style:normal;font-size:34px;color:var(--text3)}
+#c06-vla .vl-ar{flex:none;align-self:center;position:relative;width:40px;height:2px;background:linear-gradient(90deg,var(--line2),var(--acc))}
+#c06-vla .vl-ar::after{content:"";position:absolute;right:-4px;top:-6px;border:7px solid transparent;border-left:9px solid var(--acc)}
+#c06-vla .vl-model{width:200px;flex:none;align-items:center;justify-content:center;text-align:center;border-color:color-mix(in srgb,var(--llm) 55%,transparent);background:color-mix(in srgb,var(--llm) 11%,rgba(12,18,40,.9))}
+#c06-vla .vl-model .ic{font-size:32px;color:var(--llm)}
+#c06-vla .vl-model b{font:800 26px var(--num)}
+#c06-vla .vl-model small{font-size:15px;color:var(--text2)}
+#c06-vla .vl-out{flex:1;min-width:0}
+#c06-vla .vl-oh{display:flex;align-items:center;gap:12px;height:24px}
+#c06-vla .vl-ot{font-size:17px;color:var(--acc)}
+#c06-vla .vl-sim{font-size:15px;padding:1px 10px}
+#c06-vla .vl-leg{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:15px;color:var(--text3)}
+#c06-vla .vl-leg i{width:14px;height:4px;border-radius:2px;background:var(--c);margin-left:8px}
+#c06-vla .vl-oc{display:flex;gap:14px;align-items:center}
+#c06-vla .vl-plot{flex:none;display:block}
+#c06-vla .vl-ax{stroke:rgba(255,255,255,.15)}
+#c06-vla .vl-pl{fill:none;stroke-width:2.5;stroke-linejoin:round}
+#c06-vla .vl-px{stroke:var(--acc)}
+#c06-vla .vl-py{stroke:#a78bfa}
+#c06-vla .vl-pg{stroke:#fbbf24}
+#c06-vla .vl-toks{flex:1;display:flex;flex-wrap:wrap;gap:6px;align-content:center;min-height:70px}
+#c06-vla .vl-toks span{padding:3px 8px;border-radius:8px;font:15px var(--mono);color:#ddd6fe;border:1px solid color-mix(in srgb,var(--llm) 50%,transparent);background:color-mix(in srgb,var(--llm) 12%,transparent);animation:c06vl-in .3s var(--spring) both}
+#c06-vla[data-m=traj] .vl-toks::before{content:"整段平滑曲线直接生成";font-size:16px;color:var(--text3)}
+@keyframes c06vl-in{from{opacity:0;transform:translateY(8px) scale(.8)}}
+#c06-vla .vl-body{display:flex;gap:24px;margin-top:18px;height:402px}
+#c06-vla .vl-stage{width:962px;height:402px;flex:none;padding:0}
+#c06-vla .vl-svg{display:block}
+#c06-vla .vl-cone{fill:rgba(56,189,248,.05);stroke:rgba(148,163,184,.35);stroke-dasharray:5 7;transition:fill .3s}
+#c06-vla .vl-cone.on{fill:rgba(255,255,255,.2)}
+#c06-vla .vl-camg rect,#c06-vla .vl-camg circle{fill:#1e293b;stroke:#94a3b8;stroke-width:2}
+#c06-vla .vl-lb{fill:var(--text3);font-size:16px;text-anchor:middle;font-family:var(--mono)}
+#c06-vla .vl-sk{fill:var(--text3);font-size:16px}
+#c06-vla .vl-tray{fill:rgba(148,163,184,.15);stroke:#94a3b8;stroke-width:2}
+#c06-vla .vl-paper{fill:#facc15;stroke:#a16207;stroke-width:1.5}
+#c06-vla .vl-trace{fill:none;stroke:var(--acc);stroke-width:2.5;stroke-dasharray:4 6;opacity:.8}
+#c06-vla .vl-dots circle{fill:var(--llm);stroke:#fff;stroke-width:1.5}
+#c06-vla .vl-base{fill:#1e293b;stroke:#64748b;stroke-width:2}
+#c06-vla .vl-l1{stroke:#cbd5e1;stroke-width:16;stroke-linecap:round}
+#c06-vla .vl-l2{stroke:#94a3b8;stroke-width:13;stroke-linecap:round}
+#c06-vla .vl-jB,#c06-vla .vl-jE,#c06-vla .vl-jW{fill:#0f172a;stroke:var(--acc);stroke-width:3}
+#c06-vla .vl-palm,#c06-vla .vl-f1,#c06-vla .vl-f2{stroke:var(--tool);stroke-width:7;stroke-linecap:round}
+#c06-vla .vl-cup{fill:#ef4444;stroke:#7f1d1d;stroke-width:2}
+#c06-vla .vl-held{fill:var(--ok);font-size:22px;font-weight:700;opacity:0;transition:opacity .3s}
+#c06-vla .vl-held.on{opacity:1}
+#c06-vla .vl-sl{flex:1;gap:10px;justify-content:center}
+#c06-vla .vl-sl li{padding:12px 16px}
+#c06-vla .vl-sl b{font-size:22px}
+#c06-vla .vl-sl p{font-size:17px}
+#c06-vla .vl-next{font:600 18px var(--mono);color:var(--tool);margin-left:6px;white-space:nowrap}
+#c06-vla .vl-next .ic{margin-right:4px}
+#c06-vla .vl-foot{display:flex;align-items:center;gap:24px;margin-top:18px}
+#c06-vla .vl-tag{flex:1;font-size:23px;line-height:1.6;padding:14px 24px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 15%,transparent),transparent);border-left:4px solid var(--acc)}
+#c06-vla .vl-tag b{color:var(--acc)}
+#c06-vla .vl-two{display:flex;flex-direction:column;gap:6px;font-size:17px;color:var(--text2)}
+#c06-vla .vl-two em{font-style:normal;font-weight:700;color:var(--text);margin-right:8px}
+#c06-vla .vl-two small{font-size:15px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c06-vla'] = {
+  B: { x: 290, y: 290 }, L1: 210, L2: 190,
+  H: { x: 420, y: 140 }, C: { x: 610, y: 110 }, G: { x: 600, y: 262 }, L: { x: 600, y: 150 },
+  CYC: 8800,
+  init(s) {
+    const q = (x) => s.querySelector(x);
+    this.el = {
+      l1: q('.vl-l1'), l2: q('.vl-l2'), jE: q('.vl-jE'), jW: q('.vl-jW'), palm: q('.vl-palm'), f1: q('.vl-f1'), f2: q('.vl-f2'),
+      cup: q('.vl-cup'), held: q('.vl-held'), cone: q('.vl-cone'), obs: q('.vl-obs'), trace: q('.vl-trace'), dots: q('.vl-dots'),
+      px: q('.vl-px'), py: q('.vl-py'), pg: q('.vl-pg'), toks: q('.vl-toks'), ot: q('.vl-ot'), lk: q('.vl-lk use'),
+      lis: [...s.querySelectorAll('.vl-sl li')],
+    };
+    this.set = U.seg(q('.vl-seg'), (v) => { if (!this.ctx) return; this.manual = true; this.mode(s, v); this.restart(); });
+    this.m = 'traj';
+    this.clear();
+    this.draw(s, 0);
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(m);
+    s.dataset.m = m;
+    this.el.ot.textContent = m === 'tok' ? '离散 token，逐个生成' : '连续轨迹，整段生成';
+  },
+  clear() {
+    const E = this.el;
+    this.pts = { x: [], y: [], g: [], tr: [], last: -9 };
+    this.lastK = null;
+    this.rnd = U.rand(7);
+    E.toks.innerHTML = '';
+    E.dots.innerHTML = '';
+    [E.px, E.py, E.pg, E.trace].forEach((p) => p.setAttribute('points', ''));
+  },
+  restart() { this.t0 = performance.now(); this.cyc = 0; this.clear(); },
+  ease(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; },
+  qz(v, g) { return g + Math.round((v - g) / 26) * 26; },
+  bez(t) { const { H, C, G } = this, u = 1 - t; return { x: u * u * H.x + 2 * u * t * C.x + t * t * G.x, y: u * u * H.y + 2 * u * t * C.y + t * t * G.y }; },
+  // 一轮动作：0.9 s 起步 → 接近（2.4 s）→ 闭合夹爪 → 抬起 → 重新拍摄 → 确认后放行下一步
+  pose(tc) {
+    const { H, G, L } = this, disc = this.m === 'tok';
+    let W = H, g = 40, k = -1;
+    if (tc >= 900 && tc < 3300) {
+      const u = (tc - 900) / 2400;
+      if (disc) { k = Math.min(14, Math.floor(u * 15)); const p = this.bez(k / 14); W = k === 14 ? G : { x: this.qz(p.x, G.x), y: this.qz(p.y, G.y) }; }
+      else W = this.bez(this.ease(u));
+    } else if (tc >= 3300 && tc < 3800) { W = G; g = 40 - 13 * ((tc - 3300) / 500); }
+    else if (tc >= 3800 && tc < 8000) {
+      g = 27;
+      const u = Math.min(1, (tc - 3800) / 1200);
+      if (disc) { const j = Math.min(6, Math.floor(u * 7)); k = 100 + j; W = j === 6 ? { x: L.x, y: L.y } : { x: G.x, y: this.qz(G.y + (L.y - G.y) * (j / 6), G.y) }; }
+      else W = { x: G.x, y: G.y + (L.y - G.y) * this.ease(u) };
+    } else if (tc >= 8000) {
+      const e = this.ease(Math.min(1, (tc - 8000) / 800));
+      W = { x: L.x + (H.x - L.x) * e, y: L.y + (H.y - L.y) * e };
+    }
+    return { W, g, k, held: tc >= 3300 && tc < 8000 };
+  },
+  // 两连杆逆运动学：取肘部在上方的那一个解
+  ik(W) {
+    const { B, L1, L2 } = this, dx = W.x - B.x, dy = W.y - B.y;
+    const d = Math.max(Math.abs(L1 - L2) + 1, Math.min(L1 + L2 - 1, Math.hypot(dx, dy)));
+    const phi = Math.atan2(dy, dx), a = Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+    const e1 = { x: B.x + L1 * Math.cos(phi + a), y: B.y + L1 * Math.sin(phi + a) }, e2 = { x: B.x + L1 * Math.cos(phi - a), y: B.y + L1 * Math.sin(phi - a) };
+    return e1.y < e2.y ? e1 : e2;
+  },
+  cupD(cx, top) { return `M${(cx - 28).toFixed(1)} ${top.toFixed(1)}H${(cx + 28).toFixed(1)}L${(cx + 22).toFixed(1)} ${(top + 64).toFixed(1)}H${(cx - 22).toFixed(1)}Z`; },
+  draw(s, tc) {
+    const E = this.el, P = this.pose(tc), W = P.W, El = this.ik(W), g = P.g;
+    const at = (el, o) => { for (const k in o) el.setAttribute(k, o[k].toFixed(1)); };
+    at(E.l1, { x1: this.B.x, y1: this.B.y, x2: El.x, y2: El.y });
+    at(E.l2, { x1: El.x, y1: El.y, x2: W.x, y2: W.y });
+    at(E.jE, { cx: El.x, cy: El.y });
+    at(E.jW, { cx: W.x, cy: W.y });
+    at(E.palm, { x1: W.x - g, y1: W.y, x2: W.x + g, y2: W.y });
+    at(E.f1, { x1: W.x - g, y1: W.y, x2: W.x - g, y2: W.y + 36 });
+    at(E.f2, { x1: W.x + g, y1: W.y, x2: W.x + g, y2: W.y + 36 });
+    let cx = 600, top = 266, op = 1;
+    if (P.held) { cx = W.x; top = W.y + 4; }
+    else if (tc >= 8000) { if (tc < 8300) { cx = this.L.x; top = this.L.y + 4; op = 1 - (tc - 8000) / 300; } else op = (tc - 8300) / 500; }
+    E.cup.setAttribute('d', this.cupD(cx, top));
+    E.cup.style.opacity = Math.max(0, Math.min(1, op)).toFixed(2);
+    if (tc >= 900 && tc <= 5000) {
+      const x = ((tc - 900) / 4100) * 470;
+      if (x - this.pts.last >= 2) {
+        this.pts.last = x;
+        const xv = Math.min(1, Math.max(0, (W.x - 400) / 220)), hv = Math.min(1, Math.max(0, (330 - W.y) / 210)), gv = 0.1 + ((40 - g) / 13) * 0.8;
+        this.pts.x.push(`${x.toFixed(1)},${(76 - xv * 68).toFixed(1)}`);
+        this.pts.y.push(`${x.toFixed(1)},${(76 - hv * 68).toFixed(1)}`);
+        this.pts.g.push(`${x.toFixed(1)},${(76 - gv * 68).toFixed(1)}`);
+        this.pts.tr.push(`${W.x.toFixed(1)},${W.y.toFixed(1)}`);
+        E.px.setAttribute('points', this.pts.x.join(' '));
+        E.py.setAttribute('points', this.pts.y.join(' '));
+        E.pg.setAttribute('points', this.pts.g.join(' '));
+        E.trace.setAttribute('points', this.pts.tr.join(' '));
+      }
+    }
+    if (this.m === 'tok' && P.k >= 0 && P.k !== this.lastK) {
+      this.lastK = P.k;
+      const n = Math.floor(this.rnd() * 256);
+      E.toks.insertAdjacentHTML('beforeend', `<span>&lt;${String(n).padStart(3, '0')}&gt;</span>`);
+      while (E.toks.children.length > 8) E.toks.firstElementChild.remove();
+      E.dots.insertAdjacentHTML('beforeend', `<circle cx="${W.x.toFixed(1)}" cy="${W.y.toFixed(1)}" r="4"/>`);
+    }
+    const idx = tc < 900 ? 0 : tc < 5000 ? 1 : tc < 5800 ? 2 : tc < 8000 ? 3 : 4;
+    E.lis.forEach((li, i) => { li.classList.toggle('cur', i === idx); li.classList.toggle('done', i < idx); });
+    const fl = tc >= 5000 && tc < 5800, ok = tc >= 5800 && tc < 8000;
+    E.obs.classList.toggle('flash', fl);
+    E.cone.classList.toggle('on', fl);
+    E.obs.classList.toggle('held', P.held);
+    E.held.classList.toggle('on', ok);
+    if (ok !== this.lkOn) { this.lkOn = ok; E.lk.setAttribute('href', ok ? '#i-unlock' : '#i-lock'); }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.manual = false;
+    this.mode(s, 'traj');
+    this.restart();
+    ctx.raf((now) => {
+      const t = Math.max(0, now - this.t0), cyc = Math.floor(t / this.CYC);
+      if (cyc !== this.cyc) { this.cyc = cyc; if (!this.manual) this.mode(s, this.m === 'tok' ? 'traj' : 'tok'); this.clear(); }
+      this.draw(s, t % this.CYC);
+    });
+  },
+  leave() { this.ctx = null; },
+  reset(s) {
+    this.lkOn = null;
+    this.m = 'traj';
+    s.dataset.m = '';
+    this.clear();
+    this.draw(s, 0);
+    this.el.lis.forEach((li) => li.classList.remove('cur', 'done'));
+  },
+};
+</script>

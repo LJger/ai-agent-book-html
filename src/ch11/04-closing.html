@@ -1,0 +1,165 @@
+<!-- ================= 收束 ================= -->
+<section class="slide" id="c11-sum" data-part="4" data-steps="1" data-trans="zoom" data-dur="14000" data-title="三个问题不会过时" data-notes="所以，不必焦虑手里的框架会不会过时。模型每几个月迭代一次，具体的 API、产品和榜单都会翻篇，但<b>“看到什么、能做什么、如何验证做得对不对”这三个问题不会过时</b>——它们描述的不是某个模型的用法，而是一个智能系统与世界交互的基本方式。掌握了它们，无论下一代模型带来什么新能力，你都知道该把它放进公式的哪个位置，也能一眼看出，它离吹散那两朵乌云还有多远。<br>左侧不断翻篇的卡片代表具体的 API、产品和榜单（示意）；右侧三根柱子是三个不会过时的问题。按 → 后，新能力会落进对应的问题里，下方的两朵乌云显示它们离被吹散还有多远——这些新能力的例子和对应关系都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">不必焦虑框架会不会过时：<em>三个问题不会过时</em></h2></header>
+  <div class="sm-body">
+    <div class="sm-flow panel fx fx-left" style="--d:2">
+      <div class="sm-fh"><span class="lbl">每几个月翻篇</span><b>具体的 API、产品和榜单</b><span class="cap">示意</span></div>
+      <div class="sm-cards" data-clip-ok></div>
+    </div>
+    <div class="sm-qs fx fx-up" style="--d:3">
+      <div class="sm-q" style="--c:var(--ctx)"><div class="sm-qh"><svg class="ic"><use href="#i-eye"/></svg><b>看到什么</b></div><div class="sm-slot"></div></div>
+      <div class="sm-q" style="--c:var(--tool)"><div class="sm-qh"><svg class="ic"><use href="#i-wrench"/></svg><b>能做什么</b></div><div class="sm-slot"></div></div>
+      <div class="sm-q" style="--c:var(--ok)"><div class="sm-qh"><svg class="ic"><use href="#i-check"/></svg><b>如何验证做得对不对</b></div><div class="sm-slot"></div></div>
+      <p class="sm-qp">它们描述的不是某个模型的用法，而是<b>一个智能系统与世界交互的基本方式</b></p>
+    </div>
+  </div>
+  <div class="sm-bot" data-step="1">
+    <div class="sm-new fx fx-up"><span class="lbl">下一代模型带来新能力</span><b class="sm-nm">—</b><svg class="ic"><use href="#i-arrow"/></svg><span class="sm-to">放进公式的哪个位置</span></div>
+    <div class="sm-clouds fx fx-up" style="--d:2">
+      <div class="sm-cl"><svg class="ic"><use href="#i-cloud"/></svg><span>实时交互</span><div class="meter"><i></i></div></div>
+      <div class="sm-cl"><svg class="ic"><use href="#i-cloud"/></svg><span>持续积累经验</span><div class="meter"><i></i></div></div>
+      <small>离吹散两朵乌云还有多远</small>
+    </div>
+  </div>
+  <div class="src">后记 ·「模型与 Agent 的共同演进」第 5 段</div>
+</section>
+<style>
+.sm-body{display:grid;grid-template-columns:560px 1fr;gap:30px;height:510px}
+.sm-flow{position:relative;padding:20px 24px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.sm-fh{display:flex;align-items:baseline;gap:12px}
+.sm-fh b{font-size:21px}
+.sm-fh .cap{margin-left:auto}
+.sm-cards{position:relative;flex:1;overflow:hidden;-webkit-mask-image:linear-gradient(transparent,#000 14%,#000 80%,transparent);mask-image:linear-gradient(transparent,#000 14%,#000 80%,transparent)}
+.sm-cd{position:absolute;left:0;right:0;height:64px;padding:0 18px;border-radius:14px;display:flex;align-items:center;gap:12px;font-size:19px;border:1px solid var(--line2);background:rgba(12,18,40,.85);transition:top 1s var(--ease),opacity 1s,filter 1s}
+.sm-cd .ic{font-size:24px;color:var(--text3)}
+.sm-cd small{margin-left:auto;font-size:15px;color:var(--text3)}
+.sm-cd.old{opacity:.25;filter:grayscale(1)}
+.sm-cd.old span{text-decoration:line-through}
+.sm-qs{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:1fr auto;gap:18px}
+.sm-q{position:relative;display:flex;flex-direction:column;border-radius:20px;border:1.5px solid color-mix(in srgb,var(--c) 50%,transparent);background:linear-gradient(180deg,color-mix(in srgb,var(--c) 16%,transparent),rgba(12,18,40,.6));box-shadow:0 0 30px color-mix(in srgb,var(--c) 15%,transparent);animation:glowPulse 4s ease-in-out infinite}
+.sm-qh{display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 14px 14px;text-align:center}
+.sm-qh .ic{font-size:48px;color:var(--c)}
+.sm-qh b{font-size:27px;line-height:1.3}
+.sm-slot{flex:1;margin:0 16px 16px;border-radius:14px;border:1.5px dashed color-mix(in srgb,var(--c) 40%,transparent);display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:10px;overflow:hidden}
+.sm-slot i{font-style:normal;font-size:17px;padding:8px 12px;border-radius:10px;text-align:center;color:var(--text);background:color-mix(in srgb,var(--c) 22%,transparent);border:1px solid color-mix(in srgb,var(--c) 60%,transparent);animation:c11land .7s var(--spring) both}
+@keyframes c11land{from{opacity:0;translate:0 -80px;scale:.8}}
+.sm-qp{grid-column:1/-1;text-align:center;font-size:21px;color:var(--text2)}
+.sm-qp b{color:var(--acc)}
+.sm-bot{display:grid;grid-template-columns:1fr 640px;gap:30px;margin-top:22px;align-items:center}
+.sm-new{display:flex;align-items:center;gap:16px;padding:16px 22px;border-radius:18px;border:1px solid var(--line2);background:rgba(12,18,40,.75)}
+.sm-new b{font-size:22px;color:var(--acc)}
+.sm-new .ic{font-size:24px;color:var(--text3)}
+.sm-to{font-size:20px;color:var(--text)}
+.sm-clouds{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px;align-items:center}
+.sm-cl{display:grid;grid-template-columns:30px auto 1fr;gap:10px;align-items:center;font-size:18px;color:var(--text2)}
+.sm-cl .ic{font-size:26px;color:#cbd5e1}
+.sm-cl .meter i{transition:width 1s var(--ease)}
+.sm-clouds small{grid-column:1/-1;font-size:15px;color:var(--text3);text-align:right}
+</style>
+<script>
+HOOKS['c11-sum'] = {
+  OLD: [['code', 'API v1'], ['pkg', '框架 X'], ['trophy', '榜单 · 某季度'], ['code', 'API v2'], ['robot', '产品 Y'], ['pkg', '框架 Z'], ['trophy', '榜单 · 下一季度'], ['code', 'API v3']],
+  // 新能力 → 落进哪个问题（0 看到什么 / 1 能做什么 / 2 如何验证），以及对两朵乌云的推进（示意）
+  NEW: [['更长、更便宜的上下文', 0, [0, 1]], ['更快的 decode', 0, [2, 0]], ['原生的语音与 GUI 操作', 1, [2, 0]], ['自己写工具的能力', 1, [0, 1]], ['更可信的自动评估', 2, [0, 2]], ['从生产经验中更新', 2, [0, 2]]],
+  init(s) {
+    this.box = s.querySelector('.sm-cards');
+    this.slots = [...s.querySelectorAll('.sm-slot')];
+    this.nm = s.querySelector('.sm-nm');
+    this.to = s.querySelector('.sm-to');
+    this.mt = [...s.querySelectorAll('.sm-cl .meter')];
+  },
+  // 左侧卡片从下往上翻篇，最上面的过时、淡出
+  roll() {
+    const it = this.OLD[this.n++ % this.OLD.length], el = document.createElement('div');
+    el.className = 'sm-cd';
+    el.innerHTML = `<svg class="ic"><use href="#i-${it[0]}"/></svg><span>${it[1]}</span><small>翻篇中</small>`;
+    el.style.top = '400px';
+    this.box.appendChild(el);
+    this.cards.push(el);
+    void el.offsetWidth;
+    this.cards.forEach((c, i, a) => {
+      const pos = a.length - 1 - i;
+      c.style.top = 340 - pos * 76 + 'px';
+      c.classList.toggle('old', pos >= 3);
+      c.querySelector('small').textContent = pos >= 3 ? '已过时' : pos === 0 ? '刚发布' : '当前';
+    });
+    if (this.cards.length > 6) this.cards.shift().remove();
+  },
+  land() {
+    const [t, q, d] = this.NEW[this.m++ % this.NEW.length];
+    const sl = this.slots[q];
+    if (sl.children.length >= 3) sl.firstElementChild.remove();
+    sl.insertAdjacentHTML('beforeend', `<i>${t}</i>`);
+    this.nm.textContent = t;
+    this.to.textContent = ['看到什么', '能做什么', '如何验证做得对不对'][q];
+    this.lv = this.lv.map((v, i) => Math.min(92, v + d[i] * 6));
+    this.mt.forEach((m, i) => m.style.setProperty('--v', this.lv[i] + '%'));
+    if (this.m % this.NEW.length === 0) this.lv = [18, 12];
+  },
+  clear() {
+    this.box.innerHTML = '';
+    this.slots.forEach((x) => (x.innerHTML = ''));
+    this.cards = []; this.n = 0; this.m = 0; this.lv = [18, 12];
+    this.mt.forEach((m, i) => m.style.setProperty('--v', this.lv[i] + '%'));
+    this.nm.textContent = '—';
+  },
+  enter(s, ctx, k) {
+    this.k = k;
+    this.clear();
+    for (let i = 0; i < 4; i++) this.roll();
+    ctx.every(() => this.roll(), 1700);
+    if (k >= 1) this.land();
+    ctx.every(() => { if (this.k >= 1) this.land(); }, 2300);
+  },
+  step(s, ctx, k) { this.k = k; if (k >= 1) this.land(); },
+  reset() { this.clear(); },
+};
+</script>
+
+<section class="slide" id="c11-end" data-part="4" data-trans="iris" data-title="去造点什么吧" data-notes="Agent 技术仍在飞速演进，一本书追不上所有变化。但如果这本书让你带走的不是某个 API 的具体用法，而是<b>一套能在技术浪潮里保持清醒的判断力</b>，那它就完成了使命。<br>本书全部正文、配图与配套实验代码都是开源的，欢迎你去仓库里把实验亲手跑一遍、提 issue 和 PR。<br>而 Agent 最迷人的地方，正在于它能通过写代码创造新的能力，甚至改进自己；读到这里，你已经握住了“创造”的原则。<b>接下来，去造点什么吧。</b><br>全书到这里结束。可以返回总目录，或回到上一章。">
+  <div class="fe-orbit fx fx-scale" style="--d:3"></div>
+  <div class="fe-text">
+    <div class="fe-tag fx fx-up"><i></i>后记 · 全书完</div>
+    <h1 class="fe-title"><span class="split" data-off="1" data-grad="#7dd3fc,#c4b5fd,#5eead4">去造点什么吧</span></h1>
+    <div class="fe-lines">
+      <p class="fx fx-up" style="--d:8">一本书追不上所有变化；希望你带走的不是某个 API 的具体用法，而是<b>一套能在技术浪潮里保持清醒的判断力</b></p>
+      <p class="fx fx-up" style="--d:10"><svg class="ic"><use href="#i-branch"/></svg>全部正文、配图与配套实验代码都是开源的：去仓库里<b>把实验亲手跑一遍、提 issue 和 PR</b><span class="fe-repo">github.com/bojieli/ai-agent-book</span></p>
+      <p class="fx fx-up" style="--d:12"><svg class="ic"><use href="#i-wand"/></svg>Agent 能通过写代码创造新的能力，甚至改进自己；读到这里，你已经<b>握住了“创造”的原则</b></p>
+    </div>
+    <div class="end-nav fx fx-up" style="--d:14">
+      <a class="btn pri" data-nav="hub"><svg class="ic"><use href="#i-home"/></svg>返回总目录</a>
+      <a class="btn" data-nav="prev"><svg class="ic"><use href="#i-left"/></svg><span data-nav-label></span></a>
+      <a class="btn" data-nav="next"><span data-nav-label></span><svg class="ic"><use href="#i-arrow"/></svg></a>
+    </div>
+  </div>
+</section>
+<style>
+#c11-end{justify-content:center;padding-left:150px}
+.fe-tag{display:inline-flex;align-items:center;gap:12px;padding:10px 22px;border-radius:999px;border:1px solid var(--line2);background:rgba(255,255,255,.04);font-size:20px;color:var(--text2);letter-spacing:.14em;width:max-content}
+.fe-tag i{width:8px;height:8px;border-radius:50%;background:var(--acc);box-shadow:0 0 12px var(--acc);animation:blink 2s infinite}
+.fe-title{margin-top:26px;font-size:120px;line-height:1.12;font-weight:800}
+.fe-lines{margin-top:30px;display:flex;flex-direction:column;gap:16px;max-width:920px}
+.fe-lines p{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:23px;line-height:1.6;color:var(--text2)}
+.fe-lines b{color:var(--text)}
+.fe-lines .ic{font-size:26px;color:var(--acc)}
+.fe-repo{font:600 18px var(--mono);color:var(--acc2);padding:2px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--acc2) 40%,transparent)}
+.fe-text .end-nav{margin-top:36px}
+.fe-orbit{position:absolute;right:110px;top:50%;width:640px;height:640px;margin-top:-330px}
+</style>
+<script>
+HOOKS['c11-end'] = {
+  init(s) {
+    U.orbit(s.querySelector('.fe-orbit'), {
+      size: 640, core: 'Agent', outer: 'LLM + 上下文 + 工具 · 看到什么 · 能做什么 · 如何验证',
+      sats: [
+        { label: 'LLM', color: '#a78bfa', rx: 0.36, ry: 0.15, tilt: -24, dur: 12, phase: 0 },
+        { label: '上下文', color: '#22d3ee', rx: 0.33, ry: 0.13, tilt: 34, dur: 15, phase: 0.35 },
+        { label: '工具', color: '#fbbf24', rx: 0.3, ry: 0.2, tilt: 88, dur: 10, phase: 0.7 },
+      ],
+    });
+  },
+  enter(s, ctx) {
+    ctx.later(() => U.confetti(innerWidth * 0.7, innerHeight * 0.45), 1400);
+  },
+};
+</script>

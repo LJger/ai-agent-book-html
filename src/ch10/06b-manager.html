@@ -1,0 +1,798 @@
+<!-- ================= PART 06（续）管理者模式：实测、并行协调、灵台、实验 10-3 / 10-4、生成工作流 ================= -->
+<section class="slide" id="c10-exp2r" data-part="6" data-trans="rise" data-dur="18000" data-title="实验 10-2 实测：隔离的收益与代价" data-notes="配套仓库给出了两组真实运行记录，分开看。<br><b>正式实跑（v4，2026-07-30）</b>：在本仓库英文版技术书第 1–2 章上完成了 26 个 Markdown 安全翻译单元（242,090 字节、1,598 行、23 个插图引用、14 个围栏代码块）。翻译组用 ARK doubao-seed-1-6-flash-250615，匿名位置平衡裁判用 doubao-seed-1-6-250615，二者都关闭 thinking；12/12 执行与溯源门禁通过。四角色管理者组与单 Agent 组：翻译 API 调用 29 vs 26；翻译总 token 203,277 vs 1,317,808；主上下文峰值 4,618 vs 94,355；翻译墙钟时间 270.829 vs 254.127 秒；匿名质量均分 4.654 vs 4.481；裁判偏好单元数 15 vs 11；编辑部指定译法遵从率 75% vs 0%；确定性字符串术语一致率 50% vs 87.5%。<br>这次结果<b>支持“上下文隔离”，而不是无条件支持“多 Agent 全面更优”</b>：Manager 主上下文缩小 20.43 倍，翻译 token 减少 6.48 倍，匿名质量略高，但墙钟时间反而慢 6.57%。共享术语表显著提高了指定译法遵从率，却没有保证更高的宽泛字符串一致率；embedding 也没有遵守指定的“嵌入向量”。结构保真同样出现真实负结果：两组都保留了代码块和插图的数量，却都改动了代码 payload 并增加了标题；管理者组还改动了插图目标。<br><b>入门样例（gpt-5.6-luna，4 个短章节）</b>只用于教学预演：Manager 上下文峰值 697 vs 单 Agent 2,320；全流程总 token 11,849 vs 6,886（管理者模式花了更多 token）；术语内部一致率 100% vs 89%；指定术语遵从率 100% vs 53%。<br>右上角切换两组数据；绿色标出每行表现更好的一方。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-2<i>★★</i></span> 实测：<em>隔离的收益与代价</em></h2></div>
+    <div class="seg r2-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">正式实跑 v4</button><button data-v="1">入门样例（4 章）</button></div></header>
+  <div class="r2-body">
+    <div class="r2-tb fx fx-left" style="--d:2">
+      <div class="r2-hd"><span>指标</span><span class="m">四角色管理者组</span><span class="s">单 Agent 组</span></div>
+      <div class="r2-rows"></div>
+      <div class="k10-data r2-src"><svg class="ic"><use href="#i-db"/></svg><span></span></div>
+    </div>
+    <div class="r2-r fx fx-right" style="--d:3">
+      <div class="r2-big"><div><b class="r2-k0">20.43×</b><span class="r2-l0">主上下文缩小</span></div><div><b class="r2-k1">6.48×</b><span class="r2-l1">翻译 token 减少</span></div><div class="neg"><b class="r2-k2">+6.57%</b><span class="r2-l2">墙钟时间反而更慢</span></div></div>
+      <div class="r2-c ok"><svg class="ic"><use href="#i-check"/></svg><p class="r2-p0"></p></div>
+      <div class="r2-c bad"><svg class="ic"><use href="#i-alert"/></svg><p class="r2-p1"></p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-2</div>
+</section>
+<style>
+#c10-exp2r .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-exp2r .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp2r .r2-seg button{font-size:19px;padding:9px 20px}
+#c10-exp2r .r2-body{display:grid;grid-template-columns:1fr 560px;gap:26px;height:660px}
+#c10-exp2r .r2-tb{display:flex;flex-direction:column;gap:6px;padding:14px 20px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp2r .r2-hd,#c10-exp2r .r2-row{display:grid;grid-template-columns:270px 1fr 1fr;gap:18px;align-items:center}
+#c10-exp2r .r2-hd{padding:4px 10px;font-size:16px;color:var(--text3)}
+#c10-exp2r .r2-hd .m{color:var(--acc)}#c10-exp2r .r2-hd .s{color:#94a3b8}
+#c10-exp2r .r2-row{padding:9px 10px;border-radius:12px;transition:background .35s}
+#c10-exp2r .r2-row.on{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c10-exp2r .r2-row>b{font-size:18px;font-weight:600}
+#c10-exp2r .r2-v{display:flex;flex-direction:column;gap:4px}
+#c10-exp2r .r2-v span{font:700 19px var(--num);color:var(--text2)}
+#c10-exp2r .r2-v.win span{color:var(--ok)}
+#c10-exp2r .r2-v.win span::after{content:"  更好";font:600 15px var(--font);color:var(--ok)}
+#c10-exp2r .r2-bar{height:10px;border-radius:6px;background:rgba(255,255,255,.06);overflow:hidden}
+#c10-exp2r .r2-bar i{display:block;height:100%;width:0;border-radius:6px;background:var(--c);transition:width .9s var(--ease)}
+#c10-exp2r .r2-src{margin-top:auto}
+#c10-exp2r .r2-r{display:flex;flex-direction:column;gap:16px}
+#c10-exp2r .r2-big{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+#c10-exp2r .r2-big>div{padding:14px;border-radius:16px;text-align:center;border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c10-exp2r .r2-big b{display:block;font:800 34px var(--num);color:var(--ok)}
+#c10-exp2r .r2-big span{font-size:16px;color:var(--text2)}
+#c10-exp2r .r2-big .neg{border-color:color-mix(in srgb,var(--bad) 45%,transparent);background:color-mix(in srgb,var(--bad) 8%,transparent)}
+#c10-exp2r .r2-big .neg b{color:var(--bad)}
+#c10-exp2r .r2-c{display:flex;gap:12px;align-items:flex-start;padding:14px 18px;border-radius:16px}
+#c10-exp2r .r2-c .ic{flex:none;font-size:24px;margin-top:3px}
+#c10-exp2r .r2-c p{font-size:17px;line-height:1.6;color:var(--text2)}
+#c10-exp2r .r2-c p b{color:var(--text)}
+#c10-exp2r .r2-c.ok{border:1px solid color-mix(in srgb,var(--ok) 40%,transparent)}
+#c10-exp2r .r2-c.ok .ic{color:var(--ok)}
+#c10-exp2r .r2-c.bad{border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 6%,transparent)}
+#c10-exp2r .r2-c.bad .ic{color:var(--warn)}
+</style>
+<script>
+HOOKS['c10-exp2r'] = {
+  // [指标, 管理者组, 单 Agent 组, 越小越好?, 显示格式]
+  D: [
+    {
+      rows: [['翻译 API 调用', 29, 26, 1], ['翻译总 token', 203277, 1317808, 1], ['主上下文峰值', 4618, 94355, 1], ['翻译墙钟时间（秒）', 270.829, 254.127, 1], ['匿名质量均分（5 分制）', 4.654, 4.481, 0], ['裁判偏好单元数', 15, 11, 0], ['编辑部指定译法遵从率', '75%', '0%', 0], ['确定性字符串术语一致率', '50%', '87.5%', 0]],
+      big: [['20.43×', '主上下文缩小'], ['6.48×', '翻译 token 减少'], ['+6.57%', '墙钟时间反而更慢']],
+      p0: '支持<b>“上下文隔离”</b>，而不是无条件支持“多 Agent 全面更优”：主上下文与 token 大幅下降，匿名质量略高；共享术语表显著提高了指定译法遵从率',
+      p1: '真实负结果：宽泛字符串一致率反而更低，<b>embedding 没有遵守指定的“嵌入向量”</b>；两组都改动了代码 payload 并增加了标题，管理者组还改动了插图目标',
+      src: '数据：配套仓库 chapter10/book-translation 正式实跑 v4（2026-07-30，ARK doubao-seed-1-6-flash，26 个翻译单元，12/12 门禁）',
+    },
+    {
+      rows: [['主 / Manager 上下文峰值', 697, 2320, 1], ['Manager 决策调用上下文', 783, '—', 1], ['全流程总 token', 11849, 6886, 1], ['术语内部一致率', '100%', '89%', 0], ['指定术语遵从率', '100%', '53%', 0], ['参与 Agent 种类数', 4, 1, -1]],
+      big: [['3.3×', '上下文峰值差距'], ['100%', '指定术语遵从率'], ['+72%', 'token 花得更多']],
+      p0: 'Manager 上下文<b>与书的长度基本无关</b>（只加一行调用记录 / 文件索引），单 Agent 的累积上下文随章节线性增长；共享术语表消除了跨章漂移',
+      p1: '代价：管理者模式花了明显更多 token（11,849 vs 6,886）。样例只有 4 个短章节，<b>只用于教学预演</b>，不代表大规模真实书籍的绝对数值',
+      src: '数据：配套仓库 chapter10/book-translation 入门样例（gpt-5.6-luna，4 章；只用于教学预演）',
+    },
+  ],
+  init(s) { this.set = U.seg(s.querySelector('.r2-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  fmt(v) { return typeof v === 'number' ? v.toLocaleString('en-US') : v; },
+  num(v) { return typeof v === 'number' ? v : parseFloat(v); },
+  show(s, i) {
+    this.i = i;
+    this.set(String(i));
+    const d = this.D[i], q = (x) => s.querySelector(x);
+    q('.r2-rows').innerHTML = d.rows.map(([n, a, b, lo]) => {
+      const x = this.num(a), y = this.num(b), mx = Math.max(x || 0, y || 0) || 1;
+      const wa = lo >= 0 && !isNaN(y) ? (lo ? x < y : x > y) : false, wb = lo >= 0 && !isNaN(y) ? (lo ? y < x : y > x) : false;
+      return `<div class="r2-row"><b>${n}</b><div class="r2-v${wa ? ' win' : ''}"><span>${this.fmt(a)}</span><div class="r2-bar"><i style="--c:var(--acc)" data-w="${((x || 0) / mx) * 100}"></i></div></div><div class="r2-v${wb ? ' win' : ''}"><span>${this.fmt(b)}</span><div class="r2-bar"><i style="--c:#94a3b8" data-w="${isNaN(y) ? 0 : (y / mx) * 100}"></i></div></div></div>`;
+    }).join('');
+    this.ctx && this.ctx.later(() => s.querySelectorAll('.r2-bar i').forEach((b) => (b.style.width = b.dataset.w + '%')), 60);
+    d.big.forEach(([k, l], j) => { q('.r2-k' + j).textContent = k; q('.r2-l' + j).textContent = l; });
+    q('.r2-big>div:last-child').classList.toggle('neg', true);
+    q('.r2-p0').innerHTML = d.p0; q('.r2-p1').innerHTML = d.p1;
+    q('.r2-src span').textContent = d.src;
+    this.rows = [...s.querySelectorAll('.r2-row')];
+    this.r = -1;
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.show(s, 0);
+    let n = 0;
+    ctx.every(() => {
+      this.r = (this.r + 1) % this.rows.length;
+      this.rows.forEach((x, j) => x.classList.toggle('on', j === this.r));
+      if (++n % 12 === 0 && this.auto) this.show(s, 1 - this.i);
+    }, 1100);
+  },
+  leave() { this.ctx = null; },
+  reset() {},
+};
+</script>
+
+<section class="slide" id="c10-par" data-part="6" data-trans="zoom" data-dur="15000" data-title="并行协调形态与消息总线 · 图10-6" data-notes="<b>并行协调形态。</b>当多个子任务可以并行执行时，顺序模式就显得效率低下了。并行协调让多个 Agent 同时工作，大幅提升吞吐量。Manager Agent 不仅要规划并行任务，还要实时监控所有运行中的 Agent，协调通信，在 Agent 成功或失败时做出全局决策。这通常需要<b>消息总线</b>（Message Bus）作为基础设施——可以把它理解为一个“公共公告板”，Agent 可以往上面贴消息（发布），也可以关注自己感兴趣的消息类型（订阅），实现异步通信、互不阻塞。<br>图按图10-6 重画：Manager 负责并行调度、实时监控、结果汇总；四个 Agent 各有独立上下文，分别负责数据采集、内容分析、图表生成、格式校验。四条消息示例也取自原图：Manager 让 Agent 1 开始采集 arxiv 论文；Agent 3 报告图表已生成；Agent 1 直接告诉 Agent 2 数据已就绪；Manager 让依赖 Agent 2、3 的 Agent 4 开始。消息依次投递到总线，再送到订阅者。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">并行协调形态：<em>消息总线</em>是一块公共公告板</h2></header>
+  <div class="pa-body">
+    <div class="pa-st fx fx-scale" style="--d:2">
+      <svg class="pa-svg" viewBox="0 0 1000 560" width="1000" height="560"></svg>
+      <div class="pa-mgr"><b>Manager Agent</b><span>并行调度 · 实时监控 · 结果汇总</span></div>
+      <div class="pa-bus"><b>消息总线（Message Bus）</b><span>发布 · 订阅 · 异步、互不阻塞</span></div>
+      <div class="pa-ags"></div>
+    </div>
+    <div class="pa-r fx fx-right" style="--d:3">
+      <div class="pa-log win"><div class="win-bar"><i></i><i></i><i></i><span>消息总线通信示例（图10-6）</span></div><div class="pa-ms"></div></div>
+      <div class="pa-duty"><span class="lbl">Manager 在并行形态下要做的事</span><div><span>规划并行任务</span><span>实时监控所有运行中的 Agent</span><span>协调通信</span><span>成功或失败时做全局决策</span></div></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 并行协调形态 · 图10-6</div>
+</section>
+<style>
+#c10-par .pa-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:640px}
+#c10-par .pa-st{position:relative;height:560px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5)}
+#c10-par .pa-svg{position:absolute;inset:0;overflow:visible}
+#c10-par .pa-svg .fl{stroke-width:2.5}
+#c10-par .pa-mgr{position:absolute;left:330px;top:30px;width:340px;padding:14px;border-radius:18px;text-align:center;border:2px solid var(--acc);background:rgba(10,16,36,.95);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 30%,transparent)}
+#c10-par .pa-mgr b{display:block;font-size:23px;color:var(--acc)}
+#c10-par .pa-mgr span{font-size:16px;color:var(--text2)}
+#c10-par .pa-bus{position:absolute;left:40px;right:40px;top:200px;height:70px;border-radius:16px;display:flex;align-items:center;justify-content:center;gap:24px;border:1.5px dashed color-mix(in srgb,var(--warn) 60%,transparent);background:repeating-linear-gradient(90deg,rgba(251,191,36,.08) 0 20px,rgba(251,191,36,.03) 20px 40px);background-size:40px 100%;animation:c10pa-bus 1.2s linear infinite}
+@keyframes c10pa-bus{to{background-position:40px 0}}
+#c10-par .pa-bus b{font-size:21px;color:var(--warn)}
+#c10-par .pa-bus span{font-size:16px;color:var(--text2)}
+#c10-par .pa-ag{position:absolute;top:350px;width:200px;padding:12px;border-radius:16px;text-align:center;border:1.5px solid color-mix(in srgb,var(--c) 50%,transparent);background:rgba(10,16,36,.95);transition:box-shadow .3s,border-color .3s}
+#c10-par .pa-ag b{display:block;font-size:20px}
+#c10-par .pa-ag span{display:block;font-size:16px;color:var(--text2)}
+#c10-par .pa-ag em{display:inline-block;margin-top:6px;padding:2px 10px;border-radius:999px;font-style:normal;font-size:15px;color:var(--c);border:1px solid color-mix(in srgb,var(--c) 50%,transparent)}
+#c10-par .pa-ag small{display:block;margin-top:6px;font-size:15px;color:var(--text3)}
+#c10-par .pa-ag.hit{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 50%,transparent)}
+#c10-par .pa-r{display:flex;flex-direction:column;gap:16px}
+#c10-par .pa-ms{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+#c10-par .pa-m{padding:8px 12px;border-radius:10px;border:1px solid var(--line);opacity:.3;transition:opacity .4s,border-color .4s,background .4s}
+#c10-par .pa-m b{display:block;font-size:16px;color:var(--warn)}
+#c10-par .pa-m code{display:block;font:15px/1.5 var(--mono);color:var(--text2);word-break:break-all}
+#c10-par .pa-m.on{opacity:1;border-color:var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent)}
+#c10-par .pa-m.done{opacity:.75}
+#c10-par .pa-duty{padding:14px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-par .pa-duty div{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+#c10-par .pa-duty div span{padding:5px 12px;border-radius:999px;font-size:16px;border:1px solid color-mix(in srgb,var(--acc) 45%,transparent)}
+</style>
+<script>
+HOOKS['c10-par'] = {
+  AG: [['Agent 1', '数据采集', '运行中', '#22d3ee'], ['Agent 2', '内容分析', '运行中', '#22d3ee'], ['Agent 3', '图表生成', '已完成', '#34d399'], ['Agent 4', '格式校验', '等待中', '#94a3b8']],
+  // [发送者, 接收者, 消息]（-1 表示 Manager）
+  MS: [[-1, 0, '{"type":"start","task":"采集 arxiv 论文","params":{"query":"LLM agent"}}'], [2, -1, '{"type":"completed","agent_id":"3","result":"charts/fig1.svg 已生成"}'], [0, 1, '{"type":"data_ready","source":"agent_1","file":"raw_data.json"}'], [-1, 3, '{"type":"start","depends_on":["agent_2","agent_3"]}']],
+  init(s) {
+    s.querySelector('.pa-ags').innerHTML = this.AG.map(([n, r, st, c], i) => `<div class="pa-ag" style="left:${40 + i * 240}px;--c:${c}"><b>${n}</b><span>${r}</span><em>${st}</em><small>独立上下文</small></div>`).join('');
+    this.ags = [...s.querySelectorAll('.pa-ag')];
+    this.mgr = s.querySelector('.pa-mgr');
+    s.querySelector('.pa-ms').innerHTML = this.MS.map(([a, b, m]) => `<div class="pa-m"><b>${a < 0 ? 'Manager' : 'Agent ' + (a + 1)} → ${b < 0 ? 'Manager' : 'Agent ' + (b + 1)}</b><code>${m.replace(/"/g, '&quot;')}</code></div>`).join('');
+    this.ms = [...s.querySelectorAll('.pa-m')];
+    // 每个节点与总线之间的连线：上行 / 下行各一条
+    const X = (i) => (i < 0 ? 500 : 140 + i * 240), svg = s.querySelector('.pa-svg');
+    let h = '';
+    [-1, 0, 1, 2, 3].forEach((i) => {
+      const x = X(i), y0 = i < 0 ? 112 : 350, y1 = i < 0 ? 200 : 270;
+      h += `<path class="fl on" id="pa-u${i + 1}" d="M${x} ${y0} L${x} ${y1}" style="--c:${i < 0 ? 'var(--acc)' : this.AG[i][3]}"/>`;
+      h += `<path id="pa-d${i + 1}" d="M${x} ${y1} L${x} ${y0}" fill="none"/>`;
+    });
+    h += '<path id="pa-h" d="M0 235 L1000 235" fill="none"/><circle class="pk pa-k" r="11" style="fill:#fbbf24;opacity:0"/>';
+    svg.innerHTML = h;
+    this.k = svg.querySelector('.pa-k');
+    this.X = X;
+  },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, k = this.k, g = (id) => s.querySelector('#' + id);
+    while (ok()) {
+      this.ms.forEach((m) => m.classList.remove('on', 'done'));
+      for (let j = 0; j < this.MS.length; j++) {
+        const [a, b] = this.MS[j];
+        this.ms[j].classList.add('on');
+        const src = a < 0 ? this.mgr : this.ags[a], dst = b < 0 ? this.mgr : this.ags[b];
+        src.classList.add('hit');
+        k.style.opacity = 1;
+        await U.fly(k, g('pa-u' + (a + 1)), 500, { ctx, alive: ok, keep: true }); if (!ok()) return;
+        src.classList.remove('hit');
+        // 沿总线水平移动到接收者上方
+        const x0 = this.X(a), x1 = this.X(b), t0 = performance.now(), dur = 600;
+        await new Promise((res) => ctx.raf(() => { if (!ok()) { res(); return false; } const u = Math.min(1, (performance.now() - t0) / dur), e = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2; k.setAttribute('cx', (x0 + (x1 - x0) * e).toFixed(1)); k.setAttribute('cy', 235); if (u >= 1) { res(); return false; } }));
+        if (!ok()) return;
+        await U.fly(k, g('pa-d' + (b + 1)), 500, { ctx, alive: ok, keep: true }); if (!ok()) return;
+        k.style.opacity = 0;
+        dst.classList.add('hit');
+        ctx.later(() => dst.classList.remove('hit'), 700);
+        this.ms[j].classList.remove('on'); this.ms[j].classList.add('done');
+        await U.wait(ctx, 500); if (!ok()) return;
+      }
+      await U.wait(ctx, 1600);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.k.style.opacity = 0; this.ms.forEach((m) => m.classList.remove('on', 'done')); },
+};
+</script>
+
+<section class="slide" id="c10-lingtai" data-part="6" data-trans="flip" data-dur="16000" data-title="灵台：管理者模式的产品化实例" data-notes="<b>灵台（Lingtai）：管理者模式的一个产品化实例。</b>灵台是一个本地运行、以文件为本的长期 Agent 居所（脚注：灵台官方教程 lingtai.ai），它的三种角色是本节概念的完整实现：<br>• <b>主器灵</b>（main agent）是与用户对话的常驻中枢，掌管计划与记忆，并把工作派生给其他角色，这正是 Manager Agent 的位置；<br>• <b>分神</b>（daemon）是为一件嘈杂而有界的工作分出的短时并行工作者，完成后即弃，只把结论带回主器灵，这正是“子 Agent 返回结构化摘要而非全量轨迹”与并行协调形态的产品化；<br>• <b>分身</b>（avatar）则是拥有自己的记忆、邮箱与职责的持久专门化队友，用于值得跨多次会话保留的专业分工。<br>它的其余设计也与前文一一呼应：知识是每个器灵私有的持久记忆文件，技能是所有器灵共享的 Markdown 手册；上下文窗口将满时，器灵会“凝蜕”（molt），给自己写一份总结，带着持久记忆在干净的上下文中继续工作（对应第二章的上下文压缩）。底层模型可以替换而器灵犹在。身份、记忆与能力都以普通文件的形式存放在项目目录中，即“器灵即其文件”。<br>左侧动画为示意：分神出去处理嘈杂的工作，只带回结论就消散；分身常驻；主器灵的上下文将满时凝蜕。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">灵台（Lingtai）：<em>管理者模式的产品化实例</em></h2></header>
+  <div class="lt-body">
+    <div class="lt-st fx fx-scale" style="--d:2">
+      <canvas class="lt-cv" width="1520" height="1160"></canvas>
+      <div class="lt-main"><b>主器灵</b><small>main agent · 常驻中枢</small><div class="lt-ctx"><span>上下文</span><div class="meter"><i class="lt-cv2"></i></div></div><em class="lt-molt">凝蜕（molt）：写一份总结，带着持久记忆在干净的上下文中继续</em></div>
+      <div class="lt-av" style="left:40px;top:40px"><b>分身 · 研究</b><small>记忆 · 邮箱 · 职责</small></div>
+      <div class="lt-av" style="left:520px;top:40px"><b>分身 · 写作</b><small>记忆 · 邮箱 · 职责</small></div>
+      <div class="lt-tag">分神：嘈杂而有界的工作 → 只带回结论 → 即弃</div>
+      <span class="k10-sim lt-sim">示意</span>
+    </div>
+    <div class="lt-r fx fx-right" style="--d:3">
+      <div class="lt-map"></div>
+      <div class="lt-fs"><span class="lbl">器灵即其文件</span><pre class="lt-tree"></pre><p>身份、记忆与能力都是项目目录里的普通文件——<b>底层模型可以替换而器灵犹在</b></p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 灵台</div>
+</section>
+<style>
+#c10-lingtai .lt-body{display:grid;grid-template-columns:760px 1fr;gap:26px;height:640px}
+#c10-lingtai .lt-st{position:relative;height:580px;border-radius:22px;border:1px solid var(--line);background:rgba(10,16,36,.5);overflow:hidden}
+#c10-lingtai .lt-cv{position:absolute;inset:0;width:760px;height:580px}
+#c10-lingtai .lt-main{position:absolute;left:250px;top:200px;width:260px;padding:16px;border-radius:50%/40%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;border:2px solid var(--acc);background:radial-gradient(circle,color-mix(in srgb,var(--acc) 22%,#0a1024),#0a1024 75%);box-shadow:0 0 40px color-mix(in srgb,var(--acc) 35%,transparent)}
+#c10-lingtai .lt-main b{font-size:24px;color:var(--acc)}
+#c10-lingtai .lt-main small{font-size:15px;color:var(--text2)}
+#c10-lingtai .lt-ctx{width:180px;display:flex;flex-direction:column;gap:4px;margin-top:6px}
+#c10-lingtai .lt-ctx span{font-size:15px;color:var(--text3)}
+#c10-lingtai .lt-cv2{--c:var(--warn);transition:width .25s linear!important}
+#c10-lingtai .lt-molt{position:absolute;top:calc(100% + 10px);left:-60px;right:-60px;font-style:normal;font-size:16px;line-height:1.45;color:var(--warn);opacity:0;transition:opacity .4s}
+#c10-lingtai .lt-main.molt{animation:c10lt-molt 1.2s ease-out}
+#c10-lingtai .lt-main.molt .lt-molt{opacity:1}
+@keyframes c10lt-molt{30%{box-shadow:0 0 80px var(--warn);border-color:var(--warn)}}
+#c10-lingtai .lt-av{position:absolute;width:200px;padding:12px;border-radius:16px;text-align:center;border:1.5px solid #a78bfa;background:rgba(10,16,36,.95);box-shadow:0 0 22px rgba(167,139,250,.25)}
+#c10-lingtai .lt-av b{display:block;font-size:19px;color:#c4b5fd}
+#c10-lingtai .lt-av small{font-size:15px;color:var(--text2)}
+#c10-lingtai .lt-tag{position:absolute;left:0;right:0;bottom:18px;text-align:center;font-size:17px;color:#7dd3fc}
+#c10-lingtai .lt-sim{position:absolute;right:14px;top:12px}
+#c10-lingtai .lt-r{display:flex;flex-direction:column;gap:14px}
+#c10-lingtai .lt-map{display:flex;flex-direction:column;gap:8px}
+#c10-lingtai .lt-row{display:grid;grid-template-columns:200px 30px 1fr;gap:10px;align-items:center;padding:10px 14px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);transition:border-color .35s,background .35s}
+#c10-lingtai .lt-row.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c10-lingtai .lt-row b{font-size:18px;color:var(--c,var(--acc))}
+#c10-lingtai .lt-row b small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+#c10-lingtai .lt-row i{height:2px;background:var(--line2)}
+#c10-lingtai .lt-row span{font-size:16px;line-height:1.45;color:var(--text2)}
+#c10-lingtai .lt-fs{padding:12px 16px;border-radius:14px;border:1px dashed var(--line2)}
+#c10-lingtai .lt-tree{margin-top:6px;font:15px/1.5 var(--mono);color:var(--ctx)}
+#c10-lingtai .lt-fs p{font-size:16px;color:var(--text2);margin-top:4px}
+#c10-lingtai .lt-fs b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-lingtai'] = {
+  MAP: [
+    ['主器灵', 'main agent', '与用户对话的常驻中枢，掌管计划与记忆，派生工作——<b>Manager Agent 的位置</b>', 'var(--acc)'],
+    ['分神', 'daemon', '短时并行工作者，完成即弃，只带回结论——子 Agent 返回<b>结构化摘要</b>而非全量轨迹', '#7dd3fc'],
+    ['分身', 'avatar', '拥有记忆、邮箱与职责的<b>持久专门化队友</b>，跨多次会话保留', '#c4b5fd'],
+    ['知识 / 技能', 'knowledge · skills', '知识是每个器灵<b>私有</b>的持久记忆文件；技能是所有器灵<b>共享</b>的 Markdown 手册', '#34d399'],
+    ['凝蜕', 'molt', '上下文将满时写总结、带着持久记忆在干净上下文中继续——对应<b>第二章的上下文压缩</b>', 'var(--warn)'],
+  ],
+  TREE: 'project/\n├─ main/       identity.md  memory.md\n├─ avatars/    research/  writing/\n└─ skills/     *.md   ← 所有器灵共享',
+  init(s) {
+    s.querySelector('.lt-map').innerHTML = this.MAP.map(([n, e, d, c]) => `<div class="lt-row" style="--c:${c}"><b>${n}<small>${e}</small></b><i></i><span>${d}</span></div>`).join('');
+    s.querySelector('.lt-tree').textContent = this.TREE;
+    this.rows = [...s.querySelectorAll('.lt-row')];
+    this.g = s.querySelector('.lt-cv').getContext('2d');
+  },
+  enter(s, ctx) {
+    const g = this.g, main = s.querySelector('.lt-main'), bar = s.querySelector('.lt-cv2'), C = [380, 300];
+    let ds = [], acc = 0, fill = 20, last = 0, ri = -1, rt = 0;
+    ctx.raf((t) => {
+      const dt = last ? Math.min(60, t - last) : 0;
+      last = t;
+      // 分神：从主器灵飞出，在外面“嘈杂地”忙一阵，带着一个结论回来后消散
+      acc += dt;
+      if (acc > 900 && ds.length < 6) { acc = 0; const a = Math.random() * Math.PI * 2; ds.push({ a, r: 0, ph: 0, life: 0, tx: C[0] + Math.cos(a) * 230, ty: C[1] + Math.sin(a) * 170 }); }
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 760, 580);
+      for (let i = ds.length - 1; i >= 0; i--) {
+        const d = ds[i];
+        d.life += dt;
+        let x, y;
+        if (d.ph === 0) { const u = Math.min(1, d.life / 900); x = C[0] + (d.tx - C[0]) * u; y = C[1] + (d.ty - C[1]) * u; if (u >= 1) { d.ph = 1; d.life = 0; } }
+        else if (d.ph === 1) { x = d.tx + Math.sin(d.life / 60) * 8; y = d.ty + Math.cos(d.life / 47) * 8; if (d.life > 1400) { d.ph = 2; d.life = 0; } g.strokeStyle = 'rgba(125,211,252,.35)'; g.beginPath(); g.arc(d.tx, d.ty, 22 + Math.sin(d.life / 90) * 6, 0, 6.283); g.stroke(); }
+        else { const u = Math.min(1, d.life / 800); x = d.tx + (C[0] - d.tx) * u; y = d.ty + (C[1] - d.ty) * u; if (u >= 1) { ds.splice(i, 1); fill = Math.min(100, fill + 7); continue; } }
+        g.fillStyle = d.ph === 2 ? '#34d399' : '#7dd3fc';
+        g.beginPath(); g.arc(x, y, d.ph === 2 ? 6 : 8, 0, 6.283); g.fill();
+        if (d.ph === 2) { g.fillStyle = '#a7f3d0'; g.font = '15px sans-serif'; g.fillText('结论', x + 10, y - 8); }
+      }
+      // 主器灵的上下文逐渐变满，满了就凝蜕
+      fill = Math.min(100, fill + dt / 400);
+      if (fill >= 100) { fill = 22; U.restart(main, 'molt'); }
+      bar.style.setProperty('--v', fill.toFixed(1) + '%');
+      rt += dt;
+      if (rt > 2400) { rt = 0; ri = (ri + 1) % this.rows.length; this.rows.forEach((r, j) => r.classList.toggle('on', j === ri)); }
+    });
+  },
+  reset(s) { this.rows.forEach((r) => r.classList.remove('on')); s.querySelector('.lt-main').classList.remove('molt'); },
+};
+</script>
+
+<section class="slide" id="c10-exp3" data-part="6" data-trans="rise" data-dur="18000" data-title="实验 10-3 ★★★：自主编排的电话 + 电脑 Agent · 图10-7" data-notes="<b>前置要求</b>：本实验综合运用第六章的 Computer Use 和语音 Agent 技术。<br><b>任务场景</b>：用户只给出一个网站 URL，请 Agent 填写复杂的注册或航班预订表单。Computer Agent 先打开页面并识别字段；姓名、证件号、联系方式、地址和偏好等信息不在当前上下文中，需要向用户收集。<br><b>系统架构</b>：Computer Agent 负责浏览器操作，也是本实验的编排者；Phone Agent 负责 ASR、LLM、TTS 和实时对话。两者通过点对点工具或消息总线交换结构化消息（发送者、接收者、类型、内容）。不需要额外的 Manager 进程：Computer Agent 可以像调用工具一样调用 Phone Agent。直接让用户在聊天框中逐项打字会比较慢，也容易漏项或输错格式；电话 Agent 可以连续询问、确认和重问，把自然语言回答转换成结构化字段。<br><b>两种运行模式</b>：<b>固定模式（并发基线）</b>预先启动两个 Agent，验证独立 ReAct 循环、双向通信和真正并行；<b>自主模式（主实验）</b>只启动 Computer Agent，它根据页面、已知信息和任务需要，自主决定是否调用 initiate_phone_call_agent(purpose, required_info)；不要用“字段数量超过阈值”的 Python 规则代替模型决策。调用后，系统把任务目的、待收集字段及格式约束作为独立上下文交给 Phone Agent，再沿用固定模式的通信和并行机制。<br><b>并行与闭环</b>：Phone Agent 通过 WebRTC 逐项提问、抽取并校验回答；Computer Agent 同时截屏、理解页面并填写字段。每收到一个有效值就发送 info_collected，Phone Agent 不等待网页填写完成便询问下一项；Computer Agent 反馈 fill_error 或页面状态，Phone Agent 据此调整话术。格式错误发送 format_invalid 并重新询问，超过重试次数或页面异常则安全暂停。信息收集完成后发送 task_completed，Computer Agent 通过校验后提交表单。异常时取消仍在运行的对端，关闭浏览器、音频轨道和通话；真人语音须显式同意，提交须显式授权。<br><b>实验要求</b>：1. 实现两个独立 Agent 及高效的双向结构化通信；2. 在固定模式和自主模式下证明“问下一个”和“填上一个”真正重叠；3. 实现字段格式校验、重问、页面错误反馈、超时和资源清理；4. 记录消息时序、自主启动决策、延迟、成功率和资源消耗，并比较两种模式。<br>右侧双泳道按图10-7 的架构重画，时间与字段为示意；绿色高亮是“问下一个”与“填上一个”重叠的时段。图10-7 中的消息示例里，证件号这类个人值在页面上打了码。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-3<i>★★★</i></span> 自主编排的<em>电话 + 电脑 Agent</em></h2></div>
+    <div class="seg e3-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">固定模式（并发基线）</button><button data-v="1">自主模式（主实验）</button></div></header>
+  <div class="e3-body">
+    <div class="e3-l fx fx-left" style="--d:2">
+      <div class="e3-c"><b>前置要求</b><p>综合运用第六章的 Computer Use 和语音 Agent 技术</p></div>
+      <div class="e3-c"><b>任务场景</b><p>用户只给一个网站 URL，请 Agent 填写复杂的注册或航班预订表单；姓名、证件号、联系方式、地址和偏好需要<b>向用户收集</b></p></div>
+      <div class="e3-c"><b>系统架构</b><p>Computer Agent 操作浏览器，也是<b>编排者</b>；Phone Agent 负责 ASR、LLM、TTS 和实时对话。不需要额外的 Manager 进程</p></div>
+      <div class="e3-c e3-mode"><b class="e3-mt">固定模式（并发基线）</b><p class="e3-md"></p></div>
+    </div>
+    <div class="e3-r fx fx-right" style="--d:3">
+      <div class="e3-st">
+        <div class="e3-ln p"><span><svg class="ic"><use href="#i-phone"/></svg>Phone Agent<small>WebRTC · ASR · LLM · TTS</small></span></div>
+        <div class="e3-ln c"><span><svg class="ic"><use href="#i-browser"/></svg>Computer Agent<small>截屏 · Vision LLM · 填写</small></span></div>
+        <div class="e3-items"></div>
+        <i class="e3-ph"></i>
+        <span class="k10-sim e3-sim">示意</span>
+      </div>
+      <div class="e3-msgs"><span class="lbl">图10-7 消息示例（个人值打码）</span><div class="e3-ml"></div></div>
+      <div class="e3-req"><b>实验要求</b><span>① 两个独立 Agent + 双向结构化通信</span><span>② 证明“问下一个”和“填上一个”真正重叠</span><span>③ 格式校验、重问、页面错误反馈、超时、资源清理</span><span>④ 记录消息时序、自主启动决策、延迟、成功率、资源消耗</span></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-3 · 图10-7</div>
+</section>
+<style>
+#c10-exp3 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-exp3 .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp3 .e3-seg button{font-size:18px;padding:9px 18px}
+#c10-exp3 .e3-body{display:grid;grid-template-columns:400px 1fr;gap:24px;height:660px}
+#c10-exp3 .e3-l{display:flex;flex-direction:column;gap:12px}
+#c10-exp3 .e3-c{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp3 .e3-c b{font-size:18px;color:var(--acc)}
+#c10-exp3 .e3-c p{margin-top:4px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-exp3 .e3-c p b{font-size:inherit;color:var(--text)}
+#c10-exp3 .e3-mode{flex:1;border-color:color-mix(in srgb,var(--acc) 50%,transparent)}
+#c10-exp3 .e3-md code{font:15px var(--mono);color:var(--tool)}
+#c10-exp3 .e3-r{display:flex;flex-direction:column;gap:12px;min-width:0}
+#c10-exp3 .e3-st{position:relative;height:330px;border-radius:18px;border:1px solid var(--line);background:rgba(8,12,30,.55)}
+#c10-exp3 .e3-ln{position:absolute;left:0;right:0;height:110px}
+#c10-exp3 .e3-ln.p{top:20px}#c10-exp3 .e3-ln.c{top:200px}
+#c10-exp3 .e3-ln>span{position:absolute;left:16px;top:28px;width:170px;display:grid;grid-template-columns:30px 1fr;gap:0 8px;font-size:18px;font-weight:700}
+#c10-exp3 .e3-ln .ic{grid-row:1/3;font-size:26px;color:var(--acc)}
+#c10-exp3 .e3-ln small{font-size:15px;font-weight:400;color:var(--text3)}
+#c10-exp3 .e3-bk{position:absolute;height:40px;border-radius:9px;overflow:hidden;border:1px solid color-mix(in srgb,var(--c) 55%,transparent)}
+#c10-exp3 .e3-bk i{position:absolute;left:0;top:0;bottom:0;width:0;background:color-mix(in srgb,var(--c) 30%,transparent)}
+#c10-exp3 .e3-bk span{position:absolute;inset:0;display:flex;align-items:center;padding-left:6px;font-size:15px;white-space:nowrap;z-index:1}
+#c10-exp3 .e3-ov{position:absolute;top:50px;height:200px;border-radius:8px;background:rgba(52,211,153,.12);border:1px dashed rgba(52,211,153,.6);opacity:0;transition:opacity .3s}
+#c10-exp3 .e3-ov.on{opacity:1}
+#c10-exp3 .e3-mk{position:absolute;top:96px;height:104px;width:0;opacity:0;transition:opacity .25s}
+#c10-exp3 .e3-mk.on{opacity:1}
+#c10-exp3 .e3-mk::before{content:"";position:absolute;left:-1px;top:0;bottom:0;width:2px;background:var(--c)}
+#c10-exp3 .e3-mk em{position:absolute;top:38px;left:6px;padding:2px 8px;border-radius:7px;font:15px var(--mono);font-style:normal;white-space:nowrap;color:var(--c);background:rgba(8,12,30,.95);border:1px solid color-mix(in srgb,var(--c) 55%,transparent)}
+#c10-exp3 .e3-ph{position:absolute;top:8px;bottom:8px;width:2px;background:#fff;box-shadow:0 0 10px #fff}
+#c10-exp3 .e3-sim{position:absolute;right:12px;top:8px}
+#c10-exp3 .e3-msgs{padding:10px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp3 .e3-ml{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:6px}
+#c10-exp3 .e3-ml div{font:15px/1.45 var(--mono);color:var(--text2);opacity:.35;transition:opacity .3s}
+#c10-exp3 .e3-ml div.on{opacity:1;color:var(--text)}
+#c10-exp3 .e3-ml b{color:var(--acc);font-weight:600}
+#c10-exp3 .e3-req{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#c10-exp3 .e3-req b{font-size:17px;color:var(--acc)}
+#c10-exp3 .e3-req span{padding:4px 10px;border-radius:9px;font-size:15px;border:1px solid var(--line2)}
+</style>
+<script>
+HOOKS['c10-exp3'] = {
+  T: 8.9, X0: 200, PX: 95,
+  // 固定模式时间线；自主模式整体后移，先加一段“Computer 读表单 → 自主决定调用 Phone Agent”
+  P: [[0.3, 1.3, '问姓名'], [1.5, 2.6, '问证件号'], [2.8, 3.7, '重问证件号'], [3.9, 4.9, '问地址'], [5.6, 6.5, '调整话术']],
+  C: [[0, 1.0, '识别字段'], [1.4, 2.4, '填姓名'], [3.8, 4.6, '填证件号'], [4.9, 5.6, '填地址'], [6.6, 7.4, '重填地址'], [7.5, 8.8, '校验 · 授权提交']],
+  M: [[1.35, 'info_collected', '#34d399'], [2.7, 'format_invalid', '#fb7185'], [3.75, 'info_collected', '#34d399'], [4.9, 'info_collected', '#34d399'], [5.6, 'fill_error', '#fbbf24'], [6.55, 'info_collected', '#34d399'], [7.4, 'task_completed', '#a78bfa']],
+  OV: [[1.5, 2.4], [3.9, 4.6]],
+  ML: ['<b>Phone → Computer</b> 用户说姓名是张三', '<b>Computer → Phone</b> 已填写姓名，需要证件号', '<b>Phone → Computer</b> 证件号 3101************', '<b>Computer → Phone</b> 表单已提交，注册成功'],
+  x(t) { return this.X0 + t * this.PX; },
+  init(s) {
+    this.set = U.seg(s.querySelector('.e3-seg'), (v) => { this.auto = false; this.mode(s, +v); this.t = 0; });
+    s.querySelector('.e3-ml').innerHTML = this.ML.map((m) => `<div>${m}</div>`).join('');
+    this.mls = [...s.querySelectorAll('.e3-ml div')];
+    this.ph = s.querySelector('.e3-ph');
+  },
+  mode(s, m) {
+    this.m = m;
+    this.set(String(m));
+    const sh = m ? 1.6 : 0, q = (x) => s.querySelector(x);
+    q('.e3-mt').textContent = m ? '自主模式（主实验）' : '固定模式（并发基线）';
+    q('.e3-md').innerHTML = m ? '只启动 Computer Agent。它看过页面后<b>自主决定</b>调用 <code>initiate_phone_call_agent(purpose, required_info)</code>，不用“字段数超过阈值”的规则代替模型决策；之后沿用固定模式的通信与并行' : '预先启动两个 Agent，验证<b>独立 ReAct 循环、双向通信和真正并行</b>';
+    const it = [];
+    if (m) it.push({ l: 1, a: 1.0, b: 1.9, t: '决定调用', c: '#a78bfa' });
+    this.P.forEach(([a, b, t]) => it.push({ l: 0, a: a + sh, b: b + sh, t, c: '#22d3ee' }));
+    this.C.forEach(([a, b, t], i) => it.push({ l: 1, a: i ? a + sh : a, b: i ? b + sh : b, t, c: '#fbbf24' }));
+    this.it = it;
+    this.mk = this.M.map(([t, n, c]) => ({ at: t + sh, n, c }));
+    let h = this.OV.map(([a, b]) => `<div class="e3-ov" style="left:${this.x(a + sh)}px;width:${(b - a) * this.PX}px"></div>`).join('');
+    h += it.map((d) => `<div class="e3-bk" style="left:${this.x(d.a)}px;top:${d.l ? 236 : 56}px;width:${(d.b - d.a) * this.PX - 4}px;--c:${d.c}"><i></i><span>${d.t}</span></div>`).join('');
+    h += this.mk.map((d, i) => `<div class="e3-mk" style="left:${this.x(d.at)}px;--c:${d.c}"><em style="top:${i % 2 ? 62 : 16}px">${d.n}</em></div>`).join('');
+    q('.e3-items').innerHTML = h;
+    this.bks = [...s.querySelectorAll('.e3-bk')]; this.mks = [...s.querySelectorAll('.e3-mk')]; this.ovs = [...s.querySelectorAll('.e3-ov')]; this.sh = sh;
+  },
+  draw() {
+    const t = this.t;
+    this.ph.style.left = this.x(t) + 'px';
+    this.bks.forEach((b, i) => { const d = this.it[i]; b.firstElementChild.style.width = Math.max(0, Math.min(1, (t - d.a) / (d.b - d.a))) * 100 + '%'; });
+    this.mks.forEach((m, i) => m.classList.toggle('on', t >= this.mk[i].at));
+    this.ovs.forEach((o, i) => o.classList.toggle('on', t >= this.OV[i][0] + this.sh));
+    const ml = [1.35, 2.4, 3.75, 8.8].map((x) => x + this.sh);
+    this.mls.forEach((d, i) => d.classList.toggle('on', t >= ml[i]));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.mode(s, 1);
+    this.t = 0;
+    let last = 0, hold = 0;
+    ctx.raf((now) => {
+      const dt = last ? Math.min(60, now - last) : 0;
+      last = now;
+      const end = this.T + this.sh;
+      if (this.t >= end) { hold += dt; if (hold > 1800) { hold = 0; this.t = 0; if (this.auto) this.mode(s, 1 - this.m); } }
+      else this.t = Math.min(end, this.t + dt / 1000);
+      this.draw();
+    });
+  },
+  reset() { this.t = 0; this.draw(); },
+};
+</script>
+
+<section class="slide" id="c10-exp3r" data-part="6" data-trans="zoom" data-dur="17000" data-title="实验 10-3 验收记录：自主启动与并行协作" data-notes="配套仓库为实验 10-3 保留了两条路径的记录，<b>分别统计，不能合并</b>。<br><b>自主模式（raw-v4，2026-07-31）</b>：以安全合成参与者跑通真实 ARK 自主工具调用、Playwright、WebRTC/RTP、本机 TTS、真实本机 Whisper ASR、格式重问、问填并行和一次 localhost 表单提交，9/9 行为门禁通过。证据保留了不含凭据的 ARK 原始请求和响应，包含字面量 tool_choice: auto、工具参数、response ID、model、usage 与实测延迟；模型自主选择了六个字段，记录中有 9 次 TTS、7 次 Whisper、双向 RTP 和一次脱敏 localhost 提交。独立 validator 的 8/8 溯源检查和四类篡改测试都通过；日志只保留 &lt;redacted&gt;，不保留参与者值、音频或 transcript。这证明了完整技术链路，不等同于真人可用性或跨 NAT/TURN 测试。<br><b>固定拓扑（TalkAct 复现，Anthropic-caller v2，2026-08-03）</b>：Duplex（快慢双 Agent）与 Strawman（单模型）各 8 条轨迹。任务成功率都是 1.000；探针正确率 0.833 vs 0.917；语音延迟 p50 / p90 为 2.32 / 2.85 秒 vs 12.52 / 21.14 秒；最大语音延迟 4.03 vs 37.29 秒；平均整段任务耗时 207.2 vs 178.0 秒；语音延迟样本 47 vs 44。中位语音延迟改善约 12.52 / 2.32 = 5.40 倍（明显低于上游约 15 倍的结果），但任务成功率持平，单模型组的探针正确率和平均总耗时反而更好——<b>延迟优势不等于所有维度都更好</b>。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-3<i>★★★</i></span> 验收记录：<em>两条路径，分别统计</em></h2></header>
+  <div class="r3-body">
+    <div class="r3-a fx fx-left" style="--d:2">
+      <div class="r3-h"><svg class="ic"><use href="#i-robot"/></svg><div><b>自主模式 · raw-v4</b><small>2026-07-31 · 安全合成参与者</small></div><span class="r3-gate"><b data-count="9">0</b>/9 行为门禁</span></div>
+      <div class="r3-chain"></div>
+      <div class="r3-facts"><span>模型自主选择 <b>6</b> 个字段</span><span><b>9</b> 次 TTS</span><span><b>7</b> 次 Whisper</span><span>双向 RTP</span><span>1 次脱敏 localhost 提交</span><span>8/8 溯源 + 四类篡改测试</span></div>
+      <p class="r3-note"><svg class="ic"><use href="#i-alert"/></svg>证明完整技术链路，<b>不等同于真人可用性</b>或跨 NAT/TURN 测试；日志只保留 &lt;redacted&gt;</p>
+      <div class="k10-data"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter10/autonomous-phone-registration（raw-v4，ARK，tool_choice: auto）</div>
+    </div>
+    <div class="r3-b fx fx-right" style="--d:3">
+      <div class="r3-h"><svg class="ic"><use href="#i-phone"/></svg><div><b>固定拓扑 · TalkAct 复现 v2</b><small>2026-08-03 · Anthropic-caller · 各 8 条轨迹</small></div></div>
+      <div class="r3-lat">
+        <div class="r3-lr"><span>Duplex（快慢双 Agent）</span><div class="r3-lb"><i class="d" style="--p50:6.2%;--p90:7.6%;--mx:10.8%"></i></div><b>2.32 s</b></div>
+        <div class="r3-lr"><span>Strawman（单模型）</span><div class="r3-lb"><i class="s" style="--p50:33.6%;--p90:56.7%;--mx:100%"></i></div><b>12.52 s</b></div>
+        <small>语音延迟：实心 p50 · 浅色到 p90 · 细线到最大值（4.03 / 37.29 秒）</small>
+      </div>
+      <div class="r3-x"><b data-count="5.4" data-dec="2" data-suffix="×">0</b><span>中位语音延迟改善（上游约 15×）</span></div>
+      <div class="r3-t"></div>
+      <p class="r3-note"><svg class="ic"><use href="#i-scale"/></svg><b>延迟优势不等于所有维度都更好</b>：成功率持平，单模型组探针正确率与平均总耗时反而更好</p>
+      <div class="k10-data"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter10/talkact-reproduction（exp10-3-talkact-anthropic-caller-20260803-v2）</div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-3</div>
+</section>
+<style>
+#c10-exp3r .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp3r .r3-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:690px}
+#c10-exp3r .r3-a,#c10-exp3r .r3-b{padding:18px 22px;border-radius:20px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:12px}
+#c10-exp3r .r3-h{display:flex;align-items:center;gap:14px}
+#c10-exp3r .r3-h>.ic{font-size:34px;color:var(--acc)}
+#c10-exp3r .r3-h b{display:block;font-size:22px}
+#c10-exp3r .r3-h small{font-size:15px;color:var(--text3)}
+#c10-exp3r .r3-gate{margin-left:auto;font-size:16px;color:var(--text2)}
+#c10-exp3r .r3-gate b{font:800 34px var(--num);color:var(--ok)}
+#c10-exp3r .r3-chain{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#c10-exp3r .r3-chain span{padding:6px 12px;border-radius:10px;font-size:16px;border:1px solid var(--line2);opacity:.35;transition:all .35s}
+#c10-exp3r .r3-chain span.on{opacity:1;border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+#c10-exp3r .r3-chain i{color:var(--text3);font-style:normal}
+#c10-exp3r .r3-facts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#c10-exp3r .r3-facts span{padding:8px 12px;border-radius:10px;font-size:16px;color:var(--text2);background:rgba(255,255,255,.04)}
+#c10-exp3r .r3-facts b{font:800 20px var(--num);color:var(--acc)}
+#c10-exp3r .r3-note{display:flex;gap:10px;align-items:flex-start;font-size:17px;line-height:1.55;color:var(--text2);margin-top:auto}
+#c10-exp3r .r3-note .ic{flex:none;font-size:22px;color:var(--warn);margin-top:2px}
+#c10-exp3r .r3-note b{color:var(--warn)}
+#c10-exp3r .r3-lat{display:flex;flex-direction:column;gap:10px}
+#c10-exp3r .r3-lr{display:grid;grid-template-columns:200px 1fr 80px;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+#c10-exp3r .r3-lr b{font:800 20px var(--num);color:var(--text);text-align:right}
+#c10-exp3r .r3-lb{position:relative;height:22px;border-radius:6px;background:rgba(255,255,255,.05)}
+#c10-exp3r .r3-lb i{position:absolute;left:0;top:0;bottom:0;width:var(--mx);border-right:2px solid currentColor}
+#c10-exp3r .r3-lb i::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--p90) / var(--mx) * 100%);background:currentColor;opacity:.3;border-radius:6px}
+#c10-exp3r .r3-lb i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(var(--p50) / var(--mx) * 100%);background:currentColor;border-radius:6px}
+#c10-exp3r .r3-lb i.d{color:var(--ok)}#c10-exp3r .r3-lb i.s{color:#94a3b8}
+#c10-exp3r .r3-lb i{animation:c10r3-in 1.4s var(--ease) both}
+@keyframes c10r3-in{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+#c10-exp3r .r3-lat small{font-size:15px;color:var(--text3)}
+#c10-exp3r .r3-x{display:flex;align-items:baseline;gap:14px}
+#c10-exp3r .r3-x b{font:800 44px var(--num);color:var(--ok)}
+#c10-exp3r .r3-x span{font-size:17px;color:var(--text2)}
+#c10-exp3r .r3-t{display:flex;flex-direction:column;border-radius:12px;border:1px solid var(--line);overflow:hidden}
+#c10-exp3r .r3-tr{display:grid;grid-template-columns:1fr 130px 130px;gap:10px;padding:6px 14px;font-size:16px;color:var(--text2);transition:background .3s}
+#c10-exp3r .r3-tr+.r3-tr{border-top:1px solid var(--line)}
+#c10-exp3r .r3-tr.h{font-size:15px;color:var(--text3);background:rgba(255,255,255,.03)}
+#c10-exp3r .r3-tr span{text-align:right;font-family:var(--num)}
+#c10-exp3r .r3-tr span.w{color:var(--ok);font-weight:700}
+#c10-exp3r .r3-tr.on{background:color-mix(in srgb,var(--acc) 10%,transparent)}
+</style>
+<script>
+HOOKS['c10-exp3r'] = {
+  CH: ['ARK 自主工具调用', 'Playwright', 'WebRTC / RTP', '本机 TTS', '本机 Whisper ASR', '格式重问', '问填并行', 'localhost 表单提交'],
+  // [指标, Duplex, Strawman, 更好的一方 0/1/-1]
+  TR: [['任务成功率', '1.000', '1.000', -1], ['探针正确率', '0.833', '0.917', 1], ['语音延迟 p90', '2.85 s', '21.14 s', 0], ['最大语音延迟', '4.03 s', '37.29 s', 0], ['平均整段任务耗时', '207.2 s', '178.0 s', 1], ['语音延迟样本数', '47', '44', -1]],
+  init(s) {
+    s.querySelector('.r3-chain').innerHTML = this.CH.map((c) => `<span>${c}</span>`).join('<i>→</i>');
+    s.querySelector('.r3-t').innerHTML = '<div class="r3-tr h"><b>指标</b><span>Duplex</span><span>Strawman</span></div>' + this.TR.map(([n, a, b, w]) => `<div class="r3-tr"><b>${n}</b><span class="${w === 0 ? 'w' : ''}">${a}</span><span class="${w === 1 ? 'w' : ''}">${b}</span></div>`).join('');
+    this.cs = [...s.querySelectorAll('.r3-chain span')];
+    this.trs = [...s.querySelectorAll('.r3-tr:not(.h)')];
+  },
+  enter(s, ctx) {
+    let i = 0, j = -1;
+    ctx.every(() => {
+      if (i < this.cs.length) this.cs[i++].classList.add('on');
+      else { i = 0; this.cs.forEach((c) => c.classList.remove('on')); }
+      j = (j + 1) % this.trs.length;
+      this.trs.forEach((r, k) => r.classList.toggle('on', k === j));
+    }, 800);
+  },
+  reset() { this.cs.forEach((c) => c.classList.remove('on')); this.trs.forEach((r) => r.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-exp4" data-part="6" data-trans="flip" data-dur="18000" data-title="实验 10-4 ★★★：同时从多个网站搜集信息 · 图10-8" data-notes="<b>前置要求</b>：建议先了解第六章的事件驱动与中断机制。本实验探索多 Agent 并行执行在信息收集场景中的应用。与实验 10-3 的两个异构 Agent 协作不同，本实验关注的是<b>多个同构 Agent 的并行搜索</b>，以及如何通过中心协调实现高效的任务完成和资源优化。<br><b>问题</b>：给定一所大学的多个学院网站，要求在各学院的教师名录页面中查找指定教师（如“张伟”），找到后返回其所在学院、职位、研究方向等信息。<br><b>核心挑战</b>：<br><b>1. 并行启动</b>：Manager Agent 根据任务需求动态创建 10 个 Computer Use Agent 实例，每个实例对应一个学院网站，是独立进程或线程，拥有独立的浏览器会话，能并发执行且互不阻塞。启动时传递目标网站 URL、要搜索的教师姓名、任务标识符（用于消息路由）。<br><b>2. 实时监控</b>：每个 Agent 定期发送状态更新（正在加载网站、正在解析教师名录、未找到目标、找到匹配）。Manager 通过消息总线接收，维护一张任务状态表。<br><b>3. 级联终止</b>：负责某学院的 Agent 找到目标后发送 target_found；Manager 立即向所有其他仍在运行的 Agent 发送 terminate，每个 Agent 优雅停止并发送确认；Manager 等待所有确认（或超时）后汇总结果。Agent 能随时响应终止信号，终止必须优雅——不留悬挂进程或未关闭的资源；同时要处理竞态条件。<br><b>概念补充：什么是竞态条件？</b>假设 Agent A 和 Agent B 几乎在同一毫秒内各自找到了目标教师，同时报告“我找到了！”。如果 Manager 收到 A 的报告后开始汇总，紧接着又收到 B 的报告触发第二次汇总，就可能产生重复的结果或互相矛盾的状态。解决方法通常是使用“锁”机制：第一个报告到达后立即锁定状态，后续报告被识别为重复并忽略。<br><b>4. 失败处理</b>：网站无法访问、结构与预期不符、所有 Agent 都没找到——见下一页。<br>演示按图10-8 的时序（原书图示：t=0 启动，t=12s Agent 2 未找到退出，t=18s Agent 3 找到，t=18.1s 广播 terminate，t=19s 全部确认）。右上角开关可以去掉锁：两个 Agent 几乎同时命中时会触发两次汇总。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-4<i>★★★</i></span> <em>多个同构 Agent</em> 的并行搜索</h2></div>
+    <button class="tgl e4-lock on fx fx-up" style="--d:2"><i></i>settle 加锁</button></header>
+  <div class="e4-body">
+    <div class="e4-l fx fx-left" style="--d:2">
+      <div class="e4-mgr"><b>Manager Agent</b><span>动态创建 · 实时监控 · 级联终止</span><em class="e4-clk">t = 0.0 s</em></div>
+      <div class="e4-grid"></div>
+      <div class="e4-out"><span class="lbl">汇总结果（原书图示）</span><div class="e4-res"></div></div>
+    </div>
+    <div class="e4-r fx fx-right" style="--d:3">
+      <div class="e4-q"><b>问题</b>在各学院教师名录中查找“张伟”，返回学院、职位、研究方向</div>
+      <div class="e4-ch"></div>
+      <div class="e4-race"><b>概念补充：什么是竞态条件？</b><p>两个 Agent 几乎同时报告“我找到了！”——第一个报告到达后<b>立即锁定</b>，后续报告识别为重复并忽略；否则会<b>重复汇总</b>或出现矛盾状态</p></div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-4 · 图10-8</div>
+</section>
+<style>
+#c10-exp4 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c10-exp4 .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp4 .e4-body{display:grid;grid-template-columns:1000px 1fr;gap:24px;height:670px}
+#c10-exp4 .e4-l{display:flex;flex-direction:column;gap:14px}
+#c10-exp4 .e4-mgr{display:flex;align-items:center;gap:16px;padding:12px 20px;border-radius:16px;border:2px solid var(--acc);background:rgba(10,16,36,.95)}
+#c10-exp4 .e4-mgr b{font-size:22px;color:var(--acc)}
+#c10-exp4 .e4-mgr span{font-size:16px;color:var(--text2)}
+#c10-exp4 .e4-clk{margin-left:auto;font:700 22px var(--num);font-style:normal;color:var(--text)}
+#c10-exp4 .e4-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+#c10-exp4 .e4-a{padding:10px 12px;border-radius:14px;border:1.5px solid var(--line2);background:rgba(10,16,36,.9);transition:all .35s}
+#c10-exp4 .e4-a b{display:block;font-size:17px}
+#c10-exp4 .e4-a code{display:block;font:15px var(--mono);color:var(--text3)}
+#c10-exp4 .e4-a em{display:block;margin-top:6px;font-style:normal;font-size:15px;color:var(--ctx)}
+#c10-exp4 .e4-a.run{border-color:color-mix(in srgb,var(--ctx) 60%,transparent)}
+#c10-exp4 .e4-a.run em::before{content:"◎ ";animation:blink 1s infinite}
+#c10-exp4 .e4-a.no{opacity:.55}#c10-exp4 .e4-a.no em{color:var(--text3)}
+#c10-exp4 .e4-a.hit{border-color:var(--ok);box-shadow:0 0 26px color-mix(in srgb,var(--ok) 45%,transparent)}#c10-exp4 .e4-a.hit em{color:var(--ok)}
+#c10-exp4 .e4-a.term{opacity:.6;border-style:dashed}#c10-exp4 .e4-a.term em{color:var(--warn)}
+#c10-exp4 .e4-a.dup{border-color:var(--bad);box-shadow:0 0 26px color-mix(in srgb,var(--bad) 45%,transparent)}#c10-exp4 .e4-a.dup em{color:var(--bad)}
+#c10-exp4 .e4-out{flex:1;padding:12px 18px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp4 .e4-res{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#c10-exp4 .e4-rc{padding:8px 12px;border-radius:10px;font-size:17px;border:1px solid color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent);animation:upIn .4s var(--ease) both}
+#c10-exp4 .e4-rc.bad{border-color:var(--bad);background:rgba(251,113,133,.1)}
+#c10-exp4 .e4-rc code{font:15px var(--mono);color:var(--text2)}
+#c10-exp4 .e4-r{display:flex;flex-direction:column;gap:12px}
+#c10-exp4 .e4-q{padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.5;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp4 .e4-q b{color:var(--acc);margin-right:8px}
+#c10-exp4 .e4-ch{display:flex;flex-direction:column;gap:8px}
+#c10-exp4 .e4-c{padding:10px 14px;border-radius:12px;border:1px solid var(--line);transition:border-color .35s,background .35s}
+#c10-exp4 .e4-c b{font-size:17px;color:var(--acc)}
+#c10-exp4 .e4-c p{font-size:15px;line-height:1.5;color:var(--text2);margin-top:2px}
+#c10-exp4 .e4-c.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 10%,transparent)}
+#c10-exp4 .e4-race{padding:12px 16px;border-radius:14px;border:1px dashed color-mix(in srgb,var(--warn) 60%,transparent)}
+#c10-exp4 .e4-race b{font-size:17px;color:var(--warn)}
+#c10-exp4 .e4-race p{font-size:15px;line-height:1.55;color:var(--text2);margin-top:4px}
+#c10-exp4 .e4-race p b{font-size:inherit}
+</style>
+<script>
+HOOKS['c10-exp4'] = {
+  SITES: ['cs.edu.cn', 'math.edu.cn', 'phys.edu.cn', 'chem.edu.cn', 'bio.edu.cn', 'econ.edu.cn', 'law.edu.cn', 'med.edu.cn', 'arts.edu.cn', 'env.edu.cn'],
+  CH: [['1. 并行启动', '动态创建 10 个 Computer Use Agent，独立进程、独立浏览器会话；传 URL、姓名、任务标识符'], ['2. 实时监控', '状态更新经消息总线汇入 Manager 的任务状态表'], ['3. 级联终止', 'target_found → 广播 terminate → 优雅停止并确认 → 汇总'], ['4. 失败处理', '超时、错误隔离、全部完成后汇总（见下一页）']],
+  init(s) {
+    s.querySelector('.e4-grid').innerHTML = this.SITES.map((u, i) => `<div class="e4-a"><b>Agent ${i + 1}</b><code>${u}</code><em>待启动</em></div>`).join('');
+    s.querySelector('.e4-ch').innerHTML = this.CH.map(([b, p]) => `<div class="e4-c"><b>${b}</b><p>${p}</p></div>`).join('');
+    this.as = [...s.querySelectorAll('.e4-a')];
+    this.cs = [...s.querySelectorAll('.e4-c')];
+    this.lockBtn = s.querySelector('.e4-lock');
+    this.lockBtn.addEventListener('click', () => { this.lock = !this.lock; this.lockBtn.classList.toggle('on', this.lock); this.run(s); });
+  },
+  st(i, cls, txt) { const a = this.as[i]; a.className = 'e4-a ' + cls; a.querySelector('em').textContent = txt; },
+  async run(s) {
+    const tk = (this.tk = (this.tk || 0) + 1), ctx = this.ctx;
+    if (!ctx) return;
+    const ok = () => ctx.alive && tk === this.tk, clk = s.querySelector('.e4-clk'), res = s.querySelector('.e4-res'), w = (ms) => U.wait(ctx, ms);
+    const T = (v) => (clk.textContent = `t = ${v.toFixed(1)} s`), ch = (i) => this.cs.forEach((c, j) => c.classList.toggle('on', j === i));
+    while (ok()) {
+      res.innerHTML = '';
+      this.as.forEach((a, i) => this.st(i, '', '待启动'));
+      T(0); ch(0); await w(700); if (!ok()) return;
+      this.as.forEach((a, i) => this.st(i, 'run', '搜索中…'));
+      ch(1);
+      // 时间推进到 12 s：Agent 2 未找到退出；部分网站解析中
+      for (let t = 0; t <= 12; t += 1) { T(t); if (t === 6) this.st(5, 'run', '正在解析教师名录'); await w(140); if (!ok()) return; }
+      this.st(1, 'no', '未找到 ✗ 退出');
+      for (let t = 12; t <= 18; t += 1) { T(t); await w(160); if (!ok()) return; }
+      ch(2);
+      this.st(2, 'hit', '找到！✓ target_found');
+      if (!this.lock) { await w(120); if (!ok()) return; this.st(6, 'dup', '也找到了！✓ target_found'); }
+      await w(700); if (!ok()) return;
+      T(18.1);
+      res.insertAdjacentHTML('beforeend', '<div class="e4-rc">姓名：张伟 · 学院：物理学院 · 职位：教授 · 方向：量子计算 <code>（Agent 3）</code></div>');
+      if (!this.lock) { await w(400); if (!ok()) return; res.insertAdjacentHTML('beforeend', '<div class="e4-rc bad">第二次汇总：Agent 7 的报告又触发了一遍 → 重复结果 / 矛盾状态</div>'); }
+      else { res.insertAdjacentHTML('beforeend', '<div class="e4-rc"><code>settle 已锁定：只广播一次 terminate；迟到的命中记录为重复并忽略</code></div>'); }
+      this.as.forEach((a, i) => { if (a.classList.contains('run')) this.st(i, 'term', '收到 terminate'); });
+      await w(900); if (!ok()) return;
+      T(19);
+      this.as.forEach((a, i) => { if (a.classList.contains('term')) this.st(i, 'term', '已终止 ⊘ 已确认'); });
+      res.insertAdjacentHTML('beforeend', '<div class="e4-rc"><code>全部确认终止，浏览器会话已关闭 → 汇总结果返回</code></div>');
+      await w(3200); if (!ok()) return;
+      if (this.auto) { this.lock = !this.lock; this.lockBtn.classList.toggle('on', this.lock); }
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.lock = true; this.lockBtn.classList.add('on'); this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; this.as.forEach((a, i) => this.st(i, '', '待启动')); this.cs.forEach((c) => c.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-exp4r" data-part="6" data-trans="rise" data-dur="16000" data-title="实验 10-4 实测与失败处理" data-notes="<b>4. 失败处理</b>：实际运行中可能遇到多种异常：某学院网站无法访问（网络错误、服务器宕机），某网站结构与预期不符导致 Agent 无法正确解析，或者所有 Agent 搜索完毕都没找到目标。Manager Agent 的处理策略：为每个 Agent 设置超时（如 2 分钟），超时视为失败；错误隔离，不影响其他 Agent 继续执行；全部完成后汇总——只要有 Agent 成功就返回信息，全部失败则向用户报告“未找到目标教师”及各失败原因的统计。<br><b>实验要求</b>：1. 实现能动态启动多个并行 Agent 的 Manager Agent；2. 基于 browser-use 等开源项目实现 Computer Use Agent；3. 实现消息总线支持 Manager 与多个子 Agent 双向通信；4. 实现成功后的级联终止机制；5. 处理各种异常情况；6. 记录和对比并行执行与串行执行的时间差异，验证并行化带来的性能提升。<br>配套仓库的真实记录：2026-07-29 默认的十页斯坦福运行在斯坦福 HAI 页面上用 ARK 抽取找到了 Andrew Ng；并行墙钟 18.542 秒，串行 58.264 秒，约 3.142 倍；10 个并行与 10 个串行浏览器 context 全部关闭；级联压力测试产生一个胜者、一次 terminate 广播、三个落败 worker 的确认、4/4 context 关闭。后续保留完整来源的运行加速为 1.872 倍，并保留 24 份浏览器观察、3 份 ARK 响应和 114 个总线事件。两次运行的条件与记录时间不同，应分别解释，不能只选更高的数字。原书图10-8 中“约 15×”是图示估算（串行 10 个网站 × 30 秒 ≈ 5 分钟，并行 19 秒）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1"><span class="k10-exp">实验 10-4<i>★★★</i></span> 实测与<em>失败处理</em></h2></header>
+  <div class="r4-body">
+    <div class="r4-l fx fx-left" style="--d:2">
+      <div class="r4-fs"><span class="lbl">4. 失败处理</span>
+        <div class="r4-f"><svg class="ic"><use href="#i-timer"/></svg><div><b>超时视为失败</b><p>为每个 Agent 设置超时（如 2 分钟）</p></div></div>
+        <div class="r4-f"><svg class="ic"><use href="#i-shield"/></svg><div><b>错误隔离</b><p>网站无法访问、结构不符，都不影响其他 Agent 继续执行</p></div></div>
+        <div class="r4-f"><svg class="ic"><use href="#i-list"/></svg><div><b>全部完成后汇总</b><p>有一个成功就返回；全部失败则报告“未找到目标教师”与各失败原因统计</p></div></div>
+      </div>
+      <div class="r4-req"><b>实验要求</b><ol><li>动态启动多个并行 Agent 的 Manager</li><li>基于 browser-use 等实现 Computer Use Agent</li><li>消息总线支持双向通信</li><li>成功后的级联终止机制</li><li>处理网站访问失败、解析错误、全部未找到</li><li>对比并行与串行的时间差异</li></ol></div>
+    </div>
+    <div class="r4-r fx fx-right" style="--d:3">
+      <div class="r4-run"><span class="lbl">2026-07-29 · 十页斯坦福运行：在斯坦福 HAI 页面找到 Andrew Ng（ARK 抽取）</span>
+        <div class="r4-tl"><span>串行</span><div class="r4-b"><i class="s"></i></div><b>58.264 s</b></div>
+        <div class="r4-tl"><span>并行</span><div class="r4-b"><i class="p"></i></div><b>18.542 s</b></div>
+      </div>
+      <div class="r4-sp">
+        <div class="r4-s on"><b data-count="3.142" data-dec="3" data-suffix="×">0</b><span>2026-07-29 记录</span></div>
+        <div class="r4-s"><b>1.872×</b><span>完整溯源运行</span></div>
+        <div class="r4-s img"><b>约 15×</b><span>原书图10-8 图示估算</span></div>
+      </div>
+      <p class="r4-warn"><svg class="ic"><use href="#i-alert"/></svg>两次运行条件与记录时间不同，<b>应分别解释，不能只选更高的数字</b></p>
+      <div class="r4-cas"><span>级联压力测试</span><b>1</b> 个胜者 · <b>1</b> 次 terminate 广播 · <b>3</b> 个落败确认 · <b>4/4</b> context 关闭 · <b>24</b> 份浏览器观察 · <b>114</b> 个总线事件</div>
+      <div class="k10-data"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter10/parallel-web-research 记录（2026-07-29；exp10-4-real-receipts-20260730-v2）</div>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 实验 10-4</div>
+</section>
+<style>
+#c10-exp4r .title .k10-exp{font-size:24px;vertical-align:middle;margin-right:10px}
+#c10-exp4r .r4-body{display:grid;grid-template-columns:600px 1fr;gap:26px;height:680px}
+#c10-exp4r .r4-l{display:flex;flex-direction:column;gap:14px}
+#c10-exp4r .r4-fs{padding:14px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c10-exp4r .r4-f{display:flex;gap:12px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.03)}
+#c10-exp4r .r4-f .ic{flex:none;font-size:26px;color:var(--acc)}
+#c10-exp4r .r4-f b{font-size:18px}
+#c10-exp4r .r4-f p{font-size:16px;line-height:1.5;color:var(--text2)}
+#c10-exp4r .r4-req{flex:1;padding:14px 18px;border-radius:18px;border:1px dashed var(--line2)}
+#c10-exp4r .r4-req b{font-size:18px;color:var(--acc)}
+#c10-exp4r .r4-req ol{margin-top:6px;padding-left:24px;display:flex;flex-direction:column;gap:4px}
+#c10-exp4r .r4-req li{font-size:16px;color:var(--text2);list-style:decimal}
+#c10-exp4r .r4-r{display:flex;flex-direction:column;gap:14px}
+#c10-exp4r .r4-run{padding:14px 18px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:12px}
+#c10-exp4r .r4-tl{display:grid;grid-template-columns:60px 1fr 110px;gap:12px;align-items:center;font-size:17px;color:var(--text2)}
+#c10-exp4r .r4-tl b{font:800 22px var(--num);color:var(--text);text-align:right}
+#c10-exp4r .r4-b{height:28px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+#c10-exp4r .r4-b i{display:block;height:100%;border-radius:8px;animation:c10r4-g 6s linear infinite}
+#c10-exp4r .r4-b i.s{background:linear-gradient(90deg,#64748b,#94a3b8);--w:100%}
+#c10-exp4r .r4-b i.p{background:linear-gradient(90deg,var(--acc),var(--ok));--w:31.8%}
+@keyframes c10r4-g{0%{width:0}80%,100%{width:var(--w)}}
+#c10-exp4r .r4-b i.p{animation-timing-function:linear;animation-name:c10r4-p}
+@keyframes c10r4-p{0%{width:0}25.5%,100%{width:var(--w)}}
+#c10-exp4r .r4-sp{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+#c10-exp4r .r4-s{padding:14px;border-radius:16px;text-align:center;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c10-exp4r .r4-s b{display:block;font:800 36px var(--num);color:var(--ok)}
+#c10-exp4r .r4-s span{font-size:16px;color:var(--text2)}
+#c10-exp4r .r4-s.img b{color:var(--text3)}
+#c10-exp4r .r4-warn{display:flex;gap:10px;align-items:flex-start;font-size:18px;line-height:1.55;color:var(--text2)}
+#c10-exp4r .r4-warn .ic{flex:none;font-size:22px;color:var(--warn);margin-top:3px}
+#c10-exp4r .r4-warn b{color:var(--warn)}
+#c10-exp4r .r4-cas{padding:12px 16px;border-radius:14px;font-size:17px;line-height:1.6;color:var(--text2);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);background:color-mix(in srgb,var(--ok) 6%,transparent)}
+#c10-exp4r .r4-cas span{display:block;font-size:15px;color:var(--text3)}
+#c10-exp4r .r4-cas b{font:800 20px var(--num);color:var(--ok)}
+</style>
+<script>
+HOOKS['c10-exp4r'] = {};
+</script>
+
+<section class="slide" id="c10-flow" data-part="6" data-trans="zoom" data-dur="16000" data-title="管理者生成 Agent 工作流" data-notes="<b>管理者 Agent 生成 Agent 工作流。</b>前两种形态里管理者 Agent 始终待在循环中：每派发一个子任务都要模型做一次决策，上下文随调用次数增长。还有一种做法是<b>管理者先把 Agent 工作流写成一段代码，再交给确定性的运行时去执行</b>。<br>Claude Code 内置的 Workflow 工具就是这样一个实例，它给 Agent 提供 agent()、parallel()、pipeline() 几个原语：每个 agent() 是一个拥有独立上下文的子 Agent，schema 约定它只返回结构化结论而不是完整轨迹。例如：为一篇技术稿件核实七组事实，每组先调研，再逐条独立核实，最后统一汇总——pipeline 依次处理七个待核实的方向，阶段一调研，阶段二对调研结果逐条并行核实，最后等齐所有结果再汇总。<br>左边是管理者留在循环里：每派发一次就决策一次，上下文条越来越长；右边是先写成代码交给运行时：代码行逐行高亮，扇出动画示意七个方向的调研与逐条核实（每个方向的条目数为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">管理者<em>生成 Agent 工作流</em>：先写成代码，再交给确定性运行时</h2></header>
+  <div class="wf-body">
+    <div class="wf-l panel fx fx-left" style="--d:2">
+      <div class="wf-h"><b>管理者留在循环里</b><small>每派发一个子任务，都要模型做一次决策</small></div>
+      <div class="wf-loop"><div class="wf-dec"></div></div>
+      <div class="wf-ctx"><span>Manager 上下文</span><div class="meter"><i class="wf-cv"></i></div><small class="wf-cn">决策 0 次</small></div>
+    </div>
+    <div class="wf-r fx fx-right" style="--d:3">
+      <div class="wf-code win"><div class="win-bar"><i></i><i></i><i></i><span>Claude Code Workflow：agent() · parallel() · pipeline()</span></div><div class="code wf-cd"></div></div>
+      <div class="wf-fan"><canvas class="wf-cv2" width="1640" height="440"></canvas><span class="k10-sim wf-sim">示意</span></div>
+      <p class="wf-note">每个 <code>agent()</code> 拥有<b>独立上下文</b>，schema 约定它<b>只返回结构化结论</b>而不是完整轨迹</p>
+    </div>
+  </div>
+  <div class="src">第十章 ·「管理者模式：中心化协调」· 管理者 Agent 生成 Agent 工作流</div>
+</section>
+<style>
+#c10-flow .wf-body{display:grid;grid-template-columns:560px 1fr;gap:26px;height:680px}
+#c10-flow .wf-l{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c10-flow .wf-h b{display:block;font-size:22px;color:var(--warn)}
+#c10-flow .wf-h small{font-size:16px;color:var(--text2)}
+#c10-flow .wf-loop{flex:1;position:relative;overflow:hidden;border-radius:14px;border:1px solid var(--line);background:rgba(8,12,30,.5)}
+#c10-flow .wf-dec{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px}
+#c10-flow .wf-d{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:9px;font-size:15px;border:1px solid var(--line2);background:rgba(12,18,40,.9);animation:upIn .35s var(--ease) both}
+#c10-flow .wf-d em{font-style:normal;font:700 15px var(--mono);color:var(--llm)}
+#c10-flow .wf-ctx{display:flex;flex-direction:column;gap:6px}
+#c10-flow .wf-ctx span{font-size:16px;color:var(--text3)}
+#c10-flow .wf-cv{--c:var(--warn)}
+#c10-flow .wf-cn{font-size:16px;color:var(--warn)}
+#c10-flow .wf-r{display:flex;flex-direction:column;gap:12px;min-width:0}
+#c10-flow .wf-cd{font-size:16px;line-height:1.6;padding:10px 16px}
+#c10-flow .wf-fan{position:relative;height:220px;border-radius:16px;border:1px solid var(--line);background:rgba(8,12,30,.5)}
+#c10-flow .wf-cv2{width:820px;height:220px}
+#c10-flow .wf-sim{position:absolute;right:10px;top:8px}
+#c10-flow .wf-note{font-size:18px;line-height:1.6;color:var(--text2)}
+#c10-flow .wf-note code{font-family:var(--mono);color:var(--ctx)}
+#c10-flow .wf-note b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c10-flow'] = {
+  CODE: [
+    '<span class="t-k">const</span> results = <span class="t-k">await</span> pipeline(',
+    '  DIMENSIONS,                                     <span class="t-c">// 七个待核实的方向</span>',
+    '  d =&gt; agent(research(d), { schema: FINDINGS }),  <span class="t-c">// 阶段一：调研</span>',
+    '  r =&gt; parallel(r.findings.map(f =&gt; () =&gt;         <span class="t-c">// 阶段二：逐条独立核实</span>',
+    '         agent(verify(f), { schema: VERDICT })))',
+    ')',
+    '<span class="t-k">await</span> agent(writeProvenance(results.flat()))      <span class="t-c">// 汇总：等齐所有结果</span>',
+  ],
+  init(s) {
+    s.querySelector('.wf-cd').innerHTML = this.CODE.map((l) => `<span class="ln">${l}</span>`).join('');
+    this.lns = [...s.querySelectorAll('.wf-cd .ln')];
+    this.g = s.querySelector('.wf-cv2').getContext('2d');
+    const r = U.rand(3);
+    this.F = Array.from({ length: 7 }, () => 2 + Math.floor(r() * 3));
+  },
+  enter(s, ctx) {
+    const dec = s.querySelector('.wf-dec'), cv = s.querySelector('.wf-cv'), cn = s.querySelector('.wf-cn'), g = this.g, F = this.F;
+    let n = 0, t0 = performance.now();
+    dec.innerHTML = '';
+    // 左：每派发一次就决策一次，上下文变长
+    ctx.every(() => {
+      n = n >= 14 ? 0 : n + 1;
+      if (n === 0) dec.innerHTML = '';
+      else { dec.insertAdjacentHTML('beforeend', `<div class="wf-d"><em>决策 #${n}</em>派发子任务 ${n} → 等结果 → 读入上下文</div>`); while (dec.children.length > 12) dec.firstElementChild.remove(); }
+      cv.style.setProperty('--v', Math.min(100, n * 7) + '%');
+      cn.textContent = `决策 ${n} 次 · 上下文随调用次数增长`;
+    }, 900);
+    // 右：运行时按代码执行——七路调研 → 逐条并行核实 → 汇总
+    ctx.raf((t) => {
+      const u = ((t - t0) / 9000) % 1;
+      const ph = u < 0.3 ? 2 : u < 0.75 ? 3 : u < 0.95 ? 6 : -1;
+      this.lns.forEach((l, i) => l.classList.toggle('hl', i === ph || (ph === 3 && i === 4)));
+      g.setTransform(2, 0, 0, 2, 0, 0);
+      g.clearRect(0, 0, 820, 220);
+      const X0 = 40, X1 = 250, X2 = 520, X3 = 770, cy = 110;
+      g.fillStyle = '#a78bfa'; g.beginPath(); g.arc(X0, cy, 12, 0, 6.283); g.fill();
+      g.fillStyle = '#94a3b8'; g.font = '15px sans-serif'; g.fillText('DIMENSIONS', X0 - 30, cy + 32);
+      let k = 0;
+      for (let i = 0; i < 7; i++) {
+        const y = 20 + i * 30, a = Math.min(1, u / 0.3);
+        g.strokeStyle = 'rgba(34,211,238,.5)'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(X0, cy); g.lineTo(X0 + (X1 - X0) * a, cy + (y - cy) * a); g.stroke();
+        if (u > 0.3) { g.fillStyle = '#22d3ee'; g.beginPath(); g.arc(X1, y, 8, 0, 6.283); g.fill(); }
+        for (let j = 0; j < F[i]; j++, k++) {
+          const yy = 12 + (k / 21) * 196, b = Math.max(0, Math.min(1, (u - 0.3 - j * 0.03) / 0.3));
+          if (u > 0.3) { g.strokeStyle = 'rgba(251,191,36,.45)'; g.beginPath(); g.moveTo(X1, y); g.lineTo(X1 + (X2 - X1) * b, y + (yy - y) * b); g.stroke(); }
+          if (b >= 1) { g.fillStyle = '#fbbf24'; g.beginPath(); g.arc(X2, yy, 5, 0, 6.283); g.fill(); }
+          if (u > 0.75) { const c = Math.min(1, (u - 0.75) / 0.2); g.strokeStyle = 'rgba(52,211,153,.4)'; g.beginPath(); g.moveTo(X2, yy); g.lineTo(X2 + (X3 - X2) * c, yy + (cy - yy) * c); g.stroke(); }
+        }
+      }
+      if (u > 0.95 || u < 0.02) { g.fillStyle = '#34d399'; g.beginPath(); g.arc(X3, cy, 14, 0, 6.283); g.fill(); }
+      g.fillStyle = '#94a3b8';
+      g.fillText('调研 ×7', X1 - 24, 216); g.fillText('逐条核实', X2 - 30, 216); g.fillText('汇总', X3 - 14, cy + 34);
+    });
+  },
+  reset(s) { s.querySelector('.wf-dec').innerHTML = ''; this.lns.forEach((l) => l.classList.remove('hl')); },
+};
+</script>

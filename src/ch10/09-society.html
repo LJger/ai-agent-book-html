@@ -1,0 +1,231 @@
+<!-- ================= PART 09 Agent 社会 ================= -->
+<section class="slide chapter" id="c10-d9" data-part="9" data-title="PART 09 · Agent 社会" data-notes="「Agent 社会」：以上所有讨论都是工程视角——如何让一组 Agent 协作完成任务。前面几部分讨论的都是目标明确的任务协作。接下来视角切换，转向一个更开放的问题：<b>当 Agent 数量从几个扩展到成百上千、交互足够自由时，会涌现出什么行为？</b><br>本部分的案例可以从三个维度来理解：社交涌现（斯坦福 AI 小镇、Agentopia、Moltbook）、经济涌现（Vending-Bench Arena、Pinchwork 与 RentAHuman）、策略博弈（狼人杀）。其中包含两个实验：实验 10-5 运行斯坦福 AI 小镇，实验 10-6 构建语音狼人杀 Agent 系统。">
+  <div class="ch-k fx fx-up">PART 09</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">Agent 社会</h1>
+  <div class="ch-s fx fx-up" style="--d:3">从目标明确的任务协作，转向大量 Agent 长期共存时的涌现</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">当 Agent 数量从几个扩展到成百上千、交互足够自由时，会涌现出什么行为？</blockquote>
+  <div class="ch-loop" data-node="8" data-num="09"></div>
+</section>
+
+<section class="slide" id="c10-society" data-part="9" data-trans="zoom" data-dur="15000" data-title="三个维度：社交、经济与博弈" data-notes="本节的案例可以从三个维度来理解。<br><b>社交涌现</b>：<b>涌现行为</b>（Emergent Behavior）是指系统整体表现出的、无法从单个个体的行为规则中直接预测的集体行为模式。斯坦福 AI 小镇展示了 25 个 Agent 如何自组织社交活动，Agentopia 把模拟时间尺度从“天”拉长到 10 年，Moltbook 则把规模推到 150 万。Agent 系统一旦在规模上跨过某个临界点，就会产生无法被预先设计的集体行为。<br><b>经济涌现</b>：Agent 通过市场机制进行资源分配和任务协调。Vending-Bench Arena 让多个 Agent 在同一市场中竞争经营，Pinchwork 和 RentAHuman 则构建了 Agent 之间（以及 Agent 与人类之间）的经济交易市场。<br><b>策略博弈</b>：Agent 在规则约束下进行推理、欺骗和社交操控。狼人杀实验考验的是 Agent 在信息不对称条件下的策略涌现。<br>右侧画布是示意：在 25、100、约 150 万三个规模之间切换（最后一档只画出一小部分点）；左侧卡片里的案例按钮可以直接跳到对应页面。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Agent 社会的<em>三个维度</em></h2>
+  <p class="lead fx fx-up" style="--d:2">涌现行为：系统整体表现出的、无法从单个个体的行为规则中直接预测的集体行为模式</p></header>
+  <div class="so-body">
+    <div class="so-cards"></div>
+    <div class="so-st panel fx fx-right" style="--d:5">
+      <canvas class="so-cv"></canvas>
+      <div class="so-hud"><b class="so-n">25</b><span class="so-u">个 Agent</span><em class="so-t">两天虚拟时间</em></div>
+      <span class="k10-sim so-sim">画面示意</span>
+      <div class="so-ctl"><button data-i="0">25 · 斯坦福 AI 小镇</button><button data-i="1">100 · Agentopia</button><button data-i="2">约 150 万 · Moltbook</button></div>
+    </div>
+  </div>
+  <p class="tagline so-tag fx fx-up" style="--d:7">Agent 系统一旦在规模上跨过某个临界点，就会产生<b>无法被预先设计的集体行为</b></p>
+  <div class="src">第十章 ·「Agent 社会」</div>
+</section>
+<style>
+.so-body{display:grid;grid-template-columns:640px 1fr;gap:30px}
+.so-cards{display:flex;flex-direction:column;gap:16px}
+.so-c{--c:var(--acc);padding:16px 20px;border-radius:18px;background:rgba(12,18,40,.8);border:1px solid var(--line);transition:border-color .45s,box-shadow .45s,background .45s}
+.so-c.on{border-color:color-mix(in srgb,var(--c) 60%,transparent);background:color-mix(in srgb,var(--c) 10%,rgba(12,18,40,.85));box-shadow:0 0 34px -10px var(--c)}
+.so-h{display:flex;align-items:center;gap:12px}
+.so-h .ic{font-size:28px;color:var(--c)}
+.so-h b{font-size:23px;color:var(--c)}
+.so-c p{font-size:17px;line-height:1.55;color:var(--text2);margin-top:6px}
+.so-go{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.so-go button{padding:5px 12px;border-radius:999px;font-size:15px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .3s}
+.so-go button.on{color:#06101f;background:var(--c);border-color:var(--c)}
+.so-go button:hover{color:var(--text);border-color:var(--c)}
+.so-st{position:relative;height:560px;padding:0;overflow:hidden}
+.so-cv{position:absolute;left:0;top:0;width:990px;height:560px}
+.so-hud{position:absolute;left:22px;top:16px;display:flex;align-items:baseline;gap:12px}
+.so-n{font:800 46px var(--num);color:var(--acc)}
+.so-u{font-size:19px;color:var(--text2)}
+.so-t{font-style:normal;font-size:18px;color:var(--acc2);margin-left:8px;padding:2px 12px;border-radius:999px;border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent)}
+.so-sim{position:absolute;right:20px;top:22px}
+.so-ctl{position:absolute;left:20px;right:20px;bottom:16px;display:flex;gap:10px;justify-content:center}
+.so-ctl button{padding:8px 16px;border-radius:12px;font-size:17px;color:var(--text2);border:1px solid var(--line2);background:rgba(5,9,22,.8);transition:all .3s}
+.so-ctl button.on{color:#06101f;background:var(--acc);border-color:var(--acc)}
+.so-tag{margin-top:22px;font-size:23px}
+</style>
+<script>
+HOOKS['c10-society'] = {
+  C: [
+    { c: '#4ade80', ic: 'users', n: '社交涌现', p: '自组织的社交活动：规模和时间尺度一旦跨过临界点，就会出现无法预先设计的集体行为', go: [['c10-town', '斯坦福 AI 小镇 · 25 个'], ['c10-agentopia', 'Agentopia · 10 年'], ['c10-moltbook', 'Moltbook · 约 150 万']] },
+    { c: '#fbbf24', ic: 'coin', n: '经济涌现', p: 'Agent 通过市场机制进行资源分配和任务协调：竞争经营、雇佣 Agent 与真人', go: [['c10-vending', 'Vending-Bench Arena'], ['c10-market', 'Pinchwork · RentAHuman']] },
+    { c: '#f472b6', ic: 'game', n: '策略博弈', p: '在规则约束下推理、欺骗和社交操控：考验信息不对称条件下的策略涌现', go: [['c10-wolf', '狼人杀']] },
+  ],
+  S: [[25, '25', '个 Agent', '两天虚拟时间'], [100, '100', '个 Agent', '十年模拟'], [1600, '约 150 万', '个 Agent', '上线数日内']],
+  W: 990, H: 560,
+  init(s) {
+    s.querySelector('.so-cards').innerHTML = this.C.map((c, i) => `<div class="fx fx-left" style="--d:${3 + i}"><div class="so-c" data-k="${i}" style="--c:${c.c}"><div class="so-h"><svg class="ic"><use href="#i-${c.ic}"/></svg><b>${c.n}</b></div><p>${c.p}</p><div class="so-go">${c.go.map(([id, n], j) => `<button data-go="${id}" data-j="${j}">${n}</button>`).join('')}</div></div></div>`).join('');
+    s.querySelector('.so-cards').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-go]');
+      if (!b) return;
+      const idx = [...document.querySelectorAll('#deck .slide')].findIndex((x) => x.id === b.dataset.go);
+      if (idx >= 0) DECK.go(idx, 0);
+    });
+    const cv = s.querySelector('.so-cv');
+    cv.width = this.W * 2; cv.height = this.H * 2;
+    this.g = cv.getContext('2d');
+    this.g.setTransform(2, 0, 0, 2, 0, 0);
+    s.querySelector('.so-ctl').addEventListener('click', (e) => { const b = e.target.closest('[data-i]'); if (b) { this.auto = false; this.stop(s, +b.dataset.i); this.card(s, 0, +b.dataset.i); } });
+  },
+  card(s, k, j) {
+    s.querySelectorAll('.so-c').forEach((c) => c.classList.toggle('on', +c.dataset.k === k));
+    s.querySelectorAll('.so-go button').forEach((b) => b.classList.toggle('on', +b.closest('.so-c').dataset.k === k && +b.dataset.j === j));
+  },
+  stop(s, i) {
+    this.si = i;
+    const [n, lab, u, t] = this.S[i], r = U.rand(5 + i);
+    s.querySelectorAll('.so-ctl button').forEach((b) => b.classList.toggle('on', +b.dataset.i === i));
+    s.querySelector('.so-n').textContent = lab;
+    s.querySelector('.so-u').textContent = u;
+    s.querySelector('.so-t').textContent = t;
+    const K = i === 2 ? 9 : i === 1 ? 5 : 3;
+    this.cl = Array.from({ length: K }, () => [90 + r() * (this.W - 180), 110 + r() * (this.H - 230)]);
+    this.P = Array.from({ length: n }, (_, j) => ({ x: 30 + r() * (this.W - 60), y: 90 + r() * (this.H - 170), vx: (r() - 0.5) * 0.8, vy: (r() - 0.5) * 0.8, k: j % K }));
+  },
+  frame() {
+    const g = this.g, W = this.W, H = this.H, P = this.P, big = P.length > 500, rad = P.length > 50 ? 80 : 150;
+    g.clearRect(0, 0, W, H);
+    const cols = ['#4ade80', '#fbbf24', '#22d3ee', '#f472b6', '#a78bfa', '#60a5fa', '#fb923c', '#2dd4bf', '#e9edf8'];
+    for (const p of P) {
+      const [cx, cy] = this.cl[p.k];
+      p.vx += (cx - p.x) * (big ? 0.00012 : 0.00005) + (Math.random() - 0.5) * 0.08;
+      p.vy += (cy - p.y) * (big ? 0.00012 : 0.00005) + (Math.random() - 0.5) * 0.08;
+      p.vx *= 0.97; p.vy *= 0.97; p.x += p.vx; p.y += p.vy;
+      p.x = Math.max(8, Math.min(W - 8, p.x)); p.y = Math.max(80, Math.min(H - 70, p.y));
+    }
+    if (!big) {
+      g.lineWidth = 1.2;
+      for (let i = 0; i < P.length; i++) for (let j = i + 1; j < P.length; j++) {
+        const a = P[i], b = P[j], d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d < rad) { g.strokeStyle = `rgba(74,222,128,${(1 - d / rad) * 0.4})`; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); }
+      }
+    }
+    const R = big ? 1.7 : P.length > 50 ? 4 : 7;
+    for (const p of P) { g.fillStyle = cols[p.k % cols.length]; g.beginPath(); g.arc(p.x, p.y, R, 0, 6.283); g.fill(); }
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    this.stop(s, 0);
+    this.card(s, 0, 0);
+    ctx.raf(() => this.frame());
+    let k = 0;
+    ctx.every(() => {
+      if (!this.auto) return;
+      k = (k + 1) % 5;
+      if (k < 3) { this.stop(s, k); this.card(s, 0, k); } else this.card(s, k - 2, 0);
+    }, 3800);
+  },
+  reset(s) { s.querySelectorAll('.so-c,.so-go button,.so-ctl button').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c10-town" data-part="9" data-trans="flip" data-dur="18000" data-title="斯坦福 AI 小镇：记忆、反思与计划" data-notes="「斯坦福 AI 小镇：生成式 Agent 的社会模拟」：2023 年，斯坦福大学和 Google 研究团队发表了具有里程碑意义的论文《Generative Agents: Interactive Simulacra of Human Behavior》，提出了“生成式 Agent”的概念。核心创新在于不再局限于让 Agent 完成预定义的任务，而是赋予 Agent 接近人类的记忆、反思和规划能力，使它们能够在开放的社会环境中自主生活、社交和发展。Smallville 是一个类似《模拟人生》的 2D 虚拟小镇，有咖啡馆、公园、住宅、商店等公共和私人空间；25 个 Agent 扮演店主、艺术家、学生、教授等不同角色，各有背景故事、性格特点和人际关系：John Lin 是药店老板，热爱家庭、关心社区；Isabella Rodriguez 经营着小镇的咖啡馆 Hobbs Cafe，热情好客；Klaus Mueller 是一名正在写研究论文的大学生。<br>三个核心组件：<b>记忆流</b>（Memory Stream）维护一条完整的经验记录流，包含观察到的事件、进行过的对话、产生的想法；每条记忆都被赋予重要性、时近性和相关性属性，Agent 能够优先检索与当前情境最相关的记忆——就像人类不会平等地记住每一件事。<b>反思机制</b>（Reflection）：Agent 会定期暂停日常活动，回顾近期经历，提出关于自己和他人的抽象问题（“Klaus Mueller 在研究什么？”“谁是我最亲近的朋友？”），把对具体事件的记忆概括为更一般的认识，存回记忆流作为未来决策的依据，也促进自我认知。<b>计划与行动</b>（Planning and Reacting）：Agent 每天会规划活动（如“8:30 吃早餐，9:00-12:00 写作，12:30 散步”），但会根据环境变化和社交机会灵活调整，使行为既有目标导向性，又能适应社交中的各种不可预测性。<br>需要说明的是，这里的反思与第九章的持续进化不同：它发生在生成式 Agent 的日常活动中，目的是更新即时的内部状态和目标；任务后的反思在第九章中至多是候选教训，只有经过结果评价、跨轨迹归纳和后续验证，才会成为长期能力更新。<br>图10-10 以 Isabella 为例：记忆条目的重要性和时近性取自原书图示，检索驱动反思，反思驱动计划。上方情境与相关性打分为示意，会自动轮换，也可以点击。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">斯坦福 AI 小镇：<em>记忆、反思与计划</em></h2></header>
+  <div class="tw-top fx fx-up" style="--d:2">
+    <div class="tw-who"><span class="tw-av"><svg class="ic"><use href="#i-user"/></svg></span><div><b>Isabella Rodriguez</b><small>Hobbs 咖啡馆店主 · 热情好客，乐于社交</small></div></div>
+    <div class="tw-qs"><span class="tw-ql">当前情境<span class="k10-sim">示意</span></span></div>
+  </div>
+  <div class="tw-body">
+    <div class="tw-col fx fx-left" style="--d:3"><div class="tw-h"><b>记忆流</b><small>Memory Stream</small></div><div class="tw-ms"></div>
+      <div class="tw-lg"><span><i style="background:#fbbf24"></i>重要性</span><span><i style="background:#22d3ee"></i>时近性</span><span><i style="background:#4ade80"></i>相关性（示意）</span></div></div>
+    <div class="tw-col fx fx-up" style="--d:4"><div class="tw-h"><b>反思</b><small>Reflection</small><span class="tw-ar">← 检索</span></div><div class="tw-rs"></div></div>
+    <div class="tw-col fx fx-right" style="--d:5"><div class="tw-h"><b>计划与行动</b><small>Planning</small><span class="tw-ar">← 驱动</span></div><div class="tw-ps"></div></div>
+  </div>
+  <div class="tw-note fx fx-up" style="--d:7"><b>反思 ≠ 第九章的持续进化</b><span>这里的反思发生在日常活动中，更新即时的内部状态和目标；第九章里任务后的反思至多是候选教训，要经结果评价、跨轨迹归纳和后续验证才会成为长期能力更新</span></div>
+  <div class="src">第十章 ·「斯坦福 AI 小镇：生成式 Agent 的社会模拟」· 图10-10（记忆的重要性、时近性取自原书图示）</div>
+</section>
+<style>
+.tw-top{display:flex;align-items:center;gap:26px;margin-top:-8px}
+.tw-who{display:flex;align-items:center;gap:14px;padding:8px 18px 8px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--acc2) 45%,transparent);background:color-mix(in srgb,var(--acc2) 8%,transparent)}
+.tw-av{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-size:24px;color:var(--acc2);border:2px solid var(--acc2)}
+.tw-who b{display:block;font-size:20px}.tw-who small{font-size:15px;color:var(--text2)}
+.tw-qs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tw-ql{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text3)}
+.tw-qs button{padding:7px 14px;border-radius:12px;font-size:16px;color:var(--text2);border:1px solid var(--line2);background:rgba(255,255,255,.03);transition:all .3s}
+.tw-qs button.on{color:#06101f;background:var(--acc);border-color:var(--acc);font-weight:600}
+.tw-body{display:grid;grid-template-columns:620px 480px 1fr;gap:26px;margin-top:16px}
+.tw-col{display:flex;flex-direction:column;gap:10px}
+.tw-h{display:flex;align-items:baseline;gap:12px}
+.tw-h b{font-size:22px;color:var(--acc)}
+.tw-h small{font:15px var(--num);color:var(--text3)}
+.tw-ar{margin-left:auto;font-size:15px;color:var(--acc2)}
+.tw-ms{display:flex;flex-direction:column;gap:8px}
+.tw-m{display:grid;grid-template-columns:62px 1fr 64px;gap:4px 12px;align-items:center;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.78);transition:border-color .4s,background .4s,box-shadow .4s}
+.tw-m em{font-style:normal;font:700 15px var(--mono);color:var(--text3)}
+.tw-m span{font-size:17px}
+.tw-m strong{grid-row:span 2;font:800 22px var(--num);color:var(--text3);text-align:right;transition:color .4s}
+.tw-bars{grid-column:1/3;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tw-bars i{display:block;height:7px;border-radius:5px;background:rgba(255,255,255,.08);position:relative;overflow:hidden}
+.tw-bars i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--v,0%);background:var(--c);border-radius:5px;transition:width .8s var(--ease)}
+.tw-m.on{border-color:color-mix(in srgb,var(--acc) 60%,transparent);background:color-mix(in srgb,var(--acc) 12%,rgba(12,18,40,.85));box-shadow:0 0 24px -6px var(--acc)}
+.tw-m.on strong{color:var(--acc)}
+.tw-lg{display:flex;gap:16px;font-size:15px;color:var(--text3)}
+.tw-lg span{display:flex;align-items:center;gap:6px}
+.tw-lg i{width:14px;height:7px;border-radius:4px}
+.tw-rs,.tw-ps{display:flex;flex-direction:column;gap:8px}
+.tw-r{padding:10px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.78);transition:all .4s}
+.tw-r b{display:block;font-size:17px}
+.tw-r span{font-size:16px;color:var(--text2)}
+.tw-r.on{border-color:color-mix(in srgb,var(--llm) 60%,transparent);background:color-mix(in srgb,var(--llm) 12%,rgba(12,18,40,.85));box-shadow:0 0 22px -6px var(--llm)}
+.tw-r.on span{color:var(--text)}
+.tw-p{display:flex;align-items:center;gap:12px;padding:7px 14px;border-radius:12px;border:1px solid var(--line);background:rgba(12,18,40,.78);font-size:17px;transition:all .4s}
+.tw-p em{font-style:normal;font:700 16px var(--num);color:var(--text3);min-width:52px}
+.tw-p.adj{border-style:dashed;color:var(--acc2);font-size:15px;padding:4px 14px}
+.tw-p.on{border-color:color-mix(in srgb,var(--acc2) 65%,transparent);background:color-mix(in srgb,var(--acc2) 12%,rgba(12,18,40,.85))}
+.tw-p.on em{color:var(--acc2)}
+.tw-p.big{border-color:color-mix(in srgb,var(--acc) 45%,transparent)}
+.tw-note{display:flex;align-items:baseline;gap:16px;margin-top:16px;padding:12px 20px;border-radius:14px;border-left:4px solid var(--llm);background:color-mix(in srgb,var(--llm) 8%,transparent)}
+.tw-note b{font-size:18px;color:var(--llm);white-space:nowrap}
+.tw-note span{font-size:16px;line-height:1.55;color:var(--text2)}
+</style>
+<script>
+HOOKS['c10-town'] = {
+  // 记忆流：时间、内容、重要性（满分 10）、时近性，均取自原书图10-10
+  M: [['08:30', 'Hobbs 咖啡馆开门营业', 4, 0.9], ['09:15', '顾客 Klaus 来店里买咖啡', 5, 0.85], ['10:00', '决定办一场情人节派对', 9, 0.8], ['11:30', '邀请顾客 Maria 来派对', 8, 0.7], ['14:00', '请 Maria 帮忙布置场地', 7, 0.6]],
+  R: [['谁是 Hobbs 的常客？', 'Maria、Klaus、Tom（常来）'], ['我该邀请谁来派对？', '熟客与好友都邀请'], ['派对筹备到哪一步了？', '已邀数人，待布置场地'], ['谁能帮我布置咖啡馆？', 'Maria（好友，乐意帮忙）']],
+  P: [['08:00', '起床 + 早餐'], ['09:00', 'Hobbs 开店营业'], ['12:00', '边营业边邀请顾客'], ['14:00', '与 Maria 布置场地'], ['16:00', '备好茶点与座位'], ['adj', '← 根据环境变化和社交机会动态调整'], ['18:00', '在 Hobbs 举办情人节派对']],
+  // 情境（示意）：相关性打分、对应的反思与计划行
+  Q: [
+    ['09:00 · 今天先做什么？', [0.9, 0.3, 0.2, 0.1, 0.1], 0, 1],
+    ['12:00 · 该邀请谁来派对？', [0.2, 0.7, 0.8, 0.75, 0.3], 1, 2],
+    ['14:00 · 谁能帮我布置？', [0.1, 0.2, 0.55, 0.7, 0.95], 3, 3],
+    ['16:00 · 筹备到哪一步了？', [0.1, 0.15, 0.9, 0.8, 0.85], 2, 4],
+  ],
+  init(s) {
+    s.querySelector('.tw-ms').innerHTML = this.M.map(([t, x, im, re], i) => `<div class="tw-m" data-i="${i}"><em>${t}</em><span>${x}</span><strong>—</strong><div class="tw-bars"><i style="--c:#fbbf24;--v:${im * 10}%"></i><i style="--c:#22d3ee;--v:${re * 100}%"></i><i class="tw-rel" style="--c:#4ade80"></i></div></div>`).join('');
+    s.querySelector('.tw-rs').innerHTML = this.R.map(([q, a], i) => `<div class="tw-r" data-r="${i}"><b>“${q}”</b><span>→ ${a}</span></div>`).join('');
+    s.querySelector('.tw-ps').innerHTML = this.P.map(([t, x], i) => (t === 'adj' ? `<div class="tw-p adj">${x}</div>` : `<div class="tw-p${i === 6 ? ' big' : ''}" data-p="${i}"><em>${t}</em>${x}</div>`)).join('');
+    s.querySelector('.tw-qs').insertAdjacentHTML('beforeend', this.Q.map(([t], i) => `<button data-q="${i}">${t}</button>`).join(''));
+    s.querySelector('.tw-qs').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { this.auto = false; this.ask(s, +b.dataset.q); } });
+  },
+  ask(s, k) {
+    const [, rel, r, p] = this.Q[k];
+    this.k = k;
+    s.querySelectorAll('.tw-qs button').forEach((b) => b.classList.toggle('on', +b.dataset.q === k));
+    // 检索打分（示意）：重要性 + 时近性 + 相关性，取前两条
+    const sc = this.M.map(([, , im, re], i) => im / 10 + re + rel[i]);
+    const top = sc.map((v, i) => [v, i]).sort((a, b) => b[0] - a[0]).slice(0, 2).map((x) => x[1]);
+    s.querySelectorAll('.tw-m').forEach((m, i) => {
+      m.querySelector('.tw-rel').style.setProperty('--v', rel[i] * 100 + '%');
+      m.querySelector('strong').textContent = sc[i].toFixed(2);
+      m.classList.toggle('on', top.includes(i));
+    });
+    s.querySelectorAll('.tw-r').forEach((x) => x.classList.toggle('on', +x.dataset.r === r));
+    s.querySelectorAll('.tw-p[data-p]').forEach((x) => x.classList.toggle('on', +x.dataset.p === p));
+  },
+  enter(s, ctx) {
+    this.auto = true;
+    ctx.later(() => this.ask(s, 0), 900);
+    ctx.every(() => { if (this.auto) this.ask(s, ((this.k ?? -1) + 1) % this.Q.length); }, 4200);
+  },
+  reset(s) {
+    this.k = -1;
+    s.querySelectorAll('.tw-m,.tw-r,.tw-p,.tw-qs button').forEach((x) => x.classList.remove('on'));
+    s.querySelectorAll('.tw-rel').forEach((x) => x.style.setProperty('--v', '0%'));
+    s.querySelectorAll('.tw-m strong').forEach((x) => (x.textContent = '—'));
+  },
+};
+</script>

@@ -1,0 +1,459 @@
+<!-- ================= PART 03 将经验沉淀为知识 ================= -->
+<section class="slide chapter" id="c09-d3" data-part="3" data-title="PART 03 · 将经验沉淀为知识" data-notes="<b>最轻量的进化方式</b>，是把多次运行中反复出现的经验整理成可检索的知识文档。这里的“经验知识库”与第三章共享存储、索引和检索技术，但知识来源和验证目标不同。这一部分依次讲：经验与领域知识的区别、为什么原始轨迹不能直接当知识、图9-4 的知识化流程、五步提炼管道，以及 GAIA 经验学习的例子。">
+  <div class="ch-k fx fx-up">PART 03</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">将经验沉淀为知识</h1>
+  <div class="ch-s fx fx-up" style="--d:3">最轻量的进化：把反复出现的经验整理成可检索的知识文档</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">经验文档不是简单的轨迹摘要。真正有迁移价值的内容来自对照。</blockquote>
+  <div class="ch-loop" data-node="2" data-num="03"></div>
+</section>
+
+<section class="slide" id="c09-kvx" data-part="3" data-trans="rise" data-dur="14000" data-title="从“世界是什么样”到“应该怎样做”" data-notes="最轻量的进化方式，是把多次运行中反复出现的经验整理成可检索的知识文档。这里所说的“经验知识库”与第三章共享存储、索引和检索技术，但<b>知识来源和验证目标不同</b>。第三章主要从用户对话、文档和数据集中提取“用户与世界是什么样的”；本章则从 Agent 的行动轨迹和结果中提取“在什么条件下应该怎样做”。例如，“该航空公司要求特殊餐食提前二十四小时预订”是领域知识；“订票前先检查特殊餐食截止时间，避免付款后才发现无法满足需求”则是行动经验。<br><b>原始轨迹不适合作为正式知识单元。</b>它既长又嘈杂，包含工具原始输出、偶然的绕路和环境细节。正式文档通常写清<b>适用场景、推荐策略、禁止做法、例外条件、证据来源和最近验证时间</b>，而不是复述某一次任务的完整过程。<br>下方左侧是一条原始轨迹，噪声部分被逐一划掉；右侧是从多条同类轨迹整理出的正式文档（两者均为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从“世界是什么样”到“<em>应该怎样做</em>”</h2></header>
+  <div class="kv9-top">
+    <div class="kv9-c c9-card fx fx-left" style="--d:2;--c:var(--ctx)"><span class="lbl">第三章 · 用户记忆与知识库</span><b>用户与世界是什么样的</b><p>来源：用户对话、文档和数据集</p><div class="kv9-ex"><em>领域知识</em>该航空公司要求特殊餐食提前二十四小时预订</div></div>
+    <div class="kv9-mid fx fx-scale" style="--d:3"><span>共享</span><b>存储 · 索引 · 检索</b><span>不同</span><b>来源 · 验证目标</b></div>
+    <div class="kv9-c c9-card fx fx-right" style="--d:4;--c:var(--c9-know)"><span class="lbl">本章 · 经验知识库</span><b>在什么条件下应该怎样做</b><p>来源：Agent 的行动轨迹和结果</p><div class="kv9-ex"><em>行动经验</em>订票前先检查特殊餐食截止时间，避免付款后才发现无法满足需求</div></div>
+  </div>
+  <div class="kv9-low">
+    <div class="kv9-raw win fx fx-left" style="--d:5" data-clip-ok><div class="win-bar"><i></i><i></i><i></i><span>原始轨迹 · 不可变证据（示意）</span></div><div class="kv9-ls"></div></div>
+    <div class="kv9-arrow fx fx-scale" style="--d:6"><svg class="ic"><use href="#i-compress"/></svg><span>不是复述<br>某一次过程</span></div>
+    <div class="kv9-doc win fx fx-right" style="--d:7"><div class="win-bar"><i></i><i></i><i></i><span>experience/special-meal.md（示意）</span></div><div class="kv9-fs"></div></div>
+  </div>
+  <div class="src">第九章 ·「将经验沉淀为知识」</div>
+</section>
+<style>
+.kv9-top{display:grid;grid-template-columns:1fr 250px 1fr;gap:22px;align-items:stretch}
+.kv9-c{display:flex;flex-direction:column;gap:6px;padding:16px 22px}
+.kv9-c>b{font-size:25px;color:var(--c)}
+.kv9-c>p{font-size:17px;color:var(--text3)}
+.kv9-ex{margin-top:6px;padding:10px 14px;border-radius:12px;font-size:19px;line-height:1.5;background:rgba(5,9,22,.5);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
+.kv9-ex em{display:block;font-style:normal;font-size:15px;font-weight:700;color:var(--c);letter-spacing:.1em;margin-bottom:2px}
+.kv9-mid{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center}
+.kv9-mid span{font-size:15px;letter-spacing:.2em;color:var(--text3)}
+.kv9-mid b{font-size:20px;margin-bottom:10px}
+.kv9-low{display:grid;grid-template-columns:1fr 150px 1fr;gap:18px;margin-top:20px;height:390px}
+.kv9-raw,.kv9-doc{display:flex;flex-direction:column;min-width:0}
+.kv9-ls{flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+.kv9-l{position:relative;display:flex;gap:10px;font:15px/1.5 var(--mono);color:#cbd5f5;transition:opacity .5s}
+.kv9-l em{flex:none;font-style:normal;color:var(--text3)}
+.kv9-l span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv9-l i{position:absolute;right:0;top:0;font-style:normal;font:600 15px var(--font);color:var(--warn);opacity:0;transition:opacity .4s}
+.kv9-l.x{opacity:.35}
+.kv9-l.x span{text-decoration:line-through;text-decoration-color:var(--warn);padding-right:120px}
+.kv9-l.x i{opacity:1}
+.kv9-l.k span{color:var(--c9-know)}
+.kv9-arrow{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;text-align:center}
+.kv9-arrow .ic{font-size:44px;color:var(--acc)}
+.kv9-arrow span{font-size:17px;color:var(--text2);line-height:1.5}
+.kv9-fs{flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:7px}
+.kv9-f{display:grid;grid-template-columns:118px 1fr;gap:10px;font-size:17px;line-height:1.5;animation:upIn .45s var(--spring) both}
+.kv9-f em{font-style:normal;font-weight:700;color:var(--c9-know)}
+.kv9-f span{color:var(--text)}
+.kv9-h{font:700 20px var(--font);color:var(--text);margin-bottom:4px;animation:upIn .45s var(--spring) both}
+</style>
+<script>
+HOOKS['c09-kvx'] = {
+  // 原始轨迹：[行号, 内容, 噪声类型（空 = 保留为证据）]
+  L: [
+    ['01', 'user: 帮我订 6 月 3 日去大阪的航班，要素食餐', ''],
+    ['02', 'search_flights(...) → 返回 2,311 行原始 JSON', '工具原始输出'],
+    ['03', 'open_page(airline.com/meal) → 404，重试一次', '偶然的绕路'],
+    ['04', 'get_meal_policy(airline) → 特殊餐食须起飞前 24 小时预订', ''],
+    ['05', 'debug: region=ap-east-1 latency=812ms', '环境细节'],
+    ['06', 'check_deadline(flight) → 距起飞 30 小时，可订', ''],
+    ['07', 'book_meal(VGML) → ok', ''],
+    ['08', 'pay(order) → ok', ''],
+  ],
+  F: [
+    ['适用场景', '为乘客订票且需要特殊餐食'],
+    ['推荐策略', '付款前先查询特殊餐食截止时间'],
+    ['禁止做法', '先付款、事后再补订餐食'],
+    ['例外条件', '已过截止时间：先告知乘客再继续'],
+    ['证据来源', '若干条成功轨迹与失败轨迹的编号'],
+    ['最近验证', '每次复核后更新日期与环境版本'],
+  ],
+  render(s) {
+    s.querySelector('.kv9-ls').innerHTML = this.L.map(([n, t, x]) => `<div class="kv9-l" data-x="${x}"><em>${n}</em><span>${t}</span><i>${x}</i></div>`).join('');
+    s.querySelector('.kv9-fs').innerHTML = '';
+  },
+  async run(s, ctx) {
+    const tk = this.tk, ok = () => ctx.alive && tk === this.tk;
+    this.render(s);
+    const ls = [...s.querySelectorAll('.kv9-l')], fs = s.querySelector('.kv9-fs');
+    await U.wait(ctx, 900);
+    for (const l of ls) {
+      await U.wait(ctx, 420);
+      if (!ok()) return;
+      l.classList.add(l.dataset.x ? 'x' : 'k');
+    }
+    await U.wait(ctx, 600);
+    if (!ok()) return;
+    fs.insertAdjacentHTML('beforeend', '<div class="kv9-h"># 特殊餐食：订票前先确认截止时间</div>');
+    for (const [k, v] of this.F) {
+      await U.wait(ctx, 520);
+      if (!ok()) return;
+      fs.insertAdjacentHTML('beforeend', `<div class="kv9-f"><em>${k}</em><span>${v}</span></div>`);
+    }
+    await U.wait(ctx, 3600);
+    if (ok()) this.run(s, ctx);
+  },
+  init(s) { this.render(s); },
+  enter(s, ctx) { C9.tk(this); this.run(s, ctx); },
+  reset(s) { C9.tk(this); this.render(s); },
+};
+</script>
+
+<section class="slide" id="c09-fig4" data-part="3" data-trans="zoom" data-dur="16000" data-title="从已评价轨迹到经验知识文档（图9-4）" data-notes="更稳妥的系统保留<b>三层数据</b>：不可变的原始轨迹用于审计，单次运行分析记录本次成败与经验草案，再对多条同类轨迹进行比较、聚类和归纳，形成面向未来的 Markdown 知识文档。<b>图9-4</b> 展示了这一过程：原始轨迹（动作、结果、环境；不可变证据）→ 单次评价（成功、失败、标签；保留证据位置）→ 跨轨迹比较（聚合同类任务、对照成功与失败、提取共性与边界）→ Markdown 文档（适用场景与策略；例外、禁区与来源；版本与验证时间）→ 检索应用（新任务按需加载，继续产生反馈）；新证据又回到跨轨迹比较，用于修订、限定或淘汰旧知识。它与第三章共用抽取和检索基础设施；本章新增的是轨迹评价与行为改进闭环。<br>这种设计与第三章的 <b>User as Code</b> 采用了相同的两阶段思路：User as Code 先把对话事实追加到不可变日志，再周期性重建结构化用户模型；经验学习同样应<b>先保存证据，再离线生成可变知识</b>。把记录与整理分开，可以避免一次偶发成功或网络故障立即改变 Agent，也使系统能够在看到多条成功和失败后再判断共性。<br>下方开关对照两种写法：“立即写入”时，一次网络故障或偶发成功就会改写文档；“先记录、后整理”时，事件只追加到日志，周期性重建才更新文档（事件为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">原始轨迹是证据，<em>知识文档才是复用单元</em></h2></header>
+  <div class="f4-stage fx fx-scale" style="--d:2">
+    <div class="f4-n" style="left:0;width:290px" data-n="0"><b>原始轨迹</b><span>动作、结果、环境</span><span>不可变证据</span></div>
+    <div class="f4-n" style="left:340px;width:290px" data-n="1"><b>单次评价</b><span>成功、失败、标签</span><span>保留证据位置</span></div>
+    <div class="f4-n acc" style="left:680px;width:310px" data-n="2"><b>跨轨迹比较</b><span>聚合同类任务</span><span>对照成功与失败</span><span>提取共性与边界</span></div>
+    <div class="f4-n acc" style="left:1040px;width:310px" data-n="3"><b>Markdown 文档</b><span>适用场景与策略</span><span>例外、禁区与来源</span><span>版本与验证时间</span></div>
+    <div class="f4-n" style="left:1400px;width:260px" data-n="4"><b>检索应用</b><span>新任务按需加载</span><span>继续产生反馈</span></div>
+    <svg class="f4-svg" viewBox="0 0 1660 300" width="1660" height="300">
+      <defs><marker id="f4m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#94a3b8"/></marker></defs>
+      <path class="f4-p" d="M290 90 H338" marker-end="url(#f4m)"/><path class="f4-p" d="M630 90 H678" marker-end="url(#f4m)"/><path class="f4-p" d="M990 90 H1038" marker-end="url(#f4m)"/><path class="f4-p" d="M1350 90 H1398" marker-end="url(#f4m)"/>
+      <path class="f4-back" d="M1530 182 V250 H835 V184" marker-end="url(#f4m)"/>
+      <text x="1180" y="282" class="f4-bt">新证据用于修订、限定或淘汰旧知识</text>
+    </svg>
+  </div>
+  <div class="f4-low">
+    <div class="f4-ctl fx fx-left" style="--d:4">
+      <div class="f4-seg seg"><i class="knob"></i><button data-v="now">立即写入</button><button data-v="two">先记录、后整理</button></div>
+      <p class="f4-tip">同 <b>User as Code</b>：先把事实追加到不可变日志，再周期性重建</p>
+      <div class="f4-ev"><span class="lbl">刚到达的事件 <span class="c9-sy">示意</span></span><div class="f4-cur">—</div></div>
+    </div>
+    <div class="f4-log win fx fx-up" style="--d:5" data-clip-ok><div class="win-bar"><i></i><i></i><i></i><span>不可变日志 · 只追加</span></div><div class="f4-ll"></div></div>
+    <div class="f4-doc win fx fx-right" style="--d:6"><div class="win-bar"><i></i><i></i><i></i><span class="f4-dv">知识文档 · v1</span></div><div class="f4-dt"></div></div>
+  </div>
+  <div class="f4-foot fx fx-up" style="--d:7">与第三章共用抽取和检索基础设施；本章新增轨迹评价与行为改进闭环</div>
+  <div class="src">第九章 ·「将经验沉淀为知识」· 图9-4 · 与第三章 User as Code 的两阶段思路</div>
+</section>
+<style>
+.f4-stage{position:relative;width:1660px;height:300px}
+.f4-n{position:absolute;top:0;height:180px;padding:16px 18px;border-radius:18px;display:flex;flex-direction:column;gap:6px;background:rgba(12,18,40,.9);border:1px solid var(--line2);transition:all .45s var(--ease);z-index:2}
+.f4-n.acc{background:color-mix(in srgb,var(--acc) 8%,rgba(12,18,40,.92));border-color:color-mix(in srgb,var(--acc) 40%,transparent)}
+.f4-n b{font-size:23px}
+.f4-n span{font-size:17px;color:var(--text2)}
+.f4-n.on{border-color:var(--acc);box-shadow:0 0 30px color-mix(in srgb,var(--acc) 40%,transparent);translate:0 -4px}
+.f4-svg{position:absolute;inset:0;overflow:visible;pointer-events:none;z-index:1}
+.f4-p{fill:none;stroke:#94a3b8;stroke-width:2.5}
+.f4-back{fill:none;stroke:var(--acc);stroke-width:2.5;stroke-dasharray:8 7;animation:flow 1.3s linear infinite}
+.f4-bt{fill:var(--acc);font-size:19px;text-anchor:middle;font-weight:600}
+.f4-low{display:grid;grid-template-columns:400px 1fr 1fr;gap:20px;height:320px;margin-top:10px}
+.f4-ctl{display:flex;flex-direction:column;gap:14px}
+.f4-tip{font-size:17px;line-height:1.6;color:var(--text2)}
+.f4-tip b{color:var(--acc)}
+.f4-ev{flex:1;display:flex;flex-direction:column;gap:8px;padding:14px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.f4-cur{flex:1;display:flex;align-items:center;font-size:20px;line-height:1.5;padding:10px 14px;border-radius:12px;background:color-mix(in srgb,var(--c,#94a3b8) 12%,transparent);border:1px solid color-mix(in srgb,var(--c,#94a3b8) 45%,transparent);color:var(--text);transition:background .3s,border-color .3s}
+.f4-log,.f4-doc{display:flex;flex-direction:column;min-width:0}
+.f4-ll{flex:1;padding:10px 14px;display:flex;flex-direction:column;gap:5px;overflow:hidden}
+.f4-ll div{font:15px/1.5 var(--mono);color:#cbd5f5;padding:3px 8px;border-radius:7px;border-left:3px solid var(--c);background:rgba(255,255,255,.03);animation:swIn .4s var(--ease) both;white-space:nowrap}
+.f4-dt{flex:1;padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+.f4-dt b{font-size:20px}
+.f4-dt p{font-size:18px;line-height:1.6;color:var(--text2)}
+.f4-dt .f4-cnt{font:16px var(--mono);color:var(--text3)}
+.f4-doc.flip{animation:shake .45s}
+.f4-doc.bad .f4-dt b{color:var(--bad)}
+.f4-doc.good .f4-dt b{color:var(--ok)}
+.f4-foot{margin-top:14px;text-align:center;font-size:17px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c09-fig4'] = {
+  // 事件流（示意）：[文字, 类型]；ok 成功、fail 失败、net 网络故障、luck 偶发成功
+  EV: [['成功：先查截止时间，再付款', 'ok'], ['网络故障：餐食接口超时', 'net'], ['成功：先查截止时间，再付款', 'ok'], ['偶发成功：没查也赶上了截止时间', 'luck'], ['失败：付款后才发现已过截止时间', 'fail'], ['成功：先查截止时间，再付款', 'ok'], ['网络故障：餐食接口超时', 'net'], ['失败：付款后才发现已过截止时间', 'fail']],
+  CO: { ok: 'var(--ok)', fail: 'var(--bad)', net: 'var(--text3)', luck: 'var(--tool)' },
+  NOW: {
+    ok: ['先查截止时间，再付款', '刚刚一次成功就写成规则'],
+    fail: ['先查截止时间，再付款', '一次失败只得再补一句'],
+    net: ['餐食接口不可用，跳过特殊餐食', '一次网络故障改写了文档'],
+    luck: ['无须检查截止时间', '一次偶发成功推翻了正确经验'],
+  },
+  init(s) {
+    this.set = U.seg(s.querySelector('.f4-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  doc(s, title, body, cls) {
+    const d = s.querySelector('.f4-doc');
+    d.className = 'f4-doc win ' + (cls || '');
+    s.querySelector('.f4-dt').innerHTML = `<b>${title}</b><p>${body}</p>`;
+    U.restart(d, 'flip');
+  },
+  async mode(s, m) {
+    const tk = C9.tk(this), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    this.m = m;
+    this.set(m);
+    const ll = s.querySelector('.f4-ll'), cur = s.querySelector('.f4-cur'), dv = s.querySelector('.f4-dv'), ns = [...s.querySelectorAll('.f4-n')];
+    ll.innerHTML = '';
+    cur.textContent = '—';
+    let v = 1, n = 0, sup = 0, ref = 0;
+    dv.textContent = '知识文档 · v1';
+    this.doc(s, '先查截止时间，再付款', m === 'now' ? '每来一个事件就立即改写' : '只在周期性重建时更新', '');
+    if (!ctx) return;
+    for (const [t, k] of this.EV) {
+      await U.wait(ctx, 1500);
+      if (!ok()) return;
+      n++;
+      cur.textContent = t;
+      cur.style.setProperty('--c', this.CO[k]);
+      ll.insertAdjacentHTML('afterbegin', `<div style="--c:${this.CO[k]}">#${String(n).padStart(2, '0')} ${t}</div>`);
+      ns.forEach((x, j) => x.classList.toggle('on', j === 0));
+      if (k === 'ok') sup++;
+      if (k === 'fail') ref++;
+      if (m === 'now') {
+        const [ti, why] = this.NOW[k];
+        dv.textContent = `知识文档 · v${++v}`;
+        this.doc(s, ti, why, k === 'net' || k === 'luck' ? 'bad' : '');
+      } else if (n % 4 === 0) {
+        // 周期性重建：看到多条成功与失败之后再判断共性
+        ns.forEach((x, j) => x.classList.toggle('on', j >= 1 && j <= 3));
+        await U.wait(ctx, 500);
+        if (!ok()) return;
+        dv.textContent = `知识文档 · v${++v}（周期重建）`;
+        this.doc(s, '先查截止时间，再付款', `<span class="f4-cnt">支持 ${sup} 条成功 · 失败对照 ${ref} 条 · 网络故障与偶发成功不计入</span><br>${ref ? '失败轨迹恰好缺少这一步：对照之后规则得到加强' : '样本仍少：维持原结论，等待更多证据'}`, 'good');
+      }
+    }
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'now');
+    let m = 'now';
+    ctx.every(() => { if (this.auto) { m = m === 'now' ? 'two' : 'now'; this.mode(s, m); } }, 14500);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelector('.f4-ll').innerHTML = ''; s.querySelectorAll('.f4-n').forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c09-pipe5" data-part="3" data-steps="4" data-dur="7500" data-title="知识提炼的五步管道" data-notes="<b>经验文档不是简单的轨迹摘要。</b>真正有迁移价值的内容来自对照：同类成功轨迹做了什么，失败轨迹缺少什么；某种策略在哪些环境版本中有效，在哪些前置条件下失效。第三章已经介绍知识抽取、聚类与检索，本章不再重复这些算法，而把重点放在<b>轨迹评价如何成为抽取条件</b>，以及<b>抽取出的知识是否能提高后续任务表现</b>。<br>一个完整的知识提炼管道可以分成五步，按 → 逐步看：① 保存不可变轨迹和环境结果；② 为单次运行生成结构化分析，列出任务类型、所需能力、观察到的策略、错误与例外；③ 按任务族聚合同类运行，为每条经验草案建立“哪些轨迹支持、哪些轨迹反驳”的证据表；④ 只有达到支持门槛的草案才写入正式文档；⑤ 最后在未参与提炼的新任务上测试迁移效果。<br>右侧的轨迹、草案、计数和迁移结果都是示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">知识提炼的<em>五步管道</em></h2>
+  <p class="lead fx fx-up" style="--d:2">真正有迁移价值的内容来自对照：成功轨迹做了什么，失败轨迹缺少什么</p></header>
+  <div class="p5-body">
+    <ol class="sl p5-sl fx fx-left" style="--d:3">
+      <li><span>1</span><div><b>保存不可变轨迹和环境结果</b><p>原始证据，只追加、不修改</p></div></li>
+      <li><span>2</span><div><b>单次运行的结构化分析</b><p>任务类型、所需能力、观察到的策略、错误与例外</p></div></li>
+      <li><span>3</span><div><b>按任务族聚合，建立证据表</b><p>每条草案：哪些轨迹支持、哪些轨迹反驳</p></div></li>
+      <li><span>4</span><div><b>达到支持门槛才写入正式文档</b><p>不够的草案继续观察或丢弃</p></div></li>
+      <li><span>5</span><div><b>在未参与提炼的新任务上测试迁移</b><p>知识是否真的提高后续任务表现</p></div></li>
+    </ol>
+    <div class="p5-vis panel fx fx-right" style="--d:4">
+      <div class="p5-sc" data-k="0"><span class="lbl">① 不可变轨迹 + 环境结果 <span class="c9-sy">示意</span></span><div class="p5-trs"></div></div>
+      <div class="p5-sc" data-k="1"><span class="lbl">② 单次运行分析（第 7 号轨迹）<span class="c9-sy">示意</span></span>
+        <div class="p5-an"><div><em>任务类型</em>订票 · 特殊餐食</div><div><em>所需能力</em>查询餐食政策、判断截止时间</div><div><em>观察到的策略</em>付款前先查截止时间</div><div><em>错误与例外</em>餐食接口一次超时，重试后成功</div><div><em>结果</em><span class="c9-pill" style="--c:var(--ok)">成功</span></div></div></div>
+      <div class="p5-sc" data-k="2"><span class="lbl">③ 证据表：同一任务族的经验草案 <span class="c9-sy">示意</span></span><div class="p5-tb"></div></div>
+      <div class="p5-sc" data-k="3"><span class="lbl">④ 支持门槛：支持 ≥ 5 且反驳 ≤ 1 <span class="c9-sy">示意</span></span><div class="p5-tb p5-tb2"></div></div>
+      <div class="p5-sc" data-k="4"><span class="lbl">⑤ 迁移测试：未参与提炼的新任务 <span class="c9-sy">示意</span></span>
+        <div class="p5-bars"><div><span>无经验文档</span><div class="meter" style="--c:var(--text3)"><i class="p5-b0"></i></div><b class="p5-v0">—</b></div><div><span>加载经验文档</span><div class="meter" style="--c:var(--c9-know)"><i class="p5-b1"></i></div><b class="p5-v1">—</b></div></div>
+        <p class="p5-note">只有在新任务上显示正向迁移，正式文档才算真正有效；否则回到第 3 步修订</p></div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验沉淀为知识」</div>
+</section>
+<style>
+.p5-body{display:grid;grid-template-columns:600px 1fr;gap:28px;flex:1;min-height:0}
+.p5-sl li{padding:12px 16px}
+.p5-sl b{font-size:22px}
+.p5-sl p{font-size:17px}
+.p5-vis{position:relative;padding:22px 26px}
+.p5-sc{position:absolute;inset:22px 26px;display:flex;flex-direction:column;gap:14px;opacity:0;translate:0 14px;transition:opacity .5s var(--ease),translate .5s var(--ease)}
+.p5-sc.on{opacity:1;translate:0 0}
+.p5-trs{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.p5-tr{display:flex;flex-direction:column;gap:6px;padding:10px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid var(--line);animation:upIn .4s var(--spring) both}
+.p5-tr b{font:700 15px var(--mono);color:var(--text3)}
+.p5-tr i{height:8px;border-radius:4px;background:rgba(255,255,255,.14)}
+.p5-tr i:nth-of-type(2){width:70%}.p5-tr i:nth-of-type(3){width:85%}
+.p5-tr span{font-size:15px;font-weight:700;color:var(--c)}
+.p5-an{display:flex;flex-direction:column;gap:10px}
+.p5-an div{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;padding:12px 16px;border-radius:12px;font-size:19px;background:rgba(255,255,255,.03);border:1px solid var(--line)}
+.p5-an em{font-style:normal;font-size:16px;font-weight:700;color:var(--c9-know)}
+.p5-tb{display:flex;flex-direction:column;gap:10px}
+.p5-row{display:grid;grid-template-columns:1fr 150px 150px 150px;gap:12px;align-items:center;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,.03);border:1px solid var(--line);transition:all .5s}
+.p5-row b{font-size:19px;line-height:1.45}
+.p5-row .p5-s,.p5-row .p5-r{display:flex;align-items:center;gap:8px;font-size:16px;color:var(--text3)}
+.p5-row .p5-s em,.p5-row .p5-r em{font:800 26px var(--num);font-style:normal}
+.p5-row .p5-s em{color:var(--ok)}.p5-row .p5-r em{color:var(--bad)}
+.p5-row .p5-d{font-size:16px;font-weight:700;text-align:center;padding:6px 8px;border-radius:10px;color:var(--text3);border:1px dashed var(--line2)}
+.p5-row.pass{border-color:color-mix(in srgb,var(--ok) 50%,transparent);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+.p5-row.pass .p5-d{color:#06101f;background:var(--ok);border:0}
+.p5-row.hold .p5-d{color:var(--warn);border-color:var(--warn)}
+.p5-row.drop{opacity:.5}
+.p5-row.drop .p5-d{color:var(--bad);border-color:var(--bad)}
+.p5-bars{display:flex;flex-direction:column;gap:22px;margin-top:20px}
+.p5-bars>div{display:grid;grid-template-columns:150px 1fr 80px;gap:14px;align-items:center;font-size:18px}
+.p5-bars .meter{height:22px}
+.p5-bars b{font:800 26px var(--num);color:var(--c9-know)}
+.p5-note{margin-top:auto;font-size:18px;line-height:1.6;color:var(--text2)}
+</style>
+<script>
+HOOKS['c09-pipe5'] = {
+  TR: [['ok', '成功'], ['ok', '成功'], ['fail', '失败'], ['ok', '成功'], ['part', '部分成功'], ['ok', '成功'], ['ok', '成功'], ['fail', '失败'], ['ok', '成功'], ['ok', '成功']],
+  CO: { ok: 'var(--ok)', fail: 'var(--bad)', part: 'var(--tool)' },
+  D: [['付款前先查特殊餐食截止时间', 7, 0, 'pass', '写入正式文档'], ['餐食接口超时就跳过特殊餐食', 1, 3, 'drop', '反驳多于支持'], ['重试两次后改用电话订餐', 2, 1, 'hold', '证据不足，继续观察']],
+  init(s) {
+    s.querySelector('.p5-trs').innerHTML = this.TR.map(([k, t], i) => `<div class="p5-tr" style="--c:${this.CO[k]}"><b>#${String(i + 1).padStart(2, '0')}</b><i></i><i></i><i></i><span>${t}</span></div>`).join('');
+    const row = ([t, a, b], show) => `<div class="p5-row"><b>${t}</b><span class="p5-s">支持 <em>${show ? a : 0}</em></span><span class="p5-r">反驳 <em>${show ? b : 0}</em></span><span class="p5-d">—</span></div>`;
+    s.querySelector('.p5-tb').innerHTML = this.D.map((d) => row(d, false)).join('');
+    s.querySelector('.p5-tb2').innerHTML = this.D.map((d) => row(d, true)).join('');
+  },
+  apply(s, k) {
+    const ctx = this.ctx, tk = C9.tk(this);
+    s.querySelectorAll('.p5-sl li').forEach((li, i) => { li.classList.toggle('cur', i === k); li.classList.toggle('done', i < k); });
+    s.querySelectorAll('.p5-sc').forEach((x) => x.classList.toggle('on', +x.dataset.k === k));
+    if (!ctx) return;
+    if (k === 2) {
+      // 证据表：支持 / 反驳计数逐步上升
+      const rows = [...s.querySelectorAll('.p5-tb:not(.p5-tb2) .p5-row')];
+      rows.forEach((r, i) => {
+        const [, a, b] = this.D[i];
+        U.count(r.querySelector('.p5-s em'), a, { dur: 1600, delay: 300 + i * 250, ctx });
+        U.count(r.querySelector('.p5-r em'), b, { dur: 1600, delay: 300 + i * 250, ctx });
+      });
+    }
+    if (k === 3) {
+      const rows = [...s.querySelectorAll('.p5-tb2 .p5-row')];
+      rows.forEach((r) => { r.className = 'p5-row'; r.querySelector('.p5-d').textContent = '—'; });
+      rows.forEach((r, i) => ctx.later(() => { if (tk === this.tk) { r.classList.add(this.D[i][3]); r.querySelector('.p5-d').textContent = this.D[i][4]; } }, 500 + i * 700));
+    }
+    if (k === 4) {
+      const b0 = s.querySelector('.p5-b0'), b1 = s.querySelector('.p5-b1');
+      b0.style.setProperty('--v', '0%');
+      b1.style.setProperty('--v', '0%');
+      ctx.later(() => { if (tk !== this.tk) return; b0.style.setProperty('--v', '58%'); b1.style.setProperty('--v', '76%'); U.count(s.querySelector('.p5-v0'), 58, { dur: 900, suffix: '%', ctx }); U.count(s.querySelector('.p5-v1'), 76, { dur: 900, suffix: '%', ctx }); }, 400);
+    }
+  },
+  enter(s, ctx, k) { this.ctx = ctx; this.apply(s, k); },
+  step(s, ctx, k) { this.apply(s, k); },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.querySelectorAll('.p5-sc,.p5-sl li').forEach((x) => x.classList.remove('on', 'cur', 'done')); },
+};
+</script>
+
+<section class="slide" id="c09-gaia" data-part="3" data-trans="flip" data-dur="15000" data-title="GAIA 经验学习：先验证，再比较多条路径" data-notes="GAIA 经验学习提供了一个直观例子。<b>GAIA</b> 包含需要综合搜索、网页阅读、文件处理和计算的多步骤问题，<b>AWorld</b> 则提供运行 Agent、调用这些工具和保存轨迹的执行环境；前者像试卷，后者像考场与实验记录系统。<br><b>旧式做法</b>是在一次任务成功后立刻生成策略摘要并向量化入库；<b>更严格的实现</b>会先用 GAIA 答案验证或其他环境验证器标记成功、部分成功和失败，再比较同一任务族的多条路径。<b>成功轨迹贡献策略草案，失败轨迹贡献排除性知识，部分成功轨迹则帮助识别“哪一段有效、哪一段仍有问题”。</b><br><b>Reflexion</b> 所提出的自然语言反思可以参与生成经验草案，但<b>反思本身不是证据</b>；只有与环境结果相符、得到跨轨迹支持并在新任务上显示正向迁移的内容，才应进入正式经验文档。<br>右上角开关对照两种做法（轨迹与反思内容为示意）。">
+  <header class="sh c9-sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">GAIA 经验学习：<em>先验证，再比较多条路径</em></h2></div>
+    <div class="ga9-seg seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="old">旧式做法</button><button data-v="new">更严格的实现</button></div></header>
+  <div class="ga9-top fx fx-up" style="--d:3">
+    <div class="ga9-b"><svg class="ic"><use href="#i-clipboard"/></svg><div><b>GAIA · 试卷</b><span>需要综合搜索、网页阅读、文件处理和计算的多步骤问题</span></div></div>
+    <div class="ga9-b"><svg class="ic"><use href="#i-flask"/></svg><div><b>AWorld · 考场与实验记录系统</b><span>运行 Agent、调用这些工具、保存轨迹</span></div></div>
+  </div>
+  <div class="ga9-body">
+    <div class="ga9-trs panel fx fx-left" style="--d:4"><div class="ga9-th"><span class="lbl">同一任务族的五条路径 <span class="c9-sy">示意</span></span><div class="ga9-seglab"><i>搜索</i><i>网页阅读</i><i>文件处理</i><i>计算</i></div></div><div class="ga9-rows"></div></div>
+    <div class="ga9-out fx fx-right" style="--d:5">
+      <div class="ga9-old"><div class="ga9-o1"><svg class="ic"><use href="#i-zap"/></svg><b>一次成功 → 立刻生成策略摘要 → 向量化入库</b></div><p>没有标记成功、部分成功与失败，也没有对照多条路径：<br>偶然的成功和错误归因一起进入了知识库</p></div>
+      <div class="ga9-new">
+        <div class="ga9-k" data-k="ok"><em>成功轨迹</em><b>贡献策略草案</b></div>
+        <div class="ga9-k" data-k="fail"><em>失败轨迹</em><b>贡献排除性知识</b></div>
+        <div class="ga9-k" data-k="part"><em>部分成功</em><b>识别哪一段有效、哪一段仍有问题</b></div>
+        <div class="ga9-rf"><div class="ga9-bub"><svg class="ic"><use href="#i-chat"/></svg>Reflexion 反思：“应先读表格再计算” <span class="ga9-tag">草案 ≠ 证据</span></div>
+          <div class="ga9-ck"><span>与环境结果相符</span><span>得到跨轨迹支持</span><span>新任务上正向迁移</span></div>
+          <div class="ga9-in">三项都通过 → 进入正式经验文档</div></div>
+      </div>
+    </div>
+  </div>
+  <div class="src">第九章 ·「将经验沉淀为知识」· GAIA · AWorld · Reflexion</div>
+</section>
+<style>
+.ga9-top{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.ga9-b{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:14px;background:rgba(255,255,255,.035);border:1px solid var(--line)}
+.ga9-b .ic{font-size:32px;color:var(--acc);flex:none}
+.ga9-b b{display:block;font-size:20px}
+.ga9-b span{font-size:16px;color:var(--text2)}
+.ga9-body{display:grid;grid-template-columns:760px 1fr;gap:24px;margin-top:18px;flex:1;min-height:0}
+.ga9-trs{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.ga9-th{display:flex;justify-content:space-between;align-items:center}
+.ga9-seglab{display:grid;grid-template-columns:repeat(4,96px);gap:6px;margin-right:118px}
+.ga9-seglab i{font-style:normal;font-size:15px;color:var(--text3);text-align:center}
+.ga9-rows{display:flex;flex-direction:column;gap:10px}
+.ga9-r{display:grid;grid-template-columns:120px repeat(4,96px) 110px;gap:6px;align-items:center;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.025);transition:all .45s}
+.ga9-r b{font:700 16px var(--mono);color:var(--text2)}
+.ga9-r i{height:30px;border-radius:8px;background:rgba(148,163,184,.25);transition:background .45s,box-shadow .45s}
+.ga9-r i.g{background:color-mix(in srgb,var(--ok) 70%,transparent)}
+.ga9-r i.r{background:color-mix(in srgb,var(--bad) 70%,transparent)}
+.ga9-r .ga9-v{font-size:16px;font-weight:700;text-align:center;padding:4px 6px;border-radius:9px;color:var(--text3);border:1px dashed var(--line2);transition:all .45s}
+.ga9-r .ga9-v.ok{color:#06101f;background:var(--ok);border-color:transparent}
+.ga9-r .ga9-v.fail{color:#fff;background:var(--bad);border-color:transparent}
+.ga9-r .ga9-v.part{color:#06101f;background:var(--tool);border-color:transparent}
+.ga9-r.hl{border-color:color-mix(in srgb,var(--acc) 55%,transparent);background:color-mix(in srgb,var(--acc) 9%,transparent)}
+.ga9-r.lucky{border-color:var(--bad);box-shadow:0 0 22px color-mix(in srgb,var(--bad) 35%,transparent)}
+.ga9-out{position:relative}
+.ga9-old,.ga9-new{position:absolute;inset:0;display:flex;flex-direction:column;gap:12px;transition:opacity .5s var(--ease),translate .5s var(--ease)}
+#c09-gaia[data-m=new] .ga9-old,#c09-gaia[data-m=old] .ga9-new{opacity:0;translate:0 12px;pointer-events:none}
+.ga9-old{justify-content:center;gap:18px;padding:22px 26px;border-radius:18px;border:1px solid color-mix(in srgb,var(--bad) 40%,transparent);background:color-mix(in srgb,var(--bad) 6%,rgba(12,18,40,.85))}
+.ga9-o1{display:flex;gap:12px;align-items:center}
+.ga9-o1 .ic{font-size:30px;color:var(--warn);flex:none}
+.ga9-o1 b{font-size:22px;line-height:1.5}
+.ga9-old p{font-size:19px;line-height:1.7;color:var(--text2)}
+.ga9-k{--c:var(--ok);display:grid;grid-template-columns:110px 1fr;align-items:center;gap:12px;padding:11px 16px;border-radius:14px;border:1px solid color-mix(in srgb,var(--c) 40%,transparent);background:color-mix(in srgb,var(--c) 7%,transparent);opacity:.3;transition:opacity .45s,box-shadow .45s}
+.ga9-k[data-k=fail]{--c:var(--bad)}.ga9-k[data-k=part]{--c:var(--tool)}
+.ga9-k em{font-style:normal;font-size:16px;font-weight:700;color:var(--c)}
+.ga9-k b{font-size:19px}
+.ga9-k.on{opacity:1;box-shadow:0 0 22px color-mix(in srgb,var(--c) 30%,transparent)}
+.ga9-rf{flex:1;display:flex;flex-direction:column;gap:10px;padding:14px 16px;border-radius:14px;border:1px dashed var(--line2)}
+.ga9-bub{display:flex;align-items:center;gap:10px;font-size:18px;color:var(--text2)}
+.ga9-bub .ic{font-size:22px;color:var(--llm);flex:none}
+.ga9-tag{padding:2px 9px;border-radius:8px;font-size:15px;color:var(--warn);border:1px solid color-mix(in srgb,var(--warn) 55%,transparent);white-space:nowrap}
+.ga9-ck{display:flex;gap:8px}
+.ga9-ck span{flex:1;text-align:center;padding:7px 6px;border-radius:10px;font-size:16px;color:var(--text3);border:1px solid var(--line2);transition:all .4s}
+.ga9-ck span.on{color:#06101f;background:var(--ok);border-color:var(--ok)}
+.ga9-in{text-align:center;font-size:18px;font-weight:700;color:var(--text3);transition:color .4s}
+.ga9-in.on{color:var(--c9-know)}
+</style>
+<script>
+HOOKS['c09-gaia'] = {
+  // [编号, 四段结果 g/r, 判定]
+  R: [['路径 A', 'gggg', 'ok'], ['路径 B', 'gggg', 'ok'], ['路径 C', 'ggrr', 'part'], ['路径 D', 'grrr', 'fail'], ['路径 E', 'rgrg', 'ok']],
+  V: { ok: '成功', fail: '失败', part: '部分成功' },
+  init(s) {
+    s.querySelector('.ga9-rows').innerHTML = this.R.map(([n]) => `<div class="ga9-r"><b>${n}</b><i></i><i></i><i></i><i></i><span class="ga9-v">未标记</span></div>`).join('');
+    this.set = U.seg(s.querySelector('.ga9-seg'), (v) => { this.auto = false; this.mode(s, v); });
+  },
+  async mode(s, m) {
+    const tk = C9.tk(this), ctx = this.ctx, ok = () => ctx && ctx.alive && tk === this.tk;
+    s.dataset.m = m;
+    this.set(m);
+    const rows = [...s.querySelectorAll('.ga9-r')];
+    rows.forEach((r) => { r.className = 'ga9-r'; r.querySelectorAll('i').forEach((i) => (i.className = '')); const v = r.querySelector('.ga9-v'); v.className = 'ga9-v'; v.textContent = '未标记'; });
+    s.querySelectorAll('.ga9-k,.ga9-ck span,.ga9-in').forEach((x) => x.classList.remove('on'));
+    if (!ctx) return;
+    if (m === 'old') {
+      // 路径 E 偶然成功（中间两段其实出错），旧式做法却直接把它写成策略
+      await U.wait(ctx, 900);
+      if (!ok()) return;
+      rows[4].classList.add('lucky');
+      rows[4].querySelector('.ga9-v').textContent = '成功 → 入库';
+      return;
+    }
+    for (let i = 0; i < rows.length; i++) {
+      await U.wait(ctx, 500);
+      if (!ok()) return;
+      const [, seg, v] = this.R[i];
+      rows[i].querySelectorAll('i').forEach((x, j) => (x.className = seg[j]));
+      const el = rows[i].querySelector('.ga9-v');
+      el.className = 'ga9-v ' + v;
+      el.textContent = i === 4 ? '孤例成功' : this.V[v];
+    }
+    for (const k of ['ok', 'fail', 'part']) {
+      await U.wait(ctx, 900);
+      if (!ok()) return;
+      rows.forEach((r, i) => r.classList.toggle('hl', this.R[i][2] === k && !(k === 'ok' && i === 4)));
+      s.querySelector(`.ga9-k[data-k=${k}]`).classList.add('on');
+    }
+    for (const c of s.querySelectorAll('.ga9-ck span')) {
+      await U.wait(ctx, 700);
+      if (!ok()) return;
+      c.classList.add('on');
+    }
+    await U.wait(ctx, 500);
+    if (ok()) s.querySelector('.ga9-in').classList.add('on');
+  },
+  enter(s, ctx) {
+    this.ctx = ctx;
+    this.auto = true;
+    this.mode(s, 'old');
+    let m = 'old';
+    ctx.every(() => { if (this.auto) { m = m === 'old' ? 'new' : 'old'; this.mode(s, m); } }, 9000);
+  },
+  leave() { this.ctx = null; },
+  reset(s) { C9.tk(this); s.dataset.m = ''; },
+};
+</script>

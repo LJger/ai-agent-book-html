@@ -1,0 +1,650 @@
+<!-- ================= PART 05 工具太多怎么办 ================= -->
+<section class="slide chapter" id="c04-d5" data-part="5" data-title="PART 05 · 工具太多怎么办" data-notes="“能力的表达形式”一节问的是一项能力该做成什么形态，这一部分问的是另一件事：<b>不管做成什么形态，一次该让模型看见多少？</b>当可用工具从十几个增长到成百上千，工具库本身就成了一个需要设计的对象——它们该如何组织、如何暴露给模型、Agent 又该如何找到当下需要的那一个。答案有三层，一层比一层更“按需”：层次化组织与按需加载、主动工具发现，以及 Skills。中间穿插图4-2、图4-3、图4-4 与实验 4-1。">
+  <div class="ch-k fx fx-up">PART 05</div>
+  <h1 class="ch-t fx fx-up" style="--d:2">工具太多怎么办</h1>
+  <div class="ch-s fx fx-up" style="--d:3">层次化组织 · 按需加载 · 主动工具发现 · Skills</div>
+  <blockquote class="quote fx fx-blur" style="--d:6">不管做成什么形态，一次该让模型看见多少？</blockquote>
+  <div class="ch-loop" data-node="4" data-num="05"></div>
+</section>
+
+<section class="slide" id="c04-scale" data-part="5" data-trans="zoom" data-dur="15000" data-title="规模本身就会伤害正确性" data-notes="当可用工具从十几个增长到成百上千，工具库本身就成了一个需要设计的对象。<b>规模本身就会伤害正确性</b>：工具数量超过一百个时，即使最先进的大语言模型也容易在工具选择上出错；全部平铺进上下文还要占去大量 token，并让每一次工具集的变动都击穿 KV Cache。<br>答案有三层，一层比一层更“按需”。最朴素的一层是<b>层次化组织与按需加载</b>：工具定义仍然事先备好，只是不再全量塞进上下文。再进一步是<b>主动工具发现</b>：Agent 在执行过程中意识到能力缺口，主动声明需求，由系统动态匹配并注入。最轻量的一层是 <b>Skills</b>：干脆不把工具当成需要注册、检索、注入的正式定义，而当成一份可以随手翻阅的参考资料。<br>拖动滑块增加工具数量：token 占用与选错风险的曲线为示意形状。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">规模本身就会<em>伤害正确性</em></h2></header>
+  <div class="sc4-body">
+    <div class="sc4-l panel fx fx-left" style="--d:2">
+      <div class="sc4-ctl"><span>可用工具数量</span><input class="rng sc4-r" type="range" min="10" max="1000" value="20"><b class="sc4-n">20</b><span class="c4x-sx">示意</span></div>
+      <div class="sc4-dots"></div>
+      <div class="sc4-m"><span>全部平铺进上下文的 token</span><div class="meter"><i class="sc4-t"></i></div></div>
+      <div class="sc4-m"><span>工具选择出错的风险</span><div class="meter"><i class="sc4-e"></i></div><small class="sc4-ew">—</small></div>
+      <div class="sc4-m"><span>每次增删工具：KV Cache</span><b class="sc4-kv">—</b></div>
+    </div>
+    <div class="sc4-r fx fx-right" style="--d:3">
+      <span class="lbl">三层答案，一层比一层更“按需”</span>
+      <div class="sc4-st" style="--c:#c084fc"><em>1</em><b>层次化组织与按需加载</b><p>工具定义仍事先备好，只是<b>不再全量塞进上下文</b></p></div>
+      <div class="sc4-st" style="--c:#a78bfa"><em>2</em><b>主动工具发现</b><p>执行中意识到能力缺口，<b>主动声明需求</b>，系统动态匹配并注入</p></div>
+      <div class="sc4-st" style="--c:#34d399"><em>3</em><b>Skills</b><p>不当成需要注册、检索、注入的正式定义，而是<b>可以随手翻阅的参考资料</b></p></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「工具太多怎么办：层次化组织与主动工具发现」</div>
+</section>
+<style>
+#c04-scale .sc4-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:670px}
+#c04-scale .sc4-l{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c04-scale .sc4-ctl{display:grid;grid-template-columns:auto 1fr 80px auto;gap:14px;align-items:center;font-size:17px;color:var(--text2)}
+#c04-scale .sc4-ctl b{font:800 28px var(--num);color:var(--acc);text-align:right}
+#c04-scale .sc4-dots{flex:1;display:flex;flex-wrap:wrap;gap:3px;align-content:flex-start;overflow:hidden;padding:8px;border-radius:12px;background:rgba(8,12,30,.5)}
+#c04-scale .sc4-dots i{width:9px;height:9px;border-radius:2px;background:var(--tp-exe);opacity:.7}
+#c04-scale .sc4-dots i.x{background:var(--bad);opacity:1}
+#c04-scale .sc4-m{display:grid;grid-template-columns:260px 1fr auto;gap:12px;align-items:center;font-size:16px;color:var(--text2)}
+#c04-scale .sc4-t{--c:var(--warn)}#c04-scale .sc4-e{--c:var(--bad)}
+#c04-scale .sc4-ew{font-size:15px;color:var(--bad);min-width:120px;text-align:right}
+#c04-scale .sc4-kv{font-size:17px;color:var(--bad);grid-column:2/4}
+#c04-scale .sc4-r{display:flex;flex-direction:column;gap:14px}
+#c04-scale .sc4-st{display:grid;grid-template-columns:52px 1fr;gap:4px 14px;padding:16px 18px;border-radius:16px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);background:rgba(12,18,40,.72);transition:all .4s}
+#c04-scale .sc4-st em{grid-row:1/3;font-style:normal;font:800 40px var(--num);color:var(--c)}
+#c04-scale .sc4-st b{font-size:21px;color:var(--c)}
+#c04-scale .sc4-st p{font-size:16px;line-height:1.5;color:var(--text2)}
+#c04-scale .sc4-st p b{font-size:inherit;color:var(--text)}
+#c04-scale .sc4-st.on{border-color:var(--c);box-shadow:0 0 26px color-mix(in srgb,var(--c) 30%,transparent);translate:-6px 0}
+</style>
+<script>
+HOOKS['c04-scale'] = {
+  init(s) { this.r = s.querySelector('.sc4-r'); this.r.addEventListener('input', () => { this.auto = false; this.draw(s, +this.r.value); }); this.st = [...s.querySelectorAll('.sc4-st')]; },
+  draw(s, n) {
+    this.r.value = n; this.r.style.setProperty('--p', ((n - 10) / 990) * 100 + '%');
+    s.querySelector('.sc4-n').textContent = n;
+    const err = Math.min(95, 3 + 90 * (1 - Math.exp(-Math.max(0, n - 30) / 260)));
+    s.querySelector('.sc4-dots').innerHTML = Array.from({ length: Math.min(n, 1000) }, (_, i) => `<i${(i * 37) % 100 < err * 0.25 && n > 100 ? ' class="x"' : ''}></i>`).join('');
+    s.querySelector('.sc4-t').style.setProperty('--v', Math.min(100, (n / 1000) * 100) + '%');
+    s.querySelector('.sc4-e').style.setProperty('--v', err + '%');
+    s.querySelector('.sc4-ew').textContent = n > 100 ? '超过一百个：最先进的模型也容易选错' : '';
+    s.querySelector('.sc4-kv').textContent = '平铺在前缀里：每次工具集变动都会击穿';
+    this.st.forEach((x, i) => x.classList.toggle('on', n > [80, 300, 600][i]));
+  },
+  enter(s, ctx) { this.auto = true; let n = 20, d = 1; this.draw(s, n); ctx.every(() => { if (!this.auto) return; n += d * 60; if (n >= 1000) { n = 1000; d = -1; } if (n <= 20) { n = 20; d = 1; } this.draw(s, n); }, 600); },
+  reset(s) { this.draw(s, 20); },
+};
+</script>
+
+<section class="slide" id="c04-index" data-part="5" data-steps="1" data-trans="rise" data-dur="10000" data-title="按需加载：只暴露索引" data-notes="<b>按需加载：只暴露索引。</b>MCP 生态的快速扩张带来了一个工程问题：仅仅 5 个 MCP 服务器就可能引入数万 token 的工具定义开销，在 200K 的上下文窗口里还没开始对话就用掉了近三成。Cursor 在实践中验证了一种缓解方案：将工具描述同步到文件夹中，Agent 默认只看到工具名称的索引，需要时再查询具体的定义。A/B 测试显示，这种方式使 MCP 工具相关任务的总 token 消耗减少了 46.9%。<br>Pi Coding Agent 把这一思路落实为更激进的架构取舍：核心模块刻意不内置 MCP，优先建议把能力封装成带 README 的 CLI 工具，再由 Skills 按需加载；确实需要 MCP 生态时，则通过扩展接入。社区扩展 pi-mcp-adapter 展示了一种折中实现：模型默认只看到一个约 200 token 的代理工具，通过“搜索→查看定义→调用”按需发现后端工具，MCP 服务器也延迟到首次使用时才启动。这个案例说明，<b>是否采用 MCP 作为互操作协议</b>与<b>是否在会话开始时暴露所有 MCP 工具定义</b>是两个独立决策：后端可以保留 MCP 的生态兼容性，前端仍应以 CLI + Skills 或代理工具实现渐进式披露，避免服务器越接越多时上下文和 token 开销同步膨胀。<br>按 → 看 Pi 的做法。窗口条中的占比为原书描述的量级。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">按需加载：<em>只暴露索引</em></h2></header>
+  <div class="ix4-win fx fx-up" style="--d:2">
+    <div class="ix4-h"><span class="lbl">200K 上下文窗口</span><div class="seg ix4-seg"><i class="knob"></i><button data-v="0">全量定义</button><button data-v="1">只给名称索引</button></div></div>
+    <div class="ix4-bar"><i class="a"></i><i class="b"></i><span class="ix4-tx">—</span></div>
+    <div class="ix4-cur"><b data-count="46.9" data-dec="1" data-suffix="%">0</b><span>Cursor：工具描述同步到文件夹，默认只看名称索引——A/B 测试中 MCP 工具相关任务的<b>总 token 消耗减少</b></span></div>
+  </div>
+  <div class="ix4-pi" data-step="1">
+    <div class="ix4-c fx fx-up" style="--d:1"><b>Pi Coding Agent</b><p>核心刻意<b>不内置 MCP</b>：优先把能力封装成带 README 的 CLI，由 Skills 按需加载；确实需要 MCP 时通过扩展接入</p></div>
+    <div class="ix4-c fx fx-up" style="--d:2"><b>pi-mcp-adapter</b><div class="ix4-flow"><span>一个 ~200 token 的代理工具</span><i>→</i><span>搜索</span><i>→</i><span>查看定义</span><i>→</i><span>调用</span></div><p>MCP 服务器延迟到<b>首次使用</b>时才启动</p></div>
+    <div class="ix4-c ix4-two fx fx-up" style="--d:3"><b>两个独立决策</b><div><span>是否采用 MCP 作为互操作协议</span><span>是否在会话开始时暴露所有 MCP 工具定义</span></div></div>
+  </div>
+  <div class="src">第四章 ·「层次化组织与按需加载」</div>
+</section>
+<style>
+#c04-index .ix4-win{padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:14px}
+#c04-index .ix4-h{display:flex;align-items:center;justify-content:space-between}
+#c04-index .ix4-seg button{font-size:17px;padding:8px 16px}
+#c04-index .ix4-bar{position:relative;height:70px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.05);display:flex}
+#c04-index .ix4-bar i{height:100%;transition:width .8s var(--ease)}
+#c04-index .ix4-bar .a{background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--bad) 70%,transparent) 0 30px,color-mix(in srgb,var(--bad) 50%,transparent) 30px 60px)}
+#c04-index .ix4-bar .b{background:color-mix(in srgb,var(--ok) 25%,transparent)}
+#c04-index .ix4-tx{position:absolute;left:18px;top:50%;translate:0 -50%;font-size:19px;font-weight:700}
+#c04-index .ix4-cur{display:flex;align-items:center;gap:20px}
+#c04-index .ix4-cur>b{font:800 52px var(--num);color:var(--ok)}
+#c04-index .ix4-cur span{font-size:18px;line-height:1.55;color:var(--text2)}
+#c04-index .ix4-cur span b{color:var(--text)}
+#c04-index .ix4-pi{display:grid;grid-template-columns:1fr 1.2fr 1fr;gap:18px;margin-top:20px}
+#c04-index .ix4-c{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-index .ix4-c>b{font-size:20px;color:var(--acc)}
+#c04-index .ix4-c p{margin-top:6px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c04-index .ix4-c p b{color:var(--text)}
+#c04-index .ix4-flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+#c04-index .ix4-flow span{padding:5px 10px;border-radius:8px;font-size:15px;border:1px solid var(--line2)}
+#c04-index .ix4-flow i{font-style:normal;color:var(--text3)}
+#c04-index .ix4-two{border-color:var(--warn)}
+#c04-index .ix4-two div{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+#c04-index .ix4-two span{padding:8px 12px;border-radius:10px;font-size:16px;border:1px dashed var(--warn)}
+</style>
+<script>
+HOOKS['c04-index'] = {
+  init(s) { this.set = U.seg(s.querySelector('.ix4-seg'), (v) => { this.auto = false; this.show(s, +v); }); },
+  show(s, v) {
+    this.v = v; this.set(String(v));
+    s.querySelector('.ix4-bar .a').style.width = v ? '3%' : '29%';
+    s.querySelector('.ix4-bar .b').style.width = '0';
+    s.querySelector('.ix4-tx').innerHTML = v ? '只有工具名称索引：需要时再查具体定义' : '5 个 MCP 服务器的工具定义：数万 token，<span style="color:#fecdd3">还没开始对话就用掉近三成</span>';
+  },
+  enter(s, ctx) { this.auto = true; this.show(s, 0); ctx.every(() => { if (this.auto) this.show(s, 1 - this.v); }, 3200); },
+  reset(s) { this.show(s, 0); },
+};
+</script>
+
+<section class="slide" id="c04-hier" data-part="5" data-trans="flip" data-dur="15000" data-title="层次化组织与检索式预筛选" data-notes="<b>层次化组织。</b>除了按需加载工具描述，当工具的数量增长到上百个时，层次化的组织方式也比扁平列表更有效。一种有效的方式是<b>按信息源的性质分类</b>：<b>搜索工具</b>——主动查找信息（网络搜索、知识库搜索、文件搜索）；<b>读取工具</b>——从已知位置提取内容（网页阅读、文档读取、数据库查询）；<b>解析工具</b>——处理非结构化数据（图片 OCR、视频分析、音频转录）；<b>查询工具</b>——访问结构化数据源（天气 API、股票 API、公开数据库）。在系统提示词中显式说明分类结构，可以帮助 LLM 快速定位到相关的工具组。<br><b>检索式预筛选。</b>更进一步的方案是不把全部工具定义一次性注入上下文，而是按语义相似度先筛出一批候选工具再注入。当可用工具达到上百个时，平铺到上下文中既浪费 token 又干扰决策。Anthropic 的实验显示，这种按需检索的方式使 Opus 4 在工具使用基准上的准确率从 49% 提升到 74%。<br>右侧点阵中的查询与候选为示意。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">层次化组织与<em>检索式预筛选</em></h2></header>
+  <div class="hr4-body">
+    <div class="hr4-tree panel fx fx-left" style="--d:2"><b class="hr4-h">层次化组织：按信息源的性质分类</b><div class="hr4-gs"></div><p class="hr4-n">在系统提示词中<b>显式说明分类结构</b>，帮 LLM 快速定位到相关的工具组</p></div>
+    <div class="hr4-ret panel fx fx-right" style="--d:3">
+      <b class="hr4-h">检索式预筛选：按语义相似度先筛候选</b>
+      <div class="hr4-q"><span class="lbl">查询</span><code class="hr4-qt">—</code><span class="c4x-sx">示意</span></div>
+      <canvas class="hr4-cv" width="1240" height="560"></canvas>
+      <div class="hr4-k"><span>Anthropic 实验 · Opus 4 工具使用基准准确率</span><b data-count="49" data-suffix="%">0</b><i>→</i><b class="g" data-count="74" data-suffix="%" data-delay="900">0</b></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「层次化组织与按需加载」· 层次化组织 · 检索式预筛选</div>
+</section>
+<style>
+#c04-hier .hr4-body{display:grid;grid-template-columns:740px 1fr;gap:26px;height:690px}
+#c04-hier .hr4-tree,#c04-hier .hr4-ret{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c04-hier .hr4-h{font-size:21px;color:var(--acc)}
+#c04-hier .hr4-gs{display:flex;flex-direction:column;gap:10px}
+#c04-hier .hr4-g{padding:12px 16px;border-radius:14px;border:1.5px solid color-mix(in srgb,var(--c) 35%,transparent);transition:all .35s}
+#c04-hier .hr4-g b{font-size:19px;color:var(--c)}
+#c04-hier .hr4-g small{margin-left:10px;font-size:15px;color:var(--text3)}
+#c04-hier .hr4-g div{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+#c04-hier .hr4-g div span{padding:3px 10px;border-radius:999px;font-size:15px;border:1px solid var(--line2)}
+#c04-hier .hr4-g.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 10%,transparent)}
+#c04-hier .hr4-n{margin-top:auto;font-size:17px;color:var(--text2)}
+#c04-hier .hr4-n b{color:var(--text)}
+#c04-hier .hr4-q{display:flex;align-items:center;gap:12px}
+#c04-hier .hr4-q code{font:17px var(--mono);color:var(--ctx)}
+#c04-hier .hr4-cv{width:620px;height:280px;border-radius:12px;background:rgba(8,12,30,.5)}
+#c04-hier .hr4-k{display:flex;align-items:baseline;gap:14px;margin-top:auto;font-size:17px;color:var(--text2)}
+#c04-hier .hr4-k b{font:800 46px var(--num);color:var(--text3)}
+#c04-hier .hr4-k b.g{color:var(--ok)}
+#c04-hier .hr4-k i{font-style:normal;font-size:28px;color:var(--text3)}
+</style>
+<script>
+HOOKS['c04-hier'] = {
+  G: [['搜索工具', '主动查找信息', '#22d3ee', ['网络搜索', '知识库搜索', '文件搜索']], ['读取工具', '从已知位置提取内容', '#34d399', ['网页阅读', '文档读取', '数据库查询']], ['解析工具', '处理非结构化数据', '#fbbf24', ['图片 OCR', '视频分析', '音频转录']], ['查询工具', '访问结构化数据源', '#a78bfa', ['天气 API', '股票 API', '公开数据库']]],
+  Q: [['查一下明天上海会不会下雨', 3, [0.62, 0.55]], ['把这段会议录音转成文字', 2, [0.35, 0.3]], ['找知识库里关于退款的规定', 0, [0.2, 0.62]]],
+  init(s) {
+    s.querySelector('.hr4-gs').innerHTML = this.G.map(([n, d, c, t]) => `<div class="hr4-g" style="--c:${c}"><b>${n}</b><small>${d}</small><div>${t.map((x) => `<span>${x}</span>`).join('')}</div></div>`).join('');
+    this.gs = [...s.querySelectorAll('.hr4-g')];
+    const r = U.rand(17);
+    this.P = Array.from({ length: 140 }, () => { const g = (r() * 4) | 0, cx = [0.2, 0.75, 0.3, 0.65][g], cy = [0.3, 0.25, 0.75, 0.7][g]; return { x: cx + (r() - 0.5) * 0.3, y: cy + (r() - 0.5) * 0.35, g }; });
+    this.g = s.querySelector('.hr4-cv').getContext('2d');
+  },
+  enter(s, ctx) {
+    let qi = 0, t0 = performance.now();
+    const qt = s.querySelector('.hr4-qt'), g = this.g, C = this.G.map((x) => x[2]);
+    const setQ = () => { qt.textContent = this.Q[qi][0]; this.gs.forEach((x, j) => x.classList.toggle('on', j === this.Q[qi][1])); t0 = performance.now(); };
+    setQ();
+    ctx.every(() => { qi = (qi + 1) % this.Q.length; setQ(); }, 3600);
+    ctx.raf((t) => {
+      const [, gi, [qx, qy]] = this.Q[qi], u = Math.min(1, (t - t0) / 1200), W = 620, H = 280;
+      const tx = [0.2, 0.75, 0.3, 0.65][gi], ty = [0.3, 0.25, 0.75, 0.7][gi];
+      const X = (qx + (tx - qx) * u) * W, Y = (qy + (ty - qy) * u) * H, R = 40 + 30 * u;
+      g.setTransform(2, 0, 0, 2, 0, 0); g.clearRect(0, 0, W, H);
+      for (const p of this.P) { const px = p.x * W, py = p.y * H, d = Math.hypot(px - X, py - Y), hit = d < R && u > 0.8; g.fillStyle = hit ? C[p.g] : 'rgba(148,163,184,.35)'; g.beginPath(); g.arc(px, py, hit ? 5 : 3, 0, 6.283); g.fill(); }
+      g.strokeStyle = '#fff'; g.setLineDash([5, 5]); g.beginPath(); g.arc(X, Y, R, 0, 6.283); g.stroke(); g.setLineDash([]);
+      g.fillStyle = '#fff'; g.beginPath(); g.arc(X, Y, 6, 0, 6.283); g.fill();
+    });
+  },
+  reset() { this.gs.forEach((x) => x.classList.remove('on')); },
+};
+</script>
+
+<section class="slide" id="c04-active" data-part="5" data-trans="zoom" data-dur="16000" data-title="从被动选择到主动发现" data-notes="检索式预筛选缓解了工具过多的问题，但有一个内在局限——它按用户的初始查询做<b>一次性</b>匹配，而“Debug the file”这类看似简单的请求，实际可能牵出文件访问、代码分析、命令执行等多步骤、跨领域的工具链，任务开始时无法预见所有需求。<br><b>从被动选择到主动发现。</b>更进一步的思路，是让 Agent 从被动接受者变为主动发现者：在执行过程中意识到能力缺口时，主动用自然语言声明“我需要什么能力”，系统再动态匹配并注入。MCP-Zero 是代表性工作：系统提示词中不预置任何工具 schema，Agent 在思考中生成结构化请求块（如“GitHub 服务器：搜索仓库并返回元数据”），系统通过服务器级→工具级的两层语义路由从数千候选中匹配注入，论文报告在约 2800 个工具上比全量注入节省约 98% 的 token。<br>工程上更常见的等价方案，是在系统提示词里只保留少数基础工具（web search、code interpreter）外加一个“工具搜索工具”，Agent 用自然语言描述需求即可检索并加载。Anthropic 在 Claude API 中提供的 Tool Search Tool 即属此类。两者的共同点都是“Agent 声明缺口、系统按需注入”。<br>右上角切换两种做法，看“Debug the file”执行过程中逐步浮现的需求。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">从被动选择到<em>主动发现</em></h2></div>
+    <div class="seg ac4-seg fx fx-up" style="--d:2"><i class="knob"></i><button data-v="0">检索式预筛选</button><button data-v="1">主动发现</button></div></header>
+  <div class="ac4-body">
+    <div class="ac4-tl panel fx fx-left" style="--d:2"><div class="ac4-q"><span class="lbl">用户</span><code>Debug the file</code></div><div class="ac4-steps"></div><p class="ac4-k">—</p></div>
+    <div class="ac4-r fx fx-right" style="--d:3">
+      <div class="ac4-c"><b>MCP-Zero</b><p>系统提示词<b>不预置任何工具 schema</b>；Agent 在思考中生成结构化请求块（如“GitHub 服务器：搜索仓库并返回元数据”），服务器级 → 工具级两层语义路由</p><div class="ac4-n"><b data-count="98" data-prefix="约 " data-suffix="%">0</b><span>约 2800 个工具上比全量注入节省的 token</span></div></div>
+      <div class="ac4-c"><b>工程等价方案</b><p>只保留少数基础工具（web search、code interpreter）+ 一个<b>工具搜索工具</b>；Anthropic Claude API 的 Tool Search Tool 即属此类</p></div>
+      <p class="ac4-x">共同点：<b>Agent 声明缺口、系统按需注入</b></p>
+    </div>
+  </div>
+  <div class="src">第四章 ·「模型原生的主动工具发现」</div>
+</section>
+<style>
+#c04-active .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-active .ac4-seg button{font-size:18px;padding:9px 18px}
+#c04-active .ac4-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:670px}
+#c04-active .ac4-tl{padding:18px 22px;display:flex;flex-direction:column;gap:12px}
+#c04-active .ac4-q{display:flex;align-items:center;gap:12px}
+#c04-active .ac4-q code{font:700 22px var(--mono);color:var(--ctx)}
+#c04-active .ac4-steps{display:flex;flex-direction:column;gap:10px}
+#c04-active .ac4-s{display:grid;grid-template-columns:200px 1fr;gap:14px;align-items:center;padding:12px 16px;border-radius:14px;border:1px solid var(--line);animation:upIn .4s both}
+#c04-active .ac4-s b{font-size:18px}
+#c04-active .ac4-s span{font-size:16px;color:var(--text2)}
+#c04-active .ac4-s.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 8%,transparent)}
+#c04-active .ac4-s.miss{border-color:var(--bad);background:rgba(251,113,133,.08)}
+#c04-active .ac4-s.req{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,transparent)}
+#c04-active .ac4-s code{font:15px var(--mono);color:var(--acc)}
+#c04-active .ac4-k{margin-top:auto;font-size:19px;line-height:1.55}
+#c04-active .ac4-r{display:flex;flex-direction:column;gap:14px}
+#c04-active .ac4-c{padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-active .ac4-c>b{font-size:20px;color:var(--acc)}
+#c04-active .ac4-c p{margin-top:6px;font-size:16px;line-height:1.55;color:var(--text2)}
+#c04-active .ac4-c p b{color:var(--text)}
+#c04-active .ac4-n{display:flex;align-items:baseline;gap:12px;margin-top:8px}
+#c04-active .ac4-n b{font:800 40px var(--num);color:var(--ok)}
+#c04-active .ac4-n span{font-size:15px;color:var(--text3)}
+#c04-active .ac4-x{margin-top:auto;font-size:19px}
+#c04-active .ac4-x b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-active'] = {
+  N: [['文件访问', 'read_file'], ['代码分析', 'run_linter'], ['命令执行', 'run_tests']],
+  init(s) { this.set = U.seg(s.querySelector('.ac4-seg'), (v) => { this.auto = false; this.v = +v; this.run(s); }); },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    this.set(String(this.v));
+    const box = s.querySelector('.ac4-steps'), k = s.querySelector('.ac4-k');
+    box.innerHTML = ''; k.textContent = '';
+    if (this.v === 0) {
+      box.insertAdjacentHTML('beforeend', '<div class="ac4-s ok"><b>开始时一次性匹配</b><span>按“Debug the file”筛出：read_file（只像“文件”的那个）</span></div>');
+      await U.wait(ctx, 1000); if (!ok()) return;
+      for (let i = 0; i < 3; i++) {
+        const [n, t] = this.N[i];
+        box.insertAdjacentHTML('beforeend', `<div class="ac4-s ${i ? 'miss' : 'ok'}"><b>需要：${n}</b><span>${i ? `手边没有 ${t}——任务开始时无法预见这个需求` : `用 ${t} 读到了文件`}</span></div>`);
+        await U.wait(ctx, 1100); if (!ok()) return;
+      }
+      k.innerHTML = '<span style="color:var(--bad)">一次性匹配：后面浮现的需求缺工具</span>';
+    } else {
+      for (let i = 0; i < 3; i++) {
+        const [n, t] = this.N[i];
+        box.insertAdjacentHTML('beforeend', `<div class="ac4-s req"><b>缺口：${n}</b><span>声明 <code>“我需要${n}的能力”</code></span></div>`);
+        await U.wait(ctx, 800); if (!ok()) return;
+        box.insertAdjacentHTML('beforeend', `<div class="ac4-s ok"><b>系统匹配注入</b><span>${t} 的 schema 追加到上下文，继续执行</span></div>`);
+        await U.wait(ctx, 800); if (!ok()) return;
+      }
+      k.innerHTML = '<span style="color:var(--ok)">每个缺口出现时再声明：不必在开始时预见所有需求</span>';
+    }
+    await U.wait(ctx, 2600); if (!ok()) return;
+    if (this.auto) this.v = 1 - this.v;
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.v = 0; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-f42" data-part="5" data-trans="rise" data-dur="16000" data-title="图4-2 层次化工具匹配" data-notes="<b>层次化匹配与降级。</b>高效匹配的关键在于工具组织本身具有层次结构：在 MCP 等协议中，工具按<b>服务器</b>分组（类似手机上的 App，每个 App 提供一组相关功能），于是匹配可分两层——先按能力描述定位相关服务器，再在服务器内匹配具体工具，把搜索空间从“数千个工具”缩小为“数十个服务器 × 每个服务器数十个工具”，既省算力也减少跨领域的语义混淆。工程上这依赖一个离线构建、支持增量更新的嵌入索引；若两层匹配的候选相似度都低于阈值，则应明确返回“未找到”，让 Agent 改写需求重试、用基础工具手工实现，或干脆<b>创造</b>一个新工具（创造工具是第九章的主题）。首次加载后的 schema 固定在轨迹原位置，静态前缀仍可复用。<br>图4-2 的例子：Agent 声明“我需要查询 GitHub 仓库的贡献者统计”，调用 discover_tools；第一层服务器匹配：GitHub 0.92、Weather 0.15、Finance 0.23、ArXiv 0.18、File System 0.31，取 Top-1 服务器 GitHub；第二层在 GitHub 服务器内 26 个工具中匹配：search_repositories 0.41、list_contributors 0.89、get_repo_stats 0.85、create_issue 0.12、get_commit_history 0.67；返回 Top-3：list_contributors、get_repo_stats、get_commit_history。右上角开关演示两层都低于阈值时的降级路径（阈值为示意）。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">层次化匹配与降级：<em>服务器级 → 工具级</em></h2></div>
+    <button class="tgl f42-low fx fx-up" style="--d:2"><i></i>候选都低于阈值</button></header>
+  <div class="f42-st fx fx-up" style="--d:2">
+    <div class="f42-req"><code class="f42-rq">Agent：“我需要查询 GitHub 仓库的贡献者统计”</code><i>→</i><code>discover_tools(自然语言需求)</code></div>
+    <div class="f42-l"><span class="lbl">第一层：服务器匹配（语义相似度）· 工具按服务器分组，像手机上的 App</span><div class="f42-row s1"></div></div>
+    <div class="f42-l"><span class="lbl">第二层：工具匹配（Top-1 服务器内 26 个工具）</span><div class="f42-row s2"></div></div>
+    <div class="f42-out"></div>
+  </div>
+  <div class="src">第四章 ·「模型原生的主动工具发现」· 层次化匹配与降级 · 图4-2</div>
+</section>
+<style>
+#c04-f42 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-f42 .f42-st{display:flex;flex-direction:column;gap:16px}
+#c04-f42 .f42-req{display:flex;align-items:center;gap:14px;padding:12px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-f42 .f42-req code{font:18px var(--mono);color:var(--ctx)}
+#c04-f42 .f42-req i{font-style:normal;color:var(--text3)}
+#c04-f42 .f42-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:8px}
+#c04-f42 .f42-c{padding:12px 14px;border-radius:14px;border:1.5px solid var(--line2);background:rgba(12,18,40,.72);opacity:.3;transition:all .4s}
+#c04-f42 .f42-c b{display:block;font:700 17px var(--mono)}
+#c04-f42 .f42-c small{font-size:15px;color:var(--text3)}
+#c04-f42 .f42-c .meter{margin-top:8px}
+#c04-f42 .f42-c em{float:right;font:800 18px var(--num);font-style:normal}
+#c04-f42 .f42-c.on{opacity:1}
+#c04-f42 .f42-c.top{border-color:var(--ok);box-shadow:0 0 22px color-mix(in srgb,var(--ok) 35%,transparent)}
+#c04-f42 .f42-out{min-height:110px;padding:14px 18px;border-radius:14px;font-size:19px;line-height:1.6;border:1.5px dashed var(--line2)}
+#c04-f42 .f42-out.ok{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 7%,transparent)}
+#c04-f42 .f42-out.no{border-color:var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+#c04-f42 .f42-out code{font:17px var(--mono);color:var(--ok)}
+#c04-f42 .f42-out .fb{display:flex;gap:10px;margin-top:8px}
+#c04-f42 .f42-out .fb span{padding:6px 12px;border-radius:10px;font-size:16px;border:1px solid var(--warn)}
+</style>
+<script>
+HOOKS['c04-f42'] = {
+  S1: [['GitHub', 0.92], ['Weather', 0.15], ['Finance', 0.23], ['ArXiv', 0.18], ['File System', 0.31]],
+  S2: [['search_repositories', 0.41, '搜索仓库'], ['list_contributors', 0.89, '贡献者列表'], ['get_repo_stats', 0.85, '仓库统计'], ['create_issue', 0.12, '创建 Issue'], ['get_commit_history', 0.67, '提交历史']],
+  LOW1: [0.21, 0.18, 0.12, 0.25, 0.27], LOW2: [0.22, 0.19, 0.24, 0.1, 0.2],
+  init(s) { this.lb = s.querySelector('.f42-low'); this.lb.addEventListener('click', () => { this.auto = false; this.low = !this.low; this.lb.classList.toggle('on', this.low); this.run(s); }); },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const r1 = s.querySelector('.s1'), r2 = s.querySelector('.s2'), out = s.querySelector('.f42-out');
+    s.querySelector('.f42-rq').textContent = this.low ? 'Agent：“我需要把 PCB 板图转成 3D 打印文件”' : 'Agent：“我需要查询 GitHub 仓库的贡献者统计”';
+    const card = (n, v, sub) => `<div class="f42-c"><em>${v.toFixed(2)}</em><b>${n}</b><small>${sub || '&nbsp;'}</small><div class="meter" style="--c:${v > 0.5 ? 'var(--ok)' : '#64748b'}"><i style="--v:${v * 100}%"></i></div></div>`;
+    r1.innerHTML = this.S1.map(([n, v], i) => card(n, this.low ? this.LOW1[i] : v)).join('');
+    r2.innerHTML = this.S2.map(([n, v, d], i) => card(n, this.low ? this.LOW2[i] : v, d)).join('');
+    out.className = 'f42-out'; out.textContent = '';
+    const c1 = [...r1.children], c2 = [...r2.children];
+    for (const c of c1) { c.classList.add('on'); await U.wait(ctx, 220); if (!ok()) return; }
+    await U.wait(ctx, 500); if (!ok()) return;
+    if (!this.low) c1[0].classList.add('top');
+    for (const c of c2) { c.classList.add('on'); await U.wait(ctx, 220); if (!ok()) return; }
+    await U.wait(ctx, 500); if (!ok()) return;
+    if (!this.low) { [1, 2, 4].forEach((i) => c2[i].classList.add('top')); out.className = 'f42-out ok'; out.innerHTML = '返回 Top-3：<code>list_contributors, get_repo_stats, get_commit_history</code>——schema 追加到轨迹，此后固定在原位置'; }
+    else { out.className = 'f42-out no'; out.innerHTML = '两层候选都低于阈值 → <b>明确返回“未找到”</b>，Agent 可以：<div class="fb"><span>改写需求重试</span><span>用基础工具手工实现</span><span>创造一个新工具（第九章）</span></div>'; }
+    await U.wait(ctx, 3000); if (!ok()) return;
+    if (this.auto) { this.low = !this.low; this.lb.classList.toggle('on', this.low); }
+    this.run(s);
+  },
+  enter(s, ctx) { this.ctx = ctx; this.auto = true; this.low = false; this.lb.classList.remove('on'); this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-f43" data-part="5" data-trans="flip" data-dur="15000" data-title="图4-3 工具动态加载的 KV Cache 优化" data-notes="<b>动态加载与 KV Cache。</b>主动发现有一个微妙的工程代价：动态加载工具会<b>破坏 KV Cache</b>——若把全部工具定义放进静态前缀，每加载一个新工具就使整段缓存失效。破解思路和各大 API 的原生支持（OpenAI 的 tool_search 与 defer_loading、Anthropic 的 tool_reference、Codex CLI 默认开启的 tool_search）已在第二章“工具定义的设计”一节介绍：把新工具的完整 schema 追加到上下文末尾，静态前缀保持稳定，schema 此后固定在轨迹的原位置，作为普通历史消息继续命中缓存；状态栏则只维护一份简短的工具名列表。<br>按图4-3：朴素方案的 System Prompt 带着全部工具 schema（约 50K tokens），每次加载新工具，整个缓存失效；优化方案的 System Prompt 固定（角色 + 规则 + 基础工具，约 2K tokens，KV 缓存），状态栏轻量（约 200 tokens），discover_tools 返回的 get_stock_quote schema 作为工具结果出现在轨迹中，状态栏更新为“+get_stock_quote 已添加”（约 220 tokens）——System Prompt 不变，KV Cache 完全复用。对比：缓存命中率约 0%（每次工具变化失效）vs 约 95%（仅 hint 微变）；首 Token 延迟高（每次重算 50K tokens）vs 低（增量计算约 200 tokens）。<br>点击“加载新工具”观察两边的差别。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">动态加载会<em>破坏 KV Cache</em>——除非只追加</h2></div>
+    <button class="btn f43-go fx fx-up" style="--d:2"><svg class="ic"><use href="#i-plug"/></svg>加载新工具</button></header>
+  <div class="f43-body fx fx-up" style="--d:2">
+    <div class="f43-c bad"><b>朴素方案（缓存失效）</b><div class="f43-ms a"></div><p class="f43-k a">—</p></div>
+    <div class="f43-c ok"><b>优化方案（缓存稳定）</b><div class="f43-ms b"></div><p class="f43-k b">—</p></div>
+  </div>
+  <div class="f43-tb fx fx-up" style="--d:4"><div class="h"><span>对比维度</span><span>朴素方案</span><span>优化方案</span></div><div><span>缓存命中率</span><span class="r">~0%（每次工具变化失效）</span><span class="g">~95%（仅 hint 微变）</span></div><div><span>首 Token 延迟</span><span class="r">高（每次重算 50K tokens）</span><span class="g">低（增量计算 ~200 tokens）</span></div></div>
+  <div class="src">第四章 ·「模型原生的主动工具发现」· 动态加载与 KV Cache · 图4-3</div>
+</section>
+<style>
+#c04-f43 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-f43 .f43-go{font-size:18px}
+#c04-f43 .f43-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;height:500px}
+#c04-f43 .f43-c{padding:16px 20px;border-radius:18px;background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c04-f43 .f43-c.bad{border:1.5px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+#c04-f43 .f43-c.ok{border:1.5px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+#c04-f43 .f43-c>b{font-size:21px}
+#c04-f43 .f43-ms{display:flex;flex-direction:column;gap:6px}
+#c04-f43 .f43-m{display:grid;grid-template-columns:1fr 110px;gap:10px;align-items:center;padding:9px 12px;border-radius:10px;border-left:5px solid var(--c);background:rgba(255,255,255,.03);transition:all .4s}
+#c04-f43 .f43-m span{font-size:16px}
+#c04-f43 .f43-m small{display:block;font-size:15px;color:var(--text3)}
+#c04-f43 .f43-m em{font-style:normal;font:700 15px var(--num);text-align:right;color:var(--c)}
+#c04-f43 .f43-m.h{--c:var(--ok)}
+#c04-f43 .f43-m.x{--c:var(--bad);background:rgba(251,113,133,.1)}
+#c04-f43 .f43-m.n{--c:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent);animation:upIn .4s both}
+#c04-f43 .f43-k{margin-top:auto;font-size:18px;font-weight:700}
+#c04-f43 .f43-k.a{color:var(--bad)}#c04-f43 .f43-k.b{color:var(--ok)}
+#c04-f43 .f43-tb{display:flex;flex-direction:column;margin-top:16px;border-radius:14px;border:1px solid var(--line);overflow:hidden}
+#c04-f43 .f43-tb>div{display:grid;grid-template-columns:200px 1fr 1fr;gap:12px;padding:10px 18px;font-size:17px}
+#c04-f43 .f43-tb>div+div{border-top:1px solid var(--line)}
+#c04-f43 .f43-tb .h{font-size:15px;color:var(--text3);background:rgba(255,255,255,.03)}
+#c04-f43 .f43-tb .r{color:#fecdd3}#c04-f43 .f43-tb .g{color:#a7f3d0}
+</style>
+<script>
+HOOKS['c04-f43'] = {
+  init(s) { s.querySelector('.f43-go').addEventListener('click', () => { this.auto = false; this.load(s); }); },
+  base(s) {
+    s.querySelector('.f43-ms.a').innerHTML = '<div class="f43-m h"><span>System Prompt<small>你是一个AI助手… + 全部工具 schema</small></span><em>~50K tokens</em></div><div class="f43-m h"><span>User Message<small>查询 NVDA 股价</small></span><em></em></div><div class="f43-m h"><span>Assistant<small>tool_call: …</small></span><em></em></div>';
+    s.querySelector('.f43-ms.b').innerHTML = '<div class="f43-m h"><span>System Prompt（固定）<small>角色 + 规则 + 基础工具</small></span><em>~2K · KV 缓存</em></div><div class="f43-m h"><span>Agent 状态栏（轻量）<small>可用工具: web_search, get_weather…</small></span><em>~200 tokens</em></div><div class="f43-m h"><span>User: discover_tools<small>“我需要查股票价格”</small></span><em></em></div>';
+    s.querySelector('.f43-k.a').textContent = ''; s.querySelector('.f43-k.b').textContent = '';
+  },
+  load(s) {
+    this.base(s);
+    const a = [...s.querySelectorAll('.f43-ms.a .f43-m')];
+    a.forEach((m) => m.classList.replace('h', 'x'));
+    a[0].querySelector('small').textContent = '你是一个AI助手… + 全部工具 schema + get_stock_quote';
+    s.querySelector('.f43-k.a').textContent = '每次加载新工具 → 整个缓存失效！';
+    const b = s.querySelector('.f43-ms.b');
+    b.insertAdjacentHTML('beforeend', '<div class="f43-m n"><span>Tool Result<small>返回 get_stock_quote schema（工具定义在此）</small></span><em>新增</em></div><div class="f43-m n"><span>User Message<small>查询 NVDA 股价</small></span><em>新增</em></div><div class="f43-m n"><span>Agent 状态栏（更新）<small>+get_stock_quote 已添加</small></span><em>~220 tokens</em></div>');
+    s.querySelector('.f43-k.b').textContent = 'System Prompt 不变 → KV Cache 完全复用';
+  },
+  enter(s, ctx) { this.auto = true; this.base(s); let k = 0; ctx.every(() => { if (!this.auto) return; k++; if (k % 2) this.load(s); else this.base(s); }, 2800); },
+  reset(s) { this.base(s); },
+};
+</script>
+
+<section class="slide" id="c04-f44" data-part="5" data-trans="zoom" data-dur="16000" data-title="图4-4 动态发现后的上下文结构" data-notes="补充两点工程细节。其一，两个 API 都对“固定在原位置”给出了明确保证：OpenAI 要求后续请求保持 tool_search_output 项的原位置，同一工具无需重复加载；Anthropic 在会话历史的原位置内联展开 tool_reference block，官方文档明确表示后续每一轮都能保持缓存命中。其二，真正会导致重算的只有两种情况：Prompt Cache 的 TTL 过期（整段前缀一起重算，并非工具定义特有的代价），以及修改、移除或重排已加载的工具集（缓存从变动点起失效）。<br>图4-4 展示了多轮动态发现之后的上下文全貌：静态前缀中只保留系统提示词、核心工具与工具搜索元工具，历次发现的工具 schema 散落在轨迹各处，并固定在首次注入的位置，后续轮次作为普通历史命中缓存。这也意味着“工具定义必须在上下文最前面”不再是铁律——前缀依然是静态的、只增不改的，只是工具定义获得了按需进入轨迹的能力；代价是模型必须在后训练中学会理解散落在上下文各处的工具定义。<br>不难看出，这一整套“主动声明—语义匹配—动态注入”的机制虽然有效，工程上却相当繁琐：要离线维护嵌入索引、要处理 KV Cache 失效、还要为弱模型做专门训练。它们共同的前提，是把每个工具都当成一份<b>面向模型的正式定义</b>，先注册、再检索、再注入。<br>三个按钮分别演示：下一轮请求、TTL 过期、移除或重排已加载的工具。">
+  <header class="sh"><div><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">动态发现后：工具 schema <em>散落在轨迹各处</em></h2></div>
+    <div class="f44-b fx fx-up" style="--d:2"><button class="btn" data-a="0">下一轮请求</button><button class="btn" data-a="1">TTL 过期</button><button class="btn" data-a="2">移除已加载工具</button></div></header>
+  <div class="f44-body">
+    <div class="f44-tr panel fx fx-left" style="--d:2"><div class="f44-ms"></div><p class="f44-k">—</p></div>
+    <div class="f44-r fx fx-right" style="--d:3">
+      <div class="f44-c"><b>OpenAI</b><p>后续请求保持 <code>tool_search_output</code> 的原位置，同一工具无需重复加载</p></div>
+      <div class="f44-c"><b>Anthropic</b><p>在会话历史的原位置内联展开 <code>tool_reference</code>，后续每一轮都能命中</p></div>
+      <div class="f44-c warn"><b>“工具定义必须在最前面”不再是铁律</b><p>代价：模型要在后训练中学会理解<b>散落的工具定义</b></p></div>
+      <div class="f44-c"><b>前提</b><p>把每个工具当成一份<b>面向模型的正式定义</b>：先注册、再检索、再注入——繁琐</p></div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「模型原生的主动工具发现」· 图4-4</div>
+</section>
+<style>
+#c04-f44 .sh{display:flex;align-items:flex-end;justify-content:space-between}
+#c04-f44 .f44-b{display:flex;gap:10px}
+#c04-f44 .f44-b .btn{font-size:16px;padding:8px 14px}
+#c04-f44 .f44-body{display:grid;grid-template-columns:1080px 1fr;gap:26px;height:690px}
+#c04-f44 .f44-tr{padding:14px 18px;display:flex;flex-direction:column;gap:6px}
+#c04-f44 .f44-ms{display:flex;flex-direction:column;gap:5px}
+#c04-f44 .f44-m{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:center;padding:8px 12px;border-radius:9px;font-size:16px;border-left:5px solid var(--c);background:rgba(255,255,255,.03);transition:all .4s}
+#c04-f44 .f44-m em{font-style:normal;font-size:15px;text-align:right;color:var(--c)}
+#c04-f44 .f44-m.p{--c:#60a5fa}
+#c04-f44 .f44-m.h{--c:var(--ok)}
+#c04-f44 .f44-m.sc{--c:var(--warn);background:color-mix(in srgb,var(--warn) 9%,transparent)}
+#c04-f44 .f44-m.x{--c:var(--bad);background:rgba(251,113,133,.1)}
+#c04-f44 .f44-m.gone{opacity:.3;text-decoration:line-through}
+#c04-f44 .f44-k{margin-top:auto;font-size:19px;font-weight:700;min-height:30px}
+#c04-f44 .f44-r{display:flex;flex-direction:column;gap:12px}
+#c04-f44 .f44-c{padding:12px 16px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-f44 .f44-c b{font-size:18px;color:var(--acc)}
+#c04-f44 .f44-c p{margin-top:4px;font-size:16px;line-height:1.5;color:var(--text2)}
+#c04-f44 .f44-c p b{font-size:inherit;color:var(--text)}
+#c04-f44 .f44-c code{font:15px var(--mono);color:var(--ctx)}
+#c04-f44 .f44-c.warn{border-color:var(--warn)}#c04-f44 .f44-c.warn b{color:var(--warn)}
+</style>
+<script>
+HOOKS['c04-f44'] = {
+  M: [['p', 'System Prompt', '静态前缀'], ['p', '核心工具定义：web_search, code_interpreter, tool_search', '静态前缀'], ['h', 'User：查询 NVDA 股价', ''], ['h', 'Assistant：tool_search_call(股价)', ''], ['sc', 'tool_search_output → 注入 get_stock_quote 完整 schema', '首次 prefill 后命中'], ['h', 'Assistant：调用 get_stock_quote → Tool Result', ''], ['h', 'User：分析 GitHub 仓库的贡献者', ''], ['h', 'Assistant：tool_search_call(GitHub)', ''], ['sc', 'tool_search_output → 注入 list_contributors 等 schema', '首次 prefill 后命中'], ['h', 'Assistant：调用 → Tool Result → 回复', ''], ['n', '…… 本轮最新内容', '新增']],
+  init(s) { s.querySelectorAll('.f44-b .btn').forEach((b) => b.addEventListener('click', () => { this.auto = false; this.act(s, +b.dataset.a); })); },
+  act(s, a) {
+    const box = s.querySelector('.f44-ms'), k = s.querySelector('.f44-k');
+    box.innerHTML = this.M.map(([c, t, e]) => `<div class="f44-m ${c === 'n' ? 'sc' : c}"><span>${t}</span><em>${e}</em></div>`).join('');
+    const ms = [...box.children];
+    if (a === 0) { ms.slice(0, -1).forEach((m) => { m.classList.remove('p', 'sc'); m.classList.add('h'); }); k.innerHTML = '<span style="color:var(--ok)">下一轮请求：前缀与已注入的 schema 全段命中，只计算本轮新增</span>'; }
+    else if (a === 1) { ms.forEach((m) => { m.classList.remove('p', 'h', 'sc'); m.classList.add('x'); }); k.innerHTML = '<span style="color:var(--warn)">Prompt Cache TTL 过期：整段前缀一起重算——并非工具定义特有的代价</span>'; }
+    else { ms[4].classList.add('gone'); ms.slice(4).forEach((m) => { m.classList.remove('h', 'sc'); m.classList.add('x'); }); ms.slice(0, 4).forEach((m) => { m.classList.remove('p'); m.classList.add('h'); }); k.innerHTML = '<span style="color:var(--bad)">移除或重排已加载的工具：缓存从变动点起失效——不得这样做</span>'; }
+  },
+  enter(s, ctx) { this.auto = true; let i = 0; this.act(s, 0); ctx.every(() => { if (this.auto) { i = (i + 1) % 3; this.act(s, i); } }, 3200); },
+  reset(s) { this.act(s, 0); },
+};
+</script>
+
+<section class="slide" id="c04-x41" data-part="5" data-trans="rise" data-dur="17000" data-title="实验 4-1 ★★★：主动工具发现" data-notes="<b>实验 4-1 ★★★：主动工具发现。</b>本实验通过对比验证主动工具发现对小参数量模型的显著价值。使用 Qwen3-4B 模型访问本章感知工具实验（实验 4-2）中构建的 MCP 服务器中的 120+ 工具。<br><b>实验设置</b>：准备一组需要跨领域工具协作的任务，例如“查询苹果公司最新股价，搜索相关新闻分析原因”（需 Yahoo Finance + Web Search）；“在 arXiv 上搜索关于 transformer 的最新论文，下载排名前三的论文”（需 arXiv Search + File Download）；“分析 GitHub 上某个仓库的贡献者统计，生成可视化报告”（需 GitHub + Code Interpreter）。<br><b>对照组</b>：将所有 120+ 工具的完整 schema 一次性注入 system prompt（超 50K tokens）。4B 模型在这么长的上下文下指令遵循能力严重退化，出现典型问题：面对“查询股价”可能错选 Web Search 而非专门的 Yahoo Finance 工具，或者“忘记”工具列表中某些工具导致任务失败。<br><b>实验组</b>：实现混合方案（MCP-Zero 的主动发现思想 + 工具搜索工具式实现）：(1) system prompt 仅保留 web_search、code_interpreter 和 discover_tools 元工具；(2) discover_tools 接受自然语言需求（如“我需要查询股票价格的能力”），通过嵌入向量相似度匹配返回 3-5 个候选工具及完整 schema；(3) 新工具定义追加到对话历史（作为 user message），Agent 状态栏更新工具名称列表；(4) 引导模型在遇到能力缺口时主动调用 discover_tools。<br><b>预期观察</b>：准确率和任务完成率显著提升。主动工具发现不仅帮助能力较强的大模型应对成千上万工具的场景，更让小参数量模型在上百工具的场景下保持可用。<br>左右两组上下文构成并排演示（结构按原书描述，块高度为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 4-1 ★★★：<em>主动工具发现</em>——让小模型在上百工具下可用</h2></header>
+  <div class="x41-tasks fx fx-up" style="--d:2"><span class="lbl">实验设置 · 跨领域任务</span><span>查询苹果公司最新股价，搜索相关新闻分析原因<small>Yahoo Finance + Web Search</small></span><span>在 arXiv 搜索 transformer 最新论文，下载前三<small>arXiv Search + File Download</small></span><span>分析 GitHub 仓库贡献者统计，生成可视化报告<small>GitHub + Code Interpreter</small></span></div>
+  <div class="x41-body fx fx-up" style="--d:3">
+    <div class="x41-g bad"><b>对照组</b><small>Qwen3-4B · 120+ 工具完整 schema 一次性注入 system prompt</small><div class="x41-ctx a"><div class="x41-blk sys">system：全部 120+ 工具 schema<em>超 50K tokens</em></div></div><p>长上下文下指令遵循严重退化：“查询股价”错选 Web Search；“忘记”列表中的某些工具</p></div>
+    <div class="x41-g ok"><b>实验组</b><small>MCP-Zero 主动发现思想 + 工具搜索工具式实现</small><div class="x41-ctx b"><div class="x41-blk sys s">system：web_search · code_interpreter · discover_tools</div></div><p>遇到缺口调用 discover_tools → 嵌入相似度返回 3-5 个候选 → 作为 user message 追加，状态栏更新工具名列表</p></div>
+  </div>
+  <p class="x41-exp fx fx-up" style="--d:5"><b>预期观察</b>：准确率和任务完成率显著提升——实际运行结果见下一页</p>
+  <div class="src">第四章 ·「模型原生的主动工具发现」· 实验 4-1</div>
+</section>
+<style>
+#c04-x41 .x41-tasks{display:grid;grid-template-columns:auto 1fr 1fr 1fr;gap:12px;align-items:center}
+#c04-x41 .x41-tasks>span:not(.lbl){padding:10px 14px;border-radius:12px;font-size:16px;line-height:1.45;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x41 .x41-tasks small{display:block;font-size:15px;color:var(--acc)}
+#c04-x41 .x41-body{display:grid;grid-template-columns:1fr 1fr;gap:26px;margin-top:16px;height:520px}
+#c04-x41 .x41-g{padding:16px 20px;border-radius:18px;display:flex;flex-direction:column;gap:8px;background:rgba(12,18,40,.72)}
+#c04-x41 .x41-g.bad{border:1.5px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+#c04-x41 .x41-g.ok{border:1.5px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+#c04-x41 .x41-g>b{font-size:22px}
+#c04-x41 .x41-g>small{font-size:15px;color:var(--text3)}
+#c04-x41 .x41-g>p{font-size:16px;line-height:1.5;color:var(--text2)}
+#c04-x41 .x41-ctx{flex:1;display:flex;flex-direction:column;gap:5px;padding:10px;border-radius:12px;background:rgba(8,12,30,.5);overflow:hidden}
+#c04-x41 .x41-blk{padding:8px 12px;border-radius:9px;font-size:15px;border-left:5px solid var(--c);background:rgba(255,255,255,.04);animation:upIn .35s both}
+#c04-x41 .x41-blk em{float:right;font-style:normal;color:var(--bad)}
+#c04-x41 .x41-blk.sys{--c:#60a5fa}
+#c04-x41 .ctx-a .x41-blk.sys{flex:1}
+#c04-x41 .x41-ctx.a .x41-blk.sys{height:300px;background:repeating-linear-gradient(0deg,rgba(96,165,250,.12) 0 8px,rgba(96,165,250,.04) 8px 16px)}
+#c04-x41 .x41-blk.u{--c:#22d3ee}#c04-x41 .x41-blk.t{--c:#a78bfa}#c04-x41 .x41-blk.sc{--c:var(--warn);background:color-mix(in srgb,var(--warn) 10%,transparent)}#c04-x41 .x41-blk.st{--c:var(--ok)}#c04-x41 .x41-blk.bad{--c:var(--bad);color:#fecdd3}
+#c04-x41 .x41-exp{margin-top:14px;font-size:19px;color:var(--text2)}
+#c04-x41 .x41-exp b{color:var(--acc)}
+</style>
+<script>
+HOOKS['c04-x41'] = {
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const a = s.querySelector('.x41-ctx.a'), b = s.querySelector('.x41-ctx.b');
+    while (ok()) {
+      a.innerHTML = '<div class="x41-blk sys">system：全部 120+ 工具 schema<em>超 50K tokens</em></div>';
+      b.innerHTML = '<div class="x41-blk sys">system：web_search · code_interpreter · discover_tools</div>';
+      const add = (el, c, t) => el.insertAdjacentHTML('beforeend', `<div class="x41-blk ${c}">${t}</div>`);
+      await U.wait(ctx, 800); if (!ok()) return;
+      add(a, 'u', 'user：查询苹果公司最新股价……'); add(b, 'u', 'user：查询苹果公司最新股价……');
+      await U.wait(ctx, 900); if (!ok()) return;
+      add(a, 'bad', 'assistant：web_search("AAPL 股价")  ← 错选，没用专门的 Yahoo Finance 工具');
+      add(b, 't', 'assistant：discover_tools("我需要查询股票价格的能力")');
+      await U.wait(ctx, 900); if (!ok()) return;
+      add(b, 'sc', 'user：候选 3-5 个工具及完整 schema（get_stock_quote …）');
+      add(b, 'st', '状态栏：可用工具 +get_stock_quote');
+      await U.wait(ctx, 900); if (!ok()) return;
+      add(b, 't', 'assistant：get_stock_quote("AAPL")');
+      await U.wait(ctx, 3000);
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-x41r" data-part="5" data-trans="zoom" data-dur="17000" data-title="实验 4-1：真实运行记录" data-notes="配套仓库的正式验收（chapter4/active-tool-discovery，rerun_20260825，2026-08-25，Ollama qwen3:4b）：127 个完整 schema、目录合计 50,597 token。两组都完成了 3/3 个任务，工具选择准确率都是 100%——<b>原书预期的准确率提升没有在这次运行中观察到</b>。差别出现在成本上：实验组总用时 783.442 秒，对照组 3,056.294 秒（约 3.90 倍）；实验组每个任务的初始 system 只有 1,251 token，三个任务合计动态注入 8,424 token（3,939 / 1,853 / 2,632），而对照组每个任务都要带上 50,829 token。轨迹里也暴露了问题：实验组仍有协议解析错误（三个任务分别 4 / 1 / 6 次）和一次含糊的发现请求。<br>README 里另有一组教学对照（demo.py，8 个任务，不是正式验收）：弱模型 gpt-4o-mini 全量注入 5/8 → 主动发现 8/8 精确；强模型 gpt-5.6-luna 3/8 → 4/8；节省 token 约 12.8 倍 / 19.7 倍。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">实验 4-1：真实运行——<em>准确率没变，成本大降</em></h2></header>
+  <div class="x41r-body">
+    <div class="x41r-l fx fx-left" style="--d:2">
+      <div class="x41r-k"><div><span>任务完成</span><b>3/3 vs 3/3</b></div><div><span>工具选择准确率</span><b>100% vs 100%</b></div></div>
+      <div class="x41r-c"><span class="lbl">总用时</span><div class="x41r-b"><span>对照组</span><div class="bt"><i class="a"></i></div><b>3,056.294 s</b></div><div class="x41r-b"><span>实验组</span><div class="bt"><i class="b"></i></div><b>783.442 s</b></div><div class="x41r-x"><b data-count="3.9" data-dec="2" data-suffix="×">0</b><span>更快</span></div></div>
+      <div class="x41r-c"><span class="lbl">每个任务带上的 schema token</span><div class="x41r-tk"><div><b>50,829</b><small>对照组 · 每任务</small></div><div><b>1,251</b><small>实验组 · 初始 system</small></div><div><b>3,939 / 1,853 / 2,632</b><small>实验组 · 三任务动态注入（合计 8,424）</small></div></div></div>
+    </div>
+    <div class="x41r-r fx fx-right" style="--d:3">
+      <div class="x41r-warn"><svg class="ic"><use href="#i-alert"/></svg><div><b>预期的准确率提升未观察到</b><p>两组都 3/3 完成、准确率都是 100%；实验组轨迹里仍有<b>协议解析错误</b>（4 / 1 / 6 次）与一次<b>含糊的发现请求</b></p></div></div>
+      <div class="x41r-demo"><span class="lbl">另附：README 教学对照（demo.py，8 任务，非正式验收）</span><div><b>gpt-4o-mini</b><span>全量 5/8 → 发现 8/8</span><em>省 token 约 12.8×</em></div><div><b>gpt-5.6-luna</b><span>全量 3/8 → 发现 4/8</span><em>省 token 约 19.7×</em></div></div>
+      <div class="x41r-src"><svg class="ic"><use href="#i-db"/></svg>数据：配套仓库 chapter4/active-tool-discovery 正式验收 rerun_20260825（2026-08-25，Ollama qwen3:4b；127 个 schema，目录 50,597 token）</div>
+    </div>
+  </div>
+  <div class="src">第四章 ·「模型原生的主动工具发现」· 实验 4-1</div>
+</section>
+<style>
+#c04-x41r .x41r-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:690px}
+#c04-x41r .x41r-l,#c04-x41r .x41r-r{display:flex;flex-direction:column;gap:14px}
+#c04-x41r .x41r-k{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+#c04-x41r .x41r-k>div{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-x41r .x41r-k span{display:block;font-size:16px;color:var(--text3)}
+#c04-x41r .x41r-k b{font:800 34px var(--num)}
+#c04-x41r .x41r-c{padding:14px 18px;border-radius:14px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:10px}
+#c04-x41r .x41r-b{display:grid;grid-template-columns:90px 1fr 150px;gap:12px;align-items:center;font-size:17px}
+#c04-x41r .x41r-b b{font:800 20px var(--num);text-align:right}
+#c04-x41r .bt{height:28px;border-radius:8px;background:rgba(255,255,255,.05);overflow:hidden}
+#c04-x41r .bt i{display:block;height:100%;border-radius:8px;animation:c04x41r-g 1.6s var(--ease) both}
+#c04-x41r .bt .a{width:100%;background:#94a3b8}#c04-x41r .bt .b{width:25.6%;background:var(--ok)}
+@keyframes c04x41r-g{from{width:0}}
+#c04-x41r .x41r-x{display:flex;align-items:baseline;gap:10px}
+#c04-x41r .x41r-x b{font:800 40px var(--num);color:var(--ok)}
+#c04-x41r .x41r-x span{font-size:18px;color:var(--text2)}
+#c04-x41r .x41r-tk{display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:10px}
+#c04-x41r .x41r-tk b{display:block;font:800 24px var(--num)}
+#c04-x41r .x41r-tk small{font-size:15px;color:var(--text3)}
+#c04-x41r .x41r-warn{display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border-radius:16px;border:1.5px solid var(--warn);background:color-mix(in srgb,var(--warn) 7%,transparent)}
+#c04-x41r .x41r-warn .ic{flex:none;font-size:28px;color:var(--warn)}
+#c04-x41r .x41r-warn b{font-size:20px;color:var(--warn)}
+#c04-x41r .x41r-warn p{margin-top:4px;font-size:16px;line-height:1.55}
+#c04-x41r .x41r-warn p b{font-size:inherit;color:var(--text)}
+#c04-x41r .x41r-demo{padding:14px 18px;border-radius:14px;border:1px dashed var(--line2);display:flex;flex-direction:column;gap:8px}
+#c04-x41r .x41r-demo>div{display:grid;grid-template-columns:130px 1fr auto;gap:10px;font-size:16px}
+#c04-x41r .x41r-demo b{font-family:var(--mono)}
+#c04-x41r .x41r-demo em{font-style:normal;color:var(--ok)}
+#c04-x41r .x41r-src{margin-top:auto;display:flex;gap:8px;align-items:flex-start;font-size:15px;line-height:1.5;color:var(--text3)}
+#c04-x41r .x41r-src .ic{flex:none;color:var(--acc);margin-top:3px}
+</style>
+<script>
+HOOKS['c04-x41r'] = {};
+</script>
+
+<section class="slide" id="c04-skills" data-part="5" data-trans="flip" data-dur="15000" data-title="Skills：把工具发现变成“按需查阅”" data-notes="近来更流行的一种思路来自 Skills 机制。第二章从上下文工程的角度介绍过 Skills 的<b>渐进式披露</b>（Progressive Disclosure）；这里换个角度，把它看作一种工具发现范式。它与上一节最大的不同，是不再需要那套“嵌入索引 + 语义匹配”的基础设施。<br><b>渐进式披露。</b>这是第一章命名的渐进式披露模式在工具侧的变体。MCP 协议本身并不规定工具定义是全量还是按需进入模型上下文，但早期或简单的宿主实现通常会把完整 schema 一次性摆在模型面前，面向大规模工具集的实现则要另建一层发现与披露机制（关键词或语义检索、服务器命名空间、允许列表，或模型原生的 Tool Search）。Skills 则把渐进式披露作为默认的组织方式：Agent 启动时只看到一份薄薄的目录——每个 skill 的 name 与 description（合计数百 token）。当<b>当前上下文</b>真的需要某种能力时，模型才去读取对应的 sub-skill，并顺着其中的引用再往下一层，读取具体的脚本或子文档。<br>Skill 更接近人使用参考资料的方式。没有人会把一本工具书或整个维基百科从第一页读到最后一页，而是顺着索引和目录，根据当下需要逐个查阅词条。工具的详细定义不必全部常驻上下文，用到哪条查哪条。<br>演示中三层逐级展开，token 计数随之增长（数值为示意）。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">Skills：把工具发现变成<em>“按需查阅”</em></h2>
+  <p class="lead fx fx-up" style="--d:2">不再需要“嵌入索引 + 语义匹配”的基础设施：渐进式披露是默认的组织方式</p></header>
+  <div class="sk4-body">
+    <div class="sk4-tree panel fx fx-left" style="--d:3"><div class="sk4-l l0"><span class="lbl">启动时：薄薄的目录</span><div class="sk4-cat"></div></div><div class="sk4-l l1"><span class="lbl">当前上下文需要时：读 sub-skill</span><code class="sk4-sub">—</code></div><div class="sk4-l l2"><span class="lbl">顺着引用：读脚本 / 子文档</span><code class="sk4-ref">—</code></div></div>
+    <div class="sk4-r fx fx-right" style="--d:4">
+      <div class="sk4-tk"><span>常驻 + 已读的 token</span><b class="sk4-n">0</b><span class="c4x-sx">示意</span></div>
+      <div class="sk4-book"><svg class="ic"><use href="#i-book"/></svg><p>没有人把工具书或整个维基百科从第一页读到最后一页——<b>顺着索引和目录，按当下需要逐个查阅词条</b></p></div>
+      <p class="sk4-x">工具的详细定义不必全部常驻上下文：<b>用到哪条查哪条</b></p>
+    </div>
+  </div>
+  <div class="src">第四章 ·「Skills：把工具发现变成“按需查阅”」· 渐进式披露</div>
+</section>
+<style>
+#c04-skills .sk4-body{display:grid;grid-template-columns:1000px 1fr;gap:26px;height:620px}
+#c04-skills .sk4-tree{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+#c04-skills .sk4-l{padding:12px 16px;border-radius:14px;border:1.5px solid var(--line2);opacity:.35;transition:all .45s}
+#c04-skills .sk4-l.on{opacity:1;border-color:var(--acc);background:color-mix(in srgb,var(--acc) 6%,transparent)}
+#c04-skills .sk4-cat{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+#c04-skills .sk4-cat span{padding:6px 10px;border-radius:8px;font:15px var(--mono);border:1px solid var(--line);transition:all .3s}
+#c04-skills .sk4-cat span.on{border-color:var(--acc);color:var(--text);background:color-mix(in srgb,var(--acc) 14%,transparent)}
+#c04-skills .sk4-l code{display:block;margin-top:8px;font:16px/1.6 var(--mono);color:var(--text2);white-space:pre-wrap}
+#c04-skills .sk4-r{display:flex;flex-direction:column;gap:16px}
+#c04-skills .sk4-tk{display:flex;align-items:baseline;gap:12px;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-skills .sk4-tk span{font-size:17px;color:var(--text2)}
+#c04-skills .sk4-tk b{font:800 44px var(--num);color:var(--acc)}
+#c04-skills .sk4-book{display:flex;gap:14px;align-items:flex-start;padding:16px 20px;border-radius:16px;border:1px solid var(--line);background:rgba(12,18,40,.72)}
+#c04-skills .sk4-book .ic{flex:none;font-size:34px;color:var(--acc)}
+#c04-skills .sk4-book p{font-size:18px;line-height:1.6}
+#c04-skills .sk4-book b{color:var(--acc)}
+#c04-skills .sk4-x{margin-top:auto;font-size:20px;color:var(--text2)}
+#c04-skills .sk4-x b{color:var(--text)}
+</style>
+<script>
+HOOKS['c04-skills'] = {
+  CAT: ['pptx · Create presentations', 'pdf · Extract and analyze PDFs', 'xlsx · Spreadsheet formulas', 'github · Repo and PR operations', 'browser · Web automation', 'docx · Word documents'],
+  init(s) { s.querySelector('.sk4-cat').innerHTML = this.CAT.map((c) => `<span>${c}</span>`).join(''); this.cs = [...s.querySelectorAll('.sk4-cat span')]; },
+  async run(s) {
+    const ok = C4.guard(this, this.ctx), ctx = this.ctx;
+    if (!ctx) return;
+    const L = [...s.querySelectorAll('.sk4-l')], n = s.querySelector('.sk4-n');
+    while (ok()) {
+      L.forEach((l) => l.classList.remove('on')); this.cs.forEach((c) => c.classList.remove('on'));
+      s.querySelector('.sk4-sub').textContent = '—'; s.querySelector('.sk4-ref').textContent = '—';
+      L[0].classList.add('on'); n.textContent = '~300';
+      await U.wait(ctx, 1800); if (!ok()) return;
+      this.cs[3].classList.add('on'); L[1].classList.add('on'); n.textContent = '~2,300';
+      s.querySelector('.sk4-sub').textContent = 'github/SKILL.md\n## 统计贡献者：先用 gh api 拉取 contributors，再见 scripts/stats.py';
+      await U.wait(ctx, 2000); if (!ok()) return;
+      L[2].classList.add('on'); n.textContent = '~3,100';
+      s.querySelector('.sk4-ref').textContent = 'github/scripts/stats.py  ·  github/reference/api-limits.md';
+      await U.wait(ctx, 2800); if (!ok()) return;
+    }
+  },
+  enter(s, ctx) { this.ctx = ctx; this.run(s); },
+  leave() { this.ctx = null; },
+  reset() { this.tk = (this.tk || 0) + 1; },
+};
+</script>
+
+<section class="slide" id="c04-common" data-part="5" data-trans="iris" data-dur="15000" data-title="共通问题回顾" data-notes="专用工具要达到同样的渐进式披露，必须在工具之外另建一层——关键词检索或嵌入索引、检索元工具、命名空间与允许列表、tool_search 与 tool_reference 这类 API 原语，也就是上一节那套基础设施存在的理由。是否采用 MCP 作为互操作协议，与是否在会话开始时暴露全部工具定义，是两个独立的决策；Skills 的优势在于把渐进式披露内建为默认形态，实现成本更低，因此是一种更省心的工具发现思路。<br>前面把 MCP 与 Skill Hub 讲成两条并行的渠道，但它们并非互不相干：MCP 官方已经在推动 skill 经由 MCP 被发现和传递（Skills over MCP）。也就是说，同一个 skill 既可以躺在 Skill Hub 里等 npx 来装，也可以由一台 MCP 服务器供给。<br>以上都是所有工具共通的问题：能力做成什么形态、怎么描述、参数如何传、用什么协议承载、规模上来之后怎么暴露。下面转入三类工具各自的设计重点，从感知工具开始。">
+  <header class="sh"><div class="kicker"></div><h2 class="title fx fx-up" style="--d:1">共通问题回顾：<em>五个所有工具都要回答的问题</em></h2></header>
+  <div class="cm4-body">
+    <div class="cm4-c fx fx-up" style="--d:2"><b>渐进式披露的实现成本</b><div class="cm4-two"><div class="a"><span>专用工具：另建一层</span><i>关键词 / 嵌入索引</i><i>检索元工具</i><i>命名空间与允许列表</i><i>tool_search · tool_reference</i></div><div class="b"><span>Skills：内建默认</span><i>name + description 目录</i><i>按需读取正文与引用</i></div></div></div>
+    <div class="cm4-c fx fx-up" style="--d:3"><b>两条渠道并非互不相干</b><div class="cm4-ch"><span>Skill Hub<small>npx 安装</small></span><i>同一个 skill</i><span>MCP 服务器<small>Skills over MCP</small></span></div><p>MCP 官方在推动 skill 经由 MCP 被发现和传递</p></div>
+    <div class="cm4-c fx fx-up" style="--d:4"><b>五个共通问题</b><div class="cm4-q"></div><p class="cm4-nx">接下来：三类工具各自的设计重点 → <b>感知工具</b></p></div>
+  </div>
+  <div class="src">第四章 ·「Skills：把工具发现变成“按需查阅”」</div>
+</section>
+<style>
+#c04-common .cm4-body{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px;height:640px}
+#c04-common .cm4-c{padding:18px 22px;border-radius:18px;border:1px solid var(--line);background:rgba(12,18,40,.72);display:flex;flex-direction:column;gap:12px}
+#c04-common .cm4-c>b{font-size:22px;color:var(--acc)}
+#c04-common .cm4-c>p{font-size:16px;line-height:1.55;color:var(--text2)}
+#c04-common .cm4-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1}
+#c04-common .cm4-two>div{display:flex;flex-direction:column;gap:6px;padding:12px;border-radius:12px}
+#c04-common .cm4-two .a{border:1px solid color-mix(in srgb,var(--bad) 45%,transparent)}
+#c04-common .cm4-two .b{border:1px solid color-mix(in srgb,var(--ok) 45%,transparent)}
+#c04-common .cm4-two span{font-size:17px;font-weight:700}
+#c04-common .cm4-two i{font-style:normal;padding:6px 10px;border-radius:8px;font-size:15px;background:rgba(255,255,255,.04)}
+#c04-common .cm4-ch{display:flex;flex-direction:column;align-items:center;gap:10px}
+#c04-common .cm4-ch span{width:100%;padding:12px;border-radius:12px;text-align:center;font-size:19px;font-weight:700;border:1.5px solid var(--acc)}
+#c04-common .cm4-ch small{display:block;font-size:15px;font-weight:400;color:var(--text3)}
+#c04-common .cm4-ch i{font-style:normal;padding:6px 14px;border-radius:999px;font-size:16px;color:#06101f;background:var(--warn);animation:glowPulse 2.5s infinite}
+#c04-common .cm4-q{display:flex;flex-direction:column;gap:8px}
+#c04-common .cm4-q span{padding:10px 14px;border-radius:12px;font-size:18px;border:1px solid var(--line2);transition:all .35s}
+#c04-common .cm4-q span.on{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 12%,transparent)}
+#c04-common .cm4-nx{margin-top:auto;font-size:18px}
+#c04-common .cm4-nx b{color:var(--tp-per)}
+</style>
+<script>
+HOOKS['c04-common'] = {
+  Q: ['能力做成什么形态', '怎么描述', '参数如何传', '用什么协议承载', '规模上来之后怎么暴露'],
+  init(s) { s.querySelector('.cm4-q').innerHTML = this.Q.map((q, i) => `<span>${i + 1}. ${q}</span>`).join(''); this.qs = [...s.querySelectorAll('.cm4-q span')]; },
+  enter(s, ctx) { let i = 0; ctx.every(() => { this.qs.forEach((q, j) => q.classList.toggle('on', j <= i % 6 && i % 6 < 5)); i++; }, 900); },
+  reset() { this.qs.forEach((q) => q.classList.remove('on')); },
+};
+</script>
